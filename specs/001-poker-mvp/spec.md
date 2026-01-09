@@ -17,16 +17,17 @@ action controls. - Player actions: fold, check/call, bet/raise with a chip slide
 and presets (½ pot, pot, all-in). - Timers: each player has X seconds to act; if
 timer expires, auto-fold (or check when legal). - Chat: simple text chat per
 table. Game rules: - Correct Texas Hold’em rules: blinds, dealing, betting
-rounds, hand evaluation, side pots, showdown, split pots. - Deterministic state
-machine: the same inputs always produce the same game state. - Handle
-disconnects: if a player disconnects during a hand, auto-fold when action is
-required; allow reconnect. Non-functional: - Real-time updates (table state
-should feel instant). - Prevent obvious cheating: server-authoritative game
-state, no client deciding outcomes. - Auditability: keep an event log per hand
-(actions + timestamps) for debugging. - Basic moderation controls for table
-owner: kick a player, mute chat. Out of scope (explicitly): - Real money,
-payments, cashout - Multi-table tournaments - Complex auth (email/password),
-compliance features"
+rounds, hand evaluation, side pots, showdown, split pots. - Minimum raises equal
+the size of the previous bet or raise; all-in raises below the minimum are
+allowed but do not reopen betting. - Deterministic state machine: the same
+inputs always produce the same game state. - Handle disconnects: if a player
+disconnects during a hand, auto-fold when action is required; allow reconnect.
+Non-functional: - Real-time updates (table state should feel instant). - Prevent
+obvious cheating: server-authoritative game state, no client deciding outcomes.
+- Auditability: keep an event log per hand (actions + timestamps) for debugging.
+- Basic moderation controls for table owner: kick a player, mute chat. Out of
+scope (explicitly): - Real money, payments, cashout - Multi-table tournaments -
+Complex auth (email/password), compliance features"
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -98,6 +99,7 @@ the lobby and table without impacting gameplay.
 - A player attempts an illegal action (out of turn, insufficient chips).
 - A spectator joins mid-hand and must not see private hole cards.
 - Table owner disconnects while moderation controls are needed.
+- A player goes all-in for less than the minimum raise amount.
 
 ## Constitution Requirements *(mandatory)*
 
@@ -127,7 +129,7 @@ the lobby and table without impacting gameplay.
 - **FR-006**: System MUST present only legal actions (fold, check/call, bet/raise)
   for the current player.
 - **FR-007**: System MUST enforce Texas Hold’em rules, including blinds, betting
-  rounds, side pots, and showdown outcomes.
+  rounds, minimum raise rules, side pots, and showdown outcomes.
 - **FR-008**: System MUST be server-authoritative so the client cannot decide
   outcomes or alter game state.
 - **FR-009**: System MUST update table state for all players in real time.
@@ -135,7 +137,7 @@ the lobby and table without impacting gameplay.
 - **FR-011**: System MUST store a per-hand event log with timestamps for audit.
 - **FR-012**: System MUST support per-table chat with basic moderation (kick, mute).
 - **FR-013**: System MUST track basic user stats (hands played, wins) and display
-  them in profile views.
+  them in profile views; a win is counted when a player wins any portion of a pot.
 - **FR-014**: System MUST protect private hole cards from non-owning players and
   spectators.
 - **FR-015**: System MUST allow players to reconnect and resync their current

@@ -22,4 +22,40 @@ describe("deriveLegalActions", () => {
     expect(types).toContain("Call");
     expect(types).toContain("Raise");
   });
+
+  it("allows exact min raise amounts", () => {
+    const actions = deriveLegalActions(
+      {
+        hand: {
+          currentBet: 10,
+          minRaise: 10,
+          currentTurnSeat: 0,
+          roundContributions: { 0: 0 },
+          bigBlind: 10,
+        },
+        seats: [{ seatId: 0, userId: "u1", stack: 20, status: "active" }],
+      },
+      0,
+    );
+
+    expect(actions).toContainEqual({ type: "Raise", minAmount: 20, maxAmount: 20 });
+  });
+
+  it("allows short all-in raises when below min raise", () => {
+    const actions = deriveLegalActions(
+      {
+        hand: {
+          currentBet: 10,
+          minRaise: 10,
+          currentTurnSeat: 0,
+          roundContributions: { 0: 0 },
+          bigBlind: 10,
+        },
+        seats: [{ seatId: 0, userId: "u1", stack: 15, status: "active" }],
+      },
+      0,
+    );
+
+    expect(actions).toContainEqual({ type: "Raise", minAmount: 15, maxAmount: 15 });
+  });
 });

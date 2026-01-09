@@ -12401,3 +12401,1868 @@
    ]
  }
 *** End Patch
+2026-01-09T21:14:23.149878Z  INFO codex_core::codex::handlers: Shutting down Codex instance
+2026-01-09T21:15:06.892051Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg --files","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:15:09.545065Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,240p' apps/api/src/engine/handEval.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:15:14.563435Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,260p' apps/api/src/engine/actionRules.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:15:18.389942Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,260p' apps/api/src/engine/handEngine.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:15:20.914831Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '260,620p' apps/api/src/engine/handEngine.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:15:59.063062Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg \"\\bcard\\b|deck|holeCards\" apps -g\"*.ts\"","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:16:32.795946Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,240p' apps/api/tests/unit/actionRules.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:16:46.923765Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg \"winners\" -n apps/api apps/ui packages/shared","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:17:03.955575Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg \"[2-9TJQKA][CDHS]\" -n apps/ui apps/api","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:17:16.112902Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"nl -ba apps/api/src/engine/actionRules.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:17:20.107808Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"nl -ba apps/api/src/engine/handEval.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:17:28.141912Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,220p' apps/ui/src/state/deriveLegalActions.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:18:17.450289Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,200p' apps/api/src/engine/statTracker.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:18:21.885099Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"nl -ba apps/api/src/engine/statTracker.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:18:26.157667Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"nl -ba apps/api/src/engine/handEngine.ts | sed -n '230,320p'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:19:32.662098Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"poker|Hold'em|Holdem|blind|min raise|raise\" specs","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:19:36.004136Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,220p' specs/001-poker-mvp/spec.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:19:40.908328Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,200p' specs/001-poker-mvp/checklists/requirements.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:19:55.888227Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,200p' apps/ui/tests/unit/deriveLegalActions.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:20:03.231155Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,220p' apps/api/tests/unit/handEngine.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:20:14.640429Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"raise|all-in|side pot|pot\" specs/001-poker-mvp","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:20:27.606415Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/engine/actionRules.ts
+@@
+-      if (hand.currentBet === 0) {
+-        actions.push({ type: "Bet", minAmount: hand.bigBlind, maxAmount: seat.stack });
+-      } else {
+-        const minRaise = hand.currentBet + hand.minRaise;
+-        if (seat.stack + (hand.roundContributions[seat.seatId] ?? 0) > minRaise) {
+-          actions.push({
+-            type: "Raise",
+-            minAmount: minRaise,
+-            maxAmount: seat.stack + (hand.roundContributions[seat.seatId] ?? 0),
+-          });
+-        }
+-      }
++      if (hand.currentBet === 0) {
++        actions.push({ type: "Bet", minAmount: hand.bigBlind, maxAmount: seat.stack });
++      } else {
++        const contributed = hand.roundContributions[seat.seatId] ?? 0;
++        const maxTotal = seat.stack + contributed;
++        if (maxTotal > hand.currentBet) {
++          const minRaise = Math.min(hand.currentBet + hand.minRaise, maxTotal);
++          actions.push({
++            type: "Raise",
++            minAmount: minRaise,
++            maxAmount: maxTotal,
++          });
++        }
++      }
+@@
+-    const minRaise = hand.currentBet + hand.minRaise;
+-    if (seat.stack + (hand.roundContributions[seat.seatId] ?? 0) > minRaise) {
+-      actions.push({
+-        type: "Raise",
+-        minAmount: minRaise,
+-        maxAmount: seat.stack + (hand.roundContributions[seat.seatId] ?? 0),
+-      });
+-    }
++    const contributed = hand.roundContributions[seat.seatId] ?? 0;
++    const maxTotal = seat.stack + contributed;
++    if (maxTotal > hand.currentBet) {
++      const minRaise = Math.min(hand.currentBet + hand.minRaise, maxTotal);
++      actions.push({
++        type: "Raise",
++        minAmount: minRaise,
++        maxAmount: maxTotal,
++      });
++    }
+   }
+*** End Patch
+2026-01-09T21:20:37.027561Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/state/deriveLegalActions.ts
+@@
+-    if (hand.currentBet === 0) {
+-      actions.push({ type: "Bet", minAmount: hand.bigBlind, maxAmount: seat.stack });
+-    } else {
+-      const minRaise = hand.currentBet + hand.minRaise;
+-      if (seat.stack + contributed > minRaise) {
+-        actions.push({ type: "Raise", minAmount: minRaise, maxAmount: seat.stack + contributed });
+-      }
+-    }
++    if (hand.currentBet === 0) {
++      actions.push({ type: "Bet", minAmount: hand.bigBlind, maxAmount: seat.stack });
++    } else {
++      const maxTotal = seat.stack + contributed;
++      if (maxTotal > hand.currentBet) {
++        const minRaise = Math.min(hand.currentBet + hand.minRaise, maxTotal);
++        actions.push({ type: "Raise", minAmount: minRaise, maxAmount: maxTotal });
++      }
++    }
+   } else {
+     actions.push({ type: "Call", maxAmount: Math.min(toCall, seat.stack) });
+-    const minRaise = hand.currentBet + hand.minRaise;
+-    if (seat.stack + contributed > minRaise) {
+-      actions.push({ type: "Raise", minAmount: minRaise, maxAmount: seat.stack + contributed });
+-    }
++    const maxTotal = seat.stack + contributed;
++    if (maxTotal > hand.currentBet) {
++      const minRaise = Math.min(hand.currentBet + hand.minRaise, maxTotal);
++      actions.push({ type: "Raise", minAmount: minRaise, maxAmount: maxTotal });
++    }
+   }
+*** End Patch
+2026-01-09T21:20:51.566588Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/engine/handEngine.ts
+@@
+ function settleShowdown(hand: HandState, seats: TableSeat[]) {
+   const eligibleSeats = seats.filter((seat) => seat.status !== "folded" && seat.userId);
+   const players: Record<number, string[]> = {};
+   for (const seat of eligibleSeats) {
+     players[seat.seatId] = hand.holeCards[seat.seatId] ?? [];
+   }
+-  const { winners } = evaluateWinners(players, hand.communityCards);
+-  hand.winners = winners;
++  const { winners: overallWinners } = evaluateWinners(players, hand.communityCards);
++  const winnerSet = new Set<number>();
+ 
+   for (const pot of hand.pots) {
+     if (pot.amount <= 0 || pot.eligibleSeatIds.length === 0) {
+       continue;
+     }
+@@
+     const { winners: potWinners } = evaluateWinners(potPlayers, hand.communityCards);
+     if (potWinners.length === 0) {
+       continue;
+     }
++    for (const winnerSeatId of potWinners) {
++      winnerSet.add(winnerSeatId);
++    }
+     const share = Math.floor(pot.amount / potWinners.length);
+     let remainder = pot.amount - share * potWinners.length;
+     for (const winnerSeatId of potWinners) {
+       const seat = seats.find((entry) => entry.seatId === winnerSeatId);
+@@
+     }
+   }
++  if (winnerSet.size === 0) {
++    for (const winnerSeatId of overallWinners) {
++      winnerSet.add(winnerSeatId);
++    }
++  }
++  hand.winners = Array.from(winnerSet);
+ 
+   for (const seat of seats) {
+     if (seat.status === "folded" || seat.status === "all_in") {
+       seat.status = seat.userId ? "active" : "empty";
+     }
+*** End Patch
+2026-01-09T21:21:03.241662Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/tests/unit/actionRules.test.ts
+@@
+   it("returns call and raise when facing a bet", () => {
+     const hand = createHand();
+     const seat: TableSeat = { seatId: 0, userId: "u1", stack: 100, status: "active" };
+ 
+     const actions = deriveLegalActions(hand, seat).map((action) => action.type);
+     expect(actions).toContain("Call");
+     expect(actions).toContain("Raise");
+   });
++
++  it("allows exact min raise amounts", () => {
++    const hand = createHand({ currentBet: 10, minRaise: 10, roundContributions: { 0: 0 } });
++    const seat: TableSeat = { seatId: 0, userId: "u1", stack: 20, status: "active" };
++
++    const raise = deriveLegalActions(hand, seat).find((action) => action.type === "Raise");
++    expect(raise).toEqual({ type: "Raise", minAmount: 20, maxAmount: 20 });
++  });
++
++  it("allows short all-in raises when below min raise", () => {
++    const hand = createHand({ currentBet: 10, minRaise: 10, roundContributions: { 0: 0 } });
++    const seat: TableSeat = { seatId: 0, userId: "u1", stack: 15, status: "active" };
++
++    const raise = deriveLegalActions(hand, seat).find((action) => action.type === "Raise");
++    expect(raise).toEqual({ type: "Raise", minAmount: 15, maxAmount: 15 });
++  });
+*** End Patch
+2026-01-09T21:21:13.079716Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/tests/unit/deriveLegalActions.test.ts
+@@
+   it("returns call and raise when facing a bet", () => {
+     const actions = deriveLegalActions(
+       {
+@@
+     const types = actions.map((action) => action.type);
+     expect(types).toContain("Call");
+     expect(types).toContain("Raise");
+   });
++
++  it("allows exact min raise amounts", () => {
++    const actions = deriveLegalActions(
++      {
++        hand: {
++          currentBet: 10,
++          minRaise: 10,
++          currentTurnSeat: 0,
++          roundContributions: { 0: 0 },
++          bigBlind: 10,
++        },
++        seats: [{ seatId: 0, userId: "u1", stack: 20, status: "active" }],
++      },
++      0,
++    );
++
++    expect(actions).toContainEqual({ type: "Raise", minAmount: 20, maxAmount: 20 });
++  });
++
++  it("allows short all-in raises when below min raise", () => {
++    const actions = deriveLegalActions(
++      {
++        hand: {
++          currentBet: 10,
++          minRaise: 10,
++          currentTurnSeat: 0,
++          roundContributions: { 0: 0 },
++          bigBlind: 10,
++        },
++        seats: [{ seatId: 0, userId: "u1", stack: 15, status: "active" }],
++      },
++      0,
++    );
++
++    expect(actions).toContainEqual({ type: "Raise", minAmount: 15, maxAmount: 15 });
++  });
+ });
+*** End Patch
+2026-01-09T21:21:25.154567Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: specs/001-poker-mvp/spec.md
+@@
+ table. Game rules: - Correct Texas Hold’em rules: blinds, dealing, betting
+ rounds, hand evaluation, side pots, showdown, split pots. - Deterministic state
+ machine: the same inputs always produce the same game state. - Handle
+ disconnects: if a player disconnects during a hand, auto-fold when action is
+ required; allow reconnect. Non-functional: - Real-time updates (table state
+ should feel instant). - Prevent obvious cheating: server-authoritative game
+ state, no client deciding outcomes. - Auditability: keep an event log per hand
+ (actions + timestamps) for debugging. - Basic moderation controls for table
+ owner: kick a player, mute chat. Out of scope (explicitly): - Real money,
+ payments, cashout - Multi-table tournaments - Complex auth (email/password),
+ compliance features"
+@@
+ - Two or more players tie and the pot must be split.
+ - A player attempts an illegal action (out of turn, insufficient chips).
+ - A spectator joins mid-hand and must not see private hole cards.
+ - Table owner disconnects while moderation controls are needed.
++- A player goes all-in for less than the minimum raise amount.
+@@
+ - **FR-007**: System MUST enforce Texas Hold’em rules, including blinds, betting
+-  rounds, side pots, and showdown outcomes.
++  rounds, minimum raise rules, side pots, and showdown outcomes.
+@@
+ - **FR-013**: System MUST track basic user stats (hands played, wins) and display
+-  them in profile views.
++  them in profile views; a win is counted when a player wins any portion of a pot.
+*** End Patch
+2026-01-09T21:21:35.703343Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: specs/001-poker-mvp/spec.md
+@@
+ table. Game rules: - Correct Texas Hold’em rules: blinds, dealing, betting
+-rounds, hand evaluation, side pots, showdown, split pots. - Deterministic state
+-machine: the same inputs always produce the same game state. - Handle
+-disconnects: if a player disconnects during a hand, auto-fold when action is
+-required; allow reconnect. Non-functional: - Real-time updates (table state
+-should feel instant). - Prevent obvious cheating: server-authoritative game
+-state, no client deciding outcomes. - Auditability: keep an event log per hand
+-(actions + timestamps) for debugging. - Basic moderation controls for table
+-owner: kick a player, mute chat. Out of scope (explicitly): - Real money,
+-payments, cashout - Multi-table tournaments - Complex auth (email/password),
+-compliance features"
++rounds, hand evaluation, side pots, showdown, split pots. - Minimum raises equal
++the size of the previous bet or raise; all-in raises below the minimum are
++allowed but do not reopen betting. - Deterministic state machine: the same
++inputs always produce the same game state. - Handle disconnects: if a player
++disconnects during a hand, auto-fold when action is required; allow reconnect.
++Non-functional: - Real-time updates (table state should feel instant). - Prevent
++obvious cheating: server-authoritative game state, no client deciding outcomes.
++- Auditability: keep an event log per hand (actions + timestamps) for debugging.
++- Basic moderation controls for table owner: kick a player, mute chat. Out of
++scope (explicitly): - Real money, payments, cashout - Multi-table tournaments -
++Complex auth (email/password), compliance features"
+*** End Patch
+2026-01-09T21:27:54.393931Z  INFO codex_core::codex::handlers: Shutting down Codex instance
+2026-01-09T21:28:04.243645Z  INFO codex_core::codex::handlers: Shutting down Codex instance
+2026-01-09T21:28:17.018040Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"ls","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:28:19.508910Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat package.json","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:28:21.462097Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat vitest.config.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:28:27.145181Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: package.json
+@@
+     "prettier": "^3.2.0",
+     "typescript": "^5.3.0",
+-    "vitest": "^1.2.0"
++    "vitest": "^1.2.0",
++    "@vitest/coverage-v8": "^1.2.0"
+   },
+*** End Patch
+2026-01-09T21:28:30.018910Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: vitest.config.ts
+@@
+ export default defineConfig({
+   test: {
+     include: ["**/*.test.ts"],
+     exclude: ["**/node_modules/**", "**/dist/**"],
++    coverage: {
++      provider: "v8",
++      reporter: ["text", "html", "lcov"],
++    },
+   },
+ });
+*** End Patch
+2026-01-09T21:30:47.742456Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg --files -g '.gitignore'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:30:50.095448Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat .gitignore","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:30:52.149599Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: .gitignore
+@@
+ node_modules/
+ dist/
+ build/
++coverage/
+ *.log
+ .env*
+*** End Patch
+2026-01-09T21:32:01.880963Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"ls apps","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:32:04.337873Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg --files apps/ui","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:32:08.066635Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/ui/src/main.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:32:10.486071Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/ui/src/pages/LobbyPage.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:32:14.199482Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/ui/src/pages/TablePage.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:32:16.846682Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/ui/src/pages/ProfilePage.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:32:19.524726Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/ui/src/pages/FriendsPage.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:32:22.381988Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/ui/public/index.html","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:32:25.775008Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/ui/package.json","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:32:29.344528Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/ui/server.js","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:32:49.458767Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/ui/src/components/CreateTableForm.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:32:52.295942Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/ui/src/components/ActionBar.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:32:55.955480Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/ui/src/components/ChatPanel.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:32:58.754668Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/ui/src/components/ModerationMenu.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:33:02.811950Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/ui/src/components/ProfileForm.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:33:59.649600Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"leave|exit|lobby\" apps/ui/src/state/tableStore.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:34:02.102815Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/ui/src/state/tableStore.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:34:47.235331Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"Clear Auth Token|Signed in as|Specify Poker MVP|Login\" apps/ui/tests","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:34:52.175659Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/ui/tests/e2e/login.spec.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:35:00.775949Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/ui/src/services/auth.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:35:07.983279Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"Lobby|Create Table|Profile|Friends|Add Friend|Table Chat\" apps/ui/tests","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:35:35.236038Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Add File: apps/ui/src/components/PokerArt.tsx
++import React from "react";
++
++interface PokerArtProps {
++  variant?: "hero" | "table";
++}
++
++export function PokerArt({ variant = "hero" }: PokerArtProps) {
++  const size = variant === "hero" ? 280 : 220;
++  return (
++    <svg
++      className={`poker-art poker-art-${variant}`}
++      width={size}
++      height={size}
++      viewBox="0 0 320 260"
++      role="img"
++      aria-hidden="true"
++    >
++      <defs>
++        <linearGradient id="card-shine" x1="0" y1="0" x2="1" y2="1">
++          <stop offset="0%" stopColor="var(--card)" />
++          <stop offset="100%" stopColor="var(--card-soft)" />
++        </linearGradient>
++      </defs>
++      <rect x="22" y="36" width="118" height="168" rx="14" fill="url(#card-shine)" />
++      <rect x="36" y="52" width="90" height="4" rx="2" fill="var(--card-ink)" opacity="0.3" />
++      <rect x="36" y="64" width="70" height="4" rx="2" fill="var(--card-ink)" opacity="0.2" />
++      <rect x="160" y="18" width="118" height="168" rx="14" fill="url(#card-shine)" />
++      <rect x="176" y="34" width="84" height="4" rx="2" fill="var(--card-ink)" opacity="0.3" />
++      <rect x="176" y="46" width="54" height="4" rx="2" fill="var(--card-ink)" opacity="0.2" />
++      <circle cx="72" cy="186" r="44" fill="var(--chip-outer)" />
++      <circle cx="72" cy="186" r="32" fill="var(--chip-inner)" />
++      <circle cx="72" cy="186" r="18" fill="var(--chip-core)" />
++      <circle cx="238" cy="190" r="48" fill="var(--chip-outer)" />
++      <circle cx="238" cy="190" r="35" fill="var(--chip-inner)" />
++      <circle cx="238" cy="190" r="20" fill="var(--chip-core)" />
++      <path
++        d="M262 110c10 18 8 44-4 62-12 18-32 26-54 26"
++        stroke="var(--accent)"
++        strokeWidth="6"
++        strokeLinecap="round"
++        fill="none"
++        opacity="0.7"
++      />
++      <path
++        d="M88 120c12-18 36-30 60-28 22 2 40 12 52 28"
++        stroke="var(--accent-2)"
++        strokeWidth="6"
++        strokeLinecap="round"
++        fill="none"
++        opacity="0.7"
++      />
++    </svg>
++  );
++}
+*** End Patch
+2026-01-09T21:36:40.925436Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Add File: apps/ui/public/styles.css
++:root {
++  --bg: #0b1511;
++  --bg-alt: #0f2019;
++  --panel: rgba(18, 30, 24, 0.88);
++  --panel-strong: #13211b;
++  --text: #f6f2e7;
++  --muted: #c5c0b0;
++  --muted-strong: #9f9889;
++  --accent: #f4c169;
++  --accent-2: #e07a5f;
++  --accent-3: #7ed6a2;
++  --stroke: rgba(255, 255, 255, 0.1);
++  --card: #f9f4ea;
++  --card-soft: #efe8dc;
++  --card-ink: #2d2c2a;
++  --chip-outer: #f4c169;
++  --chip-inner: #173524;
++  --chip-core: #f7efe1;
++  --shadow: 0 24px 60px rgba(5, 8, 7, 0.45);
++}
++
++* {
++  box-sizing: border-box;
++}
++
++body {
++  margin: 0;
++  min-height: 100vh;
++  color: var(--text);
++  font-family: "DM Sans", "Avenir Next", "Trebuchet MS", sans-serif;
++  background:
++    radial-gradient(900px 520px at 10% -10%, #1a3b2d 0%, transparent 65%),
++    radial-gradient(820px 520px at 90% 0%, #3b2a1d 0%, transparent 70%),
++    linear-gradient(160deg, var(--bg), var(--bg-alt) 60%, #13271f 100%);
++}
++
++body::before {
++  content: "";
++  position: fixed;
++  inset: 0;
++  background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.04) 1px, transparent 0);
++  background-size: 12px 12px;
++  opacity: 0.5;
++  pointer-events: none;
++  z-index: 0;
++}
++
++#root {
++  position: relative;
++  z-index: 1;
++}
++
++h1,
++h2,
++h3 {
++  font-family: "Fraunces", "Iowan Old Style", "Palatino", serif;
++  letter-spacing: 0.4px;
++  margin: 0 0 12px;
++}
++
++p {
++  margin: 0 0 16px;
++  color: var(--muted);
++}
++
++a {
++  color: inherit;
++  text-decoration: none;
++}
++
++.app-root {
++  min-height: 100vh;
++  display: flex;
++  justify-content: center;
++}
++
++.app-shell {
++  width: min(1200px, 100%);
++  padding: 32px 24px 80px;
++  display: flex;
++  flex-direction: column;
++  gap: 28px;
++}
++
++.app-header {
++  display: flex;
++  gap: 20px;
++  align-items: center;
++  justify-content: space-between;
++  background: var(--panel);
++  border: 1px solid var(--stroke);
++  border-radius: 24px;
++  padding: 20px 24px;
++  box-shadow: var(--shadow);
++  backdrop-filter: blur(8px);
++  animation: rise-in 600ms ease-out;
++}
++
++.brand {
++  display: flex;
++  flex-direction: column;
++  gap: 6px;
++}
++
++.brand-title {
++  font-family: "Fraunces", "Iowan Old Style", "Palatino", serif;
++  font-size: 28px;
++  text-transform: uppercase;
++  letter-spacing: 2px;
++}
++
++.brand-subtitle {
++  color: var(--muted);
++  font-size: 14px;
++}
++
++.header-actions {
++  display: flex;
++  align-items: center;
++  gap: 16px;
++}
++
++.user-badge {
++  display: flex;
++  flex-direction: column;
++  gap: 2px;
++  padding: 10px 14px;
++  border-radius: 14px;
++  background: rgba(255, 255, 255, 0.04);
++  border: 1px solid var(--stroke);
++}
++
++.user-label {
++  text-transform: uppercase;
++  font-size: 11px;
++  letter-spacing: 1px;
++  color: var(--muted-strong);
++}
++
++.user-value {
++  font-weight: 600;
++  font-size: 14px;
++}
++
++.app-nav {
++  display: flex;
++  gap: 12px;
++  flex-wrap: wrap;
++}
++
++.nav-button {
++  border-radius: 999px;
++  padding: 10px 18px;
++  border: 1px solid var(--stroke);
++  background: rgba(255, 255, 255, 0.06);
++  color: var(--text);
++  font-weight: 600;
++  transition: transform 200ms ease, background 200ms ease, border 200ms ease;
++}
++
++.nav-button.active {
++  background: linear-gradient(120deg, rgba(244, 193, 105, 0.3), rgba(224, 122, 95, 0.2));
++  border-color: rgba(244, 193, 105, 0.6);
++  transform: translateY(-1px);
++}
++
++.content {
++  display: flex;
++  flex-direction: column;
++  gap: 24px;
++}
++
++.page {
++  display: flex;
++  flex-direction: column;
++  gap: 20px;
++}
++
++.page-header {
++  display: grid;
++  grid-template-columns: minmax(0, 1fr) auto;
++  gap: 24px;
++  align-items: center;
++}
++
++.page-header .meta-line {
++  color: var(--muted-strong);
++  font-size: 13px;
++}
++
++.card {
++  background: var(--panel);
++  border-radius: 20px;
++  border: 1px solid var(--stroke);
++  padding: 18px 20px;
++  box-shadow: var(--shadow);
++  backdrop-filter: blur(8px);
++}
++
++.card-subtle {
++  background: rgba(15, 24, 20, 0.7);
++  border-color: rgba(255, 255, 255, 0.06);
++  box-shadow: none;
++}
++
++.form-grid {
++  display: grid;
++  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
++  gap: 14px;
++}
++
++.field {
++  display: flex;
++  flex-direction: column;
++  gap: 6px;
++  font-size: 14px;
++  color: var(--muted);
++}
++
++.field-label {
++  font-size: 12px;
++  text-transform: uppercase;
++  letter-spacing: 1px;
++}
++
++input {
++  border-radius: 12px;
++  border: 1px solid var(--stroke);
++  background: rgba(5, 12, 9, 0.4);
++  color: var(--text);
++  padding: 10px 12px;
++  font-size: 14px;
++}
++
++input:focus {
++  outline: 2px solid rgba(244, 193, 105, 0.4);
++  outline-offset: 2px;
++}
++
++button,
++.btn {
++  border-radius: 12px;
++  border: 1px solid var(--stroke);
++  background: rgba(255, 255, 255, 0.08);
++  color: var(--text);
++  padding: 10px 16px;
++  font-weight: 600;
++  font-size: 14px;
++  cursor: pointer;
++  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
++}
++
++button:hover,
++.btn:hover {
++  transform: translateY(-1px);
++  box-shadow: 0 12px 20px rgba(5, 8, 7, 0.35);
++}
++
++.btn-primary {
++  background: linear-gradient(120deg, rgba(244, 193, 105, 0.9), rgba(224, 122, 95, 0.9));
++  color: #1b1410;
++  border-color: rgba(244, 193, 105, 0.7);
++}
++
++.btn-ghost {
++  background: transparent;
++  border-color: rgba(255, 255, 255, 0.2);
++}
++
++.btn-quiet {
++  background: rgba(255, 255, 255, 0.03);
++  color: var(--muted);
++}
++
++.table-list {
++  display: grid;
++  gap: 16px;
++}
++
++.table-card {
++  display: grid;
++  gap: 14px;
++}
++
++.table-card-header {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++}
++
++.table-name {
++  font-weight: 600;
++  font-size: 18px;
++}
++
++.status-pill {
++  padding: 6px 12px;
++  border-radius: 999px;
++  font-size: 12px;
++  text-transform: uppercase;
++  letter-spacing: 1px;
++}
++
++.status-pill.live {
++  background: rgba(244, 193, 105, 0.2);
++  color: var(--accent);
++  border: 1px solid rgba(244, 193, 105, 0.5);
++}
++
++.status-pill.waiting {
++  background: rgba(126, 214, 162, 0.18);
++  color: var(--accent-3);
++  border: 1px solid rgba(126, 214, 162, 0.4);
++}
++
++.table-meta {
++  display: grid;
++  gap: 8px;
++  color: var(--muted);
++  font-size: 14px;
++}
++
++.seat-actions {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 8px;
++}
++
++.btn-seat {
++  padding: 8px 12px;
++  font-size: 13px;
++}
++
++.table-grid {
++  display: grid;
++  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
++  gap: 18px;
++}
++
++.table-facts {
++  display: grid;
++  gap: 12px;
++}
++
++.fact {
++  display: flex;
++  justify-content: space-between;
++  gap: 8px;
++  color: var(--muted);
++  font-size: 14px;
++}
++
++.fact strong {
++  color: var(--text);
++  font-weight: 600;
++}
++
++.card-row {
++  display: flex;
++  gap: 8px;
++  flex-wrap: wrap;
++}
++
++.playing-card {
++  background: var(--card);
++  color: var(--card-ink);
++  padding: 6px 10px;
++  border-radius: 10px;
++  font-weight: 700;
++  font-size: 13px;
++  letter-spacing: 0.6px;
++}
++
++.card-ghost {
++  color: var(--muted-strong);
++  font-style: italic;
++}
++
++.seat-grid {
++  display: grid;
++  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
++  gap: 12px;
++}
++
++.seat-card {
++  background: rgba(255, 255, 255, 0.04);
++  border-radius: 14px;
++  padding: 10px 12px;
++  border: 1px solid rgba(255, 255, 255, 0.06);
++  font-size: 13px;
++  color: var(--muted);
++}
++
++.seat-card strong {
++  color: var(--text);
++}
++
++.seat-card.is-you {
++  border-color: rgba(244, 193, 105, 0.6);
++  background: rgba(244, 193, 105, 0.12);
++  color: var(--text);
++}
++
++.table-actions {
++  display: grid;
++  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
++  gap: 18px;
++}
++
++.action-bar,
++.chat-panel,
++.moderation-panel,
++.profile-panel,
++.friends-panel {
++  display: flex;
++  flex-direction: column;
++  gap: 12px;
++}
++
++.action-buttons {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 10px;
++}
++
++.chat-messages {
++  display: grid;
++  gap: 8px;
++  max-height: 220px;
++  overflow-y: auto;
++  padding-right: 6px;
++}
++
++.chat-message {
++  background: rgba(255, 255, 255, 0.03);
++  padding: 8px 10px;
++  border-radius: 10px;
++}
++
++.moderation-seat {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 10px;
++  flex-wrap: wrap;
++}
++
++.profile-grid {
++  display: grid;
++  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
++  gap: 18px;
++}
++
++.profile-summary {
++  display: grid;
++  gap: 12px;
++}
++
++.avatar {
++  width: 72px;
++  height: 72px;
++  border-radius: 20px;
++  background: rgba(255, 255, 255, 0.06);
++  display: grid;
++  place-items: center;
++  font-weight: 700;
++  font-size: 20px;
++}
++
++.avatar img {
++  width: 100%;
++  height: 100%;
++  object-fit: cover;
++  border-radius: 20px;
++}
++
++.stat-grid {
++  display: grid;
++  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
++  gap: 10px;
++}
++
++.stat {
++  background: rgba(255, 255, 255, 0.04);
++  padding: 10px 12px;
++  border-radius: 12px;
++  font-size: 13px;
++  color: var(--muted);
++}
++
++.stat strong {
++  display: block;
++  font-size: 18px;
++  color: var(--text);
++}
++
++.friends-list {
++  display: grid;
++  gap: 10px;
++}
++
++.friend-row {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 10px;
++  padding: 10px 12px;
++  border-radius: 12px;
++  background: rgba(255, 255, 255, 0.04);
++}
++
++.poker-art {
++  max-width: 100%;
++  height: auto;
++  filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.35));
++}
++
++.login-hero {
++  display: grid;
++  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
++  gap: 24px;
++  align-items: center;
++}
++
++.login-card {
++  display: grid;
++  gap: 12px;
++}
++
++.stagger-item {
++  animation: rise-in 500ms ease-out both;
++  animation-delay: calc(var(--stagger, 0) * 70ms);
++}
++
++.alert {
++  color: var(--accent-2);
++  font-size: 13px;
++}
++
++@keyframes rise-in {
++  from {
++    opacity: 0;
++    transform: translateY(12px);
++  }
++  to {
++    opacity: 1;
++    transform: translateY(0);
++  }
++}
++
++@media (max-width: 900px) {
++  .page-header,
++  .login-hero,
++  .profile-grid {
++    grid-template-columns: 1fr;
++  }
++  .header-actions {
++    flex-direction: column;
++    align-items: flex-start;
++  }
++}
+*** End Patch
+2026-01-09T21:36:47.330928Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/public/index.html
+@@
+     <meta charset="utf-8" />
+     <meta name="viewport" content="width=device-width, initial-scale=1" />
+     <title>Specify Poker MVP</title>
++    <link rel="preconnect" href="https://fonts.googleapis.com" />
++    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
++    <link
++      rel="stylesheet"
++      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:wght@500;700&display=swap"
++    />
++    <link rel="stylesheet" href="/styles.css" />
+   </head>
+*** End Patch
+2026-01-09T21:37:28.555859Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/main.tsx
+@@
+ import { LobbyPage } from "./pages/LobbyPage";
+ import { TablePage } from "./pages/TablePage";
+ import { ProfilePage } from "./pages/ProfilePage";
+ import { FriendsPage } from "./pages/FriendsPage";
++import { PokerArt } from "./components/PokerArt";
+ import { initUiTelemetry, recordNavigation } from "./observability/otel";
+ import { clearToken, hydrateTokenFromCallback, isAuthenticated, startLogin } from "./services/auth";
+ import { tableStore } from "./state/tableStore";
+ import { fetchProfile, UserProfile } from "./services/profileApi";
+@@
+ function PokerApp() {
+   const [state, setState] = React.useState(tableStore.getState());
+   const [view, setView] = React.useState<"lobby" | "profile" | "friends">("lobby");
+   const [profile, setProfile] = React.useState<UserProfile | null>(null);
+@@
+   const handleClearToken = () => {
+     clearToken();
+     window.location.reload();
+   };
+ 
+   const header = (
+-    <div>
+-      {profile ? <div>Signed in as {profile.nickname}</div> : null}
+-      <button type="button" onClick={handleClearToken}>
+-        Clear Auth Token
+-      </button>
+-    </div>
++    <header className="app-header">
++      <div className="brand">
++        <div className="brand-title">Specify Poker</div>
++        <div className="brand-subtitle">Intentional tables for focused decisions.</div>
++      </div>
++      <div className="header-actions">
++        <div className="user-badge">
++          <div className="user-label">Signed in</div>
++          <div className="user-value">{profile ? profile.nickname : "Player"}</div>
++        </div>
++        <button type="button" className="btn btn-ghost" onClick={handleClearToken}>
++          Sign out
++        </button>
++      </div>
++    </header>
+   );
+ 
+   if (state.tableState) {
+     return (
+-      <div>
++      <div className="app-shell">
+         {header}
+-        <TablePage store={tableStore} />
++        <div className="content">
++          <TablePage store={tableStore} />
++        </div>
+       </div>
+     );
+   }
+ 
++  const navClass = (target: "lobby" | "profile" | "friends") =>
++    `nav-button${view === target ? " active" : ""}`;
++
+   return (
+-    <div>
++    <div className="app-shell">
+       {header}
+-      <nav>
+-        <button type="button" onClick={() => setView("lobby")}>
++      <nav className="app-nav">
++        <button type="button" className={navClass("lobby")} onClick={() => setView("lobby")}>
+           Lobby
+         </button>
+-        <button type="button" onClick={() => setView("profile")}>
++        <button type="button" className={navClass("profile")} onClick={() => setView("profile")}>
+           Profile
+         </button>
+-        <button type="button" onClick={() => setView("friends")}>
++        <button type="button" className={navClass("friends")} onClick={() => setView("friends")}>
+           Friends
+         </button>
+       </nav>
+-      {view === "lobby" ? <LobbyPage store={tableStore} /> : null}
+-      {view === "profile" ? <ProfilePage onProfileUpdated={setProfile} /> : null}
+-      {view === "friends" ? <FriendsPage /> : null}
++      <div className="content">
++        {view === "lobby" ? <LobbyPage store={tableStore} /> : null}
++        {view === "profile" ? <ProfilePage onProfileUpdated={setProfile} /> : null}
++        {view === "friends" ? <FriendsPage /> : null}
++      </div>
+     </div>
+   );
+ }
+ 
+ function AppRoot() {
+@@
+   }, [authStatus]);
+ 
+   return (
+-    <div>
+-      <h1>Specify Poker MVP</h1>
+-      {authStatus === "checking" ? (
+-        <div>Signing in...</div>
+-      ) : authStatus === "authed" ? (
+-        <PokerApp />
+-      ) : (
+-        <button type="button" onClick={() => startLogin(window.location.origin)}>
+-          Login
+-        </button>
+-      )}
++    <div className="app-root">
++      {authStatus === "checking" ? (
++        <div className="app-shell">
++          <header className="app-header">
++            <div className="brand">
++              <div className="brand-title">Specify Poker</div>
++              <div className="brand-subtitle">Secure login in progress.</div>
++            </div>
++          </header>
++          <div className="card card-subtle">Signing in...</div>
++        </div>
++      ) : authStatus === "authed" ? (
++        <PokerApp />
++      ) : (
++        <div className="app-shell">
++          <header className="app-header">
++            <div className="brand">
++              <div className="brand-title">Specify Poker</div>
++              <div className="brand-subtitle">Plan, pace, and play with clarity.</div>
++            </div>
++          </header>
++          <div className="card login-card">
++            <div className="login-hero">
++              <div>
++                <h1>Specify Poker</h1>
++                <p>
++                  Create focused tables, keep the lobby in sight, and make decisions with the full
++                  table story in one view.
++                </p>
++                <div className="login-actions">
++                  <a
++                    className="btn btn-primary"
++                    href="#"
++                    onClick={(event) => {
++                      event.preventDefault();
++                      void startLogin(window.location.origin);
++                    }}
++                  >
++                    Login
++                  </a>
++                  <p className="meta-line">Keycloak OIDC keeps seats secure.</p>
++                </div>
++              </div>
++              <PokerArt variant="hero" />
++            </div>
++          </div>
++          <div className="table-grid">
++            <div className="card card-subtle">
++              <h3>Lobby Overview</h3>
++              <p>Live table counts, blind structure, and seat availability update as you watch.</p>
++            </div>
++            <div className="card card-subtle">
++              <h3>Table Focus</h3>
++              <p>See the pot, board, and action controls in one glance when you sit down.</p>
++            </div>
++            <div className="card card-subtle">
++              <h3>Trusted Profiles</h3>
++              <p>Maintain your poker identity and stats alongside your friends list.</p>
++            </div>
++          </div>
++        </div>
++      )}
+     </div>
+   );
+ }
+*** End Patch
+2026-01-09T21:37:34.274014Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/public/styles.css
+@@
+ .page-header .meta-line {
+   color: var(--muted-strong);
+   font-size: 13px;
+ }
+ 
++.meta-line {
++  color: var(--muted-strong);
++  font-size: 13px;
++}
++
+@@
+ .login-card {
+   display: grid;
+   gap: 12px;
+ }
++
++.login-actions {
++  display: flex;
++  align-items: center;
++  gap: 14px;
++  flex-wrap: wrap;
++}
+*** End Patch
+2026-01-09T21:37:51.167647Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/pages/LobbyPage.tsx
+@@
+ import { CreateTableForm } from "../components/CreateTableForm";
++import { PokerArt } from "../components/PokerArt";
+ import { createTable, listTables } from "../services/lobbyApi";
+ import { TableStore, tableStore, TableSummary } from "../state/tableStore";
+@@
+-  const tableRows = tables.map((table) => {
++  const tableRows = tables.map((table, index) => {
+     const seatButtons = Array.from({ length: table.config.maxPlayers }, (_, index) => (
+       <button
+         key={`${table.tableId}-seat-${index}`}
+         type="button"
++        className="btn btn-seat"
+         onClick={() => joinSeat(table.tableId, index)}
+       >
+         Join Seat {index + 1}
+       </button>
+     ));
+     return (
+-      <div key={table.tableId}>
+-        <div>{table.name}</div>
+-        <div>
+-          Blinds: {table.config.smallBlind}/{table.config.bigBlind}
+-        </div>
+-        <div>
+-          {table.seatsTaken}/{table.config.maxPlayers} seats
+-        </div>
+-        <div>Status: {table.inProgress ? "In Hand" : "Lobby"}</div>
+-        <div>{seatButtons}</div>
++      <div
++        key={table.tableId}
++        className="card table-card stagger-item"
++        style={{ "--stagger": index } as React.CSSProperties}
++      >
++        <div className="table-card-header">
++          <div>
++            <div className="table-name">{table.name}</div>
++            <div className="meta-line">
++              Blinds {table.config.smallBlind}/{table.config.bigBlind}
++            </div>
++          </div>
++          <div className={`status-pill ${table.inProgress ? "live" : "waiting"}`}>
++            {table.inProgress ? "In Hand" : "Open Lobby"}
++          </div>
++        </div>
++        <div className="table-meta">
++          <div>
++            Seats: {table.seatsTaken}/{table.config.maxPlayers}
++          </div>
++          <div>Starting Stack: {table.config.startingStack}</div>
++        </div>
++        <div className="seat-actions">{seatButtons}</div>
+       </div>
+     );
+   });
+ 
+   return (
+-    <section>
+-      <h2>Lobby</h2>
++    <section className="page">
++      <div className="page-header">
++        <div>
++          <h2>Lobby</h2>
++          <p>Pick a seat, or set up a new table with your preferred blinds.</p>
++          <div className="meta-line">Live updates run every 2 seconds.</div>
++        </div>
++        <PokerArt variant="hero" />
++      </div>
+       <CreateTableForm onCreate={handleCreate} />
+-      <div>
+-        {status === "loading" ? <div>Loading tables...</div> : null}
+-        {tableRows.length === 0 ? <div>No tables yet.</div> : tableRows}
++      <div className="table-list">
++        {status === "loading" ? <div className="meta-line">Loading tables...</div> : null}
++        {tableRows.length === 0 ? <div className="meta-line">No tables yet.</div> : tableRows}
+       </div>
+-      {error ? <div role="alert">{error}</div> : null}
++      {error ? (
++        <div role="alert" className="alert">
++          {error}
++        </div>
++      ) : null}
+     </section>
+   );
+ }
+*** End Patch
+2026-01-09T21:38:17.796649Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/pages/TablePage.tsx
+@@
+ import { ActionBar } from "../components/ActionBar";
+ import { ChatPanel } from "../components/ChatPanel";
+ import { ModerationMenu } from "../components/ModerationMenu";
++import { PokerArt } from "../components/PokerArt";
+ import { deriveLegalActions } from "../state/deriveLegalActions";
+ import { TableStore, tableStore } from "../state/tableStore";
+ import { fetchProfile } from "../services/profileApi";
+@@
+   const hand = state.tableState.hand;
+   const pot = hand?.pots.reduce((sum, entry) => sum + entry.amount, 0) ?? 0;
+-  const privateCards = state.privateHoleCards?.join(" ") ?? "Hidden";
++  const communityCards = hand?.communityCards ?? [];
++  const privateCards = state.privateHoleCards ?? [];
++
++  const renderCards = (cards: string[], fallback: string) => {
++    if (cards.length === 0) {
++      return <span className="card-ghost">{fallback}</span>;
++    }
++    return cards.map((card, index) => (
++      <span key={`${card}-${index}`} className="playing-card">
++        {card}
++      </span>
++    ));
++  };
+ 
+   return (
+-    <div>
+-      <h2>{state.tableState.name}</h2>
+-      <div>Table ID: {state.tableState.tableId}</div>
+-      <div>Pot: {pot}</div>
+-      <div>Board: {hand?.communityCards.join(" ") ?? "Waiting"}</div>
+-      <div>Your Cards: {privateCards}</div>
+-      <div>Street: {hand?.currentStreet ?? "lobby"}</div>
+-      <div>Current Turn: {hand?.currentTurnSeat ?? "-"}</div>
+-      <div>
+-        {state.tableState.seats.map((seat) => (
+-          <div key={seat.seatId}>
+-            Seat {seat.seatId + 1}: {seat.userId ?? "Empty"} (stack {seat.stack}) [{seat.status}]
+-          </div>
+-        ))}
+-      </div>
+-      <ActionBar actions={actions} onAction={(action) => store.sendAction(action)} />
+-      <ChatPanel
+-        messages={state.chatMessages}
+-        onSend={(message) => store.sendChat(message)}
+-        error={state.chatError}
+-      />
+-      {userId && state.tableState.ownerId === userId ? (
+-        <ModerationMenu tableId={state.tableState.tableId} seats={state.tableState.seats} />
+-      ) : null}
+-    </div>
++    <section className="page">
++      <div className="page-header">
++        <div>
++          <h2>{state.tableState.name}</h2>
++          <p>Track the hand flow and take your action when it is your turn.</p>
++          <div className="meta-line">Table ID: {state.tableState.tableId}</div>
++        </div>
++        <PokerArt variant="table" />
++      </div>
++      <div className="table-grid">
++        <div className="card table-facts">
++          <div className="fact">
++            <span>Pot</span>
++            <strong>{pot}</strong>
++          </div>
++          <div className="fact">
++            <span>Street</span>
++            <strong>{hand?.currentStreet ?? "Lobby"}</strong>
++          </div>
++          <div className="fact">
++            <span>Current Turn</span>
++            <strong>
++              {hand?.currentTurnSeat !== undefined ? `Seat ${hand.currentTurnSeat + 1}` : "-"}
++            </strong>
++          </div>
++          <div>
++            <div className="meta-line">Board</div>
++            <div className="card-row">{renderCards(communityCards, "Waiting")}</div>
++          </div>
++          <div>
++            <div className="meta-line">Your Cards</div>
++            <div className="card-row">{renderCards(privateCards, "Hidden")}</div>
++          </div>
++        </div>
++        <div className="card">
++          <h3>Seats</h3>
++          <div className="seat-grid">
++            {state.tableState.seats.map((seat) => (
++              <div
++                key={seat.seatId}
++                className={`seat-card${seat.seatId === state.seatId ? " is-you" : ""}`}
++              >
++                <strong>Seat {seat.seatId + 1}</strong>
++                <div>{seat.userId ?? "Open seat"}</div>
++                <div>Stack: {seat.stack}</div>
++                <div>Status: {seat.status}</div>
++              </div>
++            ))}
++          </div>
++        </div>
++      </div>
++      <div className="table-actions">
++        <ActionBar actions={actions} onAction={(action) => store.sendAction(action)} />
++        <ChatPanel
++          messages={state.chatMessages}
++          onSend={(message) => store.sendChat(message)}
++          error={state.chatError}
++        />
++      </div>
++      {userId && state.tableState.ownerId === userId ? (
++        <ModerationMenu tableId={state.tableState.tableId} seats={state.tableState.seats} />
++      ) : null}
++    </section>
+   );
+ }
+*** End Patch
+2026-01-09T21:38:30.493943Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/pages/ProfilePage.tsx
+@@
+   if (!profile) {
+     return <div>{status === "loading" ? "Loading profile..." : "Profile unavailable."}</div>;
+   }
+ 
++  const initials = profile.nickname.slice(0, 2).toUpperCase();
++
+   return (
+-    <section>
+-      <h2>Profile & Stats</h2>
+-      <div>Nickname: {profile.nickname}</div>
+-      <div>Hands Played: {profile.stats.handsPlayed}</div>
+-      <div>Wins: {profile.stats.wins}</div>
+-      <ProfileForm
+-        initialNickname={profile.nickname}
+-        initialAvatarUrl={profile.avatarUrl}
+-        onSave={handleSave}
+-      />
+-      {error ? <div role="alert">{error}</div> : null}
++    <section className="page">
++      <div className="page-header">
++        <div>
++          <h2>Profile & Stats</h2>
++          <p>Keep your poker identity tidy and share a consistent avatar with the table.</p>
++        </div>
++      </div>
++      <div className="profile-grid">
++        <div className="card profile-panel">
++          <div className="profile-summary">
++            <div className="avatar">
++              {profile.avatarUrl ? (
++                <img src={profile.avatarUrl} alt={`${profile.nickname} avatar`} />
++              ) : (
++                <span>{initials}</span>
++              )}
++            </div>
++            <div>
++              <div className="meta-line">Nickname</div>
++              <div className="table-name">{profile.nickname}</div>
++            </div>
++          </div>
++          <div className="stat-grid">
++            <div className="stat">
++              <strong>{profile.stats.handsPlayed}</strong>
++              Hands Played
++            </div>
++            <div className="stat">
++              <strong>{profile.stats.wins}</strong>
++              Wins
++            </div>
++          </div>
++        </div>
++        <ProfileForm
++          initialNickname={profile.nickname}
++          initialAvatarUrl={profile.avatarUrl}
++          onSave={handleSave}
++        />
++      </div>
++      {error ? (
++        <div role="alert" className="alert">
++          {error}
++        </div>
++      ) : null}
+     </section>
+   );
+ }
+*** End Patch
+2026-01-09T21:38:44.014091Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/pages/FriendsPage.tsx
+@@
+   return (
+-    <section>
+-      <h2>Friends</h2>
+-      <div>
+-        <label>
+-          Add Friend
+-          <input
+-            value={newFriend}
+-            onChange={(event) => setNewFriend(event.target.value)}
+-          />
+-        </label>
+-        <button type="button" onClick={handleAdd}>
+-          Add
+-        </button>
+-      </div>
+-      <div>
+-        {friends.length === 0 ? (
+-          <div>No friends yet.</div>
+-        ) : (
+-          friends.map((friend) => (
+-            <div key={friend}>
+-              {friend}
+-              <button type="button" onClick={() => handleRemove(friend)}>
+-                Remove
+-              </button>
+-            </div>
+-          ))
+-        )}
+-      </div>
+-      {error ? <div role="alert">{error}</div> : null}
++    <section className="page">
++      <div className="page-header">
++        <div>
++          <h2>Friends</h2>
++          <p>Keep trusted opponents close so new tables fill up faster.</p>
++        </div>
++      </div>
++      <div className="card friends-panel">
++        <div className="form-grid">
++          <label className="field">
++            <span className="field-label">Add Friend</span>
++            <input
++              value={newFriend}
++              onChange={(event) => setNewFriend(event.target.value)}
++              placeholder="Enter a player name"
++            />
++          </label>
++          <div className="field">
++            <span className="field-label">&nbsp;</span>
++            <button type="button" className="btn btn-primary" onClick={handleAdd}>
++              Add
++            </button>
++          </div>
++        </div>
++        <div className="friends-list">
++          {friends.length === 0 ? (
++            <div className="meta-line">No friends yet.</div>
++          ) : (
++            friends.map((friend) => (
++              <div key={friend} className="friend-row">
++                <div>{friend}</div>
++                <button type="button" className="btn btn-quiet" onClick={() => handleRemove(friend)}>
++                  Remove
++                </button>
++              </div>
++            ))
++          )}
++        </div>
++      </div>
++      {error ? (
++        <div role="alert" className="alert">
++          {error}
++        </div>
++      ) : null}
+     </section>
+   );
+ }
+*** End Patch
+2026-01-09T21:39:02.096884Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/components/CreateTableForm.tsx
+@@
+   return (
+-    <form onSubmit={handleSubmit}>
+-      <h3>Create Table</h3>
+-      <label>
+-        Name
+-        <input value={name} onChange={(event) => setName(event.target.value)} />
+-      </label>
+-      <label>
+-        Small Blind
+-        <input
+-          type="number"
+-          min={1}
+-          value={smallBlind}
+-          onChange={(event) => setSmallBlind(event.target.value)}
+-        />
+-      </label>
+-      <label>
+-        Big Blind
+-        <input
+-          type="number"
+-          min={1}
+-          value={bigBlind}
+-          onChange={(event) => setBigBlind(event.target.value)}
+-        />
+-      </label>
+-      <label>
+-        Max Players
+-        <input
+-          type="number"
+-          min={2}
+-          max={9}
+-          value={maxPlayers}
+-          onChange={(event) => setMaxPlayers(event.target.value)}
+-        />
+-      </label>
+-      <label>
+-        Starting Stack
+-        <input
+-          type="number"
+-          min={1}
+-          value={startingStack}
+-          onChange={(event) => setStartingStack(event.target.value)}
+-        />
+-      </label>
+-      <button type="submit" disabled={!isValid}>
+-        Create Table
+-      </button>
+-      {error ? <div role="alert">{error}</div> : null}
++    <form className="card" onSubmit={handleSubmit}>
++      <h3>Create Table</h3>
++      <div className="form-grid">
++        <label className="field">
++          <span className="field-label">Name</span>
++          <input
++            value={name}
++            onChange={(event) => setName(event.target.value)}
++            placeholder="Friday Night No Limit"
++          />
++        </label>
++        <label className="field">
++          <span className="field-label">Small Blind</span>
++          <input
++            type="number"
++            min={1}
++            value={smallBlind}
++            onChange={(event) => setSmallBlind(event.target.value)}
++          />
++        </label>
++        <label className="field">
++          <span className="field-label">Big Blind</span>
++          <input
++            type="number"
++            min={1}
++            value={bigBlind}
++            onChange={(event) => setBigBlind(event.target.value)}
++          />
++        </label>
++        <label className="field">
++          <span className="field-label">Max Players</span>
++          <input
++            type="number"
++            min={2}
++            max={9}
++            value={maxPlayers}
++            onChange={(event) => setMaxPlayers(event.target.value)}
++          />
++        </label>
++        <label className="field">
++          <span className="field-label">Starting Stack</span>
++          <input
++            type="number"
++            min={1}
++            value={startingStack}
++            onChange={(event) => setStartingStack(event.target.value)}
++          />
++        </label>
++      </div>
++      <button type="submit" className="btn btn-primary" disabled={!isValid}>
++        Create Table
++      </button>
++      {error ? (
++        <div role="alert" className="alert">
++          {error}
++        </div>
++      ) : null}
+     </form>
+   );
+ }
+*** End Patch
+2026-01-09T21:39:13.122503Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/components/ActionBar.tsx
+@@
+   const handleAction = (type: ActionType) => {
+@@
+     onAction({ type, amount: resolved });
+   };
+ 
+   if (actions.length === 0) {
+-    return <div>No actions available</div>;
++    return <div className="card card-subtle">No actions available</div>;
+   }
+ 
++  const actionClass = (action: ActionType) => {
++    if (action === "Raise" || action === "Bet") {
++      return "btn btn-primary";
++    }
++    if (action === "Fold") {
++      return "btn btn-quiet";
++    }
++    return "btn";
++  };
++
+   return (
+-    <div>
+-      <label>
+-        Amount
+-        <input
+-          type="number"
+-          min={0}
+-          value={amount}
+-          onChange={(event) => setAmount(event.target.value)}
+-        />
+-      </label>
+-      <div>
++    <div className="card action-bar">
++      <h3>Action</h3>
++      <label className="field">
++        <span className="field-label">Amount</span>
++        <input
++          type="number"
++          min={0}
++          value={amount}
++          onChange={(event) => setAmount(event.target.value)}
++        />
++      </label>
++      <div className="action-buttons">
+         {actionable.map((action) => (
+-          <button key={action} type="button" onClick={() => handleAction(action)}>
++          <button
++            key={action}
++            type="button"
++            className={actionClass(action)}
++            onClick={() => handleAction(action)}
++          >
+             {action}
+           </button>
+         ))}
+       </div>
+     </div>
+*** End Patch
+2026-01-09T21:39:24.169588Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/components/ChatPanel.tsx
+@@
+   return (
+-    <section>
+-      <h3>Table Chat</h3>
+-      <div>
++    <section className="card chat-panel">
++      <h3>Table Chat</h3>
++      <div className="chat-messages">
+         {messages.length === 0 ? (
+-          <div>No messages yet.</div>
++          <div className="meta-line">No messages yet.</div>
+         ) : (
+           messages.map((entry) => (
+-            <div key={entry.id}>
++            <div key={entry.id} className="chat-message">
+               <strong>{entry.userId}</strong>: {entry.text}
+             </div>
+           ))
+         )}
+       </div>
+-      <form onSubmit={handleSubmit}>
+-        <label>
+-          Message
+-          <input value={message} onChange={(event) => setMessage(event.target.value)} />
+-        </label>
+-        <button type="submit">Send</button>
+-      </form>
+-      {error ? <div role="alert">{error}</div> : null}
++      <form onSubmit={handleSubmit} className="form-grid">
++        <label className="field">
++          <span className="field-label">Message</span>
++          <input value={message} onChange={(event) => setMessage(event.target.value)} />
++        </label>
++        <div className="field">
++          <span className="field-label">&nbsp;</span>
++          <button type="submit" className="btn btn-primary">
++            Send
++          </button>
++        </div>
++      </form>
++      {error ? (
++        <div role="alert" className="alert">
++          {error}
++        </div>
++      ) : null}
+     </section>
+   );
+ }
+*** End Patch
+2026-01-09T21:39:34.596530Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/components/ModerationMenu.tsx
+@@
+   return (
+-    <section>
+-      <h3>Moderation</h3>
++    <section className="card moderation-panel">
++      <h3>Moderation</h3>
+       {seated.length === 0 ? (
+-        <div>No seated players.</div>
++        <div className="meta-line">No seated players.</div>
+       ) : (
+         seated.map((seat) => (
+-          <div key={seat.seatId}>
+-            Seat {seat.seatId + 1}: {seat.userId}
+-            <button type="button" onClick={() => request("kick", seat.seatId)}>
++          <div key={seat.seatId} className="moderation-seat">
++            <div>
++              <strong>Seat {seat.seatId + 1}</strong>: {seat.userId}
++            </div>
++            <div className="action-buttons">
++              <button type="button" className="btn btn-quiet" onClick={() => request("kick", seat.seatId)}>
+               Kick
+             </button>
+-            <button type="button" onClick={() => request("mute", seat.seatId)}>
++              <button type="button" className="btn" onClick={() => request("mute", seat.seatId)}>
+               Mute
+             </button>
++            </div>
+           </div>
+         ))
+       )}
+-      {error ? <div role="alert">{error}</div> : null}
++      {error ? (
++        <div role="alert" className="alert">
++          {error}
++        </div>
++      ) : null}
+     </section>
+   );
+ }
+*** End Patch
+2026-01-09T21:39:45.346379Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/components/ProfileForm.tsx
+@@
+   return (
+-    <form onSubmit={handleSubmit}>
+-      <h3>Profile</h3>
+-      <label>
+-        Nickname
+-        <input value={nickname} onChange={(event) => setNickname(event.target.value)} />
+-      </label>
+-      <label>
+-        Avatar URL
+-        <input value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} />
+-      </label>
+-      <button type="submit" disabled={!isValid}>
+-        Save Profile
+-      </button>
+-      {error ? <div role="alert">{error}</div> : null}
++    <form className="card profile-panel" onSubmit={handleSubmit}>
++      <h3>Profile</h3>
++      <div className="form-grid">
++        <label className="field">
++          <span className="field-label">Nickname</span>
++          <input value={nickname} onChange={(event) => setNickname(event.target.value)} />
++        </label>
++        <label className="field">
++          <span className="field-label">Avatar URL</span>
++          <input
++            value={avatarUrl}
++            onChange={(event) => setAvatarUrl(event.target.value)}
++            placeholder="https://"
++          />
++        </label>
++      </div>
++      <button type="submit" className="btn btn-primary" disabled={!isValid}>
++        Save Profile
++      </button>
++      {error ? (
++        <div role="alert" className="alert">
++          {error}
++        </div>
++      ) : null}
+     </form>
+   );
+ }
+*** End Patch
+2026-01-09T21:42:11.879920Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/server.js
+@@
+ function resolveAssetPath(relativePath) {
++  const publicAsset = path.join(publicDir, relativePath);
++  if (fs.existsSync(publicAsset)) {
++    return publicAsset;
++  }
+   const direct = path.join(distDir, relativePath);
+   if (fs.existsSync(direct)) {
+     return direct;
+   }
+*** End Patch

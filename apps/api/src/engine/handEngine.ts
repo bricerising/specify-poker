@@ -250,8 +250,8 @@ function settleShowdown(hand: HandState, seats: TableSeat[]) {
   for (const seat of eligibleSeats) {
     players[seat.seatId] = hand.holeCards[seat.seatId] ?? [];
   }
-  const { winners } = evaluateWinners(players, hand.communityCards);
-  hand.winners = winners;
+  const { winners: overallWinners } = evaluateWinners(players, hand.communityCards);
+  const winnerSet = new Set<number>();
 
   for (const pot of hand.pots) {
     if (pot.amount <= 0 || pot.eligibleSeatIds.length === 0) {
@@ -265,6 +265,9 @@ function settleShowdown(hand: HandState, seats: TableSeat[]) {
     if (potWinners.length === 0) {
       continue;
     }
+    for (const winnerSeatId of potWinners) {
+      winnerSet.add(winnerSeatId);
+    }
     const share = Math.floor(pot.amount / potWinners.length);
     let remainder = pot.amount - share * potWinners.length;
     for (const winnerSeatId of potWinners) {
@@ -276,6 +279,12 @@ function settleShowdown(hand: HandState, seats: TableSeat[]) {
       remainder = Math.max(0, remainder - 1);
     }
   }
+  if (winnerSet.size === 0) {
+    for (const winnerSeatId of overallWinners) {
+      winnerSet.add(winnerSeatId);
+    }
+  }
+  hand.winners = Array.from(winnerSet);
 
   for (const seat of seats) {
     if (seat.status === "folded" || seat.status === "all_in") {

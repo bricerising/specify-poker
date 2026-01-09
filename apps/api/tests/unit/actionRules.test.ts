@@ -39,6 +39,22 @@ describe("action rules", () => {
     expect(actions).toContain("Raise");
   });
 
+  it("allows exact min raise amounts", () => {
+    const hand = createHand({ currentBet: 10, minRaise: 10, roundContributions: { 0: 0 } });
+    const seat: TableSeat = { seatId: 0, userId: "u1", stack: 20, status: "active" };
+
+    const raise = deriveLegalActions(hand, seat).find((action) => action.type === "Raise");
+    expect(raise).toEqual({ type: "Raise", minAmount: 20, maxAmount: 20 });
+  });
+
+  it("allows short all-in raises when below min raise", () => {
+    const hand = createHand({ currentBet: 10, minRaise: 10, roundContributions: { 0: 0 } });
+    const seat: TableSeat = { seatId: 0, userId: "u1", stack: 15, status: "active" };
+
+    const raise = deriveLegalActions(hand, seat).find((action) => action.type === "Raise");
+    expect(raise).toEqual({ type: "Raise", minAmount: 15, maxAmount: 15 });
+  });
+
   it("creates side pots based on contributions", () => {
     const pots = calculatePots(
       { 0: 50, 1: 100, 2: 100 },

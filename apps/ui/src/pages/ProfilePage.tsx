@@ -61,18 +61,53 @@ export function ProfilePage({ onProfileUpdated }: ProfilePageProps) {
     return <div>{status === "loading" ? "Loading profile..." : "Profile unavailable."}</div>;
   }
 
+  const initials = profile.nickname.slice(0, 2).toUpperCase();
+
   return (
-    <section>
-      <h2>Profile & Stats</h2>
-      <div>Nickname: {profile.nickname}</div>
-      <div>Hands Played: {profile.stats.handsPlayed}</div>
-      <div>Wins: {profile.stats.wins}</div>
-      <ProfileForm
-        initialNickname={profile.nickname}
-        initialAvatarUrl={profile.avatarUrl}
-        onSave={handleSave}
-      />
-      {error ? <div role="alert">{error}</div> : null}
+    <section className="page">
+      <div className="page-header">
+        <div>
+          <h2>Profile & Stats</h2>
+          <p>Keep your poker identity tidy and share a consistent avatar with the table.</p>
+        </div>
+      </div>
+      <div className="profile-grid">
+        <div className="card profile-panel">
+          <div className="profile-summary">
+            <div className="avatar">
+              {profile.avatarUrl ? (
+                <img src={profile.avatarUrl} alt={`${profile.nickname} avatar`} />
+              ) : (
+                <span>{initials}</span>
+              )}
+            </div>
+            <div>
+              <div className="meta-line">Nickname</div>
+              <div className="table-name">{profile.nickname}</div>
+            </div>
+          </div>
+          <div className="stat-grid">
+            <div className="stat">
+              <strong>{profile.stats.handsPlayed}</strong>
+              Hands Played
+            </div>
+            <div className="stat">
+              <strong>{profile.stats.wins}</strong>
+              Wins
+            </div>
+          </div>
+        </div>
+        <ProfileForm
+          initialNickname={profile.nickname}
+          initialAvatarUrl={profile.avatarUrl}
+          onSave={handleSave}
+        />
+      </div>
+      {error ? (
+        <div role="alert" className="alert">
+          {error}
+        </div>
+      ) : null}
     </section>
   );
 }

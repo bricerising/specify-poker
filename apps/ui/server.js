@@ -29,6 +29,10 @@ function sendFile(res, filePath) {
 }
 
 function resolveAssetPath(relativePath) {
+  const publicAsset = path.join(publicDir, relativePath);
+  if (fs.existsSync(publicAsset)) {
+    return publicAsset;
+  }
   const direct = path.join(distDir, relativePath);
   if (fs.existsSync(direct)) {
     return direct;

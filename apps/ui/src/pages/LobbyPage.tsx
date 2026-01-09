@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { trace } from "@opentelemetry/api";
 
 import { CreateTableForm } from "../components/CreateTableForm";
+import { PokerArt } from "../components/PokerArt";
 import { createTable, listTables } from "../services/lobbyApi";
 import { TableStore, tableStore, TableSummary } from "../state/tableStore";
 
@@ -66,40 +67,65 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
     }
   };
 
-  const tableRows = tables.map((table) => {
+  const tableRows = tables.map((table, index) => {
     const seatButtons = Array.from({ length: table.config.maxPlayers }, (_, index) => (
       <button
         key={`${table.tableId}-seat-${index}`}
         type="button"
+        className="btn btn-seat"
         onClick={() => joinSeat(table.tableId, index)}
       >
         Join Seat {index + 1}
       </button>
     ));
     return (
-      <div key={table.tableId}>
-        <div>{table.name}</div>
-        <div>
-          Blinds: {table.config.smallBlind}/{table.config.bigBlind}
+      <div
+        key={table.tableId}
+        className="card table-card stagger-item"
+        style={{ "--stagger": index } as React.CSSProperties}
+      >
+        <div className="table-card-header">
+          <div>
+            <div className="table-name">{table.name}</div>
+            <div className="meta-line">
+              Blinds {table.config.smallBlind}/{table.config.bigBlind}
+            </div>
+          </div>
+          <div className={`status-pill ${table.inProgress ? "live" : "waiting"}`}>
+            {table.inProgress ? "In Hand" : "Open Lobby"}
+          </div>
         </div>
-        <div>
-          {table.seatsTaken}/{table.config.maxPlayers} seats
+        <div className="table-meta">
+          <div>
+            Seats: {table.seatsTaken}/{table.config.maxPlayers}
+          </div>
+          <div>Starting Stack: {table.config.startingStack}</div>
         </div>
-        <div>Status: {table.inProgress ? "In Hand" : "Lobby"}</div>
-        <div>{seatButtons}</div>
+        <div className="seat-actions">{seatButtons}</div>
       </div>
     );
   });
 
   return (
-    <section>
-      <h2>Lobby</h2>
-      <CreateTableForm onCreate={handleCreate} />
-      <div>
-        {status === "loading" ? <div>Loading tables...</div> : null}
-        {tableRows.length === 0 ? <div>No tables yet.</div> : tableRows}
+    <section className="page">
+      <div className="page-header">
+        <div>
+          <h2>Lobby</h2>
+          <p>Pick a seat, or set up a new table with your preferred blinds.</p>
+          <div className="meta-line">Live updates run every 2 seconds.</div>
+        </div>
+        <PokerArt variant="hero" />
       </div>
-      {error ? <div role="alert">{error}</div> : null}
+      <CreateTableForm onCreate={handleCreate} />
+      <div className="table-list">
+        {status === "loading" ? <div className="meta-line">Loading tables...</div> : null}
+        {tableRows.length === 0 ? <div className="meta-line">No tables yet.</div> : tableRows}
+      </div>
+      {error ? (
+        <div role="alert" className="alert">
+          {error}
+        </div>
+      ) : null}
     </section>
   );
 }

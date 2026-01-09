@@ -27,27 +27,36 @@ export function ChatPanel({ messages, onSend, error }: ChatPanelProps) {
   };
 
   return (
-    <section>
+    <section className="card chat-panel">
       <h3>Table Chat</h3>
-      <div>
+      <div className="chat-messages">
         {messages.length === 0 ? (
-          <div>No messages yet.</div>
+          <div className="meta-line">No messages yet.</div>
         ) : (
           messages.map((entry) => (
-            <div key={entry.id}>
+            <div key={entry.id} className="chat-message">
               <strong>{entry.userId}</strong>: {entry.text}
             </div>
           ))
         )}
       </div>
-      <form onSubmit={handleSubmit}>
-        <label>
-          Message
+      <form onSubmit={handleSubmit} className="form-grid">
+        <label className="field">
+          <span className="field-label">Message</span>
           <input value={message} onChange={(event) => setMessage(event.target.value)} />
         </label>
-        <button type="submit">Send</button>
+        <div className="field">
+          <span className="field-label">&nbsp;</span>
+          <button type="submit" className="btn btn-primary">
+            Send
+          </button>
+        </div>
       </form>
-      {error ? <div role="alert">{error}</div> : null}
+      {error ? (
+        <div role="alert" className="alert">
+          {error}
+        </div>
+      ) : null}
     </section>
   );
 }

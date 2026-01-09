@@ -29,24 +29,32 @@ export function ModerationMenu({ tableId, seats, onModeration }: ModerationMenuP
   };
 
   return (
-    <section>
+    <section className="card moderation-panel">
       <h3>Moderation</h3>
       {seated.length === 0 ? (
-        <div>No seated players.</div>
+        <div className="meta-line">No seated players.</div>
       ) : (
         seated.map((seat) => (
-          <div key={seat.seatId}>
-            Seat {seat.seatId + 1}: {seat.userId}
-            <button type="button" onClick={() => request("kick", seat.seatId)}>
+          <div key={seat.seatId} className="moderation-seat">
+            <div>
+              <strong>Seat {seat.seatId + 1}</strong>: {seat.userId}
+            </div>
+            <div className="action-buttons">
+              <button type="button" className="btn btn-quiet" onClick={() => request("kick", seat.seatId)}>
               Kick
             </button>
-            <button type="button" onClick={() => request("mute", seat.seatId)}>
+              <button type="button" className="btn" onClick={() => request("mute", seat.seatId)}>
               Mute
             </button>
+            </div>
           </div>
         ))
       )}
-      {error ? <div role="alert">{error}</div> : null}
+      {error ? (
+        <div role="alert" className="alert">
+          {error}
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -5,6 +5,7 @@ import { LobbyPage } from "./pages/LobbyPage";
 import { TablePage } from "./pages/TablePage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { FriendsPage } from "./pages/FriendsPage";
+import { PokerArt } from "./components/PokerArt";
 import { initUiTelemetry, recordNavigation } from "./observability/otel";
 import { clearToken, hydrateTokenFromCallback, isAuthenticated, startLogin } from "./services/auth";
 import { tableStore } from "./state/tableStore";
@@ -41,40 +42,56 @@ function PokerApp() {
   };
 
   const header = (
-    <div>
-      {profile ? <div>Signed in as {profile.nickname}</div> : null}
-      <button type="button" onClick={handleClearToken}>
-        Clear Auth Token
-      </button>
-    </div>
+    <header className="app-header">
+      <div className="brand">
+        <div className="brand-title">Specify Poker</div>
+        <div className="brand-subtitle">Intentional tables for focused decisions.</div>
+      </div>
+      <div className="header-actions">
+        <div className="user-badge">
+          <div className="user-label">Signed in</div>
+          <div className="user-value">{profile ? profile.nickname : "Player"}</div>
+        </div>
+        <button type="button" className="btn btn-ghost" onClick={handleClearToken}>
+          Sign out
+        </button>
+      </div>
+    </header>
   );
 
   if (state.tableState) {
     return (
-      <div>
+      <div className="app-shell">
         {header}
-        <TablePage store={tableStore} />
+        <div className="content">
+          <TablePage store={tableStore} />
+        </div>
       </div>
     );
   }
 
+  const navClass = (target: "lobby" | "profile" | "friends") =>
+    `nav-button${view === target ? " active" : ""}`;
+
   return (
-    <div>
+    <div className="app-shell">
       {header}
-      <nav>
-        <button type="button" onClick={() => setView("lobby")}>
+      <nav className="app-nav">
+        <button type="button" className={navClass("lobby")} onClick={() => setView("lobby")}>
           Lobby
         </button>
-        <button type="button" onClick={() => setView("profile")}>
+        <button type="button" className={navClass("profile")} onClick={() => setView("profile")}>
           Profile
         </button>
-        <button type="button" onClick={() => setView("friends")}>
+        <button type="button" className={navClass("friends")} onClick={() => setView("friends")}>
           Friends
         </button>
       </nav>
-      {view === "lobby" ? <LobbyPage store={tableStore} /> : null}
-      {view === "profile" ? <ProfilePage onProfileUpdated={setProfile} /> : null}
-      {view === "friends" ? <FriendsPage /> : null}
+      <div className="content">
+        {view === "lobby" ? <LobbyPage store={tableStore} /> : null}
+        {view === "profile" ? <ProfilePage onProfileUpdated={setProfile} /> : null}
+        {view === "friends" ? <FriendsPage /> : null}
+      </div>
     </div>
   );
 }
@@ -103,16 +120,67 @@ function AppRoot() {
   }, [authStatus]);
 
   return (
-    <div>
-      <h1>Specify Poker MVP</h1>
+    <div className="app-root">
       {authStatus === "checking" ? (
-        <div>Signing in...</div>
+        <div className="app-shell">
+          <header className="app-header">
+            <div className="brand">
+              <div className="brand-title">Specify Poker</div>
+              <div className="brand-subtitle">Secure login in progress.</div>
+            </div>
+          </header>
+          <div className="card card-subtle">Signing in...</div>
+        </div>
       ) : authStatus === "authed" ? (
         <PokerApp />
       ) : (
-        <button type="button" onClick={() => startLogin(window.location.origin)}>
-          Login
-        </button>
+        <div className="app-shell">
+          <header className="app-header">
+            <div className="brand">
+              <div className="brand-title">Specify Poker</div>
+              <div className="brand-subtitle">Plan, pace, and play with clarity.</div>
+            </div>
+          </header>
+          <div className="card login-card">
+            <div className="login-hero">
+              <div>
+                <h1>Specify Poker</h1>
+                <p>
+                  Create focused tables, keep the lobby in sight, and make decisions with the full
+                  table story in one view.
+                </p>
+                <div className="login-actions">
+                  <a
+                    className="btn btn-primary"
+                    href="#"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      void startLogin(window.location.origin);
+                    }}
+                  >
+                    Login
+                  </a>
+                  <p className="meta-line">Keycloak OIDC keeps seats secure.</p>
+                </div>
+              </div>
+              <PokerArt variant="hero" />
+            </div>
+          </div>
+          <div className="table-grid">
+            <div className="card card-subtle">
+              <h3>Lobby Overview</h3>
+              <p>Live table counts, blind structure, and seat availability update as you watch.</p>
+            </div>
+            <div className="card card-subtle">
+              <h3>Table Focus</h3>
+              <p>See the pot, board, and action controls in one glance when you sit down.</p>
+            </div>
+            <div className="card card-subtle">
+              <h3>Trusted Profiles</h3>
+              <p>Maintain your poker identity and stats alongside your friends list.</p>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

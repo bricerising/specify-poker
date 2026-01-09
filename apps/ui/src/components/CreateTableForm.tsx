@@ -59,53 +59,63 @@ export function CreateTableForm({ onCreate }: CreateTableFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form className="card" onSubmit={handleSubmit}>
       <h3>Create Table</h3>
-      <label>
-        Name
-        <input value={name} onChange={(event) => setName(event.target.value)} />
-      </label>
-      <label>
-        Small Blind
-        <input
-          type="number"
-          min={1}
-          value={smallBlind}
-          onChange={(event) => setSmallBlind(event.target.value)}
-        />
-      </label>
-      <label>
-        Big Blind
-        <input
-          type="number"
-          min={1}
-          value={bigBlind}
-          onChange={(event) => setBigBlind(event.target.value)}
-        />
-      </label>
-      <label>
-        Max Players
-        <input
-          type="number"
-          min={2}
-          max={9}
-          value={maxPlayers}
-          onChange={(event) => setMaxPlayers(event.target.value)}
-        />
-      </label>
-      <label>
-        Starting Stack
-        <input
-          type="number"
-          min={1}
-          value={startingStack}
-          onChange={(event) => setStartingStack(event.target.value)}
-        />
-      </label>
-      <button type="submit" disabled={!isValid}>
+      <div className="form-grid">
+        <label className="field">
+          <span className="field-label">Name</span>
+          <input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Friday Night No Limit"
+          />
+        </label>
+        <label className="field">
+          <span className="field-label">Small Blind</span>
+          <input
+            type="number"
+            min={1}
+            value={smallBlind}
+            onChange={(event) => setSmallBlind(event.target.value)}
+          />
+        </label>
+        <label className="field">
+          <span className="field-label">Big Blind</span>
+          <input
+            type="number"
+            min={1}
+            value={bigBlind}
+            onChange={(event) => setBigBlind(event.target.value)}
+          />
+        </label>
+        <label className="field">
+          <span className="field-label">Max Players</span>
+          <input
+            type="number"
+            min={2}
+            max={9}
+            value={maxPlayers}
+            onChange={(event) => setMaxPlayers(event.target.value)}
+          />
+        </label>
+        <label className="field">
+          <span className="field-label">Starting Stack</span>
+          <input
+            type="number"
+            min={1}
+            value={startingStack}
+            onChange={(event) => setStartingStack(event.target.value)}
+          />
+        </label>
+      </div>
+      <button type="submit" className="btn btn-primary" disabled={!isValid}>
         Create Table
       </button>
-      {error ? <div role="alert">{error}</div> : null}
+      {error ? (
+        <div role="alert" className="alert">
+          {error}
+        </div>
+      ) : null}
     </form>
   );
 }

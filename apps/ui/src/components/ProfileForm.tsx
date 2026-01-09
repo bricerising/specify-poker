@@ -38,20 +38,30 @@ export function ProfileForm({ initialNickname, initialAvatarUrl, onSave }: Profi
   };
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form className="card profile-panel" onSubmit={handleSubmit}>
       <h3>Profile</h3>
-      <label>
-        Nickname
-        <input value={nickname} onChange={(event) => setNickname(event.target.value)} />
-      </label>
-      <label>
-        Avatar URL
-        <input value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} />
-      </label>
-      <button type="submit" disabled={!isValid}>
+      <div className="form-grid">
+        <label className="field">
+          <span className="field-label">Nickname</span>
+          <input value={nickname} onChange={(event) => setNickname(event.target.value)} />
+        </label>
+        <label className="field">
+          <span className="field-label">Avatar URL</span>
+          <input
+            value={avatarUrl}
+            onChange={(event) => setAvatarUrl(event.target.value)}
+            placeholder="https://"
+          />
+        </label>
+      </div>
+      <button type="submit" className="btn btn-primary" disabled={!isValid}>
         Save Profile
       </button>
-      {error ? <div role="alert">{error}</div> : null}
+      {error ? (
+        <div role="alert" className="alert">
+          {error}
+        </div>
+      ) : null}
     </form>
   );
 }

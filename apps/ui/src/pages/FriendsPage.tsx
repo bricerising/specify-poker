@@ -47,35 +47,50 @@ export function FriendsPage() {
   };
 
   return (
-    <section>
-      <h2>Friends</h2>
-      <div>
-        <label>
-          Add Friend
-          <input
-            value={newFriend}
-            onChange={(event) => setNewFriend(event.target.value)}
-          />
-        </label>
-        <button type="button" onClick={handleAdd}>
-          Add
-        </button>
+    <section className="page">
+      <div className="page-header">
+        <div>
+          <h2>Friends</h2>
+          <p>Keep trusted opponents close so new tables fill up faster.</p>
+        </div>
       </div>
-      <div>
-        {friends.length === 0 ? (
-          <div>No friends yet.</div>
-        ) : (
-          friends.map((friend) => (
-            <div key={friend}>
-              {friend}
-              <button type="button" onClick={() => handleRemove(friend)}>
-                Remove
-              </button>
-            </div>
-          ))
-        )}
+      <div className="card friends-panel">
+        <div className="form-grid">
+          <label className="field">
+            <span className="field-label">Add Friend</span>
+            <input
+              value={newFriend}
+              onChange={(event) => setNewFriend(event.target.value)}
+              placeholder="Enter a player name"
+            />
+          </label>
+          <div className="field">
+            <span className="field-label">&nbsp;</span>
+            <button type="button" className="btn btn-primary" onClick={handleAdd}>
+              Add
+            </button>
+          </div>
+        </div>
+        <div className="friends-list">
+          {friends.length === 0 ? (
+            <div className="meta-line">No friends yet.</div>
+          ) : (
+            friends.map((friend) => (
+              <div key={friend} className="friend-row">
+                <div>{friend}</div>
+                <button type="button" className="btn btn-quiet" onClick={() => handleRemove(friend)}>
+                  Remove
+                </button>
+              </div>
+            ))
+          )}
+        </div>
       </div>
-      {error ? <div role="alert">{error}</div> : null}
+      {error ? (
+        <div role="alert" className="alert">
+          {error}
+        </div>
+      ) : null}
     </section>
   );
 }

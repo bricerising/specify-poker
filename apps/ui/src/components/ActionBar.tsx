@@ -53,13 +53,24 @@ export function ActionBar({ actions, onAction }: ActionBarProps) {
   };
 
   if (actions.length === 0) {
-    return <div>No actions available</div>;
+    return <div className="card card-subtle">No actions available</div>;
   }
 
+  const actionClass = (action: ActionType) => {
+    if (action === "Raise" || action === "Bet") {
+      return "btn btn-primary";
+    }
+    if (action === "Fold") {
+      return "btn btn-quiet";
+    }
+    return "btn";
+  };
+
   return (
-    <div>
-      <label>
-        Amount
+    <div className="card action-bar">
+      <h3>Action</h3>
+      <label className="field">
+        <span className="field-label">Amount</span>
         <input
           type="number"
           min={0}
@@ -67,9 +78,14 @@ export function ActionBar({ actions, onAction }: ActionBarProps) {
           onChange={(event) => setAmount(event.target.value)}
         />
       </label>
-      <div>
+      <div className="action-buttons">
         {actionable.map((action) => (
-          <button key={action} type="button" onClick={() => handleAction(action)}>
+          <button
+            key={action}
+            type="button"
+            className={actionClass(action)}
+            onClick={() => handleAction(action)}
+          >
             {action}
           </button>
         ))}

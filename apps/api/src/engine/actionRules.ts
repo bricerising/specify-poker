@@ -27,24 +27,28 @@ export function deriveLegalActions(hand: HandState, seat: TableSeat): LegalActio
       if (hand.currentBet === 0) {
         actions.push({ type: "Bet", minAmount: hand.bigBlind, maxAmount: seat.stack });
       } else {
-        const minRaise = hand.currentBet + hand.minRaise;
-        if (seat.stack + (hand.roundContributions[seat.seatId] ?? 0) > minRaise) {
+        const contributed = hand.roundContributions[seat.seatId] ?? 0;
+        const maxTotal = seat.stack + contributed;
+        if (maxTotal > hand.currentBet) {
+          const minRaise = Math.min(hand.currentBet + hand.minRaise, maxTotal);
           actions.push({
             type: "Raise",
             minAmount: minRaise,
-            maxAmount: seat.stack + (hand.roundContributions[seat.seatId] ?? 0),
+            maxAmount: maxTotal,
           });
         }
       }
     }
   } else {
     actions.push({ type: "Call", maxAmount: Math.min(toCall, seat.stack) });
-    const minRaise = hand.currentBet + hand.minRaise;
-    if (seat.stack + (hand.roundContributions[seat.seatId] ?? 0) > minRaise) {
+    const contributed = hand.roundContributions[seat.seatId] ?? 0;
+    const maxTotal = seat.stack + contributed;
+    if (maxTotal > hand.currentBet) {
+      const minRaise = Math.min(hand.currentBet + hand.minRaise, maxTotal);
       actions.push({
         type: "Raise",
         minAmount: minRaise,
-        maxAmount: seat.stack + (hand.roundContributions[seat.seatId] ?? 0),
+        maxAmount: maxTotal,
       });
     }
   }
