@@ -1,0 +1,35 @@
+{
+  "realm": "poker-local",
+  "enabled": true,
+  "displayName": "Specify Poker Local",
+  "clients": [
+    {
+      "clientId": "poker-ui",
+      "name": "Specify Poker UI",
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "demo",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Demo",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}
