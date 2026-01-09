@@ -5,8 +5,8 @@ import { HandState, TableSeat } from "../../src/engine/types";
 import { getProfile, resetProfiles } from "../../src/services/profileService";
 
 describe("stat tracker", () => {
-  it("increments hands played and wins for winners", () => {
-    resetProfiles();
+  it("increments hands played and wins for winners", async () => {
+    await resetProfiles();
 
     const hand: HandState = {
       handId: "hand-1",
@@ -37,9 +37,9 @@ describe("stat tracker", () => {
       { seatId: 1, userId: "u2", stack: 100, status: "active" },
     ];
 
-    recordHandCompletion(hand, seats);
+    await recordHandCompletion(hand, seats);
 
-    expect(getProfile("u1").stats).toEqual({ handsPlayed: 1, wins: 0 });
-    expect(getProfile("u2").stats).toEqual({ handsPlayed: 1, wins: 1 });
+    expect((await getProfile("u1")).stats).toEqual({ handsPlayed: 1, wins: 0 });
+    expect((await getProfile("u2")).stats).toEqual({ handsPlayed: 1, wins: 1 });
   });
 });

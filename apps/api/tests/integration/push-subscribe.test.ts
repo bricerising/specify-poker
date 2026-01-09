@@ -21,7 +21,7 @@ describe("push subscription", () => {
     process.env.JWT_ISSUER = "test-issuer";
     process.env.JWT_AUDIENCE = "test-audience";
 
-    pushNotifications.clear();
+    await pushNotifications.clear();
     const app = createApp({ useInMemoryTelemetry: true });
     const token = signToken();
 
@@ -36,7 +36,7 @@ describe("push subscription", () => {
       .send(subscription);
 
     expect(registerResponse.status).toBe(204);
-    expect(pushNotifications.list("user-123")).toHaveLength(1);
+    expect(await pushNotifications.list("user-123")).toHaveLength(1);
 
     const deleteResponse = await request(app)
       .delete("/api/push/subscribe")
@@ -44,6 +44,6 @@ describe("push subscription", () => {
       .send({ endpoint: subscription.endpoint });
 
     expect(deleteResponse.status).toBe(204);
-    expect(pushNotifications.list("user-123")).toHaveLength(0);
+    expect(await pushNotifications.list("user-123")).toHaveLength(0);
   });
 });

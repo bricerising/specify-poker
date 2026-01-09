@@ -6,11 +6,17 @@ import { verifyToken } from "../auth/jwt";
 import { getTracer } from "../observability/otel";
 import { registerConnection, unregisterConnection } from "./connectionRegistry";
 import { registerConnection as registerSeatConnection, unregisterConnection as unregisterSeatConnection } from "./connectionManager";
-import { attachChatHub } from "./chatHub";
-import { attachTableHub } from "./tableHub";
+import { attachChatHub, handleChatPubSubEvent } from "./chatHub";
+import { attachTableHub, handleTablePubSubEvent, handleTimerPubSubEvent } from "./tableHub";
+import { initWsPubSub } from "./pubsub";
 
 export function attachWebSocketServer(server: http.Server) {
   const wss = new WebSocketServer({ server, path: "/ws" });
+  void initWsPubSub({
+    onTableEvent: handleTablePubSubEvent,
+    onChatEvent: handleChatPubSubEvent,
+    onTimerEvent: handleTimerPubSubEvent,
+  });
 
   wss.on("connection", async (socket, request) => {
     const requestUrl = request.url ?? "";
@@ -33,7 +39,7 @@ export function attachWebSocketServer(server: http.Server) {
     const userId = claims.sub ?? "unknown";
     const connectionId = randomUUID();
 
-    registerConnection({
+    void registerConnection({
       connectionId,
       userId,
       connectedAt: new Date().toISOString(),
@@ -60,8 +66,8 @@ export function attachWebSocketServer(server: http.Server) {
     attachChatHub(socket, userId, connectionId);
 
     socket.on("close", () => {
-      unregisterConnection(connectionId);
-      unregisterSeatConnection(connectionId);
+      void unregisterConnection(connectionId);
+      void unregisterSeatConnection(connectionId);
     });
   });
 

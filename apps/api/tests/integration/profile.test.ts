@@ -26,8 +26,8 @@ describe("profile endpoints", () => {
     process.env.JWT_ISSUER = "test-issuer";
     process.env.JWT_AUDIENCE = "test-audience";
 
-    resetProfiles();
-    resetFriends();
+    await resetProfiles();
+    await resetFriends();
 
     const app = createApp({ useInMemoryTelemetry: true });
     const token = signToken("user-1");

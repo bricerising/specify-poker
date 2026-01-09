@@ -12,6 +12,22 @@ export function ActionBar({ actions, onAction }: ActionBarProps) {
   const [amount, setAmount] = useState("0");
 
   const actionable = useMemo(() => actions.map((action) => action.type), [actions]);
+  const constraints = useMemo(() => {
+    const map = new Map<ActionType, { min?: number; max?: number }>();
+    for (const action of actions) {
+      map.set(action.type, { min: action.minAmount, max: action.maxAmount });
+    }
+    return map;
+  }, [actions]);
+
+  React.useEffect(() => {
+    const raise = actions.find((action) => action.type === "Raise");
+    const bet = actions.find((action) => action.type === "Bet");
+    const preferred = raise?.minAmount ?? bet?.minAmount;
+    if (preferred !== undefined) {
+      setAmount(String(preferred));
+    }
+  }, [actions]);
 
   const handleAction = (type: ActionType) => {
     const tracer = trace.getTracer("ui");
@@ -23,7 +39,17 @@ export function ActionBar({ actions, onAction }: ActionBarProps) {
     span.end();
 
     const value = Number(amount);
-    onAction({ type, amount: Number.isNaN(value) ? undefined : value });
+    const limits = constraints.get(type);
+    let resolved = Number.isNaN(value) ? undefined : value;
+    if ((type === "Bet" || type === "Raise") && limits?.min !== undefined) {
+      if (resolved === undefined || resolved < limits.min) {
+        resolved = limits.min;
+      }
+    }
+    if ((type === "Bet" || type === "Raise") && limits?.max !== undefined && resolved !== undefined) {
+      resolved = Math.min(resolved, limits.max);
+    }
+    onAction({ type, amount: resolved });
   };
 
   if (actions.length === 0) {

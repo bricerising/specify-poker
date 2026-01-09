@@ -26,8 +26,8 @@ describe("create table endpoint", () => {
     process.env.JWT_ISSUER = "test-issuer";
     process.env.JWT_AUDIENCE = "test-audience";
 
-    resetTables();
-    resetTableStates();
+    await resetTables();
+    await resetTableStates();
 
     const app = createApp({ useInMemoryTelemetry: true });
     const token = signToken();

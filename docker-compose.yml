@@ -23,9 +23,11 @@ services:
       PORT: "4000"
       KEYCLOAK_URL: "http://keycloak:8080"
       KEYCLOAK_REALM: "poker-local"
+      REDIS_URL: "redis://redis:6379"
     depends_on:
       - keycloak
       - otel-collector
+      - redis
     healthcheck:
       test: ["CMD-SHELL", "true"]
       interval: 10s
@@ -102,6 +104,16 @@ services:
       - prometheus
     healthcheck:
       test: ["CMD-SHELL", "true"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 2s
       retries: 3

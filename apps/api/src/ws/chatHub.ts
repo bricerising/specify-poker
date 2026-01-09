@@ -3,6 +3,7 @@ import WebSocket from "ws";
 
 import { getTableState } from "../services/tableState";
 import { isUserMuted } from "../services/moderationService";
+import { WsPubSubMessage, publishChatEvent } from "./pubsub";
 import { checkWsRateLimit, parseChatMessage, parseTableId } from "./validators";
 
 interface ChatConnection {
@@ -21,7 +22,7 @@ function send(socket: WebSocket, message: Record<string, unknown>) {
   }
 }
 
-function broadcast(tableId: string, message: Record<string, unknown>) {
+function broadcastLocal(tableId: string, message: Record<string, unknown>) {
   const subscribers = chatSubscriptions.get(tableId);
   if (!subscribers) {
     return;
@@ -34,16 +35,28 @@ function broadcast(tableId: string, message: Record<string, unknown>) {
   }
 }
 
-function isSeated(tableId: string, userId: string) {
-  const state = getTableState(tableId);
+export function handleChatPubSubEvent(message: WsPubSubMessage) {
+  if (message.channel !== "chat") {
+    return;
+  }
+  broadcastLocal(message.tableId, message.payload);
+}
+
+async function broadcast(tableId: string, message: Record<string, unknown>) {
+  broadcastLocal(tableId, message);
+  await publishChatEvent(tableId, message);
+}
+
+async function isSeated(tableId: string, userId: string) {
+  const state = await getTableState(tableId);
   if (!state) {
     return false;
   }
   return state.seats.some((seat) => seat.userId === userId && seat.status !== "empty");
 }
 
-function handleSubscribe(client: ChatConnection, tableId: string) {
-  if (!isSeated(tableId, client.userId)) {
+async function handleSubscribe(client: ChatConnection, tableId: string) {
+  if (!(await isSeated(tableId, client.userId))) {
     send(client.socket, {
       type: "ChatError",
       tableId,
@@ -74,7 +87,7 @@ function handleUnsubscribe(client: ChatConnection, tableId: string) {
   }
 }
 
-function handleChatSend(client: ChatConnection, payload: { tableId: string; message?: string }) {
+async function handleChatSend(client: ChatConnection, payload: { tableId: string; message?: string }) {
   const tableId = payload.tableId;
   const parsed = parseChatMessage(payload.message);
   if (!parsed.ok) {
@@ -87,17 +100,17 @@ function handleChatSend(client: ChatConnection, payload: { tableId: string; mess
     return;
   }
 
-  if (!isSeated(tableId, client.userId)) {
+  if (!(await isSeated(tableId, client.userId))) {
     send(client.socket, { type: "ChatError", tableId, reason: "not_seated" });
     return;
   }
 
-  if (isUserMuted(tableId, client.userId)) {
+  if (await isUserMuted(tableId, client.userId)) {
     send(client.socket, { type: "ChatError", tableId, reason: "muted" });
     return;
   }
 
-  broadcast(tableId, {
+  await broadcast(tableId, {
     type: "ChatMessage",
     tableId,
     message: {
@@ -133,7 +146,7 @@ export function attachChatHub(socket: WebSocket, userId: string, connectionId: s
         send(client.socket, { type: "ChatError", tableId: null, reason: "invalid_table" });
         return;
       }
-      handleSubscribe(client, tableId);
+      void handleSubscribe(client, tableId);
       return;
     }
     if (type === "UnsubscribeChat") {
@@ -150,7 +163,7 @@ export function attachChatHub(socket: WebSocket, userId: string, connectionId: s
         send(client.socket, { type: "ChatError", tableId: null, reason: "invalid_table" });
         return;
       }
-      handleChatSend(client, {
+      void handleChatSend(client, {
         tableId,
         message: message.message as string | undefined,
       });

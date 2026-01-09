@@ -60,6 +60,7 @@ export function TablePage({ store = tableStore }: TablePageProps) {
 
   const hand = state.tableState.hand;
   const pot = hand?.pots.reduce((sum, entry) => sum + entry.amount, 0) ?? 0;
+  const privateCards = state.privateHoleCards?.join(" ") ?? "Hidden";
 
   return (
     <div>
@@ -67,6 +68,7 @@ export function TablePage({ store = tableStore }: TablePageProps) {
       <div>Table ID: {state.tableState.tableId}</div>
       <div>Pot: {pot}</div>
       <div>Board: {hand?.communityCards.join(" ") ?? "Waiting"}</div>
+      <div>Your Cards: {privateCards}</div>
       <div>Street: {hand?.currentStreet ?? "lobby"}</div>
       <div>Current Turn: {hand?.currentTurnSeat ?? "-"}</div>
       <div>

@@ -27,11 +27,11 @@ describe("moderation endpoints", () => {
     process.env.JWT_ISSUER = "test-issuer";
     process.env.JWT_AUDIENCE = "test-audience";
 
-    resetTables();
-    resetTableStates();
-    resetModeration();
+    await resetTables();
+    await resetTableStates();
+    await resetModeration();
 
-    const summary = createTable({
+    const summary = await createTable({
       name: "Moderation Table",
       ownerId: "owner-1",
       config: {
@@ -76,7 +76,7 @@ describe("moderation endpoints", () => {
       userId: "user-2",
     });
 
-    const state = getTableState(summary.tableId);
+    const state = await getTableState(summary.tableId);
     const seat = state?.seats.find((entry) => entry.seatId === 0);
     expect(seat?.userId).toBeNull();
   });

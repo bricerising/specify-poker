@@ -18,13 +18,13 @@ function requireAuth(req: express.Request, res: express.Response) {
 export function createModerationRouter() {
   const router = express.Router();
 
-  router.post("/api/tables/:tableId/moderation/kick", (req, res) => {
+  router.post("/api/tables/:tableId/moderation/kick", async (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) {
       return;
     }
 
-    const table = getTable(req.params.tableId);
+    const table = await getTable(req.params.tableId);
     if (!table) {
       return res.status(404).json({ code: "missing_table", message: "Table not found" });
     }
@@ -37,14 +37,14 @@ export function createModerationRouter() {
       return res.status(400).json({ code: "invalid_seat", message: "seatId required" });
     }
 
-    const tableState = getTableState(req.params.tableId);
+    const tableState = await getTableState(req.params.tableId);
     const seat = tableState?.seats.find((entry) => entry.seatId === seatId);
     if (!seat || !seat.userId) {
       return res.status(404).json({ code: "seat_empty", message: "Seat empty" });
     }
 
     const targetUserId = seat.userId;
-    const result = leaveSeat({ tableId: req.params.tableId, userId: targetUserId });
+    const result = await leaveSeat({ tableId: req.params.tableId, userId: targetUserId });
     if (!result.ok) {
       return res.status(409).json({ code: result.reason, message: "Unable to kick" });
     }
@@ -57,7 +57,7 @@ export function createModerationRouter() {
       by: auth.userId,
     });
 
-    broadcastTableState(req.params.tableId);
+    await broadcastTableState(req.params.tableId);
 
     return res.status(200).json({
       tableId: req.params.tableId,
@@ -68,13 +68,13 @@ export function createModerationRouter() {
     });
   });
 
-  router.post("/api/tables/:tableId/moderation/mute", (req, res) => {
+  router.post("/api/tables/:tableId/moderation/mute", async (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) {
       return;
     }
 
-    const table = getTable(req.params.tableId);
+    const table = await getTable(req.params.tableId);
     if (!table) {
       return res.status(404).json({ code: "missing_table", message: "Table not found" });
     }
@@ -87,14 +87,14 @@ export function createModerationRouter() {
       return res.status(400).json({ code: "invalid_seat", message: "seatId required" });
     }
 
-    const tableState = getTableState(req.params.tableId);
+    const tableState = await getTableState(req.params.tableId);
     const seat = tableState?.seats.find((entry) => entry.seatId === seatId);
     if (!seat || !seat.userId) {
       return res.status(404).json({ code: "seat_empty", message: "Seat empty" });
     }
 
     const targetUserId = seat.userId;
-    muteUser(req.params.tableId, targetUserId);
+    await muteUser(req.params.tableId, targetUserId);
 
     console.log("moderation.action", {
       action: "mute",

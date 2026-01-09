@@ -6,10 +6,10 @@ export function registerConnection(connectionId: string, userId: string) {
   connections.set(connectionId, userId);
 }
 
-export function unregisterConnection(connectionId: string) {
+export async function unregisterConnection(connectionId: string) {
   const userId = connections.get(connectionId);
   connections.delete(connectionId);
   if (userId) {
-    markSeatDisconnected(userId);
+    await markSeatDisconnected(userId);
   }
 }

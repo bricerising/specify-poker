@@ -28,9 +28,9 @@ describe("ws table hub", () => {
     process.env.JWT_ISSUER = "test-issuer";
     process.env.JWT_AUDIENCE = "test-audience";
 
-    resetTables();
-    resetTableStates();
-    const summary = createTable({
+    await resetTables();
+    await resetTableStates();
+    const summary = await createTable({
       name: "WS Table",
       ownerId: "owner-1",
       config: {

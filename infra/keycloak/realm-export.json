@@ -30,6 +30,20 @@
           "temporary": false
         }
       ]
+    },
+    {
+      "username": "demo2",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Demo",
+      "lastName": "Two",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo2",
+          "temporary": false
+        }
+      ]
     }
   ]
 }

@@ -6,7 +6,7 @@ import { TablePage } from "./pages/TablePage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { FriendsPage } from "./pages/FriendsPage";
 import { initUiTelemetry, recordNavigation } from "./observability/otel";
-import { hydrateTokenFromCallback, isAuthenticated, startLogin } from "./services/auth";
+import { clearToken, hydrateTokenFromCallback, isAuthenticated, startLogin } from "./services/auth";
 import { tableStore } from "./state/tableStore";
 import { fetchProfile, UserProfile } from "./services/profileApi";
 
@@ -35,7 +35,19 @@ function PokerApp() {
       });
   }, []);
 
-  const header = profile ? <div>Signed in as {profile.nickname}</div> : null;
+  const handleClearToken = () => {
+    clearToken();
+    window.location.reload();
+  };
+
+  const header = (
+    <div>
+      {profile ? <div>Signed in as {profile.nickname}</div> : null}
+      <button type="button" onClick={handleClearToken}>
+        Clear Auth Token
+      </button>
+    </div>
+  );
 
   if (state.tableState) {
     return (

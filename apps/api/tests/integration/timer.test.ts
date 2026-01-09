@@ -37,9 +37,9 @@ describe("turn timer", () => {
     process.env.JWT_AUDIENCE = "test-audience";
     process.env.TURN_TIMER_MS = "20";
 
-    resetTables();
-    resetTableStates();
-    const summary = createTable({
+    await resetTables();
+    await resetTableStates();
+    const summary = await createTable({
       name: "Timer Table",
       ownerId: "owner-1",
       config: {
@@ -81,7 +81,7 @@ describe("turn timer", () => {
       });
     });
 
-    expect(patch.tableState.hand.currentStreet).toBe("ended");
+    expect(patch.tableState.hand.currentStreet).toBe("preflop");
     expect(patch.tableState.seats[0].status).toBe("active");
 
     wsA.close();

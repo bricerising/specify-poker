@@ -27,9 +27,9 @@ describe("moderation contract", () => {
     process.env.JWT_ISSUER = "test-issuer";
     process.env.JWT_AUDIENCE = "test-audience";
 
-    resetTables();
-    resetTableStates();
-    resetModeration();
+    await resetTables();
+    await resetTableStates();
+    await resetModeration();
 
     const server = createServer({ useInMemoryTelemetry: true });
     await new Promise<void>((resolve) => server.listen(0, resolve));

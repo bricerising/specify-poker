@@ -8,9 +8,9 @@ import { eventStore, HandEvent } from "./eventStore";
 import { getTable, updateTable } from "./tableRegistry";
 import { ensureTableState, getTableState, listTableStates, startHandIfReady, updateTableState } from "./tableState";
 
-function syncSummary(tableId: string) {
+async function syncSummary(tableId: string) {
+  const state = await getTableState(tableId);
   return updateTable(tableId, (summary) => {
-    const state = getTableState(tableId);
     if (!state) {
       return summary;
     }
@@ -23,7 +23,7 @@ function syncSummary(tableId: string) {
   });
 }
 
-function recordEvent(handId: string, type: string, payload: Record<string, unknown>) {
+async function recordEvent(handId: string, type: string, payload: Record<string, unknown>) {
   const event: HandEvent = {
     eventId: randomUUID(),
     handId,
@@ -31,18 +31,40 @@ function recordEvent(handId: string, type: string, payload: Record<string, unkno
     payload,
     ts: new Date().toISOString(),
   };
-  eventStore.append(event);
+  await eventStore.append(event);
 }
 
-export function joinSeat(options: { tableId: string; seatId: number; userId: string }) {
-  const summary = getTable(options.tableId);
+export async function joinSeat(options: { tableId: string; seatId: number; userId: string }) {
+  const summary = await getTable(options.tableId);
   if (!summary) {
     return { ok: false, reason: "missing_table" as const };
   }
-  const state = ensureTableState(summary);
+  const state = await ensureTableState(summary);
 
   const seat = state.seats.find((entry) => entry.seatId === options.seatId);
-  if (!seat || seat.status !== "empty") {
+  if (!seat) {
+    return { ok: false, reason: "seat_unavailable" as const };
+  }
+
+  const existingSeat = state.seats.find((entry) => entry.userId === options.userId);
+  if (existingSeat) {
+    if (existingSeat.seatId === options.seatId && existingSeat.status === "disconnected") {
+      seat.status = "active";
+      await updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
+      await syncSummary(state.tableId);
+      return { ok: true, tableState: await getTableState(state.tableId) };
+    }
+    return { ok: false, reason: "already_seated" as const };
+  }
+
+  if (seat.userId === options.userId && seat.status === "disconnected") {
+    seat.status = "active";
+    await updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
+    await syncSummary(state.tableId);
+    return { ok: true, tableState: await getTableState(state.tableId) };
+  }
+
+  if (seat.status !== "empty") {
     return { ok: false, reason: "seat_unavailable" as const };
   }
 
@@ -51,20 +73,20 @@ export function joinSeat(options: { tableId: string; seatId: number; userId: str
   seat.status = "active";
 
   const updated = { ...state, version: state.version + 1 };
-  updateTableState(state.tableId, () => updated);
-  syncSummary(state.tableId);
+  await updateTableState(state.tableId, () => updated);
+  await syncSummary(state.tableId);
 
-  const handState = startHandIfReady(state.tableId);
+  const handState = await startHandIfReady(state.tableId);
   if (handState?.hand) {
-    recordEvent(handState.hand.handId, "HandStarted", { snapshot: handState.hand });
-    syncSummary(state.tableId);
+    await recordEvent(handState.hand.handId, "HandStarted", { snapshot: handState.hand });
+    await syncSummary(state.tableId);
   }
 
-  return { ok: true, tableState: getTableState(state.tableId) };
+  return { ok: true, tableState: await getTableState(state.tableId) };
 }
 
-export function leaveSeat(options: { tableId: string; userId: string }) {
-  const state = getTableState(options.tableId);
+export async function leaveSeat(options: { tableId: string; userId: string }) {
+  const state = await getTableState(options.tableId);
   if (!state) {
     return { ok: false, reason: "missing_table" as const };
   }
@@ -78,26 +100,29 @@ export function leaveSeat(options: { tableId: string; userId: string }) {
   seat.stack = 0;
   seat.status = "empty";
 
-  updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
-  syncSummary(state.tableId);
+  await updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
+  await syncSummary(state.tableId);
 
-  return { ok: true, tableState: getTableState(state.tableId) };
+  return { ok: true, tableState: await getTableState(state.tableId) };
 }
 
-export function applyTableAction(options: {
+export async function applyTableAction(options: {
   tableId: string;
   seatId: number;
   action: HandActionInput;
+  allowInactive?: boolean;
 }) {
-  const state = getTableState(options.tableId);
+  const state = await getTableState(options.tableId);
   if (!state) {
     return { ok: false, reason: "missing_table" as const };
   }
 
   const previousStreet = state.hand?.currentStreet ?? null;
-  const result = applyAction(state, options.seatId, options.action);
-  updateTableState(options.tableId, () => result.table);
-  syncSummary(options.tableId);
+  const result = applyAction(state, options.seatId, options.action, {
+    allowInactive: options.allowInactive,
+  });
+  await updateTableState(options.tableId, () => result.table);
+  await syncSummary(options.tableId);
 
   if (previousStreet && result.table.hand?.currentStreet && previousStreet !== result.table.hand.currentStreet) {
     const span = getTracer().startSpan("poker.hand.transition", {
@@ -113,34 +138,60 @@ export function applyTableAction(options: {
   const handEnded = result.table.hand?.currentStreet === "ended" && previousStreet !== "ended";
 
   if (handEnded && result.table.hand) {
-    recordHandCompletion(result.table.hand, result.table.seats);
+    await recordHandCompletion(result.table.hand, result.table.seats);
   }
 
   if (result.table.hand) {
-    recordEvent(result.table.hand.handId, "ActionTaken", {
+    await recordEvent(result.table.hand.handId, "ActionTaken", {
       action: options.action,
       snapshot: result.table.hand,
     });
 
     if (result.table.hand.currentStreet === "showdown") {
-      recordEvent(result.table.hand.handId, "Showdown", { snapshot: result.table.hand });
+      await recordEvent(result.table.hand.handId, "Showdown", { snapshot: result.table.hand });
     }
 
     if (result.table.hand.currentStreet === "ended") {
-      recordEvent(result.table.hand.handId, "HandEnded", { snapshot: result.table.hand });
+      await recordEvent(result.table.hand.handId, "HandEnded", { snapshot: result.table.hand });
     }
   }
 
-  return { ok: result.accepted, reason: result.reason, tableState: result.table };
+  let finalState = result.table;
+  if (handEnded) {
+    const nextState = await startHandIfReady(options.tableId);
+    if (nextState?.hand && nextState.hand.handId !== result.table.hand?.handId) {
+      await recordEvent(nextState.hand.handId, "HandStarted", { snapshot: nextState.hand });
+      finalState = nextState;
+      await syncSummary(options.tableId);
+    }
+  }
+
+  return { ok: result.accepted, reason: result.reason, tableState: finalState };
 }
 
-export function markSeatDisconnected(userId: string) {
-  for (const state of listTableStates()) {
+export async function markSeatDisconnected(userId: string) {
+  const states = await listTableStates();
+  for (const state of states) {
     const seat = state.seats.find((entry) => entry.userId === userId);
     if (seat && seat.status === "active") {
       seat.status = "disconnected";
-      updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
-      syncSummary(state.tableId);
+      await updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
+      await syncSummary(state.tableId);
     }
   }
+}
+
+export async function reconnectSeat(options: { tableId: string; userId: string }) {
+  const state = await getTableState(options.tableId);
+  if (!state) {
+    return null;
+  }
+  const seat = state.seats.find((entry) => entry.userId === options.userId);
+  if (!seat || seat.status !== "disconnected") {
+    return state;
+  }
+  seat.status = "active";
+  await updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
+  await syncSummary(state.tableId);
+  return getTableState(state.tableId);
 }

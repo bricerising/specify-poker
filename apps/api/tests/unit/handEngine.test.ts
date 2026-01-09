@@ -60,4 +60,28 @@ describe("hand engine", () => {
     expect(state.hand?.currentStreet).toBe("ended");
     expect(state.hand?.communityCards.length).toBe(5);
   });
+
+  it("allows forced fold when a disconnected seat times out", () => {
+    const table = createTableState();
+    const deck = [
+      "AS",
+      "KS",
+      "QS",
+      "JS",
+      "TS",
+      "9H",
+      "8H",
+      "7H",
+      "6H",
+    ];
+    const started = startHand(table, { deck, now: () => "2026-01-01T00:00:00.000Z" });
+    const seatId = started.hand!.currentTurnSeat;
+    started.seats[seatId].status = "disconnected";
+
+    const result = applyAction(started, seatId, { type: "Fold" }, { allowInactive: true });
+
+    expect(result.accepted).toBe(true);
+    expect(result.table.hand?.currentStreet).toBe("ended");
+    expect(result.table.seats[seatId].status).toBe("active");
+  });
 });

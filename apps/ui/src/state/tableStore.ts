@@ -1,4 +1,5 @@
 import { apiFetch, getApiBaseUrl } from "../services/apiClient";
+import { getToken } from "../services/auth";
 import { isStaleVersion, requestResync, shouldResync } from "../services/wsClient";
 
 export interface TableConfig {
@@ -59,6 +60,8 @@ export interface TableStoreState {
   error?: string;
   chatMessages: ChatMessage[];
   chatError?: string;
+  privateHoleCards: string[] | null;
+  privateHandId: string | null;
 }
 
 export interface TableStore {
@@ -86,6 +89,8 @@ export function createTableStore(): TableStore {
     seatId: null,
     status: "idle",
     chatMessages: [],
+    privateHoleCards: null,
+    privateHandId: null,
   };
 
   const listeners = new Set<(state: TableStoreState) => void>();
@@ -108,8 +113,13 @@ export function createTableStore(): TableStore {
     }
     const apiBase = getApiBaseUrl();
     const baseUrl = wsUrl ?? apiBase.replace(/^http/, "ws") + "/ws";
+    const token = getToken();
+    const url = new URL(baseUrl, window.location.origin);
+    if (token && !url.searchParams.has("token")) {
+      url.searchParams.set("token", token);
+    }
     setState({ status: "connecting" });
-    socket = new WebSocket(baseUrl);
+    socket = new WebSocket(url.toString());
 
     socket.addEventListener("open", () => {
       setState({ status: "connected" });
@@ -134,7 +144,21 @@ export function createTableStore(): TableStore {
         if (shouldResync(currentVersion, incomingVersion)) {
           requestResync(socket, incoming.tableId);
         }
-        setState({ tableState: incoming });
+        const incomingHandId = incoming.hand?.handId ?? null;
+        const clearPrivate =
+          !incomingHandId || (state.privateHandId && state.privateHandId !== incomingHandId);
+        setState({
+          tableState: incoming,
+          ...(clearPrivate ? { privateHoleCards: null, privateHandId: null } : {}),
+        });
+        return;
+      }
+      if (message.type === "HoleCards") {
+        const cards = message.cards as string[] | undefined;
+        const handId = (message.handId as string | undefined) ?? null;
+        if (cards && cards.length === 2) {
+          setState({ privateHoleCards: cards, privateHandId: handId });
+        }
         return;
       }
       if (message.type === "ChatMessage") {
@@ -165,7 +189,7 @@ export function createTableStore(): TableStore {
         body: JSON.stringify({ seatId }),
       });
       const payload = await response.json();
-      setState({ seatId, chatMessages: [], chatError: undefined });
+      setState({ seatId, chatMessages: [], chatError: undefined, privateHoleCards: null, privateHandId: null });
       connect(payload.wsUrl);
       if (socket) {
         socket.addEventListener("open", () => {

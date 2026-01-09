@@ -29,11 +29,11 @@ describe("ws chat hub", () => {
     process.env.JWT_ISSUER = "test-issuer";
     process.env.JWT_AUDIENCE = "test-audience";
 
-    resetTables();
-    resetTableStates();
-    resetModeration();
+    await resetTables();
+    await resetTableStates();
+    await resetModeration();
 
-    const summary = createTable({
+    const summary = await createTable({
       name: "Chat Table",
       ownerId: "owner-1",
       config: {
@@ -45,8 +45,8 @@ describe("ws chat hub", () => {
       },
     });
 
-    joinSeat({ tableId: summary.tableId, seatId: 0, userId: "user-a" });
-    joinSeat({ tableId: summary.tableId, seatId: 1, userId: "user-b" });
+    await joinSeat({ tableId: summary.tableId, seatId: 0, userId: "user-a" });
+    await joinSeat({ tableId: summary.tableId, seatId: 1, userId: "user-b" });
 
     const server = createServer({ useInMemoryTelemetry: true });
     await new Promise<void>((resolve) => server.listen(0, resolve));

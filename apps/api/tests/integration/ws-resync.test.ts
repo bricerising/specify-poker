@@ -27,10 +27,10 @@ describe("ws resync", () => {
     process.env.JWT_ISSUER = "test-issuer";
     process.env.JWT_AUDIENCE = "test-audience";
 
-    resetTables();
-    resetTableStates();
+    await resetTables();
+    await resetTableStates();
 
-    const summary = createTable({
+    const summary = await createTable({
       name: "Resync Table",
       ownerId: "owner-1",
       config: {

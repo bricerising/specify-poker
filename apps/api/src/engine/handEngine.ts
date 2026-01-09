@@ -85,7 +85,11 @@ export function startHand(
   }
 
   const sortedSeats = occupied.map((seat) => seat.seatId).sort((a, b) => a - b);
-  const buttonSeat = sortedSeats[0];
+  const previousButton = table.hand?.buttonSeat;
+  const buttonSeat =
+    typeof previousButton === "number"
+      ? nextActiveSeat(table.seats, previousButton)
+      : sortedSeats[0];
   const smallBlindSeat =
     occupied.length === 2 ? buttonSeat : nextActiveSeat(table.seats, buttonSeat);
   const bigBlindSeat = nextActiveSeat(table.seats, smallBlindSeat);
@@ -157,6 +161,22 @@ function getFoldedSeatIds(seats: TableSeat[]) {
 
 function activeSeatsRemaining(seats: TableSeat[]) {
   return seats.filter((seat) => seat.status === "active" || seat.status === "all_in");
+}
+
+function activeSeats(seats: TableSeat[]) {
+  return seats.filter((seat) => seat.status === "active");
+}
+
+function dealRemainingCommunityCards(hand: HandState) {
+  if (hand.communityCards.length === 0) {
+    hand.communityCards.push(...dealCards(hand.deck, 3));
+  }
+  if (hand.communityCards.length === 3) {
+    hand.communityCards.push(...dealCards(hand.deck, 1));
+  }
+  if (hand.communityCards.length === 4) {
+    hand.communityCards.push(...dealCards(hand.deck, 1));
+  }
 }
 
 function isBettingRoundComplete(hand: HandState, seats: TableSeat[]) {
@@ -233,11 +253,21 @@ function settleShowdown(hand: HandState, seats: TableSeat[]) {
   const { winners } = evaluateWinners(players, hand.communityCards);
   hand.winners = winners;
 
-  const potTotal = hand.pots.reduce((sum, pot) => sum + pot.amount, 0);
-  if (winners.length > 0 && potTotal > 0) {
-    const share = Math.floor(potTotal / winners.length);
-    let remainder = potTotal - share * winners.length;
-    for (const winnerSeatId of winners) {
+  for (const pot of hand.pots) {
+    if (pot.amount <= 0 || pot.eligibleSeatIds.length === 0) {
+      continue;
+    }
+    const potPlayers: Record<number, string[]> = {};
+    for (const seatId of pot.eligibleSeatIds) {
+      potPlayers[seatId] = hand.holeCards[seatId] ?? [];
+    }
+    const { winners: potWinners } = evaluateWinners(potPlayers, hand.communityCards);
+    if (potWinners.length === 0) {
+      continue;
+    }
+    const share = Math.floor(pot.amount / potWinners.length);
+    let remainder = pot.amount - share * potWinners.length;
+    for (const winnerSeatId of potWinners) {
       const seat = seats.find((entry) => entry.seatId === winnerSeatId);
       if (!seat) {
         continue;
@@ -261,7 +291,7 @@ export function applyAction(
   table: TableState,
   seatId: number,
   action: HandActionInput,
-  options: { now?: () => string } = {},
+  options: { now?: () => string; allowInactive?: boolean } = {},
 ) {
   const hand = table.hand;
   if (!hand) {
@@ -277,7 +307,17 @@ export function applyAction(
     return { table, accepted: false, reason: "seat_missing" };
   }
 
-  const validation = validateAction(hand, seat, action);
+  if (
+    seat.status !== "active" &&
+    !(options.allowInactive && seat.status === "disconnected" && (action.type === "Fold" || action.type === "Check"))
+  ) {
+    return { table, accepted: false, reason: "seat_inactive" };
+  }
+
+  const validationSeat = options.allowInactive && seat.status === "disconnected"
+    ? { ...seat, status: "active" as const }
+    : seat;
+  const validation = validateAction(hand, validationSeat, action);
   if (!validation.ok) {
     return { table, accepted: false, reason: validation.reason };
   }
@@ -327,6 +367,7 @@ export function applyAction(
   }
 
   const remaining = activeSeatsRemaining(table.seats);
+  const active = activeSeats(table.seats);
   if (remaining.length === 1) {
     hand.winners = remaining.map((seat) => seat.seatId);
     remaining[0].stack += hand.pots.reduce((sum, pot) => sum + pot.amount, 0);
@@ -337,6 +378,11 @@ export function applyAction(
     }
     hand.currentStreet = "ended";
     hand.endedAt = now();
+    table.status = "lobby";
+  } else if (active.length === 0 || (active.length === 1 && remaining.length > 1)) {
+    dealRemainingCommunityCards(hand);
+    hand.currentStreet = "showdown";
+    settleShowdown(hand, table.seats);
     table.status = "lobby";
   } else if (isBettingRoundComplete(hand, table.seats)) {
     if (hand.currentStreet === "river") {

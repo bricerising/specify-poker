@@ -1,4 +1,5 @@
 import { getFriends } from "./friendsService";
+import { getRedisClient } from "./redisClient";
 
 export interface UserStats {
   handsPlayed: number;
@@ -20,6 +21,7 @@ interface StoredProfile {
 }
 
 const profiles = new Map<string, StoredProfile>();
+const PROFILES_KEY = "poker:profiles";
 
 function createDefaultProfile(userId: string, defaults?: { nickname?: string; avatarUrl?: string | null }) {
   return {
@@ -32,33 +34,52 @@ function createDefaultProfile(userId: string, defaults?: { nickname?: string; av
   };
 }
 
-function ensureProfile(userId: string, defaults?: { nickname?: string; avatarUrl?: string | null }) {
+async function ensureProfile(
+  userId: string,
+  defaults?: { nickname?: string; avatarUrl?: string | null },
+) {
   const existing = profiles.get(userId);
   if (existing) {
     return existing;
   }
+  const redis = await getRedisClient();
+  if (redis) {
+    const payload = await redis.hGet(PROFILES_KEY, userId);
+    if (payload) {
+      const stored = JSON.parse(payload) as StoredProfile;
+      profiles.set(userId, stored);
+      return stored;
+    }
+  }
   const created = createDefaultProfile(userId, defaults);
   profiles.set(userId, created);
+  if (redis) {
+    await redis.hSet(PROFILES_KEY, userId, JSON.stringify(created));
+  }
   return created;
 }
 
-export function getProfile(userId: string, defaults?: { nickname?: string; avatarUrl?: string | null }): UserProfile {
-  const stored = ensureProfile(userId, defaults);
+export async function getProfile(
+  userId: string,
+  defaults?: { nickname?: string; avatarUrl?: string | null },
+): Promise<UserProfile> {
+  const stored = await ensureProfile(userId, defaults);
+  const friends = await getFriends(userId);
   return {
     userId,
     nickname: stored.nickname,
     avatarUrl: stored.avatarUrl,
     stats: { ...stored.stats },
-    friends: getFriends(userId),
+    friends,
   };
 }
 
-export function updateProfile(
+export async function updateProfile(
   userId: string,
   updates: { nickname?: string; avatarUrl?: string | null },
   defaults?: { nickname?: string; avatarUrl?: string | null },
 ) {
-  const stored = ensureProfile(userId, defaults);
+  const stored = await ensureProfile(userId, defaults);
   if (typeof updates.nickname === "string") {
     stored.nickname = updates.nickname;
   }
@@ -66,11 +87,15 @@ export function updateProfile(
     stored.avatarUrl = updates.avatarUrl;
   }
   profiles.set(userId, stored);
+  const redis = await getRedisClient();
+  if (redis) {
+    await redis.hSet(PROFILES_KEY, userId, JSON.stringify(stored));
+  }
   return getProfile(userId);
 }
 
-export function recordHandStats(userId: string, outcome: { played: boolean; won: boolean }) {
-  const stored = ensureProfile(userId);
+export async function recordHandStats(userId: string, outcome: { played: boolean; won: boolean }) {
+  const stored = await ensureProfile(userId);
   if (outcome.played) {
     stored.stats.handsPlayed += 1;
   }
@@ -78,8 +103,16 @@ export function recordHandStats(userId: string, outcome: { played: boolean; won:
     stored.stats.wins += 1;
   }
   profiles.set(userId, stored);
+  const redis = await getRedisClient();
+  if (redis) {
+    await redis.hSet(PROFILES_KEY, userId, JSON.stringify(stored));
+  }
 }
 
-export function resetProfiles() {
+export async function resetProfiles() {
   profiles.clear();
+  const redis = await getRedisClient();
+  if (redis) {
+    await redis.del(PROFILES_KEY);
+  }
 }

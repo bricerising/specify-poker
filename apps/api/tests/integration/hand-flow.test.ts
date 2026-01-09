@@ -78,9 +78,9 @@ describe("hand flow", () => {
     process.env.JWT_ISSUER = "test-issuer";
     process.env.JWT_AUDIENCE = "test-audience";
 
-    resetTables();
-    resetTableStates();
-    const summary = createTable({
+    await resetTables();
+    await resetTableStates();
+    const summary = await createTable({
       name: "Hand Flow",
       ownerId: "owner-1",
       config: {
@@ -122,6 +122,7 @@ describe("hand flow", () => {
 
     let tableState = (await waitForMessage(wsA, (message) => message.type === "TableSnapshot"))
       .tableState;
+    const initialHandId = tableState?.hand?.handId;
 
     expect(tableState?.hand?.currentStreet).toBe("preflop");
 
@@ -139,7 +140,7 @@ describe("hand flow", () => {
 
     const playHand = async () => {
       let guard = 0;
-      while (tableState?.hand && tableState.hand.currentStreet !== "ended") {
+      while (tableState?.hand && tableState.hand.handId === initialHandId) {
         if (guard > 20) {
           throw new Error("hand did not complete");
         }
@@ -160,8 +161,8 @@ describe("hand flow", () => {
 
     await playHand();
 
-    expect(tableState?.hand?.currentStreet).toBe("ended");
-    expect(tableState?.hand?.communityCards.length).toBe(5);
+    expect(tableState?.hand?.handId).not.toBe(initialHandId);
+    expect(tableState?.hand?.currentStreet).toBe("preflop");
 
     wsA.close();
     wsB.close();

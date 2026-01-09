@@ -44,7 +44,7 @@ function normalizeDefaultNickname(primary: string | undefined, fallback: string)
 export function createProfileRouter() {
   const router = express.Router();
 
-  router.get("/api/me", (req, res) => {
+  router.get("/api/me", async (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) {
       return;
@@ -54,10 +54,10 @@ export function createProfileRouter() {
       auth.userId,
     );
     const avatarUrl = (auth.claims?.picture as string | undefined) ?? null;
-    res.status(200).json(getProfile(auth.userId, { nickname, avatarUrl }));
+    res.status(200).json(await getProfile(auth.userId, { nickname, avatarUrl }));
   });
 
-  router.post("/api/profile", (req, res) => {
+  router.post("/api/profile", async (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) {
       return;
@@ -83,18 +83,18 @@ export function createProfileRouter() {
       avatarUrl: (auth.claims?.picture as string | undefined) ?? null,
     };
 
-    res.status(200).json(updateProfile(auth.userId, { nickname, avatarUrl }, defaults));
+    res.status(200).json(await updateProfile(auth.userId, { nickname, avatarUrl }, defaults));
   });
 
-  router.get("/api/friends", (req, res) => {
+  router.get("/api/friends", async (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) {
       return;
     }
-    res.status(200).json({ friends: getFriends(auth.userId) });
+    res.status(200).json({ friends: await getFriends(auth.userId) });
   });
 
-  router.put("/api/friends", (req, res) => {
+  router.put("/api/friends", async (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) {
       return;
@@ -109,7 +109,7 @@ export function createProfileRouter() {
     }
 
     const cleaned = friends.map((entry) => entry.trim()).filter((entry) => entry.length > 0);
-    res.status(200).json({ friends: setFriends(auth.userId, cleaned) });
+    res.status(200).json({ friends: await setFriends(auth.userId, cleaned) });
   });
 
   return router;

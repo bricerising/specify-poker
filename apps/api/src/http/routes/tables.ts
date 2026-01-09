@@ -7,12 +7,12 @@ import { joinSeat, leaveSeat } from "../../services/tableService";
 export function createTablesRouter() {
   const router = express.Router();
 
-  router.get("/api/tables", (_req, res) => {
-    createDefaultTable();
-    res.status(200).json(listTables());
+  router.get("/api/tables", async (_req, res) => {
+    await createDefaultTable();
+    res.status(200).json(await listTables());
   });
 
-  router.post("/api/tables", (req, res) => {
+  router.post("/api/tables", async (req, res) => {
     const auth = req.auth;
     if (!auth) {
       return res.status(401).json({ code: "auth_denied", message: "Missing auth" });
@@ -45,7 +45,7 @@ export function createTablesRouter() {
       return res.status(400).json({ code: "invalid_starting_stack", message: "startingStack required" });
     }
 
-    const summary = createTable({
+    const summary = await createTable({
       name,
       ownerId: auth.userId,
       config: {
@@ -68,7 +68,7 @@ export function createTablesRouter() {
     return res.status(201).json(summary);
   });
 
-  router.post("/api/tables/:tableId/join", (req, res) => {
+  router.post("/api/tables/:tableId/join", async (req, res) => {
     const auth = req.auth;
     if (!auth) {
       return res.status(401).json({ code: "auth_denied", message: "Missing auth" });
@@ -79,7 +79,7 @@ export function createTablesRouter() {
       return res.status(400).json({ code: "invalid_seat", message: "seatId required" });
     }
 
-    const result = joinSeat({
+    const result = await joinSeat({
       tableId: req.params.tableId,
       seatId,
       userId: auth.userId,
@@ -109,13 +109,13 @@ export function createTablesRouter() {
     });
   });
 
-  router.post("/api/tables/:tableId/leave", (req, res) => {
+  router.post("/api/tables/:tableId/leave", async (req, res) => {
     const auth = req.auth;
     if (!auth) {
       return res.status(401).json({ code: "auth_denied", message: "Missing auth" });
     }
 
-    const result = leaveSeat({ tableId: req.params.tableId, userId: auth.userId });
+    const result = await leaveSeat({ tableId: req.params.tableId, userId: auth.userId });
     if (!result.ok) {
       return res.status(404).json({ code: result.reason, message: "Not seated" });
     }

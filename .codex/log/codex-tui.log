@@ -8736,3 +8736,3668 @@
 2026-01-09T19:36:55.221432Z  INFO ghost snapshot blocking task finished
 2026-01-09T19:36:55.221501Z  INFO ghost commit captured: 072b1fe8d29724a68df62f8c220b5af3348daaf1
 2026-01-09T19:36:55.221515Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:38:00.780156Z  INFO Shutting down Codex instance
+2026-01-09T19:39:21.383434Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":".specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:39:25.676337Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg --files","workdir":"/Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp"}
+2026-01-09T19:39:28.234151Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/checklists/requirements.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:39:34.685270Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/tasks.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:39:39.618479Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/plan.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:39:44.477380Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/data-model.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:39:45.402294Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/research.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:39:46.322006Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/quickstart.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:39:47.258607Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/contracts/openapi.yaml","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:39:48.564145Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/contracts/ws-messages.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:39:53.732253Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"git rev-parse --git-dir 2>/dev/null","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:39:57.421415Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg --files -g '.gitignore' -g '.dockerignore' -g '.eslintignore' -g '.prettierignore' -g '.npmignore' -g '.terraformignore' -g '.helmignore' -g '.eslintrc*' -g 'eslint.config.*' -g '.prettierrc*' -g 'Dockerfile*' -g '*.tf'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:40:02.260447Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/.gitignore","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:40:03.025180Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/.dockerignore","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:40:03.809334Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/.eslintignore","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:40:04.610475Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/.prettierignore","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:40:05.715976Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/.npmignore","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:40:19.238101Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/spec.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:40:30.279727Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"TODO|FIXME|HACK\" /Users/bricerising/git/brice@github/specify-poker","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:40:34.795637Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/handEngine.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:40:39.277544Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '220,520p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/handEngine.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:40:48.011833Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/types.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:41:04.672883Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/tableRegistry.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:41:09.919490Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/tableState.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:41:15.039792Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,260p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/actionRules.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:41:20.260903Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/handEval.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:41:25.487814Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,260p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:41:27.941048Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '260,520p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:41:50.367072Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,260p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/wsClient.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:41:53.764639Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,260p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/state/tableStore.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:42:09.323921Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/state/deriveLegalActions.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:42:42.730890Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"nl -ba /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/handEngine.ts | sed -n '50,140p'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:42:48.531049Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"nl -ba /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/handEngine.ts | sed -n '220,340p'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:42:54.469803Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"nl -ba /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/actionRules.ts | sed -n '1,200p'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:43:00.717104Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"nl -ba /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/state/deriveLegalActions.ts | sed -n '1,200p'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:43:06.021644Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/eventStore.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:43:13.085091Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/unit/replay.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:43:16.588536Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/handReplay.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:43:23.449945Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,260p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/tableService.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:43:33.365056Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"nl -ba /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts | sed -n '1,200p'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:43:40.654002Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,260p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/connectionManager.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:44:36.587647Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,260p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/pages/TablePage.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:45:00.527554Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"holeCards|deck\" /Users/bricerising/git/brice@github/specify-poker/apps","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:45:30.223984Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/handEngine.ts
+@@
+-  const sortedSeats = occupied.map((seat) => seat.seatId).sort((a, b) => a - b);
+-  const buttonSeat = sortedSeats[0];
++  const sortedSeats = occupied.map((seat) => seat.seatId).sort((a, b) => a - b);
++  const previousButton = table.hand?.buttonSeat;
++  const buttonSeat =
++    typeof previousButton === "number"
++      ? nextActiveSeat(table.seats, previousButton)
++      : sortedSeats[0];
+@@
+ function settleShowdown(hand: HandState, seats: TableSeat[]) {
+   const eligibleSeats = seats.filter((seat) => seat.status !== "folded" && seat.userId);
+   const players: Record<number, string[]> = {};
+   for (const seat of eligibleSeats) {
+     players[seat.seatId] = hand.holeCards[seat.seatId] ?? [];
+   }
+-  const { winners } = evaluateWinners(players, hand.communityCards);
+-  hand.winners = winners;
+-
+-  const potTotal = hand.pots.reduce((sum, pot) => sum + pot.amount, 0);
+-  if (winners.length > 0 && potTotal > 0) {
+-    const share = Math.floor(potTotal / winners.length);
+-    let remainder = potTotal - share * winners.length;
+-    for (const winnerSeatId of winners) {
+-      const seat = seats.find((entry) => entry.seatId === winnerSeatId);
+-      if (!seat) {
+-        continue;
+-      }
+-      seat.stack += share + (remainder > 0 ? 1 : 0);
+-      remainder = Math.max(0, remainder - 1);
+-    }
+-  }
++  const { winners } = evaluateWinners(players, hand.communityCards);
++  hand.winners = winners;
++
++  for (const pot of hand.pots) {
++    if (pot.amount <= 0 || pot.eligibleSeatIds.length === 0) {
++      continue;
++    }
++    const potPlayers: Record<number, string[]> = {};
++    for (const seatId of pot.eligibleSeatIds) {
++      potPlayers[seatId] = hand.holeCards[seatId] ?? [];
++    }
++    const { winners: potWinners } = evaluateWinners(potPlayers, hand.communityCards);
++    if (potWinners.length === 0) {
++      continue;
++    }
++    const share = Math.floor(pot.amount / potWinners.length);
++    let remainder = pot.amount - share * potWinners.length;
++    for (const winnerSeatId of potWinners) {
++      const seat = seats.find((entry) => entry.seatId === winnerSeatId);
++      if (!seat) {
++        continue;
++      }
++      seat.stack += share + (remainder > 0 ? 1 : 0);
++      remainder = Math.max(0, remainder - 1);
++    }
++  }
+*** End Patch
+2026-01-09T19:45:40.238115Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/actionRules.ts
+@@
+-  if (toCall <= 0) {
+-    actions.push({ type: "Check" });
+-    if (seat.stack > 0) {
+-      actions.push({ type: "Bet", minAmount: hand.bigBlind, maxAmount: seat.stack });
+-    }
+-  } else {
++  if (toCall <= 0) {
++    actions.push({ type: "Check" });
++    if (seat.stack > 0) {
++      if (hand.currentBet === 0) {
++        actions.push({ type: "Bet", minAmount: hand.bigBlind, maxAmount: seat.stack });
++      } else {
++        const minRaise = hand.currentBet + hand.minRaise;
++        if (seat.stack + (hand.roundContributions[seat.seatId] ?? 0) > minRaise) {
++          actions.push({
++            type: "Raise",
++            minAmount: minRaise,
++            maxAmount: seat.stack + (hand.roundContributions[seat.seatId] ?? 0),
++          });
++        }
++      }
++    }
++  } else {
+*** End Patch
+2026-01-09T19:45:47.119328Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/state/deriveLegalActions.ts
+@@
+-  if (toCall <= 0) {
+-    actions.push({ type: "Check" });
+-    actions.push({ type: "Bet", minAmount: hand.bigBlind, maxAmount: seat.stack });
+-  } else {
++  if (toCall <= 0) {
++    actions.push({ type: "Check" });
++    if (hand.currentBet === 0) {
++      actions.push({ type: "Bet", minAmount: hand.bigBlind, maxAmount: seat.stack });
++    } else {
++      const minRaise = hand.currentBet + hand.minRaise;
++      if (seat.stack + contributed > minRaise) {
++        actions.push({ type: "Raise", minAmount: minRaise, maxAmount: seat.stack + contributed });
++      }
++    }
++  } else {
+*** End Patch
+2026-01-09T19:46:05.042794Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts
+@@
+-import { applyTableAction, joinSeat, leaveSeat } from "../services/tableService";
++import { applyTableAction, joinSeat, leaveSeat } from "../services/tableService";
+ import { getTableState } from "../services/tableState";
+ import { scheduleTurnTimeout, clearTurnTimeout } from "../services/turnTimer";
+ import { checkWsRateLimit, parseActionType, parseSeatId, parseTableId } from "./validators";
+@@
+ function broadcastTable(tableId: string, message: Record<string, unknown>) {
+@@
+ }
+ 
++function redactTableState(tableState: ReturnType<typeof getTableState>) {
++  if (!tableState) {
++    return tableState;
++  }
++  if (!tableState.hand) {
++    return tableState;
++  }
++  const { hand } = tableState;
++  return {
++    ...tableState,
++    hand: {
++      ...hand,
++      holeCards: {},
++      deck: [],
++    },
++  };
++}
++
+ export function broadcastTableState(tableId: string) {
+   const tableState = getTableState(tableId);
+   if (!tableState) {
+     return;
+   }
+   broadcastTable(tableId, {
+     type: "TablePatch",
+     tableId,
+     handId: tableState.hand?.handId,
+-    tableState,
++    tableState: redactTableState(tableState),
+   });
+ }
+@@
+-  const durationMs = Number(process.env.TURN_TIMER_MS ?? 15000);
++  const durationMs = Number(process.env.TURN_TIMER_MS ?? 20000);
+@@
+   const tableState = getTableState(tableId);
+   if (tableState) {
+-    send(client.socket, { type: "TableSnapshot", tableState });
++    send(client.socket, { type: "TableSnapshot", tableState: redactTableState(tableState) });
+     scheduleTurn(tableId);
+   }
+@@
+-      send(client.socket, { type: "TablePatch",
+-        tableId,
+-        handId: result.tableState.hand?.handId,
+-        tableState: result.tableState,
+-      });
++      send(client.socket, {
++        type: "TablePatch",
++        tableId,
++        handId: result.tableState.hand?.handId,
++        tableState: redactTableState(result.tableState),
++      });
+@@
+     broadcastTable(tableId, {
+       type: "TablePatch",
+       tableId,
+       handId: result.tableState.hand?.handId,
+-      tableState: result.tableState,
++      tableState: redactTableState(result.tableState),
+     });
+     scheduleTurn(tableId);
+   }
+@@
+   if (result.ok && result.tableState) {
+     broadcastTable(payload.tableId, {
+       type: "TablePatch",
+       tableId: payload.tableId,
+       handId: result.tableState.hand?.handId,
+-      tableState: result.tableState,
++      tableState: redactTableState(result.tableState),
+     });
+     scheduleTurn(payload.tableId);
+   }
+ }
+@@
+   if (result.ok && result.tableState) {
+     broadcastTable(payload.tableId, {
+       type: "TablePatch",
+       tableId: payload.tableId,
+       handId: result.tableState.hand?.handId,
+-      tableState: result.tableState,
++      tableState: redactTableState(result.tableState),
+     });
+   }
+ }
+@@
+   if (!tableState) {
+     return;
+   }
+-  send(client.socket, { type: "TableSnapshot", tableState });
++  send(client.socket, { type: "TableSnapshot", tableState: redactTableState(tableState) });
+   scheduleTurn(tableId);
+ }
+*** End Patch
+2026-01-09T19:46:11.436630Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"nl -ba /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts | sed -n '1,220p'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:46:17.019817Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"nl -ba /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts | sed -n '220,520p'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:46:31.531855Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts
+@@
+ function broadcastTable(tableId: string, message: Record<string, unknown>) {
+@@
+ }
+ 
++function redactTableState(tableState: ReturnType<typeof getTableState>) {
++  if (!tableState || !tableState.hand) {
++    return tableState;
++  }
++  const { hand } = tableState;
++  return {
++    ...tableState,
++    hand: {
++      ...hand,
++      holeCards: {},
++      deck: [],
++    },
++  };
++}
++
+ export function broadcastTableState(tableId: string) {
+   const tableState = getTableState(tableId);
+   if (!tableState) {
+     return;
+   }
+   broadcastTable(tableId, {
+     type: "TablePatch",
+     tableId,
+     handId: tableState.hand?.handId,
+-    tableState,
++    tableState: redactTableState(tableState),
+   });
+ }
+@@
+-  const durationMs = Number(process.env.TURN_TIMER_MS ?? 15000);
++  const durationMs = Number(process.env.TURN_TIMER_MS ?? 20000);
+@@
+-        broadcastTable(tableId, {
+-          type: "TablePatch",
+-          tableId,
+-          handId: result.tableState.hand?.handId,
+-          tableState: result.tableState,
+-        });
++        broadcastTable(tableId, {
++          type: "TablePatch",
++          tableId,
++          handId: result.tableState.hand?.handId,
++          tableState: redactTableState(result.tableState),
++        });
+@@
+   const tableState = getTableState(tableId);
+   if (tableState) {
+-    send(client.socket, { type: "TableSnapshot", tableState });
++    send(client.socket, { type: "TableSnapshot", tableState: redactTableState(tableState) });
+     scheduleTurn(tableId);
+   }
+@@
+   if (result.ok && result.tableState) {
+     broadcastTable(tableId, {
+       type: "TablePatch",
+       tableId,
+       handId: result.tableState.hand?.handId,
+-      tableState: result.tableState,
++      tableState: redactTableState(result.tableState),
+     });
+     scheduleTurn(tableId);
+   }
+@@
+   if (result.ok && result.tableState) {
+     broadcastTable(payload.tableId, {
+       type: "TablePatch",
+       tableId: payload.tableId,
+       handId: result.tableState.hand?.handId,
+-      tableState: result.tableState,
++      tableState: redactTableState(result.tableState),
+     });
+     scheduleTurn(payload.tableId);
+   }
+@@
+   if (result.ok && result.tableState) {
+     broadcastTable(payload.tableId, {
+       type: "TablePatch",
+       tableId: payload.tableId,
+       handId: result.tableState.hand?.handId,
+-      tableState: result.tableState,
++      tableState: redactTableState(result.tableState),
+     });
+   }
+@@
+   if (!tableState) {
+     return;
+   }
+-  send(client.socket, { type: "TableSnapshot", tableState });
++  send(client.socket, { type: "TableSnapshot", tableState: redactTableState(tableState) });
+   scheduleTurn(tableId);
+ }
+*** End Patch
+2026-01-09T19:50:41.150885Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"disconnect|disconnected|reconnect|timeout\" /Users/bricerising/git/brice@github/specify-poker/apps/api/tests","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:50:49.642278Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/timer.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:50:56.473869Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"registerConnection|unregisterConnection\" /Users/bricerising/git/brice@github/specify-poker/apps/api/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:51:00.673681Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,140p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/server.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:51:21.977760Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"applyTableAction\\(\" /Users/bricerising/git/brice@github/specify-poker/apps/api/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:51:28.317294Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"applyAction\\(\" /Users/bricerising/git/brice@github/specify-poker/apps/api/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:51:34.159165Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"applyAction\\(\" /Users/bricerising/git/brice@github/specify-poker/apps/api/tests","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:51:54.019825Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"joinSeat|JoinSeat|seatId\" /Users/bricerising/git/brice@github/specify-poker/apps/ui/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:51:59.578447Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,140p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/pages/LobbyPage.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:52:23.680835Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/unit/handEngine.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:52:31.605877Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/handEngine.ts
+@@
+ export function applyAction(
+   table: TableState,
+   seatId: number,
+   action: HandActionInput,
+-  options: { now?: () => string } = {},
++  options: { now?: () => string; allowInactive?: boolean } = {},
+ ) {
+   const hand = table.hand;
+   if (!hand) {
+     return { table, accepted: false, reason: "no_hand" };
+   }
+@@
+   const seat = table.seats.find((entry) => entry.seatId === seatId);
+   if (!seat) {
+     return { table, accepted: false, reason: "seat_missing" };
+   }
+ 
+-  const validation = validateAction(hand, seat, action);
++  if (
++    seat.status !== "active" &&
++    !(options.allowInactive && seat.status === "disconnected" && (action.type === "Fold" || action.type === "Check"))
++  ) {
++    return { table, accepted: false, reason: "seat_inactive" };
++  }
++
++  const validationSeat = options.allowInactive && seat.status === "disconnected"
++    ? { ...seat, status: "active" as const }
++    : seat;
++  const validation = validateAction(hand, validationSeat, action);
+*** End Patch
+2026-01-09T19:52:38.262631Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/tableService.ts
+@@
+-export function applyTableAction(options: {
+-  tableId: string;
+-  seatId: number;
+-  action: HandActionInput;
+-}) {
++export function applyTableAction(options: {
++  tableId: string;
++  seatId: number;
++  action: HandActionInput;
++  allowInactive?: boolean;
++}) {
+   const state = getTableState(options.tableId);
+   if (!state) {
+     return { ok: false, reason: "missing_table" as const };
+   }
+ 
+   const previousStreet = state.hand?.currentStreet ?? null;
+-  const result = applyAction(state, options.seatId, options.action);
++  const result = applyAction(state, options.seatId, options.action, {
++    allowInactive: options.allowInactive,
++  });
+*** End Patch
+2026-01-09T19:52:45.634080Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/tableService.ts
+@@
+ export function joinSeat(options: { tableId: string; seatId: number; userId: string }) {
+   const summary = getTable(options.tableId);
+   if (!summary) {
+     return { ok: false, reason: "missing_table" as const };
+   }
+   const state = ensureTableState(summary);
+ 
+   const seat = state.seats.find((entry) => entry.seatId === options.seatId);
+-  if (!seat || seat.status !== "empty") {
++  if (!seat) {
++    return { ok: false, reason: "seat_unavailable" as const };
++  }
++
++  if (seat.userId === options.userId && seat.status === "disconnected") {
++    seat.status = "active";
++    updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
++    syncSummary(state.tableId);
++    return { ok: true, tableState: getTableState(state.tableId) };
++  }
++
++  if (seat.status !== "empty") {
+     return { ok: false, reason: "seat_unavailable" as const };
+   }
+*** End Patch
+2026-01-09T19:52:58.840480Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts
+@@
+       const result = applyTableAction({
+         tableId,
+         seatId,
+         action,
++        allowInactive: true,
+       });
+*** End Patch
+2026-01-09T19:53:13.790095Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/tableService.ts
+@@
+ export function markSeatDisconnected(userId: string) {
+   for (const state of listTableStates()) {
+     const seat = state.seats.find((entry) => entry.userId === userId);
+     if (seat && seat.status === "active") {
+       seat.status = "disconnected";
+       updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
+       syncSummary(state.tableId);
+     }
+   }
+ }
++
++export function reconnectSeat(options: { tableId: string; userId: string }) {
++  const state = getTableState(options.tableId);
++  if (!state) {
++    return null;
++  }
++  const seat = state.seats.find((entry) => entry.userId === options.userId);
++  if (!seat || seat.status !== "disconnected") {
++    return state;
++  }
++  seat.status = "active";
++  updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
++  syncSummary(state.tableId);
++  return getTableState(state.tableId);
++}
+*** End Patch
+2026-01-09T19:53:20.973377Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts
+@@
+-import { applyTableAction, joinSeat, leaveSeat } from "../services/tableService";
++import { applyTableAction, joinSeat, leaveSeat, reconnectSeat } from "../services/tableService";
+@@
+-  const tableState = getTableState(tableId);
++  const tableState = reconnectSeat({ tableId, userId: client.userId }) ?? getTableState(tableId);
+   if (tableState) {
+     send(client.socket, { type: "TableSnapshot", tableState: redactTableState(tableState) });
+     scheduleTurn(tableId);
+   }
+@@
+-  const tableState = getTableState(tableId);
++  const tableState = reconnectSeat({ tableId, userId: client.userId }) ?? getTableState(tableId);
+   if (!tableState) {
+     return;
+   }
+*** End Patch
+2026-01-09T19:53:32.427973Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/unit/handEngine.test.ts
+@@
+   it("advances streets through showdown", () => {
+@@
+     expect(state.hand?.currentStreet).toBe("ended");
+     expect(state.hand?.communityCards.length).toBe(5);
+   });
++
++  it("allows forced fold when a disconnected seat times out", () => {
++    const table = createTableState();
++    const deck = [
++      "AS",
++      "KS",
++      "QS",
++      "JS",
++      "TS",
++      "9H",
++      "8H",
++      "7H",
++      "6H",
++    ];
++    const started = startHand(table, { deck, now: () => "2026-01-01T00:00:00.000Z" });
++    const seatId = started.hand!.currentTurnSeat;
++    started.seats[seatId].status = "disconnected";
++
++    const result = applyAction(started, seatId, { type: "Fold" }, { allowInactive: true });
++
++    expect(result.accepted).toBe(true);
++    expect(result.table.seats[seatId].status).toBe("folded");
++  });
+ });
+*** End Patch
+2026-01-09T19:54:21.335787Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/moderation.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:54:29.363997Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,260p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/moderation.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:54:35.917386Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/server.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:54:42.067988Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/observability/httpTracing.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:54:53.838117Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,260p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/router.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:54:58.548108Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/middleware/auth.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:55:05.573592Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/middleware/rateLimit.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:55:14.417494Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/auth/jwt.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:56:05.032852Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,260p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/observability/otel.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:56:42.264185Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/moderationService.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:57:36.609191Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"npx vitest apps/api/tests/integration/moderation.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:57:44.176717Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/package.json","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:57:48.941428Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg --files -g 'vitest.config.*' -g 'vite.config.*'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:57:52.115917Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/vitest.config.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:58:25.333456Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/unit/handEngine.test.ts
+@@
+-    expect(result.accepted).toBe(true);
+-    expect(result.table.seats[seatId].status).toBe("folded");
++    expect(result.accepted).toBe(true);
++    expect(result.table.hand?.currentStreet).toBe("ended");
++    expect(result.table.seats[seatId].status).toBe("active");
+   });
+ });
+*** End Patch
+2026-01-09T19:58:45.467543Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,260p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/tables.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:59:11.798199Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"JWT_HS256_SECRET\" /Users/bricerising/git/brice@github/specify-poker/apps/api/tests","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:00:17.211981Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,120p' /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/create-table.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:00:33.994881Z  WARN codex_core::codex: stream disconnected - retrying turn (1/5 in 204ms)...
+2026-01-09T20:02:02.982692Z  INFO codex_core::codex: interrupt received: abort current task, if any
+2026-01-09T20:06:20.640523Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/docker-compose.yml","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:06:25.084964Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"in-memory|Map<|new Map\" /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:06:42.143685Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/profileService.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:06:45.727809Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/friendsService.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:06:51.437113Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/pushNotifications.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:06:58.325762Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/moderationService.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:07:36.810891Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/profile.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:07:40.415125Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/push.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:07:44.711240Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,260p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/chatHub.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:08:05.846417Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/statTracker.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:08:15.533681Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/audit.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:08:25.652051Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/redisClient.ts
++import { createClient, RedisClientType } from "redis";
++
++let client: RedisClientType | null = null;
++let connection: Promise<RedisClientType | null> | null = null;
++
++function getRedisUrl() {
++  const url = process.env.REDIS_URL?.trim();
++  return url && url.length > 0 ? url : null;
++}
++
++export function isRedisEnabled() {
++  return Boolean(getRedisUrl());
++}
++
++export async function getRedisClient() {
++  const url = getRedisUrl();
++  if (!url) {
++    return null;
++  }
++  if (client) {
++    return client;
++  }
++  if (!connection) {
++    client = createClient({ url });
++    client.on("error", (error) => {
++      console.warn("redis.error", { message: error.message });
++    });
++    connection = client.connect().then(() => client).catch((error) => {
++      console.warn("redis.connect.failed", { message: error.message });
++      return null;
++    });
++  }
++  return connection;
++}
++
++export async function closeRedisClient() {
++  if (client) {
++    await client.quit();
++  }
++  client = null;
++  connection = null;
++}
+*** End Patch
+2026-01-09T20:08:47.789314Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/tableRegistry.ts
+@@
+-import { randomUUID } from "crypto";
+-
+-import { ensureTableState } from "./tableState";
+-import { TableSummary } from "./tableTypes";
+-
+-const tables = new Map<string, TableSummary>();
+-
+-export function createTable(input: Omit<TableSummary, "tableId" | "seatsTaken" | "inProgress">) {
+-  const tableId = randomUUID();
+-  const summary: TableSummary = {
+-    tableId,
+-    name: input.name,
+-    ownerId: input.ownerId,
+-    config: input.config,
+-    seatsTaken: 0,
+-    inProgress: false,
+-  };
+-  tables.set(tableId, summary);
+-  ensureTableState(summary);
+-  return summary;
+-}
+-
+-export function listTables() {
+-  return Array.from(tables.values());
+-}
+-
+-export function getTable(tableId: string) {
+-  return tables.get(tableId) ?? null;
+-}
+-
+-export function updateTable(tableId: string, updater: (table: TableSummary) => TableSummary) {
+-  const current = tables.get(tableId);
+-  if (!current) {
+-    return null;
+-  }
+-  const next = updater(current);
+-  tables.set(tableId, next);
+-  return next;
+-}
+-
+-export function resetTables() {
+-  tables.clear();
+-}
+-
+-export function createDefaultTable() {
+-  if (tables.size > 0) {
+-    return null;
+-  }
+-  return createTable({
+-    name: "Main Table",
+-    ownerId: "system",
+-    config: {
+-      smallBlind: 5,
+-      bigBlind: 10,
+-      maxPlayers: 6,
+-      startingStack: 500,
+-      bettingStructure: "NoLimit",
+-    },
+-  });
+-}
++import { randomUUID } from "crypto";
++
++import { getRedisClient } from "./redisClient";
++import { ensureTableState } from "./tableState";
++import { TableSummary } from "./tableTypes";
++
++const tables = new Map<string, TableSummary>();
++const TABLES_KEY = "poker:tables";
++
++function cacheTable(summary: TableSummary) {
++  tables.set(summary.tableId, summary);
++  return summary;
++}
++
++export async function createTable(
++  input: Omit<TableSummary, "tableId" | "seatsTaken" | "inProgress">,
++) {
++  const tableId = randomUUID();
++  const summary: TableSummary = {
++    tableId,
++    name: input.name,
++    ownerId: input.ownerId,
++    config: input.config,
++    seatsTaken: 0,
++    inProgress: false,
++  };
++  const redis = await getRedisClient();
++  if (redis) {
++    await redis.hSet(TABLES_KEY, tableId, JSON.stringify(summary));
++  }
++  cacheTable(summary);
++  await ensureTableState(summary);
++  return summary;
++}
++
++export async function listTables() {
++  const redis = await getRedisClient();
++  if (!redis) {
++    return Array.from(tables.values());
++  }
++  const entries = await redis.hGetAll(TABLES_KEY);
++  const list = Object.values(entries).map((value) => JSON.parse(value) as TableSummary);
++  list.forEach((summary) => cacheTable(summary));
++  return list;
++}
++
++export async function getTable(tableId: string) {
++  const cached = tables.get(tableId);
++  if (cached) {
++    return cached;
++  }
++  const redis = await getRedisClient();
++  if (!redis) {
++    return null;
++  }
++  const payload = await redis.hGet(TABLES_KEY, tableId);
++  if (!payload) {
++    return null;
++  }
++  return cacheTable(JSON.parse(payload) as TableSummary);
++}
++
++export async function updateTable(tableId: string, updater: (table: TableSummary) => TableSummary) {
++  const current = await getTable(tableId);
++  if (!current) {
++    return null;
++  }
++  const next = updater(current);
++  const redis = await getRedisClient();
++  if (redis) {
++    await redis.hSet(TABLES_KEY, tableId, JSON.stringify(next));
++  }
++  cacheTable(next);
++  return next;
++}
++
++export async function resetTables() {
++  tables.clear();
++  const redis = await getRedisClient();
++  if (redis) {
++    await redis.del(TABLES_KEY);
++  }
++}
++
++export async function createDefaultTable() {
++  const existing = await listTables();
++  if (existing.length > 0) {
++    return null;
++  }
++  return createTable({
++    name: "Main Table",
++    ownerId: "system",
++    config: {
++      smallBlind: 5,
++      bigBlind: 10,
++      maxPlayers: 6,
++      startingStack: 500,
++      bettingStructure: "NoLimit",
++    },
++  });
++}
+*** End Patch
+2026-01-09T20:09:16.462852Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/tableState.ts
+@@
+-import { startHand } from "../engine/handEngine";
+-import { TableSeat, TableState } from "../engine/types";
+-import { TableSummary } from "./tableTypes";
+-
+-const tableStates = new Map<string, TableState>();
+-
+-function createSeats(maxPlayers: number): TableSeat[] {
+-  return Array.from({ length: maxPlayers }, (_, seatId) => ({
+-    seatId,
+-    userId: null,
+-    stack: 0,
+-    status: "empty" as const,
+-  }));
+-}
+-
+-export function ensureTableState(summary: TableSummary) {
+-  const existing = tableStates.get(summary.tableId);
+-  if (existing) {
+-    return existing;
+-  }
+-
+-  const state: TableState = {
+-    tableId: summary.tableId,
+-    name: summary.name,
+-    ownerId: summary.ownerId,
+-    config: summary.config,
+-    seats: createSeats(summary.config.maxPlayers),
+-    status: "lobby",
+-    hand: null,
+-    version: 0,
+-  };
+-
+-  tableStates.set(summary.tableId, state);
+-  return state;
+-}
+-
+-export function getTableState(tableId: string) {
+-  return tableStates.get(tableId) ?? null;
+-}
+-
+-export function listTableStates() {
+-  return Array.from(tableStates.values());
+-}
+-
+-export function updateTableState(tableId: string, updater: (state: TableState) => TableState) {
+-  const current = tableStates.get(tableId);
+-  if (!current) {
+-    return null;
+-  }
+-  const next = updater({ ...current, seats: [...current.seats] });
+-  tableStates.set(tableId, next);
+-  return next;
+-}
+-
+-export function resetTableStates() {
+-  tableStates.clear();
+-}
+-
+-export function startHandIfReady(tableId: string) {
+-  return updateTableState(tableId, (state) => {
+-    if (state.status === "in_hand") {
+-      return state;
+-    }
+-    const readySeats = state.seats.filter((seat) => seat.status === "active");
+-    if (readySeats.length < 2) {
+-      return state;
+-    }
+-    return startHand(state);
+-  });
+-}
++import { startHand } from "../engine/handEngine";
++import { TableSeat, TableState } from "../engine/types";
++import { getRedisClient } from "./redisClient";
++import { TableSummary } from "./tableTypes";
++
++const tableStates = new Map<string, TableState>();
++const TABLE_STATE_KEY = "poker:tableState";
++const TABLE_STATE_IDS_KEY = "poker:tableState:ids";
++
++function createSeats(maxPlayers: number): TableSeat[] {
++  return Array.from({ length: maxPlayers }, (_, seatId) => ({
++    seatId,
++    userId: null,
++    stack: 0,
++    status: "empty" as const,
++  }));
++}
++
++function cacheState(state: TableState) {
++  tableStates.set(state.tableId, state);
++  return state;
++}
++
++function getStateKey(tableId: string) {
++  return `${TABLE_STATE_KEY}:${tableId}`;
++}
++
++export async function ensureTableState(summary: TableSummary) {
++  const existing = tableStates.get(summary.tableId);
++  if (existing) {
++    return existing;
++  }
++
++  const state: TableState = {
++    tableId: summary.tableId,
++    name: summary.name,
++    ownerId: summary.ownerId,
++    config: summary.config,
++    seats: createSeats(summary.config.maxPlayers),
++    status: "lobby",
++    hand: null,
++    version: 0,
++  };
++
++  const redis = await getRedisClient();
++  if (redis) {
++    await redis.set(getStateKey(summary.tableId), JSON.stringify(state));
++    await redis.sAdd(TABLE_STATE_IDS_KEY, summary.tableId);
++  }
++
++  return cacheState(state);
++}
++
++export async function getTableState(tableId: string) {
++  const cached = tableStates.get(tableId);
++  if (cached) {
++    return cached;
++  }
++  const redis = await getRedisClient();
++  if (!redis) {
++    return null;
++  }
++  const payload = await redis.get(getStateKey(tableId));
++  if (!payload) {
++    return null;
++  }
++  return cacheState(JSON.parse(payload) as TableState);
++}
++
++export async function listTableStates() {
++  const redis = await getRedisClient();
++  if (!redis) {
++    return Array.from(tableStates.values());
++  }
++  const tableIds = await redis.sMembers(TABLE_STATE_IDS_KEY);
++  const entries = await Promise.all(
++    tableIds.map(async (tableId) => {
++      const payload = await redis.get(getStateKey(tableId));
++      return payload ? (JSON.parse(payload) as TableState) : null;
++    }),
++  );
++  const list = entries.filter((entry): entry is TableState => Boolean(entry));
++  list.forEach((state) => cacheState(state));
++  return list;
++}
++
++export async function updateTableState(
++  tableId: string,
++  updater: (state: TableState) => TableState,
++) {
++  const current = await getTableState(tableId);
++  if (!current) {
++    return null;
++  }
++  const next = updater({ ...current, seats: [...current.seats] });
++  const redis = await getRedisClient();
++  if (redis) {
++    await redis.set(getStateKey(tableId), JSON.stringify(next));
++    await redis.sAdd(TABLE_STATE_IDS_KEY, tableId);
++  }
++  return cacheState(next);
++}
++
++export async function resetTableStates() {
++  tableStates.clear();
++  const redis = await getRedisClient();
++  if (redis) {
++    const tableIds = await redis.sMembers(TABLE_STATE_IDS_KEY);
++    const keys = tableIds.map((tableId) => getStateKey(tableId));
++    if (keys.length > 0) {
++      await redis.del(keys);
++    }
++    await redis.del(TABLE_STATE_IDS_KEY);
++  }
++}
++
++export async function startHandIfReady(tableId: string) {
++  return updateTableState(tableId, (state) => {
++    if (state.status === "in_hand") {
++      return state;
++    }
++    const readySeats = state.seats.filter((seat) => seat.status === "active");
++    if (readySeats.length < 2) {
++      return state;
++    }
++    return startHand(state);
++  });
++}
+*** End Patch
+2026-01-09T20:09:24.245484Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/eventStore.ts
+@@
+ export interface EventStore {
+-  append(event: HandEvent): void;
+-  list(handId: string): HandEvent[];
++  append(event: HandEvent): Promise<void>;
++  list(handId: string): Promise<HandEvent[]>;
+ }
+ 
+ class InMemoryEventStore implements EventStore {
+   private readonly eventsByHand = new Map<string, HandEvent[]>();
+ 
+-  append(event: HandEvent) {
++  async append(event: HandEvent) {
+     const list = this.eventsByHand.get(event.handId) ?? [];
+     list.push(event);
+     this.eventsByHand.set(event.handId, list);
+@@
+-  list(handId: string) {
++  async list(handId: string) {
+     return [...(this.eventsByHand.get(handId) ?? [])];
+   }
+ 
+-  reset() {
++  reset() {
+     this.eventsByHand.clear();
+   }
+ }
+@@
+ export const eventStore = createInMemoryEventStore();
+ 
+-export function resetEventStore() {
++export function resetEventStore() {
+   eventStore.reset();
+ }
+*** End Patch
+2026-01-09T20:09:41.107393Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/eventStore.ts
+@@
+-export interface EventStore {
+-  append(event: HandEvent): Promise<void>;
+-  list(handId: string): Promise<HandEvent[]>;
+-}
++import { getRedisClient } from "./redisClient";
++
++export interface EventStore {
++  append(event: HandEvent): Promise<void>;
++  list(handId: string): Promise<HandEvent[]>;
++  reset(): Promise<void>;
++}
+@@
+-class InMemoryEventStore implements EventStore {
++class InMemoryEventStore implements EventStore {
+   private readonly eventsByHand = new Map<string, HandEvent[]>();
+@@
+-  reset() {
++  async reset() {
+     this.eventsByHand.clear();
+   }
+ }
+ 
+-export function createInMemoryEventStore() {
+-  return new InMemoryEventStore();
+-}
++class RedisEventStore implements EventStore {
++  private readonly idsKey = "poker:handEvents:ids";
++
++  private getKey(handId: string) {
++    return `poker:handEvents:${handId}`;
++  }
++
++  async append(event: HandEvent) {
++    const redis = await getRedisClient();
++    if (!redis) {
++      return;
++    }
++    const payload = JSON.stringify(event);
++    await redis.rPush(this.getKey(event.handId), payload);
++    await redis.sAdd(this.idsKey, event.handId);
++  }
++
++  async list(handId: string) {
++    const redis = await getRedisClient();
++    if (!redis) {
++      return [];
++    }
++    const entries = await redis.lRange(this.getKey(handId), 0, -1);
++    return entries.map((entry) => JSON.parse(entry) as HandEvent);
++  }
++
++  async reset() {
++    const redis = await getRedisClient();
++    if (!redis) {
++      return;
++    }
++    const ids = await redis.sMembers(this.idsKey);
++    const keys = ids.map((handId) => this.getKey(handId));
++    if (keys.length > 0) {
++      await redis.del(keys);
++    }
++    await redis.del(this.idsKey);
++  }
++}
++
++export function createInMemoryEventStore() {
++  return new InMemoryEventStore();
++}
++
++export function createRedisEventStore() {
++  return new RedisEventStore();
++}
+ 
+-export const eventStore = createInMemoryEventStore();
++const inMemoryStore = createInMemoryEventStore();
++const redisStore = createRedisEventStore();
++
++export const eventStore: EventStore = {
++  async append(event: HandEvent) {
++    await inMemoryStore.append(event);
++    await redisStore.append(event);
++  },
++  async list(handId: string) {
++    const redis = await getRedisClient();
++    if (redis) {
++      const events = await redisStore.list(handId);
++      if (events.length > 0) {
++        return events;
++      }
++    }
++    return inMemoryStore.list(handId);
++  },
++  async reset() {
++    await inMemoryStore.reset();
++    await redisStore.reset();
++  },
++};
+ 
+ export function resetEventStore() {
+-  eventStore.reset();
++  return eventStore.reset();
+ }
+*** End Patch
+2026-01-09T20:09:53.251219Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/friendsService.ts
+@@
+-const friendsByUser = new Map<string, string[]>();
+-
+-export function getFriends(userId: string) {
+-  return friendsByUser.get(userId) ?? [];
+-}
+-
+-export function setFriends(userId: string, friends: string[]) {
+-  const unique = Array.from(new Set(friends));
+-  friendsByUser.set(userId, unique);
+-  return unique;
+-}
+-
+-export function resetFriends() {
+-  friendsByUser.clear();
+-}
++import { getRedisClient } from "./redisClient";
++
++const friendsByUser = new Map<string, string[]>();
++
++function getFriendsKey(userId: string) {
++  return `poker:friends:${userId}`;
++}
++
++export async function getFriends(userId: string) {
++  const cached = friendsByUser.get(userId);
++  if (cached) {
++    return cached;
++  }
++  const redis = await getRedisClient();
++  if (!redis) {
++    return [];
++  }
++  const payload = await redis.get(getFriendsKey(userId));
++  if (!payload) {
++    return [];
++  }
++  const parsed = JSON.parse(payload) as string[];
++  friendsByUser.set(userId, parsed);
++  return parsed;
++}
++
++export async function setFriends(userId: string, friends: string[]) {
++  const unique = Array.from(new Set(friends));
++  friendsByUser.set(userId, unique);
++  const redis = await getRedisClient();
++  if (redis) {
++    await redis.set(getFriendsKey(userId), JSON.stringify(unique));
++  }
++  return unique;
++}
++
++export async function resetFriends() {
++  friendsByUser.clear();
++  const redis = await getRedisClient();
++  if (redis) {
++    const keys = await redis.keys("poker:friends:*");
++    if (keys.length > 0) {
++      await redis.del(keys);
++    }
++  }
++}
+*** End Patch
+2026-01-09T20:10:18.926623Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/profileService.ts
+@@
+-import { getFriends } from "./friendsService";
++import { getFriends } from "./friendsService";
++import { getRedisClient } from "./redisClient";
+@@
+-const profiles = new Map<string, StoredProfile>();
++const profiles = new Map<string, StoredProfile>();
++const PROFILES_KEY = "poker:profiles";
+@@
+-function ensureProfile(userId: string, defaults?: { nickname?: string; avatarUrl?: string | null }) {
+-  const existing = profiles.get(userId);
+-  if (existing) {
+-    return existing;
+-  }
+-  const created = createDefaultProfile(userId, defaults);
+-  profiles.set(userId, created);
+-  return created;
+-}
+-
+-export function getProfile(userId: string, defaults?: { nickname?: string; avatarUrl?: string | null }): UserProfile {
+-  const stored = ensureProfile(userId, defaults);
+-  return {
+-    userId,
+-    nickname: stored.nickname,
+-    avatarUrl: stored.avatarUrl,
+-    stats: { ...stored.stats },
+-    friends: getFriends(userId),
+-  };
+-}
+-
+-export function updateProfile(
+-  userId: string,
+-  updates: { nickname?: string; avatarUrl?: string | null },
+-  defaults?: { nickname?: string; avatarUrl?: string | null },
+-) {
+-  const stored = ensureProfile(userId, defaults);
+-  if (typeof updates.nickname === "string") {
+-    stored.nickname = updates.nickname;
+-  }
+-  if (updates.avatarUrl !== undefined) {
+-    stored.avatarUrl = updates.avatarUrl;
+-  }
+-  profiles.set(userId, stored);
+-  return getProfile(userId);
+-}
+-
+-export function recordHandStats(userId: string, outcome: { played: boolean; won: boolean }) {
+-  const stored = ensureProfile(userId);
+-  if (outcome.played) {
+-    stored.stats.handsPlayed += 1;
+-  }
+-  if (outcome.won) {
+-    stored.stats.wins += 1;
+-  }
+-  profiles.set(userId, stored);
+-}
+-
+-export function resetProfiles() {
+-  profiles.clear();
+-}
++async function ensureProfile(
++  userId: string,
++  defaults?: { nickname?: string; avatarUrl?: string | null },
++) {
++  const existing = profiles.get(userId);
++  if (existing) {
++    return existing;
++  }
++  const redis = await getRedisClient();
++  if (redis) {
++    const payload = await redis.hGet(PROFILES_KEY, userId);
++    if (payload) {
++      const stored = JSON.parse(payload) as StoredProfile;
++      profiles.set(userId, stored);
++      return stored;
++    }
++  }
++  const created = createDefaultProfile(userId, defaults);
++  profiles.set(userId, created);
++  if (redis) {
++    await redis.hSet(PROFILES_KEY, userId, JSON.stringify(created));
++  }
++  return created;
++}
++
++export async function getProfile(
++  userId: string,
++  defaults?: { nickname?: string; avatarUrl?: string | null },
++): Promise<UserProfile> {
++  const stored = await ensureProfile(userId, defaults);
++  const friends = await getFriends(userId);
++  return {
++    userId,
++    nickname: stored.nickname,
++    avatarUrl: stored.avatarUrl,
++    stats: { ...stored.stats },
++    friends,
++  };
++}
++
++export async function updateProfile(
++  userId: string,
++  updates: { nickname?: string; avatarUrl?: string | null },
++  defaults?: { nickname?: string; avatarUrl?: string | null },
++) {
++  const stored = await ensureProfile(userId, defaults);
++  if (typeof updates.nickname === "string") {
++    stored.nickname = updates.nickname;
++  }
++  if (updates.avatarUrl !== undefined) {
++    stored.avatarUrl = updates.avatarUrl;
++  }
++  profiles.set(userId, stored);
++  const redis = await getRedisClient();
++  if (redis) {
++    await redis.hSet(PROFILES_KEY, userId, JSON.stringify(stored));
++  }
++  return getProfile(userId);
++}
++
++export async function recordHandStats(userId: string, outcome: { played: boolean; won: boolean }) {
++  const stored = await ensureProfile(userId);
++  if (outcome.played) {
++    stored.stats.handsPlayed += 1;
++  }
++  if (outcome.won) {
++    stored.stats.wins += 1;
++  }
++  profiles.set(userId, stored);
++  const redis = await getRedisClient();
++  if (redis) {
++    await redis.hSet(PROFILES_KEY, userId, JSON.stringify(stored));
++  }
++}
++
++export async function resetProfiles() {
++  profiles.clear();
++  const redis = await getRedisClient();
++  if (redis) {
++    await redis.del(PROFILES_KEY);
++  }
++}
+*** End Patch
+2026-01-09T20:10:32.955923Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/moderationService.ts
+@@
+-const mutedByTable = new Map<string, Set<string>>();
+-
+-export function muteUser(tableId: string, userId: string) {
+-  const muted = mutedByTable.get(tableId) ?? new Set<string>();
+-  muted.add(userId);
+-  mutedByTable.set(tableId, muted);
+-  return muted;
+-}
+-
+-export function isUserMuted(tableId: string, userId: string) {
+-  return mutedByTable.get(tableId)?.has(userId) ?? false;
+-}
+-
+-export function resetModeration() {
+-  mutedByTable.clear();
+-}
++import { getRedisClient } from "./redisClient";
++
++const mutedByTable = new Map<string, Set<string>>();
++
++function getMutedKey(tableId: string) {
++  return `poker:muted:${tableId}`;
++}
++
++export async function muteUser(tableId: string, userId: string) {
++  const muted = mutedByTable.get(tableId) ?? new Set<string>();
++  muted.add(userId);
++  mutedByTable.set(tableId, muted);
++  const redis = await getRedisClient();
++  if (redis) {
++    await redis.sAdd(getMutedKey(tableId), userId);
++  }
++  return muted;
++}
++
++export async function isUserMuted(tableId: string, userId: string) {
++  const cached = mutedByTable.get(tableId);
++  if (cached) {
++    return cached.has(userId);
++  }
++  const redis = await getRedisClient();
++  if (!redis) {
++    return false;
++  }
++  const members = await redis.sMembers(getMutedKey(tableId));
++  const muted = new Set(members);
++  mutedByTable.set(tableId, muted);
++  return muted.has(userId);
++}
++
++export async function resetModeration() {
++  mutedByTable.clear();
++  const redis = await getRedisClient();
++  if (redis) {
++    const keys = await redis.keys("poker:muted:*");
++    if (keys.length > 0) {
++      await redis.del(keys);
++    }
++  }
++}
+*** End Patch
+2026-01-09T20:10:51.047997Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/pushNotifications.ts
+@@
+-export interface PushSubscriptionPayload {
+-  endpoint: string;
+-  keys?: {
+-    p256dh?: string;
+-    auth?: string;
+-  };
+-}
+-
+-const subscriptions = new Map<string, PushSubscriptionPayload[]>();
+-
+-export const pushNotifications = {
+-  register(userId: string, subscription: PushSubscriptionPayload) {
+-    const list = subscriptions.get(userId) ?? [];
+-    const exists = list.some((item) => item.endpoint === subscription.endpoint);
+-    if (!exists) {
+-      list.push(subscription);
+-      subscriptions.set(userId, list);
+-    }
+-  },
+-  unregister(userId: string, endpoint: string) {
+-    const list = subscriptions.get(userId) ?? [];
+-    const next = list.filter((item) => item.endpoint !== endpoint);
+-    subscriptions.set(userId, next);
+-  },
+-  list(userId: string) {
+-    return subscriptions.get(userId) ?? [];
+-  },
+-  clear() {
+-    subscriptions.clear();
+-  },
+-};
++import { getRedisClient } from "./redisClient";
++
++export interface PushSubscriptionPayload {
++  endpoint: string;
++  keys?: {
++    p256dh?: string;
++    auth?: string;
++  };
++}
++
++const subscriptions = new Map<string, PushSubscriptionPayload[]>();
++
++function getPushKey(userId: string) {
++  return `poker:push:${userId}`;
++}
++
++export const pushNotifications = {
++  async register(userId: string, subscription: PushSubscriptionPayload) {
++    const list = subscriptions.get(userId) ?? [];
++    const exists = list.some((item) => item.endpoint === subscription.endpoint);
++    if (!exists) {
++      list.push(subscription);
++      subscriptions.set(userId, list);
++      const redis = await getRedisClient();
++      if (redis) {
++        await redis.set(getPushKey(userId), JSON.stringify(list));
++      }
++    }
++  },
++  async unregister(userId: string, endpoint: string) {
++    const list = subscriptions.get(userId) ?? [];
++    const next = list.filter((item) => item.endpoint !== endpoint);
++    subscriptions.set(userId, next);
++    const redis = await getRedisClient();
++    if (redis) {
++      await redis.set(getPushKey(userId), JSON.stringify(next));
++    }
++  },
++  async list(userId: string) {
++    const cached = subscriptions.get(userId);
++    if (cached) {
++      return cached;
++    }
++    const redis = await getRedisClient();
++    if (!redis) {
++      return [];
++    }
++    const payload = await redis.get(getPushKey(userId));
++    if (!payload) {
++      return [];
++    }
++    const parsed = JSON.parse(payload) as PushSubscriptionPayload[];
++    subscriptions.set(userId, parsed);
++    return parsed;
++  },
++  async clear() {
++    subscriptions.clear();
++    const redis = await getRedisClient();
++    if (redis) {
++      const keys = await redis.keys("poker:push:*");
++      if (keys.length > 0) {
++        await redis.del(keys);
++      }
++    }
++  },
++};
+*** End Patch
+2026-01-09T20:10:58.922985Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/statTracker.ts
+@@
+-import { recordHandStats } from "../services/profileService";
++import { recordHandStats } from "../services/profileService";
+ import { HandState, TableSeat } from "./types";
+ 
+-export function recordHandCompletion(hand: HandState, seats: TableSeat[]) {
++export async function recordHandCompletion(hand: HandState, seats: TableSeat[]) {
+   const winners = new Set(hand.winners ?? []);
+   for (const seat of seats) {
+     if (!seat.userId || seat.status === "empty") {
+       continue;
+     }
+-    recordHandStats(seat.userId, {
++    await recordHandStats(seat.userId, {
+       played: true,
+       won: winners.has(seat.seatId),
+     });
+   }
+ }
+*** End Patch
+2026-01-09T20:11:35.830619Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/tableService.ts
+@@
+-import { recordHandCompletion } from "../engine/statTracker";
++import { recordHandCompletion } from "../engine/statTracker";
+ import { getTracer } from "../observability/otel";
+ import { eventStore, HandEvent } from "./eventStore";
+-import { getTable, updateTable } from "./tableRegistry";
+-import { ensureTableState, getTableState, listTableStates, startHandIfReady, updateTableState } from "./tableState";
++import { getTable, updateTable } from "./tableRegistry";
++import { ensureTableState, getTableState, listTableStates, startHandIfReady, updateTableState } from "./tableState";
+ 
+-function syncSummary(tableId: string) {
+-  return updateTable(tableId, (summary) => {
+-    const state = getTableState(tableId);
+-    if (!state) {
+-      return summary;
+-    }
+-    const seatsTaken = state.seats.filter((seat) => seat.userId && seat.status !== "empty").length;
+-    return {
+-      ...summary,
+-      seatsTaken,
+-      inProgress: state.status === "in_hand",
+-    };
+-  });
++async function syncSummary(tableId: string) {
++  return updateTable(tableId, async (summary) => {
++    const state = await getTableState(tableId);
++    if (!state) {
++      return summary;
++    }
++    const seatsTaken = state.seats.filter((seat) => seat.userId && seat.status !== "empty").length;
++    return {
++      ...summary,
++      seatsTaken,
++      inProgress: state.status === "in_hand",
++    };
++  });
+ }
+ 
+-function recordEvent(handId: string, type: string, payload: Record<string, unknown>) {
++async function recordEvent(handId: string, type: string, payload: Record<string, unknown>) {
+   const event: HandEvent = {
+     eventId: randomUUID(),
+     handId,
+     type,
+     payload,
+     ts: new Date().toISOString(),
+   };
+-  eventStore.append(event);
++  await eventStore.append(event);
+ }
+ 
+-export function joinSeat(options: { tableId: string; seatId: number; userId: string }) {
+-  const summary = getTable(options.tableId);
++export async function joinSeat(options: { tableId: string; seatId: number; userId: string }) {
++  const summary = await getTable(options.tableId);
+   if (!summary) {
+     return { ok: false, reason: "missing_table" as const };
+   }
+-  const state = ensureTableState(summary);
++  const state = await ensureTableState(summary);
+ 
+   const seat = state.seats.find((entry) => entry.seatId === options.seatId);
+   if (!seat) {
+     return { ok: false, reason: "seat_unavailable" as const };
+   }
+ 
+   if (seat.userId === options.userId && seat.status === "disconnected") {
+     seat.status = "active";
+-    updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
+-    syncSummary(state.tableId);
+-    return { ok: true, tableState: getTableState(state.tableId) };
++    await updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
++    await syncSummary(state.tableId);
++    return { ok: true, tableState: await getTableState(state.tableId) };
+   }
+ 
+   if (seat.status !== "empty") {
+     return { ok: false, reason: "seat_unavailable" as const };
+   }
+ 
+   seat.userId = options.userId;
+   seat.stack = summary.config.startingStack;
+   seat.status = "active";
+ 
+   const updated = { ...state, version: state.version + 1 };
+-  updateTableState(state.tableId, () => updated);
+-  syncSummary(state.tableId);
++  await updateTableState(state.tableId, () => updated);
++  await syncSummary(state.tableId);
+ 
+-  const handState = startHandIfReady(state.tableId);
++  const handState = await startHandIfReady(state.tableId);
+   if (handState?.hand) {
+-    recordEvent(handState.hand.handId, "HandStarted", { snapshot: handState.hand });
+-    syncSummary(state.tableId);
++    await recordEvent(handState.hand.handId, "HandStarted", { snapshot: handState.hand });
++    await syncSummary(state.tableId);
+   }
+ 
+-  return { ok: true, tableState: getTableState(state.tableId) };
++  return { ok: true, tableState: await getTableState(state.tableId) };
+ }
+ 
+-export function leaveSeat(options: { tableId: string; userId: string }) {
+-  const state = getTableState(options.tableId);
++export async function leaveSeat(options: { tableId: string; userId: string }) {
++  const state = await getTableState(options.tableId);
+   if (!state) {
+     return { ok: false, reason: "missing_table" as const };
+   }
+@@
+   seat.stack = 0;
+   seat.status = "empty";
+ 
+-  updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
+-  syncSummary(state.tableId);
++  await updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
++  await syncSummary(state.tableId);
+ 
+-  return { ok: true, tableState: getTableState(state.tableId) };
++  return { ok: true, tableState: await getTableState(state.tableId) };
+ }
+ 
+-export function applyTableAction(options: {
++export async function applyTableAction(options: {
+   tableId: string;
+   seatId: number;
+   action: HandActionInput;
+   allowInactive?: boolean;
+ }) {
+-  const state = getTableState(options.tableId);
++  const state = await getTableState(options.tableId);
+   if (!state) {
+     return { ok: false, reason: "missing_table" as const };
+   }
+ 
+   const previousStreet = state.hand?.currentStreet ?? null;
+   const result = applyAction(state, options.seatId, options.action, {
+     allowInactive: options.allowInactive,
+   });
+-  updateTableState(options.tableId, () => result.table);
+-  syncSummary(options.tableId);
++  await updateTableState(options.tableId, () => result.table);
++  await syncSummary(options.tableId);
+@@
+   const handEnded = result.table.hand?.currentStreet === "ended" && previousStreet !== "ended";
+ 
+   if (handEnded && result.table.hand) {
+-    recordHandCompletion(result.table.hand, result.table.seats);
++    await recordHandCompletion(result.table.hand, result.table.seats);
+   }
+ 
+   if (result.table.hand) {
+-    recordEvent(result.table.hand.handId, "ActionTaken", {
++    await recordEvent(result.table.hand.handId, "ActionTaken", {
+       action: options.action,
+       snapshot: result.table.hand,
+     });
+ 
+     if (result.table.hand.currentStreet === "showdown") {
+-      recordEvent(result.table.hand.handId, "Showdown", { snapshot: result.table.hand });
++      await recordEvent(result.table.hand.handId, "Showdown", { snapshot: result.table.hand });
+     }
+ 
+     if (result.table.hand.currentStreet === "ended") {
+-      recordEvent(result.table.hand.handId, "HandEnded", { snapshot: result.table.hand });
++      await recordEvent(result.table.hand.handId, "HandEnded", { snapshot: result.table.hand });
+     }
+   }
+ 
+   return { ok: result.accepted, reason: result.reason, tableState: result.table };
+ }
+ 
+-export function markSeatDisconnected(userId: string) {
+-  for (const state of listTableStates()) {
++export async function markSeatDisconnected(userId: string) {
++  const states = await listTableStates();
++  for (const state of states) {
+     const seat = state.seats.find((entry) => entry.userId === userId);
+     if (seat && seat.status === "active") {
+       seat.status = "disconnected";
+-      updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
+-      syncSummary(state.tableId);
++      await updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
++      await syncSummary(state.tableId);
+     }
+   }
+ }
+ 
+-export function reconnectSeat(options: { tableId: string; userId: string }) {
+-  const state = getTableState(options.tableId);
++export async function reconnectSeat(options: { tableId: string; userId: string }) {
++  const state = await getTableState(options.tableId);
+   if (!state) {
+     return null;
+   }
+@@
+   if (!seat || seat.status !== "disconnected") {
+     return state;
+   }
+   seat.status = "active";
+-  updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
+-  syncSummary(state.tableId);
+-  return getTableState(state.tableId);
++  await updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
++  await syncSummary(state.tableId);
++  return getTableState(state.tableId);
+ }
+*** End Patch
+2026-01-09T20:11:49.862556Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/tableService.ts
+@@
+-async function syncSummary(tableId: string) {
+-  return updateTable(tableId, async (summary) => {
+-    const state = await getTableState(tableId);
+-    if (!state) {
+-      return summary;
+-    }
+-    const seatsTaken = state.seats.filter((seat) => seat.userId && seat.status !== "empty").length;
+-    return {
+-      ...summary,
+-      seatsTaken,
+-      inProgress: state.status === "in_hand",
+-    };
+-  });
++async function syncSummary(tableId: string) {
++  const state = await getTableState(tableId);
++  return updateTable(tableId, (summary) => {
++    if (!state) {
++      return summary;
++    }
++    const seatsTaken = state.seats.filter((seat) => seat.userId && seat.status !== "empty").length;
++    return {
++      ...summary,
++      seatsTaken,
++      inProgress: state.status === "in_hand",
++    };
++  });
+ }
+*** End Patch
+2026-01-09T20:12:18.018768Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts
+@@
+-import { applyTableAction, joinSeat, leaveSeat, reconnectSeat } from "../services/tableService";
+-import { getTableState } from "../services/tableState";
++import { applyTableAction, joinSeat, leaveSeat, reconnectSeat } from "../services/tableService";
++import { getTableState } from "../services/tableState";
+@@
+-export function broadcastTableState(tableId: string) {
+-  const tableState = getTableState(tableId);
++export async function broadcastTableState(tableId: string) {
++  const tableState = await getTableState(tableId);
+   if (!tableState) {
+     return;
+   }
+   broadcastTable(tableId, {
+@@
+-function scheduleTurn(tableId: string) {
+-  const state = getTableState(tableId);
++async function scheduleTurn(tableId: string) {
++  const state = await getTableState(tableId);
+   if (!state?.hand || state.hand.currentStreet === "ended") {
+     clearTurnTimeout(tableId);
+     return;
+   }
+@@
+-    onTimeout: () => {
+-      const current = getTableState(tableId);
++    onTimeout: async () => {
++      const current = await getTableState(tableId);
+       if (!current?.hand) {
+         return;
+       }
+@@
+-      const result = applyTableAction({
++      const result = await applyTableAction({
+         tableId,
+         seatId,
+         action,
+         allowInactive: true,
+       });
+       if (result.ok && result.tableState) {
+         broadcastTable(tableId, {
+           type: "TablePatch",
+           tableId,
+           handId: result.tableState.hand?.handId,
+           tableState: redactTableState(result.tableState),
+         });
+-        scheduleTurn(tableId);
++        await scheduleTurn(tableId);
+       }
+     },
+   });
+@@
+-function handleSubscribe(client: ClientConnection, tableId: string) {
++async function handleSubscribe(client: ClientConnection, tableId: string) {
+   client.subscriptions.add(tableId);
+   const subscribers = tableSubscriptions.get(tableId) ?? new Set<string>();
+   subscribers.add(client.connectionId);
+   tableSubscriptions.set(tableId, subscribers);
+ 
+-  const tableState = getTableState(tableId);
++  const tableState = await getTableState(tableId);
+   if (tableState) {
+     send(client.socket, { type: "TableSnapshot", tableState: redactTableState(tableState) });
+-    scheduleTurn(tableId);
++    await scheduleTurn(tableId);
+   }
+ }
+@@
+-function handleAction(client: ClientConnection, payload: {
++async function handleAction(client: ClientConnection, payload: {
+   tableId: string;
+   handId?: string;
+   action: string;
+   amount?: number;
+ }) {
+   const tableId = payload.tableId;
+-  const tableState = getTableState(tableId);
++  const tableState = await getTableState(tableId);
+   if (!tableState || !tableState.hand) {
+@@
+-  const result = applyTableAction({
++  const result = await applyTableAction({
+     tableId,
+     seatId: seat.seatId,
+     action: {
+       type: actionType as "Fold" | "Check" | "Call" | "Bet" | "Raise",
+       amount: payload.amount,
+     },
+   });
+@@
+   if (result.ok && result.tableState) {
+     broadcastTable(tableId, {
+       type: "TablePatch",
+       tableId,
+       handId: result.tableState.hand?.handId,
+       tableState: redactTableState(result.tableState),
+     });
+-    scheduleTurn(tableId);
++    await scheduleTurn(tableId);
+   }
+ }
+ 
+-function handleJoinSeat(client: ClientConnection, payload: { tableId: string; seatId: number }) {
+-  const result = joinSeat({
++async function handleJoinSeat(client: ClientConnection, payload: { tableId: string; seatId: number }) {
++  const result = await joinSeat({
+     tableId: payload.tableId,
+     seatId: payload.seatId,
+     userId: client.userId,
+   });
+ 
+   if (result.ok && result.tableState) {
+     broadcastTable(payload.tableId, {
+       type: "TablePatch",
+       tableId: payload.tableId,
+       handId: result.tableState.hand?.handId,
+       tableState: redactTableState(result.tableState),
+     });
+-    scheduleTurn(payload.tableId);
++    await scheduleTurn(payload.tableId);
+   }
+ }
+ 
+-function handleLeaveTable(client: ClientConnection, payload: { tableId: string }) {
+-  const result = leaveSeat({ tableId: payload.tableId, userId: client.userId });
++async function handleLeaveTable(client: ClientConnection, payload: { tableId: string }) {
++  const result = await leaveSeat({ tableId: payload.tableId, userId: client.userId });
+   if (result.ok && result.tableState) {
+     broadcastTable(payload.tableId, {
+       type: "TablePatch",
+       tableId: payload.tableId,
+       handId: result.tableState.hand?.handId,
+       tableState: redactTableState(result.tableState),
+     });
+   }
+ }
+ 
+-function handleResync(client: ClientConnection, tableId: string) {
+-  const tableState = reconnectSeat({ tableId, userId: client.userId }) ?? getTableState(tableId);
++async function handleResync(client: ClientConnection, tableId: string) {
++  const tableState = (await reconnectSeat({ tableId, userId: client.userId })) ?? (await getTableState(tableId));
+   if (!tableState) {
+     return;
+   }
+   send(client.socket, { type: "TableSnapshot", tableState: redactTableState(tableState) });
+-  scheduleTurn(tableId);
++  await scheduleTurn(tableId);
+ }
+@@
+-      handleSubscribe(client, tableId);
++      void handleSubscribe(client, tableId);
+       return;
+     }
+@@
+-      handleJoinSeat(client, {
++      void handleJoinSeat(client, {
+         tableId,
+         seatId,
+       });
+       return;
+     }
+@@
+-      handleLeaveTable(client, { tableId });
++      void handleLeaveTable(client, { tableId });
+       return;
+     }
+@@
+-      handleAction(client, {
++      void handleAction(client, {
+         tableId,
+         handId: message.handId as string,
+         action: message.action as string,
+         amount: message.amount as number | undefined,
+       });
+       return;
+     }
+@@
+-      handleResync(client, tableId);
++      void handleResync(client, tableId);
+     }
+   });
+*** End Patch
+2026-01-09T20:12:23.037881Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,260p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:12:29.478066Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '260,520p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:12:52.998147Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts
+@@
+-export function broadcastTableState(tableId: string) {
+-  const tableState = getTableState(tableId);
++export async function broadcastTableState(tableId: string) {
++  const tableState = await getTableState(tableId);
+   if (!tableState) {
+     return;
+   }
+@@
+-function scheduleTurn(tableId: string) {
+-  const state = getTableState(tableId);
++async function scheduleTurn(tableId: string) {
++  const state = await getTableState(tableId);
+   if (!state?.hand || state.hand.currentStreet === "ended") {
+     clearTurnTimeout(tableId);
+     return;
+   }
+@@
+-    onTimeout: () => {
+-      const current = getTableState(tableId);
++    onTimeout: async () => {
++      const current = await getTableState(tableId);
+       if (!current?.hand) {
+         return;
+       }
+@@
+-      const result = applyTableAction({
++      const result = await applyTableAction({
+         tableId,
+         seatId,
+         action,
+         allowInactive: true,
+       });
+       if (result.ok && result.tableState) {
+         broadcastTable(tableId, {
+           type: "TablePatch",
+           tableId,
+           handId: result.tableState.hand?.handId,
+           tableState: redactTableState(result.tableState),
+         });
+-        scheduleTurn(tableId);
++        await scheduleTurn(tableId);
+       }
+     },
+   });
+@@
+-function handleSubscribe(client: ClientConnection, tableId: string) {
++async function handleSubscribe(client: ClientConnection, tableId: string) {
+@@
+-  const tableState = reconnectSeat({ tableId, userId: client.userId }) ?? getTableState(tableId);
++  const tableState = (await reconnectSeat({ tableId, userId: client.userId })) ?? (await getTableState(tableId));
+   if (tableState) {
+     send(client.socket, { type: "TableSnapshot", tableState: redactTableState(tableState) });
+-    scheduleTurn(tableId);
++    await scheduleTurn(tableId);
+   }
+ }
+@@
+-function handleAction(client: ClientConnection, payload: {
++async function handleAction(client: ClientConnection, payload: {
+@@
+-  const tableState = getTableState(tableId);
++  const tableState = await getTableState(tableId);
+@@
+-  const result = applyTableAction({
++  const result = await applyTableAction({
+@@
+-    scheduleTurn(tableId);
++    await scheduleTurn(tableId);
+   }
+ }
+ 
+-function handleJoinSeat(client: ClientConnection, payload: { tableId: string; seatId: number }) {
+-  const result = joinSeat({
++async function handleJoinSeat(client: ClientConnection, payload: { tableId: string; seatId: number }) {
++  const result = await joinSeat({
+@@
+-    scheduleTurn(payload.tableId);
++    await scheduleTurn(payload.tableId);
+   }
+ }
+ 
+-function handleLeaveTable(client: ClientConnection, payload: { tableId: string }) {
+-  const result = leaveSeat({ tableId: payload.tableId, userId: client.userId });
++async function handleLeaveTable(client: ClientConnection, payload: { tableId: string }) {
++  const result = await leaveSeat({ tableId: payload.tableId, userId: client.userId });
+   if (result.ok && result.tableState) {
+@@
+-function handleResync(client: ClientConnection, tableId: string) {
+-  const tableState = reconnectSeat({ tableId, userId: client.userId }) ?? getTableState(tableId);
++async function handleResync(client: ClientConnection, tableId: string) {
++  const tableState = (await reconnectSeat({ tableId, userId: client.userId })) ?? (await getTableState(tableId));
+   if (!tableState) {
+     return;
+   }
+   send(client.socket, { type: "TableSnapshot", tableState: redactTableState(tableState) });
+-  scheduleTurn(tableId);
++  await scheduleTurn(tableId);
+ }
+@@
+-      handleSubscribe(client, tableId);
++      void handleSubscribe(client, tableId);
+@@
+-      handleJoinSeat(client, {
++      void handleJoinSeat(client, {
+@@
+-      handleLeaveTable(client, { tableId });
++      void handleLeaveTable(client, { tableId });
+@@
+-      handleAction(client, {
++      void handleAction(client, {
+@@
+-      handleResync(client, tableId);
++      void handleResync(client, tableId);
+*** End Patch
+2026-01-09T20:13:03.588943Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts
+@@
+-import { applyTableAction, joinSeat, leaveSeat, reconnectSeat } from "../services/tableService";
++import { TableState } from "../engine/types";
++import { applyTableAction, joinSeat, leaveSeat, reconnectSeat } from "../services/tableService";
+ import { getTableState } from "../services/tableState";
+@@
+-function redactTableState(tableState: ReturnType<typeof getTableState>) {
++function redactTableState(tableState: TableState | null) {
+*** End Patch
+2026-01-09T20:13:18.540355Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/chatHub.ts
+@@
+-import { getTableState } from "../services/tableState";
+-import { isUserMuted } from "../services/moderationService";
++import { getTableState } from "../services/tableState";
++import { isUserMuted } from "../services/moderationService";
+@@
+-function isSeated(tableId: string, userId: string) {
+-  const state = getTableState(tableId);
++async function isSeated(tableId: string, userId: string) {
++  const state = await getTableState(tableId);
+   if (!state) {
+     return false;
+   }
+   return state.seats.some((seat) => seat.userId === userId && seat.status !== "empty");
+ }
+ 
+-function handleSubscribe(client: ChatConnection, tableId: string) {
+-  if (!isSeated(tableId, client.userId)) {
++async function handleSubscribe(client: ChatConnection, tableId: string) {
++  if (!(await isSeated(tableId, client.userId))) {
+     send(client.socket, {
+       type: "ChatError",
+       tableId,
+@@
+-function handleChatSend(client: ChatConnection, payload: { tableId: string; message?: string }) {
++async function handleChatSend(client: ChatConnection, payload: { tableId: string; message?: string }) {
+   const tableId = payload.tableId;
+   const parsed = parseChatMessage(payload.message);
+@@
+-  if (!isSeated(tableId, client.userId)) {
++  if (!(await isSeated(tableId, client.userId))) {
+     send(client.socket, { type: "ChatError", tableId, reason: "not_seated" });
+     return;
+   }
+ 
+-  if (isUserMuted(tableId, client.userId)) {
++  if (await isUserMuted(tableId, client.userId)) {
+     send(client.socket, { type: "ChatError", tableId, reason: "muted" });
+     return;
+   }
+@@
+-      handleSubscribe(client, tableId);
++      void handleSubscribe(client, tableId);
+@@
+-      handleChatSend(client, {
++      void handleChatSend(client, {
+         tableId,
+         message: message.message as string | undefined,
+       });
+*** End Patch
+2026-01-09T20:13:34.219066Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/tables.ts
+@@
+-  router.get("/api/tables", (_req, res) => {
+-    createDefaultTable();
+-    res.status(200).json(listTables());
++  router.get("/api/tables", async (_req, res) => {
++    await createDefaultTable();
++    res.status(200).json(await listTables());
+   });
+ 
+-  router.post("/api/tables", (req, res) => {
++  router.post("/api/tables", async (req, res) => {
+@@
+-    const summary = createTable({
++    const summary = await createTable({
+@@
+-    return res.status(201).json(summary);
++    return res.status(201).json(summary);
+   });
+ 
+-  router.post("/api/tables/:tableId/join", (req, res) => {
++  router.post("/api/tables/:tableId/join", async (req, res) => {
+@@
+-    const result = joinSeat({
++    const result = await joinSeat({
+@@
+-    return res.status(200).json({
++    return res.status(200).json({
+       tableId: req.params.tableId,
+       seatId,
+       wsUrl,
+     });
+   });
+ 
+-  router.post("/api/tables/:tableId/leave", (req, res) => {
++  router.post("/api/tables/:tableId/leave", async (req, res) => {
+@@
+-    const result = leaveSeat({ tableId: req.params.tableId, userId: auth.userId });
++    const result = await leaveSeat({ tableId: req.params.tableId, userId: auth.userId });
+     if (!result.ok) {
+       return res.status(404).json({ code: result.reason, message: "Not seated" });
+     }
+*** End Patch
+2026-01-09T20:13:44.903301Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/moderation.ts
+@@
+-  router.post("/api/tables/:tableId/moderation/kick", (req, res) => {
++  router.post("/api/tables/:tableId/moderation/kick", async (req, res) => {
+@@
+-    const table = getTable(req.params.tableId);
++    const table = await getTable(req.params.tableId);
+@@
+-    const tableState = getTableState(req.params.tableId);
++    const tableState = await getTableState(req.params.tableId);
+@@
+-    const result = leaveSeat({ tableId: req.params.tableId, userId: targetUserId });
++    const result = await leaveSeat({ tableId: req.params.tableId, userId: targetUserId });
+@@
+-    broadcastTableState(req.params.tableId);
++    await broadcastTableState(req.params.tableId);
+@@
+-  router.post("/api/tables/:tableId/moderation/mute", (req, res) => {
++  router.post("/api/tables/:tableId/moderation/mute", async (req, res) => {
+@@
+-    const table = getTable(req.params.tableId);
++    const table = await getTable(req.params.tableId);
+@@
+-    const tableState = getTableState(req.params.tableId);
++    const tableState = await getTableState(req.params.tableId);
+@@
+-    muteUser(req.params.tableId, targetUserId);
++    await muteUser(req.params.tableId, targetUserId);
+*** End Patch
+2026-01-09T20:13:55.342713Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/profile.ts
+@@
+-  router.get("/api/me", (req, res) => {
++  router.get("/api/me", async (req, res) => {
+     const auth = requireAuth(req, res);
+     if (!auth) {
+       return;
+     }
+@@
+-    res.status(200).json(getProfile(auth.userId, { nickname, avatarUrl }));
++    res.status(200).json(await getProfile(auth.userId, { nickname, avatarUrl }));
+   });
+ 
+-  router.post("/api/profile", (req, res) => {
++  router.post("/api/profile", async (req, res) => {
+@@
+-    res.status(200).json(updateProfile(auth.userId, { nickname, avatarUrl }, defaults));
++    res.status(200).json(await updateProfile(auth.userId, { nickname, avatarUrl }, defaults));
+   });
+ 
+-  router.get("/api/friends", (req, res) => {
++  router.get("/api/friends", async (req, res) => {
+     const auth = requireAuth(req, res);
+     if (!auth) {
+       return;
+     }
+-    res.status(200).json({ friends: getFriends(auth.userId) });
++    res.status(200).json({ friends: await getFriends(auth.userId) });
+   });
+ 
+-  router.put("/api/friends", (req, res) => {
++  router.put("/api/friends", async (req, res) => {
+@@
+-    res.status(200).json({ friends: setFriends(auth.userId, cleaned) });
++    res.status(200).json({ friends: await setFriends(auth.userId, cleaned) });
+   });
+*** End Patch
+2026-01-09T20:14:02.880383Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/push.ts
+@@
+-  router.post("/api/push/subscribe", (req, res) => {
++  router.post("/api/push/subscribe", async (req, res) => {
+@@
+-    pushNotifications.register(req.auth.userId, subscription);
++    await pushNotifications.register(req.auth.userId, subscription);
+     res.status(204).send();
+   });
+ 
+-  router.delete("/api/push/subscribe", (req, res) => {
++  router.delete("/api/push/subscribe", async (req, res) => {
+@@
+-    pushNotifications.unregister(req.auth.userId, endpoint);
++    await pushNotifications.unregister(req.auth.userId, endpoint);
+     res.status(204).send();
+   });
+*** End Patch
+2026-01-09T20:14:12.355575Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/audit.ts
+@@
+-  router.get("/api/audit/:handId", (req, res) => {
+-    const events = eventStore.list(req.params.handId);
++  router.get("/api/audit/:handId", async (req, res) => {
++    const events = await eventStore.list(req.params.handId);
+     const replay = replayHand(events);
+     res.status(200).json({ handId: req.params.handId, events, replay });
+   });
+*** End Patch
+2026-01-09T20:14:20.490606Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/connectionManager.ts
+@@
+-export function unregisterConnection(connectionId: string) {
++export async function unregisterConnection(connectionId: string) {
+   const userId = connections.get(connectionId);
+   connections.delete(connectionId);
+   if (userId) {
+-    markSeatDisconnected(userId);
++    await markSeatDisconnected(userId);
+   }
+ }
+*** End Patch
+2026-01-09T20:14:29.680964Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/server.ts
+@@
+     socket.on("close", () => {
+       unregisterConnection(connectionId);
+-      unregisterSeatConnection(connectionId);
++      void unregisterSeatConnection(connectionId);
+     });
+   });
+*** End Patch
+2026-01-09T20:14:41.586493Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"createTable\\(|resetTables\\(|resetTableStates\\(|getTableState\\(|listTables\\(|joinSeat\\(|leaveSeat\\(|getProfile\\(|setFriends\\(|getFriends\\(|resetModeration\\(|resetFriends\\(|resetProfiles\\(|pushNotifications\" /Users/bricerising/git/brice@github/specify-poker/apps/api/tests","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:14:49.969569Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/hand-flow.test.ts
+@@
+-    resetTables();
+-    resetTableStates();
+-    const summary = createTable({
++    await resetTables();
++    await resetTableStates();
++    const summary = await createTable({
+*** End Patch
+2026-01-09T20:14:58.792073Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/ws-table.test.ts
+@@
+-    resetTables();
+-    resetTableStates();
+-    const summary = createTable({
++    await resetTables();
++    await resetTableStates();
++    const summary = await createTable({
+*** End Patch
+2026-01-09T20:15:11.588369Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/ws-chat.test.ts
+@@
+-    resetTables();
+-    resetTableStates();
+-    resetModeration();
++    await resetTables();
++    await resetTableStates();
++    await resetModeration();
+@@
+-    const summary = createTable({
++    const summary = await createTable({
+@@
+-    joinSeat({ tableId: summary.tableId, seatId: 0, userId: "user-a" });
+-    joinSeat({ tableId: summary.tableId, seatId: 1, userId: "user-b" });
++    await joinSeat({ tableId: summary.tableId, seatId: 0, userId: "user-a" });
++    await joinSeat({ tableId: summary.tableId, seatId: 1, userId: "user-b" });
+*** End Patch
+2026-01-09T20:15:17.664930Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/profile.test.ts
+@@
+-    resetProfiles();
+-    resetFriends();
++    await resetProfiles();
++    await resetFriends();
+*** End Patch
+2026-01-09T20:15:26.643166Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/contract/profile.contract.test.ts
+@@
+-    resetProfiles();
+-    resetFriends();
++    await resetProfiles();
++    await resetFriends();
+*** End Patch
+2026-01-09T20:15:34.585066Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/push-subscribe.test.ts
+@@
+-    pushNotifications.clear();
++    await pushNotifications.clear();
+@@
+-    expect(pushNotifications.list("user-123")).toHaveLength(1);
++    expect(await pushNotifications.list("user-123")).toHaveLength(1);
+@@
+-    expect(pushNotifications.list("user-123")).toHaveLength(0);
++    expect(await pushNotifications.list("user-123")).toHaveLength(0);
+*** End Patch
+2026-01-09T20:15:43.437521Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/tables.test.ts
+@@
+-    resetTables();
+-    resetTableStates();
+-    const summary = createTable({
++    await resetTables();
++    await resetTableStates();
++    const summary = await createTable({
+*** End Patch
+2026-01-09T20:15:56.750250Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/timer.test.ts
+@@
+-    resetTables();
+-    resetTableStates();
+-    const summary = createTable({
++    await resetTables();
++    await resetTableStates();
++    const summary = await createTable({
+*** End Patch
+2026-01-09T20:16:05.757893Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/contract/moderation.contract.test.ts
+@@
+-    resetTables();
+-    resetTableStates();
+-    resetModeration();
++    await resetTables();
++    await resetTableStates();
++    await resetModeration();
+*** End Patch
+2026-01-09T20:16:13.030156Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/ws-resync.test.ts
+@@
+-    resetTables();
+-    resetTableStates();
++    await resetTables();
++    await resetTableStates();
+@@
+-    const summary = createTable({
++    const summary = await createTable({
+*** End Patch
+2026-01-09T20:16:22.656092Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/unit/statTracker.test.ts
+@@
+-    resetProfiles();
++    await resetProfiles();
+@@
+-    expect(getProfile("u1").stats).toEqual({ handsPlayed: 1, wins: 0 });
+-    expect(getProfile("u2").stats).toEqual({ handsPlayed: 1, wins: 1 });
++    expect((await getProfile("u1")).stats).toEqual({ handsPlayed: 1, wins: 0 });
++    expect((await getProfile("u2")).stats).toEqual({ handsPlayed: 1, wins: 1 });
+*** End Patch
+2026-01-09T20:16:29.251120Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,120p' /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/unit/statTracker.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:16:35.816415Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/unit/statTracker.test.ts
+@@
+-describe("stat tracker", () => {
+-  it("increments hands played and wins for winners", () => {
++describe("stat tracker", () => {
++  it("increments hands played and wins for winners", async () => {
+@@
+-    recordHandCompletion(hand, seats);
++    await recordHandCompletion(hand, seats);
+*** End Patch
+2026-01-09T20:16:42.861198Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/create-table.test.ts
+@@
+-    resetTables();
+-    resetTableStates();
++    await resetTables();
++    await resetTableStates();
+*** End Patch
+2026-01-09T20:16:53.725826Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/contract/tables.contract.test.ts
+@@
+-    resetTables();
+-    resetTableStates();
+-    const summary = createTable({
++    await resetTables();
++    await resetTableStates();
++    const summary = await createTable({
+@@
+-    resetTables();
+-    resetTableStates();
+-    const summary = createTable({
++    await resetTables();
++    await resetTableStates();
++    const summary = await createTable({
+@@
+-    expect(getTableState(summary.tableId)).not.toBeNull();
++    expect(await getTableState(summary.tableId)).not.toBeNull();
+*** End Patch
+2026-01-09T20:17:01.672755Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/contract/tables.contract.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:17:07.178957Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/friends.test.ts
+@@
+-    resetProfiles();
+-    resetFriends();
++    await resetProfiles();
++    await resetFriends();
+*** End Patch
+2026-01-09T20:17:17.643988Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/moderation.test.ts
+@@
+-    resetTables();
+-    resetTableStates();
+-    resetModeration();
++    await resetTables();
++    await resetTableStates();
++    await resetModeration();
+@@
+-    const summary = createTable({
++    const summary = await createTable({
+@@
+-    const state = getTableState(summary.tableId);
++    const state = await getTableState(summary.tableId);
+*** End Patch
+2026-01-09T20:17:31.881698Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"eventStore\" /Users/bricerising/git/brice@github/specify-poker/apps/api/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:17:40.422420Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"getTableState\\(|listTableStates\\(|resetTableStates\\(|startHandIfReady\\(|ensureTableState\\(\" /Users/bricerising/git/brice@github/specify-poker/apps/api/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:17:47.545200Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"getTable\\(|listTables\\(|createTable\\(|resetTables\\(\" /Users/bricerising/git/brice@github/specify-poker/apps/api/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:17:58.813977Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"resetTables\\(|resetTableStates\\(|resetModeration\\(|resetProfiles\\(|resetFriends\\(|createTable\\(\" /Users/bricerising/git/brice@github/specify-poker/apps/api/tests","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:18:08.846210Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"resetEventStore\" /Users/bricerising/git/brice@github/specify-poker","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:18:19.906384Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,120p' /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/push-subscribe.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:18:44.640586Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/package.json
+@@
+   "devDependencies": {
+     "@types/node": "^20.11.0",
+     "@types/react": "^18.2.0",
+     "@types/react-dom": "^18.2.0",
+     "@typescript-eslint/eslint-plugin": "^8.10.0",
+     "@typescript-eslint/parser": "^8.10.0",
+     "eslint": "^8.56.0",
+     "eslint-plugin-react": "^7.33.0",
+     "prettier": "^3.2.0",
+     "typescript": "^5.3.0",
+     "vitest": "^1.2.0"
++  },
++  "dependencies": {
++    "redis": "^4.6.13"
+   }
+ }
+*** End Patch
+2026-01-09T20:18:58.511049Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/docker-compose.yml
+@@
+   api:
+     build:
+       context: .
+       dockerfile: apps/api/Dockerfile
+     ports:
+       - "4000:4000"
+     environment:
+       PORT: "4000"
+       KEYCLOAK_URL: "http://keycloak:8080"
+       KEYCLOAK_REALM: "poker-local"
++      REDIS_URL: "redis://redis:6379"
+     depends_on:
+       - keycloak
+       - otel-collector
++      - redis
+     healthcheck:
+       test: ["CMD-SHELL", "true"]
+       interval: 10s
+       timeout: 2s
+       retries: 3
+@@
+   grafana:
+     image: grafana/grafana:10.3.1
+     ports:
+       - "3001:3000"
+@@
+     healthcheck:
+       test: ["CMD-SHELL", "true"]
+       interval: 10s
+       timeout: 2s
+       retries: 3
++
++  redis:
++    image: redis:7-alpine
++    ports:
++      - "6379:6379"
++    healthcheck:
++      test: ["CMD", "redis-cli", "ping"]
++      interval: 10s
++      timeout: 2s
++      retries: 3
+*** End Patch
+2026-01-09T20:19:06.705716Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/quickstart.md
+@@
+ ## Expected Local Stack
+ 
+ - ui: React app (dev server or production build)
+ - api: Express server (REST + WebSocket)
+ - keycloak: OIDC provider
+ - keycloak-db: Postgres for Keycloak
++- redis: in-memory store for tables, hands, profiles, friends, and moderation
+ - otel-collector: receives OTLP from UI/API
+ - prometheus: metrics store
+*** End Patch
+2026-01-09T20:19:44.905752Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,140p' /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/contract/moderation.contract.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:19:57.492242Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/connectionRegistry.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:20:10.294668Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/ws-resync.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:20:30.010606Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/pushNotifications.ts
+@@
+ export const pushNotifications = {
+   async register(userId: string, subscription: PushSubscriptionPayload) {
+-    const list = subscriptions.get(userId) ?? [];
++    let list = subscriptions.get(userId);
++    if (!list) {
++      const redis = await getRedisClient();
++      if (redis) {
++        const payload = await redis.get(getPushKey(userId));
++        list = payload ? (JSON.parse(payload) as PushSubscriptionPayload[]) : [];
++      } else {
++        list = [];
++      }
++    }
+     const exists = list.some((item) => item.endpoint === subscription.endpoint);
+     if (!exists) {
+       list.push(subscription);
+       subscriptions.set(userId, list);
+       const redis = await getRedisClient();
+@@
+   async unregister(userId: string, endpoint: string) {
+-    const list = subscriptions.get(userId) ?? [];
++    let list = subscriptions.get(userId);
++    if (!list) {
++      const redis = await getRedisClient();
++      if (redis) {
++        const payload = await redis.get(getPushKey(userId));
++        list = payload ? (JSON.parse(payload) as PushSubscriptionPayload[]) : [];
++      } else {
++        list = [];
++      }
++    }
+*** End Patch
+2026-01-09T20:21:02.416737Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"broadcastTableState\" /Users/bricerising/git/brice@github/specify-poker/apps/api/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:21:14.805418Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"getProfile\\(\" /Users/bricerising/git/brice@github/specify-poker/apps","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:21:33.032994Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,160p' /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/tables.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:22:17.792014Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,160p' /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/friends.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:23:17.071002Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"createTable\\(|listTables\\(|getTable\\(|updateTable\\(|resetTables\\(\" /Users/bricerising/git/brice@github/specify-poker/apps/api/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:23:28.534469Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,140p' /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/contract/profile.contract.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:26:08.697025Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"applyTableAction\\(\" /Users/bricerising/git/brice@github/specify-poker","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:26:18.428798Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"joinSeat\\(\" /Users/bricerising/git/brice@github/specify-poker/apps/api/tests","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:30:17.906966Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,120p' /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/unit/eventStore.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:30:24.274088Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/unit/eventStore.test.ts
+@@
+-describe("event store", () => {
+-  it("appends and lists events", () => {
++describe("event store", () => {
++  it("appends and lists events", async () => {
+@@
+-    store.append(event);
+-    const events = store.list("hand-1");
++    await store.append(event);
++    const events = await store.list("hand-1");
+*** End Patch
+2026-01-09T20:35:29.245122Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/ws-table.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:36:02.094757Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/apiClient.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:36:16.137367Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,260p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/auth.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:36:37.028634Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/state/tableStore.ts
+@@
+-import { apiFetch, getApiBaseUrl } from "../services/apiClient";
++import { apiFetch, getApiBaseUrl } from "../services/apiClient";
++import { getToken } from "../services/auth";
+@@
+   const connect = (wsUrl?: string) => {
+     if (socket && socket.readyState === WebSocket.OPEN) {
+       return;
+     }
+     const apiBase = getApiBaseUrl();
+-    const baseUrl = wsUrl ?? apiBase.replace(/^http/, "ws") + "/ws";
++    const baseUrl = wsUrl ?? apiBase.replace(/^http/, "ws") + "/ws";
++    const token = getToken();
++    const url = new URL(baseUrl, window.location.origin);
++    if (token && !url.searchParams.has("token")) {
++      url.searchParams.set("token", token);
++    }
+     setState({ status: "connecting" });
+-    socket = new WebSocket(baseUrl);
++    socket = new WebSocket(url.toString());
+*** End Patch
+2026-01-09T20:37:25.157058Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"TablePage|LobbyPage|ProfilePage|App\" /Users/bricerising/git/brice@github/specify-poker/apps/ui/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:37:29.137135Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,140p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/main.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:37:40.924838Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/main.tsx
+@@
+-import { hydrateTokenFromCallback, isAuthenticated, startLogin } from "./services/auth";
++import { clearToken, hydrateTokenFromCallback, isAuthenticated, startLogin } from "./services/auth";
+@@
+ function PokerApp() {
+   const [state, setState] = React.useState(tableStore.getState());
+   const [view, setView] = React.useState<"lobby" | "profile" | "friends">("lobby");
+   const [profile, setProfile] = React.useState<UserProfile | null>(null);
+@@
+-  const header = profile ? <div>Signed in as {profile.nickname}</div> : null;
++  const handleClearToken = () => {
++    clearToken();
++    window.location.reload();
++  };
++
++  const header = (
++    <div>
++      {profile ? <div>Signed in as {profile.nickname}</div> : null}
++      <button type="button" onClick={handleClearToken}>
++        Clear Auth Token
++      </button>
++    </div>
++  );
+*** End Patch
+2026-01-09T20:41:09.089287Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/handEngine.ts
+@@
+ function activeSeatsRemaining(seats: TableSeat[]) {
+   return seats.filter((seat) => seat.status === "active" || seat.status === "all_in");
+ }
+ 
++function activeSeats(seats: TableSeat[]) {
++  return seats.filter((seat) => seat.status === "active");
++}
++
++function dealRemainingCommunityCards(hand: HandState) {
++  if (hand.communityCards.length === 0) {
++    hand.communityCards.push(...dealCards(hand.deck, 3));
++  }
++  if (hand.communityCards.length === 3) {
++    hand.communityCards.push(...dealCards(hand.deck, 1));
++  }
++  if (hand.communityCards.length === 4) {
++    hand.communityCards.push(...dealCards(hand.deck, 1));
++  }
++}
++
+@@
+   const remaining = activeSeatsRemaining(table.seats);
++  const active = activeSeats(table.seats);
+   if (remaining.length === 1) {
+@@
+     hand.currentStreet = "ended";
+     hand.endedAt = now();
+     table.status = "lobby";
++  } else if (active.length === 0) {
++    dealRemainingCommunityCards(hand);
++    hand.currentStreet = "showdown";
++    settleShowdown(hand, table.seats);
++    table.status = "lobby";
+   } else if (isBettingRoundComplete(hand, table.seats)) {
+*** End Patch
+2026-01-09T20:45:31.966807Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/components/ActionBar.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:45:55.622161Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/components/ActionBar.tsx
+@@
+ export function ActionBar({ actions, onAction }: ActionBarProps) {
+   const [amount, setAmount] = useState("0");
+ 
+   const actionable = useMemo(() => actions.map((action) => action.type), [actions]);
++  const constraints = useMemo(() => {
++    const map = new Map<ActionType, { min?: number; max?: number }>();
++    for (const action of actions) {
++      map.set(action.type, { min: action.minAmount, max: action.maxAmount });
++    }
++    return map;
++  }, [actions]);
++
++  React.useEffect(() => {
++    const raise = actions.find((action) => action.type === "Raise");
++    const bet = actions.find((action) => action.type === "Bet");
++    const preferred = raise?.minAmount ?? bet?.minAmount;
++    if (preferred !== undefined) {
++      setAmount(String(preferred));
++    }
++  }, [actions]);
+ 
+   const handleAction = (type: ActionType) => {
+     const tracer = trace.getTracer("ui");
+     const span = tracer.startSpan("ui.action.submit", {
+       attributes: {
+         "poker.action": type,
+       },
+     });
+     span.end();
+ 
+     const value = Number(amount);
+-    onAction({ type, amount: Number.isNaN(value) ? undefined : value });
++    const limits = constraints.get(type);
++    let resolved = Number.isNaN(value) ? undefined : value;
++    if ((type === "Bet" || type === "Raise") && limits?.min !== undefined) {
++      if (resolved === undefined || resolved < limits.min) {
++        resolved = limits.min;
++      }
++    }
++    if ((type === "Bet" || type === "Raise") && limits?.max !== undefined && resolved !== undefined) {
++      resolved = Math.min(resolved, limits.max);
++    }
++    onAction({ type, amount: resolved });
+   };
+*** End Patch
+2026-01-09T20:48:26.970339Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"connectionRegistry\" /Users/bricerising/git/brice@github/specify-poker/apps/api/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:49:22.778277Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/pubsub.ts
++import { randomUUID } from "crypto";
++import { createClient, RedisClientType } from "redis";
++
++import { getRedisUrl } from "../services/redisClient";
++
++type WsChannel = "table" | "chat" | "timer";
++
++export type WsPubSubMessage = {
++  channel: WsChannel;
++  tableId: string;
++  payload: Record<string, unknown>;
++  sourceId: string;
++};
++
++const PUBSUB_CHANNEL = "poker:ws:events";
++const instanceId = randomUUID();
++let pubClient: RedisClientType | null = null;
++let subClient: RedisClientType | null = null;
++let initialized = false;
++
++export function getWsInstanceId() {
++  return instanceId;
++}
++
++export async function initWsPubSub(handlers: {
++  onTableEvent: (message: WsPubSubMessage) => void;
++  onChatEvent: (message: WsPubSubMessage) => void;
++  onTimerEvent: (message: WsPubSubMessage) => void;
++}) {
++  const url = getRedisUrl();
++  if (!url) {
++    return false;
++  }
++  if (initialized) {
++    return true;
++  }
++
++  pubClient = createClient({ url });
++  subClient = pubClient.duplicate();
++
++  pubClient.on("error", (error) => {
++    console.warn("redis.pubsub.error", { message: error.message });
++  });
++  subClient.on("error", (error) => {
++    console.warn("redis.pubsub.error", { message: error.message });
++  });
++
++  await pubClient.connect();
++  await subClient.connect();
++
++  await subClient.subscribe(PUBSUB_CHANNEL, (message) => {
++    let parsed: WsPubSubMessage;
++    try {
++      parsed = JSON.parse(message) as WsPubSubMessage;
++    } catch {
++      return;
++    }
++    if (parsed.sourceId === instanceId) {
++      return;
++    }
++    if (parsed.channel === "table") {
++      handlers.onTableEvent(parsed);
++      return;
++    }
++    if (parsed.channel === "chat") {
++      handlers.onChatEvent(parsed);
++      return;
++    }
++    if (parsed.channel === "timer") {
++      handlers.onTimerEvent(parsed);
++    }
++  });
++
++  initialized = true;
++  return true;
++}
++
++async function publish(message: Omit<WsPubSubMessage, "sourceId">) {
++  const url = getRedisUrl();
++  if (!url || !pubClient) {
++    return false;
++  }
++  const payload: WsPubSubMessage = { ...message, sourceId: instanceId };
++  await pubClient.publish(PUBSUB_CHANNEL, JSON.stringify(payload));
++  return true;
++}
++
++export async function publishTableEvent(tableId: string, payload: Record<string, unknown>) {
++  return publish({ channel: "table", tableId, payload });
++}
++
++export async function publishChatEvent(tableId: string, payload: Record<string, unknown>) {
++  return publish({ channel: "chat", tableId, payload });
++}
++
++export async function publishTimerEvent(tableId: string, payload: Record<string, unknown>) {
++  return publish({ channel: "timer", tableId, payload });
++}
+*** End Patch
+2026-01-09T20:49:29.742425Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/redisClient.ts
+@@
+-function getRedisUrl() {
++export function getRedisUrl() {
+   const url = process.env.REDIS_URL?.trim();
+   return url && url.length > 0 ? url : null;
+ }
+*** End Patch
+2026-01-09T20:49:50.018901Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts
+@@
+-import { TableState } from "../engine/types";
++import { TableState } from "../engine/types";
+ import { applyTableAction, joinSeat, leaveSeat, reconnectSeat } from "../services/tableService";
+ import { getTableState } from "../services/tableState";
+ import { scheduleTurnTimeout, clearTurnTimeout } from "../services/turnTimer";
++import { WsPubSubMessage, publishTableEvent, publishTimerEvent } from "./pubsub";
+ import { checkWsRateLimit, parseActionType, parseSeatId, parseTableId } from "./validators";
+@@
+-function broadcastTable(tableId: string, message: Record<string, unknown>) {
++function broadcastTableLocal(tableId: string, message: Record<string, unknown>) {
+   const subscribers = tableSubscriptions.get(tableId);
+   if (!subscribers) {
+     return;
+   }
+   for (const connectionId of subscribers) {
+@@
+   }
+ }
+ 
++export function handleTablePubSubEvent(message: WsPubSubMessage) {
++  if (message.channel !== "table") {
++    return;
++  }
++  broadcastTableLocal(message.tableId, message.payload);
++}
++
++export function handleTimerPubSubEvent(message: WsPubSubMessage) {
++  if (message.channel !== "timer") {
++    return;
++  }
++  broadcastTableLocal(message.tableId, message.payload);
++}
++
++async function broadcastTable(tableId: string, message: Record<string, unknown>) {
++  broadcastTableLocal(tableId, message);
++  await publishTableEvent(tableId, message);
++}
++
++async function broadcastTimer(tableId: string, message: Record<string, unknown>) {
++  broadcastTableLocal(tableId, message);
++  await publishTimerEvent(tableId, message);
++}
++
+ function redactTableState(tableState: TableState | null) {
+   if (!tableState || !tableState.hand) {
+     return tableState;
+   }
+@@
+-export async function broadcastTableState(tableId: string) {
++export async function broadcastTableState(tableId: string) {
+   const tableState = await getTableState(tableId);
+   if (!tableState) {
+     return;
+   }
+-  broadcastTable(tableId, {
++  await broadcastTable(tableId, {
+     type: "TablePatch",
+     tableId,
+     handId: tableState.hand?.handId,
+     tableState: redactTableState(tableState),
+   });
+ }
+@@
+-      if (result.ok && result.tableState) {
+-        broadcastTable(tableId, {
++      if (result.ok && result.tableState) {
++        await broadcastTable(tableId, {
+           type: "TablePatch",
+           tableId,
+           handId: result.tableState.hand?.handId,
+           tableState: redactTableState(result.tableState),
+         });
+         await scheduleTurn(tableId);
+       }
+     },
+@@
+-  if (tableState) {
+-    send(client.socket, { type: "TableSnapshot", tableState: redactTableState(tableState) });
+-    await scheduleTurn(tableId);
+-  }
++  if (tableState) {
++    send(client.socket, { type: "TableSnapshot", tableState: redactTableState(tableState) });
++    await scheduleTurn(tableId);
++  }
+ }
+@@
+-  if (result.ok && result.tableState) {
+-    broadcastTable(tableId, {
++  if (result.ok && result.tableState) {
++    await broadcastTable(tableId, {
+       type: "TablePatch",
+       tableId,
+       handId: result.tableState.hand?.handId,
+       tableState: redactTableState(result.tableState),
+     });
+     await scheduleTurn(tableId);
+   }
+@@
+-  if (result.ok && result.tableState) {
+-    broadcastTable(payload.tableId, {
++  if (result.ok && result.tableState) {
++    await broadcastTable(payload.tableId, {
+       type: "TablePatch",
+       tableId: payload.tableId,
+       handId: result.tableState.hand?.handId,
+       tableState: redactTableState(result.tableState),
+     });
+     await scheduleTurn(payload.tableId);
+   }
+ }
+@@
+-  if (result.ok && result.tableState) {
+-    broadcastTable(payload.tableId, {
++  if (result.ok && result.tableState) {
++    await broadcastTable(payload.tableId, {
+       type: "TablePatch",
+       tableId: payload.tableId,
+       handId: result.tableState.hand?.handId,
+       tableState: redactTableState(result.tableState),
+     });
+   }
+ }
+@@
+-  await scheduleTurn(tableId);
++  await scheduleTurn(tableId);
+ }
+@@
+-  broadcastTable(tableId, {
++  await broadcastTimer(tableId, {
+     type: "TimerUpdate",
+     tableId,
+     handId: state.hand.handId,
+     currentTurnSeat: state.hand.currentTurnSeat,
+     deadlineTs: state.hand.actionTimerDeadline,
+   });
+*** End Patch
+2026-01-09T20:49:54.013496Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"nl -ba /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts | sed -n '1,200p'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:49:58.469617Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"nl -ba /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts | sed -n '200,420p'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:50:12.036493Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts
+@@
+ import { TableState } from "../engine/types";
+ import { applyTableAction, joinSeat, leaveSeat, reconnectSeat } from "../services/tableService";
+ import { getTableState } from "../services/tableState";
+ import { scheduleTurnTimeout, clearTurnTimeout } from "../services/turnTimer";
++import { WsPubSubMessage, publishTableEvent, publishTimerEvent } from "./pubsub";
+ import { checkWsRateLimit, parseActionType, parseSeatId, parseTableId } from "./validators";
+@@
+-function broadcastTable(tableId: string, message: Record<string, unknown>) {
++function broadcastTableLocal(tableId: string, message: Record<string, unknown>) {
+   const subscribers = tableSubscriptions.get(tableId);
+   if (!subscribers) {
+     return;
+   }
+   for (const connectionId of subscribers) {
+@@
+   }
+ }
+ 
++export function handleTablePubSubEvent(message: WsPubSubMessage) {
++  if (message.channel !== "table") {
++    return;
++  }
++  broadcastTableLocal(message.tableId, message.payload);
++}
++
++export function handleTimerPubSubEvent(message: WsPubSubMessage) {
++  if (message.channel !== "timer") {
++    return;
++  }
++  broadcastTableLocal(message.tableId, message.payload);
++}
++
++async function broadcastTable(tableId: string, message: Record<string, unknown>) {
++  broadcastTableLocal(tableId, message);
++  await publishTableEvent(tableId, message);
++}
++
++async function broadcastTimer(tableId: string, message: Record<string, unknown>) {
++  broadcastTableLocal(tableId, message);
++  await publishTimerEvent(tableId, message);
++}
++
+*** End Patch
+2026-01-09T20:50:28.376261Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts
+@@
+ export async function broadcastTableState(tableId: string) {
+   const tableState = await getTableState(tableId);
+   if (!tableState) {
+     return;
+   }
+-  broadcastTable(tableId, {
++  await broadcastTable(tableId, {
+     type: "TablePatch",
+     tableId,
+     handId: tableState.hand?.handId,
+     tableState: redactTableState(tableState),
+   });
+ }
+@@
+-      if (result.ok && result.tableState) {
+-        broadcastTable(tableId, {
++      if (result.ok && result.tableState) {
++        await broadcastTable(tableId, {
+           type: "TablePatch",
+           tableId,
+           handId: result.tableState.hand?.handId,
+           tableState: redactTableState(result.tableState),
+         });
+         await scheduleTurn(tableId);
+       }
+     },
+   });
+@@
+-  broadcastTable(tableId, {
++  await broadcastTimer(tableId, {
+     type: "TimerUpdate",
+     tableId,
+     handId: state.hand.handId,
+     currentTurnSeat: state.hand.currentTurnSeat,
+     deadlineTs: state.hand.actionTimerDeadline,
+   });
+@@
+-  if (result.ok && result.tableState) {
+-    broadcastTable(tableId, {
++  if (result.ok && result.tableState) {
++    await broadcastTable(tableId, {
+       type: "TablePatch",
+       tableId,
+       handId: result.tableState.hand?.handId,
+       tableState: redactTableState(result.tableState),
+     });
+     await scheduleTurn(tableId);
+   }
+@@
+-  if (result.ok && result.tableState) {
+-    broadcastTable(payload.tableId, {
++  if (result.ok && result.tableState) {
++    await broadcastTable(payload.tableId, {
+       type: "TablePatch",
+       tableId: payload.tableId,
+       handId: result.tableState.hand?.handId,
+       tableState: redactTableState(result.tableState),
+     });
+     await scheduleTurn(payload.tableId);
+   }
+@@
+-  if (result.ok && result.tableState) {
+-    broadcastTable(payload.tableId, {
++  if (result.ok && result.tableState) {
++    await broadcastTable(payload.tableId, {
+       type: "TablePatch",
+       tableId: payload.tableId,
+       handId: result.tableState.hand?.handId,
+       tableState: redactTableState(result.tableState),
+     });
+   }
+*** End Patch
+2026-01-09T20:50:38.357137Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/chatHub.ts
+@@
+ import { getTableState } from "../services/tableState";
+ import { isUserMuted } from "../services/moderationService";
++import { WsPubSubMessage, publishChatEvent } from "./pubsub";
+ import { checkWsRateLimit, parseChatMessage, parseTableId } from "./validators";
+@@
+-function broadcast(tableId: string, message: Record<string, unknown>) {
++function broadcastLocal(tableId: string, message: Record<string, unknown>) {
+   const subscribers = chatSubscriptions.get(tableId);
+   if (!subscribers) {
+     return;
+   }
+@@
+   }
+ }
+ 
++export function handleChatPubSubEvent(message: WsPubSubMessage) {
++  if (message.channel !== "chat") {
++    return;
++  }
++  broadcastLocal(message.tableId, message.payload);
++}
++
++async function broadcast(tableId: string, message: Record<string, unknown>) {
++  broadcastLocal(tableId, message);
++  await publishChatEvent(tableId, message);
++}
++
+@@
+-  broadcast(tableId, {
++  await broadcast(tableId, {
+     type: "ChatMessage",
+     tableId,
+     message: {
+       id: randomUUID(),
+       userId: client.userId,
+*** End Patch
+2026-01-09T20:50:48.489946Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/server.ts
+@@
+-import { registerConnection, unregisterConnection } from "./connectionRegistry";
++import { registerConnection, unregisterConnection } from "./connectionRegistry";
+ import { registerConnection as registerSeatConnection, unregisterConnection as unregisterSeatConnection } from "./connectionManager";
+-import { attachChatHub } from "./chatHub";
+-import { attachTableHub } from "./tableHub";
++import { attachChatHub, handleChatPubSubEvent } from "./chatHub";
++import { attachTableHub, handleTablePubSubEvent, handleTimerPubSubEvent } from "./tableHub";
++import { initWsPubSub } from "./pubsub";
+@@
+ export function attachWebSocketServer(server: http.Server) {
+   const wss = new WebSocketServer({ server, path: "/ws" });
++  void initWsPubSub({
++    onTableEvent: handleTablePubSubEvent,
++    onChatEvent: handleChatPubSubEvent,
++    onTimerEvent: handleTimerPubSubEvent,
++  });
+ 
+   wss.on("connection", async (socket, request) => {
+@@
+-    registerConnection({
++    void registerConnection({
+       connectionId,
+       userId,
+       connectedAt: new Date().toISOString(),
+     });
+     registerSeatConnection(connectionId, userId);
+@@
+-      unregisterConnection(connectionId);
++      void unregisterConnection(connectionId);
+       void unregisterSeatConnection(connectionId);
+     });
+   });
+*** End Patch
+2026-01-09T20:51:04.317613Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/connectionRegistry.ts
+@@
+-export interface ConnectionInfo {
+-  connectionId: string;
+-  userId: string;
+-  connectedAt: string;
+-}
+-
+-const connections = new Map<string, ConnectionInfo>();
+-
+-export function registerConnection(info: ConnectionInfo) {
+-  connections.set(info.connectionId, info);
+-}
+-
+-export function unregisterConnection(connectionId: string) {
+-  connections.delete(connectionId);
+-}
+-
+-export function getActiveConnections() {
+-  return Array.from(connections.values());
+-}
+-
+-export function resetConnections() {
+-  connections.clear();
+-}
++import { getRedisClient } from "../services/redisClient";
++
++export interface ConnectionInfo {
++  connectionId: string;
++  userId: string;
++  connectedAt: string;
++}
++
++const connections = new Map<string, ConnectionInfo>();
++const CONNECTIONS_KEY = "poker:ws:connections";
++
++export async function registerConnection(info: ConnectionInfo) {
++  connections.set(info.connectionId, info);
++  const redis = await getRedisClient();
++  if (redis) {
++    await redis.hSet(CONNECTIONS_KEY, info.connectionId, JSON.stringify(info));
++  }
++}
++
++export async function unregisterConnection(connectionId: string) {
++  connections.delete(connectionId);
++  const redis = await getRedisClient();
++  if (redis) {
++    await redis.hDel(CONNECTIONS_KEY, connectionId);
++  }
++}
++
++export async function getActiveConnections() {
++  const redis = await getRedisClient();
++  if (!redis) {
++    return Array.from(connections.values());
++  }
++  const entries = await redis.hGetAll(CONNECTIONS_KEY);
++  const list = Object.values(entries).map((value) => JSON.parse(value) as ConnectionInfo);
++  list.forEach((info) => connections.set(info.connectionId, info));
++  return list;
++}
++
++export async function resetConnections() {
++  connections.clear();
++  const redis = await getRedisClient();
++  if (redis) {
++    await redis.del(CONNECTIONS_KEY);
++  }
++}
+*** End Patch
+2026-01-09T20:54:48.008719Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/handEngine.ts
+@@
+-  } else if (active.length === 0) {
++  } else if (active.length === 0 || (active.length === 1 && remaining.length > 1)) {
+     dealRemainingCommunityCards(hand);
+     hand.currentStreet = "showdown";
+     settleShowdown(hand, table.seats);
+     table.status = "lobby";
+*** End Patch
+2026-01-09T20:58:18.359760Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"currentStreet\\)\\.toBe\\(\" /Users/bricerising/git/brice@github/specify-poker/apps/api/tests","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:58:23.206573Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '120,190p' /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/hand-flow.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T20:58:36.762391Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/tableService.ts
+@@
+   const handEnded = result.table.hand?.currentStreet === "ended" && previousStreet !== "ended";
+ 
+   if (handEnded && result.table.hand) {
+     await recordHandCompletion(result.table.hand, result.table.seats);
+   }
+@@
+     if (result.table.hand.currentStreet === "ended") {
+       await recordEvent(result.table.hand.handId, "HandEnded", { snapshot: result.table.hand });
+     }
+   }
+ 
+-  return { ok: result.accepted, reason: result.reason, tableState: result.table };
++  let finalState = result.table;
++  if (handEnded) {
++    const nextState = await startHandIfReady(options.tableId);
++    if (nextState?.hand && nextState.hand.handId !== result.table.hand?.handId) {
++      await recordEvent(nextState.hand.handId, "HandStarted", { snapshot: nextState.hand });
++      finalState = nextState;
++      await syncSummary(options.tableId);
++    }
++  }
++
++  return { ok: result.accepted, reason: result.reason, tableState: finalState };
+ }
+*** End Patch
+2026-01-09T20:59:01.790069Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/hand-flow.test.ts
+@@
+-    let tableState = (await waitForMessage(wsA, (message) => message.type === "TableSnapshot"))
+-      .tableState;
++    let tableState = (await waitForMessage(wsA, (message) => message.type === "TableSnapshot"))
++      .tableState;
++    const initialHandId = tableState?.hand?.handId;
+@@
+-    const playHand = async () => {
++    const playHand = async () => {
+       let guard = 0;
+-      while (tableState?.hand && tableState.hand.currentStreet !== "ended") {
++      while (tableState?.hand && tableState.hand.handId === initialHandId) {
+         if (guard > 20) {
+           throw new Error("hand did not complete");
+         }
+         const hand = tableState.hand;
+         const seatId = hand.currentTurnSeat;
+@@
+-    await playHand();
+-
+-    expect(tableState?.hand?.currentStreet).toBe("ended");
+-    expect(tableState?.hand?.communityCards.length).toBe(5);
++    await playHand();
++
++    expect(tableState?.hand?.handId).not.toBe(initialHandId);
++    expect(tableState?.hand?.currentStreet).toBe("preflop");
+*** End Patch
+2026-01-09T20:59:12.709890Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/timer.test.ts
+@@
+-    expect(patch.tableState.hand.currentStreet).toBe("ended");
++    expect(patch.tableState.hand.currentStreet).toBe("preflop");
+     expect(patch.tableState.seats[0].status).toBe("active");
+*** End Patch
+2026-01-09T21:00:22.269390Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/apps/api/Dockerfile","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:00:28.897595Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/apps/ui/Dockerfile","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:00:35.451258Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/Dockerfile
+@@
+ COPY package.json package-lock.json tsconfig.base.json ./
+ COPY apps/api/package.json apps/api/tsconfig.json ./apps/api/
+-COPY apps/api/src ./apps/api/src
+ COPY packages/shared/package.json packages/shared/tsconfig.json ./packages/shared/
+-COPY packages/shared/src ./packages/shared/src
+ 
+ RUN npm ci
++
++COPY apps/api/src ./apps/api/src
++COPY packages/shared/src ./packages/shared/src
+ RUN npm run build --workspace=@specify-poker/api
+*** End Patch
+2026-01-09T21:00:41.197884Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/Dockerfile
+@@
+ COPY package.json package-lock.json tsconfig.base.json ./
+ COPY apps/ui/package.json apps/ui/tsconfig.json ./apps/ui/
+-COPY apps/ui/src ./apps/ui/src
+-COPY apps/ui/server.js ./apps/ui/server.js
+-COPY apps/ui/public ./apps/ui/public
+ 
+ RUN npm ci
++
++COPY apps/ui/src ./apps/ui/src
++COPY apps/ui/server.js ./apps/ui/server.js
++COPY apps/ui/public ./apps/ui/public
+ RUN npm run build --workspace=@specify-poker/ui
+*** End Patch
+2026-01-09T21:04:17.834052Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts
+@@
+-import { WsPubSubMessage, publishTableEvent, publishTimerEvent } from "./pubsub";
++import { WsPubSubMessage, publishTableEvent, publishTimerEvent } from "./pubsub";
+ import { checkWsRateLimit, parseActionType, parseSeatId, parseTableId } from "./validators";
+@@
+-function broadcastTableLocal(tableId: string, message: Record<string, unknown>) {
++async function broadcastTableLocal(tableId: string, message: Record<string, unknown>) {
+   const subscribers = tableSubscriptions.get(tableId);
+   if (!subscribers) {
+     return;
+   }
++  const tableState = await getTableState(tableId);
+   for (const connectionId of subscribers) {
+     const client = clients.get(connectionId);
+     if (client) {
+       send(client.socket, message);
++      if (tableState?.hand) {
++        const seat = tableState.seats.find((entry) => entry.userId === client.userId);
++        const holeCards = seat ? tableState.hand.holeCards[seat.seatId] : undefined;
++        if (holeCards && holeCards.length === 2) {
++          send(client.socket, {
++            type: "HoleCards",
++            tableId,
++            handId: tableState.hand.handId,
++            seatId: seat?.seatId,
++            cards: holeCards,
++          });
++        }
++      }
+     }
+   }
+ }
+ 
+-export function handleTablePubSubEvent(message: WsPubSubMessage) {
++export function handleTablePubSubEvent(message: WsPubSubMessage) {
+   if (message.channel !== "table") {
+     return;
+   }
+-  broadcastTableLocal(message.tableId, message.payload);
++  void broadcastTableLocal(message.tableId, message.payload);
+ }
+ 
+ export function handleTimerPubSubEvent(message: WsPubSubMessage) {
+   if (message.channel !== "timer") {
+     return;
+   }
+-  broadcastTableLocal(message.tableId, message.payload);
++  void broadcastTableLocal(message.tableId, message.payload);
+ }
+ 
+ async function broadcastTable(tableId: string, message: Record<string, unknown>) {
+-  broadcastTableLocal(tableId, message);
++  await broadcastTableLocal(tableId, message);
+   await publishTableEvent(tableId, message);
+ }
+ 
+ async function broadcastTimer(tableId: string, message: Record<string, unknown>) {
+-  broadcastTableLocal(tableId, message);
++  await broadcastTableLocal(tableId, message);
+   await publishTimerEvent(tableId, message);
+ }
+*** End Patch
+2026-01-09T21:04:31.535677Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts
+@@
+   const tableState = (await reconnectSeat({ tableId, userId: client.userId })) ?? (await getTableState(tableId));
+   if (tableState) {
+     send(client.socket, { type: "TableSnapshot", tableState: redactTableState(tableState) });
++    if (tableState.hand) {
++      const seat = tableState.seats.find((entry) => entry.userId === client.userId);
++      const holeCards = seat ? tableState.hand.holeCards[seat.seatId] : undefined;
++      if (holeCards && holeCards.length === 2) {
++        send(client.socket, {
++          type: "HoleCards",
++          tableId,
++          handId: tableState.hand.handId,
++          seatId: seat?.seatId,
++          cards: holeCards,
++        });
++      }
++    }
+     await scheduleTurn(tableId);
+   }
+ }
+@@
+   if (!tableState) {
+     return;
+   }
+   send(client.socket, { type: "TableSnapshot", tableState: redactTableState(tableState) });
++  if (tableState.hand) {
++    const seat = tableState.seats.find((entry) => entry.userId === client.userId);
++    const holeCards = seat ? tableState.hand.holeCards[seat.seatId] : undefined;
++    if (holeCards && holeCards.length === 2) {
++      send(client.socket, {
++        type: "HoleCards",
++        tableId,
++        handId: tableState.hand.handId,
++        seatId: seat?.seatId,
++        cards: holeCards,
++      });
++    }
++  }
+   await scheduleTurn(tableId);
+ }
+*** End Patch
+2026-01-09T21:04:45.515742Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/state/tableStore.ts
+@@
+ export interface TableStoreState {
+   tables: TableSummary[];
+   tableState: TableState | null;
+   seatId: number | null;
+   status: "idle" | "connecting" | "connected" | "error";
+   error?: string;
+   chatMessages: ChatMessage[];
+   chatError?: string;
++  privateHoleCards: string[] | null;
++  privateHandId: string | null;
+ }
+@@
+   let state: TableStoreState = {
+     tables: [],
+     tableState: null,
+     seatId: null,
+     status: "idle",
+     chatMessages: [],
++    privateHoleCards: null,
++    privateHandId: null,
+   };
+@@
+       if (message.type === "TableSnapshot" || message.type === "TablePatch") {
+         const incoming = message.tableState as TableState | undefined;
+         if (!incoming) {
+           return;
+         }
+         const currentVersion = state.tableState?.version ?? null;
+         const incomingVersion = incoming.version ?? 0;
+         if (isStaleVersion(currentVersion, incomingVersion)) {
+           return;
+         }
+         if (shouldResync(currentVersion, incomingVersion)) {
+           requestResync(socket, incoming.tableId);
+         }
+-        setState({ tableState: incoming });
++        const incomingHandId = incoming.hand?.handId ?? null;
++        const clearPrivate =
++          !incomingHandId || (state.privateHandId && state.privateHandId !== incomingHandId);
++        setState({
++          tableState: incoming,
++          ...(clearPrivate ? { privateHoleCards: null, privateHandId: null } : {}),
++        });
+         return;
+       }
++      if (message.type === "HoleCards") {
++        const cards = message.cards as string[] | undefined;
++        const handId = (message.handId as string | undefined) ?? null;
++        if (cards && cards.length === 2) {
++          setState({ privateHoleCards: cards, privateHandId: handId });
++        }
++        return;
++      }
+       if (message.type === "ChatMessage") {
+         setState({ chatMessages: [...state.chatMessages, message.message], chatError: undefined });
+         return;
+       }
+@@
+     joinSeat: async (tableId, seatId) => {
+       const response = await apiFetch(`/api/tables/${tableId}/join`, {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({ seatId }),
+       });
+       const payload = await response.json();
+-      setState({ seatId, chatMessages: [], chatError: undefined });
++      setState({ seatId, chatMessages: [], chatError: undefined, privateHoleCards: null, privateHandId: null });
+       connect(payload.wsUrl);
+*** End Patch
+2026-01-09T21:04:53.400836Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/pages/TablePage.tsx
+@@
+   const hand = state.tableState.hand;
+   const pot = hand?.pots.reduce((sum, entry) => sum + entry.amount, 0) ?? 0;
++  const privateCards = state.privateHoleCards?.join(" ") ?? "Hidden";
+ 
+   return (
+     <div>
+       <h2>{state.tableState.name}</h2>
+       <div>Table ID: {state.tableState.tableId}</div>
+       <div>Pot: {pot}</div>
+       <div>Board: {hand?.communityCards.join(" ") ?? "Waiting"}</div>
++      <div>Your Cards: {privateCards}</div>
+       <div>Street: {hand?.currentStreet ?? "lobby"}</div>
+*** End Patch
+2026-01-09T21:09:08.464679Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/tableService.ts
+@@
+   const seat = state.seats.find((entry) => entry.seatId === options.seatId);
+   if (!seat) {
+     return { ok: false, reason: "seat_unavailable" as const };
+   }
+ 
++  const existingSeat = state.seats.find((entry) => entry.userId === options.userId);
++  if (existingSeat) {
++    if (existingSeat.seatId === options.seatId && existingSeat.status === "disconnected") {
++      seat.status = "active";
++      await updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
++      await syncSummary(state.tableId);
++      return { ok: true, tableState: await getTableState(state.tableId) };
++    }
++    return { ok: false, reason: "already_seated" as const };
++  }
++
+   if (seat.userId === options.userId && seat.status === "disconnected") {
+     seat.status = "active";
+     await updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
+     await syncSummary(state.tableId);
+     return { ok: true, tableState: await getTableState(state.tableId) };
+*** End Patch
+2026-01-09T21:10:28.270353Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/infra/keycloak/realm-export.json","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:10:40.232395Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/infra/keycloak/realm-export.json
+@@
+     {
+       "username": "demo",
+       "enabled": true,
+       "emailVerified": true,
+       "firstName": "Demo",
+       "lastName": "User",
+       "credentials": [
+         {
+           "type": "password",
+           "value": "demo",
+           "temporary": false
+         }
+       ]
++    },
++    {
++      "username": "demo2",
++      "enabled": true,
++      "emailVerified": true,
++      "firstName": "Demo",
++      "lastName": "Two",
++      "credentials": [
++        {
++          "type": "password",
++          "value": "demo2",
++          "temporary": false
++        }
++      ]
+     }
+   ]
+ }
+*** End Patch

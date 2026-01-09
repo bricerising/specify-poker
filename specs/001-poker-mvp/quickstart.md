@@ -26,6 +26,7 @@
 - api: Express server (REST + WebSocket)
 - keycloak: OIDC provider
 - keycloak-db: Postgres for Keycloak
+- redis: in-memory store for tables, hands, profiles, friends, and moderation
 - otel-collector: receives OTLP from UI/API
 - prometheus: metrics store
 - tempo (or jaeger): traces store
