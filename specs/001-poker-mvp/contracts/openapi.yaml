@@ -1,0 +1,272 @@
+openapi: 3.0.3
+info:
+  title: Play-Money Poker MVP API
+  version: 0.1.0
+servers:
+  - url: http://localhost:4000
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+    UserProfile:
+      type: object
+      required: [userId, nickname, avatarUrl, stats]
+      properties:
+        userId:
+          type: string
+        nickname:
+          type: string
+        avatarUrl:
+          type: string
+          nullable: true
+        stats:
+          type: object
+          required: [handsPlayed, wins]
+          properties:
+            handsPlayed:
+              type: integer
+            wins:
+              type: integer
+        friends:
+          type: array
+          items:
+            type: string
+    TableConfig:
+      type: object
+      required: [smallBlind, bigBlind, maxPlayers, startingStack, bettingStructure]
+      properties:
+        smallBlind:
+          type: integer
+        bigBlind:
+          type: integer
+        ante:
+          type: integer
+          nullable: true
+        maxPlayers:
+          type: integer
+        startingStack:
+          type: integer
+        bettingStructure:
+          type: string
+          enum: [NoLimit]
+    TableSummary:
+      type: object
+      required: [tableId, name, config, seatsTaken, inProgress]
+      properties:
+        tableId:
+          type: string
+        name:
+          type: string
+        config:
+          $ref: '#/components/schemas/TableConfig'
+        seatsTaken:
+          type: integer
+        inProgress:
+          type: boolean
+    TableCreateRequest:
+      type: object
+      required: [name, config]
+      properties:
+        name:
+          type: string
+        config:
+          $ref: '#/components/schemas/TableConfig'
+    TableJoinRequest:
+      type: object
+      required: [seatId]
+      properties:
+        seatId:
+          type: integer
+    TableJoinResponse:
+      type: object
+      required: [tableId, seatId, wsUrl]
+      properties:
+        tableId:
+          type: string
+        seatId:
+          type: integer
+        wsUrl:
+          type: string
+    ModerationRequest:
+      type: object
+      required: [targetUserId]
+      properties:
+        targetUserId:
+          type: string
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+
+  /api/me:
+    get:
+      summary: Get current user profile
+      responses:
+        '200':
+          description: Profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/profile:
+    post:
+      summary: Update nickname and avatar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nickname:
+                  type: string
+                avatarUrl:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/tables:
+    get:
+      summary: List lobby tables
+      responses:
+        '200':
+          description: Tables list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TableSummary'
+    post:
+      summary: Create table
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TableCreateRequest'
+      responses:
+        '201':
+          description: Table created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TableSummary'
+
+  /api/tables/{tableId}/join:
+    post:
+      summary: Join a seat at a table
+      parameters:
+        - name: tableId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TableJoinRequest'
+      responses:
+        '200':
+          description: Join result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TableJoinResponse'
+        '409':
+          description: Seat unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/tables/{tableId}/leave:
+    post:
+      summary: Leave a table
+      parameters:
+        - name: tableId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Left table
+
+  /api/tables/{tableId}/mod/kick:
+    post:
+      summary: Kick a player (owner only)
+      parameters:
+        - name: tableId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerationRequest'
+      responses:
+        '204':
+          description: Player kicked
+
+  /api/tables/{tableId}/mod/mute:
+    post:
+      summary: Mute a player (owner only)
+      parameters:
+        - name: tableId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerationRequest'
+      responses:
+        '204':
+          description: Player muted

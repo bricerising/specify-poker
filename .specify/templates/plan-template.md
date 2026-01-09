@@ -31,7 +31,11 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- Secure multi-device access plan (auth, session revocation, device linking)
+- Realtime state sync design using push notifications
+- Telemetry event schema and collection plan
+- Deterministic game rules approach (seeded RNG, replayability)
+- Confirmation of no on-platform payments
 
 ## Project Structure
 

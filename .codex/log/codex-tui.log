@@ -1,0 +1,590 @@
+2026-01-09T13:29:11.675705Z  INFO cwd not set, using current dir
+2026-01-09T13:35:54.030036Z  INFO spawning ghost snapshot task
+2026-01-09T13:35:54.408694Z  INFO ghost snapshot blocking task finished
+2026-01-09T13:35:54.408938Z  INFO ghost commit captured: 1f973459b8d9d3f2ecc48d12fe788139d678c01f
+2026-01-09T13:35:54.409438Z  INFO ghost snapshot gate marked ready
+2026-01-09T13:36:00.195529Z  INFO ToolCall: shell_command {"command":"ls","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:36:02.282967Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' .specify/memory/constitution.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:36:04.936006Z  INFO ToolCall: shell_command {"command":"rg --files -g 'README*'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:36:07.909118Z  INFO ToolCall: shell_command {"command":"ls -a","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:36:11.423068Z  INFO ToolCall: shell_command {"command":"ls .specify/templates","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:36:13.299762Z  INFO ToolCall: shell_command {"command":"ls .specify/templates/commands","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:36:18.052837Z  INFO ToolCall: shell_command {"command":"sed -n '1,220p' .specify/templates/plan-template.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:36:20.397420Z  INFO ToolCall: shell_command {"command":"sed -n '1,260p' .specify/templates/spec-template.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:36:22.649966Z  INFO ToolCall: shell_command {"command":"sed -n '1,260p' .specify/templates/tasks-template.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:36:30.900881Z  INFO ToolCall: shell_command {"command":"date +%F","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:37:31.162682Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: .specify/memory/constitution.md
+@@
+-# [PROJECT_NAME] Constitution
+-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
++<!--
++Sync Impact Report:
++- Version change: N/A (template) -> 1.0.0
++- Modified principles: N/A (template) -> Secure Multi-Device Access; Real-Time State Sync
++  & Push; Telemetry & Behavioral Observability; Deterministic Game Rules; No Platform
++  Payments
++- Added sections: Product Constraints; Delivery & Quality Gates
++- Removed sections: None
++- Templates requiring updates: ✅ .specify/templates/plan-template.md; ✅ .specify/templates/spec-template.md;
++  ✅ .specify/templates/tasks-template.md
++- Follow-up TODOs: TODO(RATIFICATION_DATE): original adoption date unknown
++-->
++# Specify Poker Constitution
+ 
+ ## Core Principles
+ 
+-### [PRINCIPLE_1_NAME]
+-<!-- Example: I. Library-First -->
+-[PRINCIPLE_1_DESCRIPTION]
+-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
++### I. Secure Multi-Device Access
++Players MUST authenticate to access games across devices. Account linking, session
++management, and device revocation MUST be supported to prevent unauthorized access.
++Rationale: Fair gameplay depends on trustworthy identity and secure continuity.
+ 
+-### [PRINCIPLE_2_NAME]
+-<!-- Example: II. CLI Interface -->
+-[PRINCIPLE_2_DESCRIPTION]
+-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
++### II. Real-Time State Sync & Push
++All game state changes MUST be synchronized in real time for every player and
++delivered via push notifications. Server-authoritative state and ordered events
++MUST prevent divergence across devices. Rationale: The experience is only fair
++when everyone sees the same game state at the same time.
+ 
+-### [PRINCIPLE_3_NAME]
+-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
+-[PRINCIPLE_3_DESCRIPTION]
+-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
++### III. Telemetry & Behavioral Observability
++Telemetry MUST be collected for core user flows and game events using a defined
++event schema. The system MUST minimize sensitive data while preserving analytical
++value. Rationale: The product must be observable to understand real usage.
+ 
+-### [PRINCIPLE_4_NAME]
+-<!-- Example: IV. Integration Testing -->
+-[PRINCIPLE_4_DESCRIPTION]
+-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
++### IV. Deterministic Game Rules
++Game rules MUST be deterministic: the same inputs and seeded randomness MUST
++produce the same outputs across all clients. Determinism MUST be verifiable via
++tests and replayable event logs. Rationale: Determinism underpins fairness.
+ 
+-### [PRINCIPLE_5_NAME]
+-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
+-[PRINCIPLE_5_DESCRIPTION]
+-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
++### V. No Platform Payments
++The game MUST NOT support on-platform payments or in-app purchases. Rationale:
++The experience must remain payment-free and free of platform billing complexity.
+ 
+-## [SECTION_2_NAME]
+-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+-
+-[SECTION_2_CONTENT]
+-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
++## Product Constraints
++
++- Gameplay requires authenticated access; anonymous sessions are not permitted.
++- Realtime sync MUST use push notifications in addition to realtime channels.
++- Telemetry events MUST be documented with ownership, purpose, and retention.
++- Client behavior MUST be resilient to reconnects without state divergence.
++- No payment, wallet, or checkout flows are allowed in any client.
+ 
+-## [SECTION_3_NAME]
+-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+-
+-[SECTION_3_CONTENT]
+-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
++## Delivery & Quality Gates
++
++- Deterministic rules MUST have unit tests covering seeded scenarios.
++- Sync logic MUST have integration tests for reconnects and out-of-order events.
++- Telemetry MUST be validated for schema correctness before release.
++- Push notification behavior MUST be verified on each supported platform.
+ 
+ ## Governance
+-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
+ 
+-[GOVERNANCE_RULES]
+-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
++- This constitution supersedes other guidance when conflicts arise.
++- Amendments require a documented proposal, rationale, and version bump per
++  semantic versioning (MAJOR for removals or redefinitions, MINOR for additions,
++  PATCH for clarifications).
++- All plans, specs, and tasks MUST include a compliance check against these
++  principles before implementation begins.
++- Compliance reviews occur at feature planning and pre-release checkpoints.
+ 
+-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
+-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
++**Version**: 1.0.0 | **Ratified**: TODO(RATIFICATION_DATE): original adoption date unknown | **Last Amended**: 2026-01-09
+*** End Patch
+2026-01-09T13:37:36.502282Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: .specify/templates/plan-template.md
+@@
+ ## Constitution Check
+ 
+ *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+ 
+-[Gates determined based on constitution file]
++- Secure multi-device access plan (auth, session revocation, device linking)
++- Realtime state sync design using push notifications
++- Telemetry event schema and collection plan
++- Deterministic game rules approach (seeded RNG, replayability)
++- Confirmation of no on-platform payments
+*** End Patch
+2026-01-09T13:37:42.318017Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: .specify/templates/spec-template.md
+@@
+ ### Edge Cases
+ 
+ <!--
+   ACTION REQUIRED: The content in this section represents placeholders.
+   Fill them out with the right edge cases.
+ -->
+ 
+ - What happens when [boundary condition]?
+ - How does system handle [error scenario]?
+ 
++## Constitution Requirements *(mandatory)*
++
++<!--
++  ACTION REQUIRED: Explain how this feature complies with each constitution rule.
++  If a requirement is not applicable, justify why.
++-->
++
++- **Secure multi-device access**: [How this feature enforces authenticated access]
++- **Realtime sync + push**: [How this feature participates in realtime state updates]
++- **Telemetry**: [Events collected and schema ownership]
++- **Deterministic rules**: [How deterministic behavior is preserved or verified]
++- **No platform payments**: [Statement confirming no payment flows are added]
++
+ ## Requirements *(mandatory)*
+*** End Patch
+2026-01-09T13:37:53.582972Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: .specify/templates/tasks-template.md
+@@
+-**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
++**Tests**: Tests are REQUIRED for deterministic rules, sync correctness, and telemetry validation; otherwise only include them if explicitly requested in the feature specification.
+@@
+ Examples of foundational tasks (adjust based on your project):
+ 
+ - [ ] T004 Setup database schema and migrations framework
+ - [ ] T005 [P] Implement authentication/authorization framework
+ - [ ] T006 [P] Setup API routing and middleware structure
+ - [ ] T007 Create base models/entities that all stories depend on
+ - [ ] T008 Configure error handling and logging infrastructure
+ - [ ] T009 Setup environment configuration management
++- [ ] T010 Define telemetry event schema and validation pipeline
++- [ ] T011 [P] Implement realtime sync + push notification infrastructure
++- [ ] T012 Create deterministic rules test harness (seeded RNG, replay)
+@@
+-### Tests for User Story 1 (OPTIONAL - only if tests requested) ⚠️
++### Tests for User Story 1 (REQUIRED if deterministic, sync, or telemetry changes) ⚠️
+@@
+-- [ ] T010 [P] [US1] Contract test for [endpoint] in tests/contract/test_[name].py
+-- [ ] T011 [P] [US1] Integration test for [user journey] in tests/integration/test_[name].py
++- [ ] T013 [P] [US1] Contract test for [endpoint] in tests/contract/test_[name].py
++- [ ] T014 [P] [US1] Integration test for [user journey] in tests/integration/test_[name].py
+*** End Patch
+2026-01-09T13:38:08.666896Z  INFO ToolCall: shell_command {"command":"rg -n \"T0\" .specify/templates/tasks-template.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:38:27.407989Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: .specify/templates/tasks-template.md
+@@
+-- [ ] T012 [P] [US1] Create [Entity1] model in src/models/[entity1].py
+-- [ ] T013 [P] [US1] Create [Entity2] model in src/models/[entity2].py
+-- [ ] T014 [US1] Implement [Service] in src/services/[service].py (depends on T012, T013)
+-- [ ] T015 [US1] Implement [endpoint/feature] in src/[location]/[file].py
+-- [ ] T016 [US1] Add validation and error handling
+-- [ ] T017 [US1] Add logging for user story 1 operations
++- [ ] T015 [P] [US1] Create [Entity1] model in src/models/[entity1].py
++- [ ] T016 [P] [US1] Create [Entity2] model in src/models/[entity2].py
++- [ ] T017 [US1] Implement [Service] in src/services/[service].py (depends on T015, T016)
++- [ ] T018 [US1] Implement [endpoint/feature] in src/[location]/[file].py
++- [ ] T019 [US1] Add validation and error handling
++- [ ] T020 [US1] Add logging for user story 1 operations
+@@
+-- [ ] T018 [P] [US2] Contract test for [endpoint] in tests/contract/test_[name].py
+-- [ ] T019 [P] [US2] Integration test for [user journey] in tests/integration/test_[name].py
++- [ ] T021 [P] [US2] Contract test for [endpoint] in tests/contract/test_[name].py
++- [ ] T022 [P] [US2] Integration test for [user journey] in tests/integration/test_[name].py
+@@
+-- [ ] T020 [P] [US2] Create [Entity] model in src/models/[entity].py
+-- [ ] T021 [US2] Implement [Service] in src/services/[service].py
+-- [ ] T022 [US2] Implement [endpoint/feature] in src/[location]/[file].py
+-- [ ] T023 [US2] Integrate with User Story 1 components (if needed)
++- [ ] T023 [P] [US2] Create [Entity] model in src/models/[entity].py
++- [ ] T024 [US2] Implement [Service] in src/services/[service].py
++- [ ] T025 [US2] Implement [endpoint/feature] in src/[location]/[file].py
++- [ ] T026 [US2] Integrate with User Story 1 components (if needed)
+@@
+-- [ ] T024 [P] [US3] Contract test for [endpoint] in tests/contract/test_[name].py
+-- [ ] T025 [P] [US3] Integration test for [user journey] in tests/integration/test_[name].py
++- [ ] T027 [P] [US3] Contract test for [endpoint] in tests/contract/test_[name].py
++- [ ] T028 [P] [US3] Integration test for [user journey] in tests/integration/test_[name].py
+@@
+-- [ ] T026 [P] [US3] Create [Entity] model in src/models/[entity].py
+-- [ ] T027 [US3] Implement [Service] in src/services/[service].py
+-- [ ] T028 [US3] Implement [endpoint/feature] in src/[location]/[file].py
++- [ ] T029 [P] [US3] Create [Entity] model in src/models/[entity].py
++- [ ] T030 [US3] Implement [Service] in src/services/[service].py
++- [ ] T031 [US3] Implement [endpoint/feature] in src/[location]/[file].py
+*** End Patch
+2026-01-09T13:38:31.218761Z  INFO ToolCall: shell_command {"command":"rg -n \"\\[[A-Z0-9_]+\\]\" .specify/memory/constitution.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:47:01.246363Z  INFO spawning ghost snapshot task
+2026-01-09T13:47:01.614956Z  INFO ghost snapshot blocking task finished
+2026-01-09T13:47:01.615005Z  INFO ghost commit captured: abfd077344a18f250196f07635fb725785a1ff2d
+2026-01-09T13:47:01.615017Z  INFO ghost snapshot gate marked ready
+2026-01-09T13:47:10.439005Z  INFO ToolCall: shell_command {"command":"git fetch --all --prune","workdir":"/Users/bricerising/git/brice@github/specify-poker","sandbox_permissions":"require_escalated","justification":"Need network access to fetch remote branches for accurate feature numbering."}
+2026-01-09T13:53:43.928539Z  INFO interrupt received: abort current task, if any
+2026-01-09T13:54:04.304366Z  INFO spawning ghost snapshot task
+2026-01-09T13:54:04.670634Z  INFO ghost snapshot blocking task finished
+2026-01-09T13:54:04.670676Z  INFO ghost commit captured: a47cfb6849b2a7c60ea824ff6bc9610ebaddbb0f
+2026-01-09T13:54:04.670686Z  INFO ghost snapshot gate marked ready
+2026-01-09T13:54:09.936163Z  INFO ToolCall: shell_command {"command":".specify/scripts/bash/setup-plan.sh --json","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:55:12.933599Z  INFO spawning ghost snapshot task
+2026-01-09T13:55:13.302013Z  INFO ghost snapshot blocking task finished
+2026-01-09T13:55:13.302059Z  INFO ghost commit captured: 5b1423065aaafe34a448bd61d970152c3a290784
+2026-01-09T13:55:13.302069Z  INFO ghost snapshot gate marked ready
+2026-01-09T13:55:21.760639Z  INFO ToolCall: shell_command {"command":"git branch --show-current","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:55:26.062166Z  INFO ToolCall: shell_command {"command":".specify/scripts/bash/setup-plan.sh --json","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:55:30.059118Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/specs/001-init-poker/spec.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:55:30.902128Z  INFO ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/.specify/memory/constitution.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:55:32.265041Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/specs/001-init-poker/plan.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:55:36.826865Z  INFO ToolCall: shell_command {"command":"ls /Users/bricerising/git/brice@github/specify-poker/specs","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:57:42.502263Z  INFO spawning ghost snapshot task
+2026-01-09T13:57:42.874248Z  INFO ghost snapshot blocking task finished
+2026-01-09T13:57:42.874299Z  INFO ghost commit captured: 5e010b23ea22e8936f46d081a2d528c3ed25a22e
+2026-01-09T13:57:42.874310Z  INFO ghost snapshot gate marked ready
+2026-01-09T13:57:49.075272Z  INFO ToolCall: shell_command {"command":"git fetch --all --prune","workdir":"/Users/bricerising/git/brice@github/specify-poker","sandbox_permissions":"require_escalated","justification":"Need network access to fetch remote branches for accurate feature numbering."}
+2026-01-09T13:57:55.769356Z  INFO ToolCall: shell_command {"command":"git ls-remote --heads origin | rg -n \"refs/heads/[0-9]+-poker-mvp$\"","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:58:01.095025Z  INFO ToolCall: shell_command {"command":"git ls-remote --heads origin | rg -n \"refs/heads/[0-9]+-poker-mvp$\"","workdir":"/Users/bricerising/git/brice@github/specify-poker","sandbox_permissions":"require_escalated","justification":"Need network access to list remote branches for feature numbering."}
+2026-01-09T13:58:20.243456Z  INFO ToolCall: shell_command {"command":"git branch | rg -n \"^[* ]*[0-9]+-poker-mvp$\"","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:58:24.447657Z  INFO ToolCall: shell_command {"command":"ls specs | rg -n \"^[0-9]+-poker-mvp$\"","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:58:34.392707Z  INFO ToolCall: shell_command {"command":".specify/scripts/bash/create-new-feature.sh --json \"Build a web-based poker website (MVP) for play-money Texas Hold’em. Users: - Users can create a nickname and avatar. - Authenticate users using keycloak. - Support logging in with google accounts. - Basic profiles: nickname, avatar, stats (hands played, wins), and a friends list (optional). Player flows: 1) Landing page → “Enter Lobby” 2) Lobby shows tables with: table name, blinds, max players, seats taken, and whether a hand is in progress. 3) Create table: set table name, blinds (small/big), max players (2–9), and starting chip stack (play money). 4) Join table: choose a seat if open. If a hand is in progress, join as spectator until next hand. In-table experience: - Table layout: seats around the table, community cards, pot, dealer button, player action controls. - Player actions: fold, check/call, bet/raise with a chip slider and presets (½ pot, pot, all-in). - Timers: each player has X seconds to act; if timer expires, auto-fold (or check when legal). - Chat: simple text chat per table. Game rules: - Correct Texas Hold’em rules: blinds, dealing, betting rounds, hand evaluation, side pots, showdown, split pots. - Deterministic state machine: the same inputs always produce the same game state. - Handle disconnects: if a player disconnects during a hand, auto-fold when action is required; allow reconnect. Non-functional: - Real-time updates (table state should feel instant). - Prevent obvious cheating: server-authoritative game state, no client deciding outcomes. - Auditability: keep an event log per hand (actions + timestamps) for debugging. - Basic moderation controls for table owner: kick a player, mute chat. Out of scope (explicitly): - Real money, payments, cashout - Multi-table tournaments - Complex auth (email/password), compliance features\" --number 1 --short-name \"poker-mvp\"","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:58:40.386470Z  INFO ToolCall: shell_command {"command":"ls -la .git/refs/heads","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:58:53.934617Z  INFO ToolCall: shell_command {"command":".specify/scripts/bash/create-new-feature.sh --json \"Build a web-based poker website (MVP) for play-money Texas Hold’em. Users: - Users can create a nickname and avatar. - Authenticate users using keycloak. - Support logging in with google accounts. - Basic profiles: nickname, avatar, stats (hands played, wins), and a friends list (optional). Player flows: 1) Landing page → “Enter Lobby” 2) Lobby shows tables with: table name, blinds, max players, seats taken, and whether a hand is in progress. 3) Create table: set table name, blinds (small/big), max players (2–9), and starting chip stack (play money). 4) Join table: choose a seat if open. If a hand is in progress, join as spectator until next hand. In-table experience: - Table layout: seats around the table, community cards, pot, dealer button, player action controls. - Player actions: fold, check/call, bet/raise with a chip slider and presets (½ pot, pot, all-in). - Timers: each player has X seconds to act; if timer expires, auto-fold (or check when legal). - Chat: simple text chat per table. Game rules: - Correct Texas Hold’em rules: blinds, dealing, betting rounds, hand evaluation, side pots, showdown, split pots. - Deterministic state machine: the same inputs always produce the same game state. - Handle disconnects: if a player disconnects during a hand, auto-fold when action is required; allow reconnect. Non-functional: - Real-time updates (table state should feel instant). - Prevent obvious cheating: server-authoritative game state, no client deciding outcomes. - Auditability: keep an event log per hand (actions + timestamps) for debugging. - Basic moderation controls for table owner: kick a player, mute chat. Out of scope (explicitly): - Real money, payments, cashout - Multi-table tournaments - Complex auth (email/password), compliance features\" --number 1 --short-name \"poker-mvp\"","workdir":"/Users/bricerising/git/brice@github/specify-poker","sandbox_permissions":"require_escalated","justification":"Script needs permission to create the new git branch and spec files in the repo."}
+2026-01-09T13:59:09.616573Z  INFO ToolCall: shell_command {"command":"sed -n '1,260p' /Users/bricerising/git/brice@github/specify-poker/.specify/templates/spec-template.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:59:21.888611Z  INFO ToolCall: shell_command {"command":"date +%F","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:59:27.418296Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/spec.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T13:59:45.982946Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Delete File: /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/spec.md
+*** End Patch
+2026-01-09T14:00:23.383465Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/spec.md
++# Feature Specification: Play-Money Poker MVP
++
++**Feature Branch**: `001-poker-mvp`  
++**Created**: 2026-01-09  
++**Status**: Draft  
++**Input**: User description: "Build a web-based poker website (MVP) for play-money
++Texas Hold’em. Users: - Users can create a nickname and avatar. - Authenticate
++users using keycloak. - Support logging in with google accounts. - Basic
++profiles: nickname, avatar, stats (hands played, wins), and a friends list
++(optional). Player flows: 1) Landing page → “Enter Lobby” 2) Lobby shows tables
++with: table name, blinds, max players, seats taken, and whether a hand is in
++progress. 3) Create table: set table name, blinds (small/big), max players (2–9),
++and starting chip stack (play money). 4) Join table: choose a seat if open. If a
++hand is in progress, join as spectator until next hand. In-table experience: -
++Table layout: seats around the table, community cards, pot, dealer button, player
++action controls. - Player actions: fold, check/call, bet/raise with a chip slider
++and presets (½ pot, pot, all-in). - Timers: each player has X seconds to act; if
++timer expires, auto-fold (or check when legal). - Chat: simple text chat per
++table. Game rules: - Correct Texas Hold’em rules: blinds, dealing, betting
++rounds, hand evaluation, side pots, showdown, split pots. - Deterministic state
++machine: the same inputs always produce the same game state. - Handle
++disconnects: if a player disconnects during a hand, auto-fold when action is
++required; allow reconnect. Non-functional: - Real-time updates (table state
++should feel instant). - Prevent obvious cheating: server-authoritative game
++state, no client deciding outcomes. - Auditability: keep an event log per hand
++(actions + timestamps) for debugging. - Basic moderation controls for table
++owner: kick a player, mute chat. Out of scope (explicitly): - Real money,
++payments, cashout - Multi-table tournaments - Complex auth (email/password),
++compliance features"
++
++## User Scenarios & Testing *(mandatory)*
++
++### User Story 1 - Join & Play a Hand (Priority: P1)
++
++As a player, I can enter the lobby, join a table, receive real-time updates, and
++play a complete hand of Texas Hold’em with legal actions only.
++
++**Why this priority**: Core gameplay is the MVP value; without it the product
++does not deliver.
++
++**Independent Test**: A single player can join a table with bots or test users,
++play a full hand through showdown, and see the correct winner and chip updates.
++
++**Acceptance Scenarios**:
++
++1. **Given** an authenticated user in the lobby, **When** they join an open seat,
++   **Then** the table view loads and shows their seat, stack, and action controls.
++2. **Given** an active hand, **When** it is the user's turn to act, **Then** only
++   legal actions are presented and the action updates the table state for all
++   players in real time.
++
++---
++
++### User Story 2 - Create & Manage a Table (Priority: P2)
++
++As a player, I can create a new table with play-money settings and manage basic
++moderation controls for my table.
++
++**Why this priority**: Table creation is required to start new games and manage
++the session quality.
++
++**Independent Test**: A user creates a table, joins a seat, and can remove or
++mute another test user without affecting other tables.
++
++**Acceptance Scenarios**:
++
++1. **Given** an authenticated user in the lobby, **When** they create a table,
++   **Then** the table appears in the lobby list with its settings and occupancy.
++2. **Given** the table owner is seated, **When** they kick or mute a player,
++   **Then** the affected player is removed or muted for that table only.
++
++---
++
++### User Story 3 - Profiles & Social Context (Priority: P3)
++
++As a player, I can set a nickname and avatar and view basic profile stats in the
++table and lobby.
++
++**Why this priority**: Identity and stats improve the social experience but are
++not required to complete a hand.
++
++**Independent Test**: A user updates nickname/avatar and sees them reflected in
++the lobby and table without impacting gameplay.
++
++**Acceptance Scenarios**:
++
++1. **Given** an authenticated user, **When** they update their nickname or
++   avatar, **Then** the updated profile appears in the lobby and table.
++
++---
++
++### Edge Cases
++
++- Player disconnects while it is their turn to act.
++- Player reconnects after missing updates and must resync state.
++- All players but one fold before showdown.
++- Two or more players tie and the pot must be split.
++- A player attempts an illegal action (out of turn, insufficient chips).
++- A spectator joins mid-hand and must not see private hole cards.
++- Table owner disconnects while moderation controls are needed.
++
++## Constitution Requirements *(mandatory)*
++
++- **Secure multi-device access**: Only authenticated users can access the lobby
++  and tables; sessions can be revoked per user.
++- **Realtime sync + push**: Live table updates are delivered instantly; players
++  receive out-of-band turn notifications to stay in sync across devices.
++- **Telemetry**: Core events are captured for logins, table creation/join,
++  actions, hand outcomes, and disconnects under a defined schema.
++- **Deterministic rules**: Game progression follows a deterministic state
++  machine with replayable event logs.
++- **No platform payments**: The MVP uses play-money only and includes no payment
++  or cashout flows.
++
++## Requirements *(mandatory)*
++
++### Functional Requirements
++
++- **FR-001**: System MUST authenticate users via Keycloak and allow Google login.
++- **FR-002**: System MUST allow users to set a nickname and avatar.
++- **FR-003**: System MUST show a lobby listing available tables with name, blinds,
++  max players, seats taken, and in-progress status.
++- **FR-004**: System MUST allow users to create a table with name, blinds,
++  max players (2–9), and starting chip stack.
++- **FR-005**: System MUST allow users to join an open seat or spectate if a hand
++  is in progress.
++- **FR-006**: System MUST present only legal actions (fold, check/call, bet/raise)
++  for the current player.
++- **FR-007**: System MUST enforce Texas Hold’em rules, including blinds, betting
++  rounds, side pots, and showdown outcomes.
++- **FR-008**: System MUST be server-authoritative so the client cannot decide
++  outcomes or alter game state.
++- **FR-009**: System MUST update table state for all players in real time.
++- **FR-010**: System MUST apply a turn timer and auto-fold or auto-check on expiry.
++- **FR-011**: System MUST store a per-hand event log with timestamps for audit.
++- **FR-012**: System MUST support per-table chat with basic moderation (kick, mute).
++- **FR-013**: System MUST track basic user stats (hands played, wins) and display
++  them in profile views.
++- **FR-014**: System MUST protect private hole cards from non-owning players and
++  spectators.
++- **FR-015**: System MUST allow players to reconnect and resync their current
++  table state.
++- **FR-016**: System MUST provide a friends list capability that can be empty or
++  unused without impacting gameplay.
++- **FR-017**: System MUST provide turn notifications to keep multi-device users
++  in sync when they are not actively viewing the table.
++
++### Key Entities *(include if feature involves data)*
++
++- **UserProfile**: User identity, nickname, avatar, stats, and friends list.
++- **Table**: Table configuration, seats, owner, and current status.
++- **Seat**: Player occupancy, stack, and status at a table.
++- **Hand**: Hand lifecycle, community cards, pot(s), and outcome.
++- **HandEvent**: Timestamped game actions for audit and replay.
++- **ChatMessage**: Per-table message with author and timestamp.
++
++## Success Criteria *(mandatory)*
++
++### Measurable Outcomes
++
++- **SC-001**: 95% of users can join a table and begin a hand within 2 minutes of
++  entering the lobby.
++- **SC-002**: Table state updates are observed by all seated players within
++  1 second for 95% of actions.
++- **SC-003**: 99% of completed hands produce consistent outcomes across clients
++  when replayed from the event log.
++- **SC-004**: At least 90% of test users can complete a full hand without
++  encountering illegal action prompts.
++- **SC-005**: Chat and moderation actions complete successfully in 95% of trials.
++
++## Assumptions
++
++- Default turn timer is 20 seconds and is not configurable in the MVP.
++- Friends list is stored and displayed but does not include invitations or
++  presence indicators in the MVP.
+*** End Patch
+2026-01-09T14:00:28.347675Z  INFO ToolCall: shell_command {"command":"mkdir -p /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/checklists","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:00:37.559678Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/checklists/requirements.md
++# Specification Quality Checklist: Play-Money Poker MVP
++
++**Purpose**: Validate specification completeness and quality before proceeding to planning  
++**Created**: 2026-01-09  
++**Feature**: /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/spec.md
++
++## Content Quality
++
++- [x] No implementation details (languages, frameworks, APIs)
++- [x] Focused on user value and business needs
++- [x] Written for non-technical stakeholders
++- [x] All mandatory sections completed
++
++## Requirement Completeness
++
++- [x] No [NEEDS CLARIFICATION] markers remain
++- [x] Requirements are testable and unambiguous
++- [x] Success criteria are measurable
++- [x] Success criteria are technology-agnostic (no implementation details)
++- [x] All acceptance scenarios are defined
++- [x] Edge cases are identified
++- [x] Scope is clearly bounded
++- [x] Dependencies and assumptions identified
++
++## Feature Readiness
++
++- [x] All functional requirements have clear acceptance criteria
++- [x] User scenarios cover primary flows
++- [x] Feature meets measurable outcomes defined in Success Criteria
++- [x] No implementation details leak into specification
++
++## Notes
++
++- Items marked incomplete require spec updates before `/speckit.clarify` or
++  `/speckit.plan`
+*** End Patch
+2026-01-09T14:01:16.348020Z  INFO spawning ghost snapshot task
+2026-01-09T14:01:16.732681Z  INFO ghost snapshot blocking task finished
+2026-01-09T14:01:16.732727Z  INFO ghost commit captured: f4e4a319d3f72231c1b16372bc7ce45f550984f2
+2026-01-09T14:01:16.732737Z  INFO ghost snapshot gate marked ready
+2026-01-09T14:01:21.291039Z  INFO ToolCall: shell_command {"command":".specify/scripts/bash/setup-plan.sh --json","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:01:26.661837Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/spec.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:01:27.653669Z  INFO ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/.specify/memory/constitution.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:01:28.970839Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/plan.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:02:24.718448Z  INFO ToolCall: shell_command {"command":"cat <<'EOF' > /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/plan.md\n# Implementation Plan: Play-Money Poker MVP\n\n**Branch**: `001-poker-mvp` | **Date**: 2026-01-09 | **Spec**: /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/spec.md\n**Input**: Feature specification from `/Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/spec.md`\n\n**Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.\n\n## Summary\n\nDeliver a web-based, play-money Texas Hold'em MVP with server-authoritative gameplay,\nreal-time table updates, Keycloak-based authentication (including Google login),\nand auditability via per-hand event logs. Provide a local Docker Compose stack with\nobservability (OTel + Grafana) and a deterministic poker engine with timer-driven\nactions, reconnection, chat, and basic moderation.\n\n## Technical Context\n\n**Language/Version**: TypeScript (Node.js 20 LTS, React 18)\n**Primary Dependencies**: React UI, Express API, Keycloak (OIDC), WebSocket\ntransport, OpenTelemetry SDKs, Grafana stack, Docker Compose\n**Storage**: Keycloak Postgres for auth; gameplay state in memory with optional\nJSON/SQLite persistence for event logs\n**Testing**: Vitest for unit/integration, React Testing Library for UI,\nPlaywright for smoke tests, fast-check optional for property tests\n**Target Platform**: Modern browsers and Linux containers\n**Project Type**: Web application (frontend + backend + shared)\n**Performance Goals**: 95% of table updates observed within 1 second by seated\nplayers\n**Constraints**: Server-authoritative state, deterministic rules, no payments,\nreal-time updates plus push notifications, prevent hole-card leakage\n**Scale/Scope**: MVP single-instance deployment, 2-9 players per table, tens of\nconcurrent tables\n\n## Constitution Check\n\n*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*\n\n- Secure multi-device access plan (auth, session revocation, device linking):\n  PASS - Keycloak OIDC with session controls\n- Realtime state sync design using push notifications: PASS - WebSocket updates\n  plus Web Push notifications for turn alerts\n- Telemetry event schema and collection plan: PASS - OTel events for gameplay,\n  auth, and connectivity\n- Deterministic game rules approach (seeded RNG, replayability): PASS - event\n  sourcing and seeded shuffle for replay\n- Confirmation of no on-platform payments: PASS - play-money only\n\n## Project Structure\n\n### Documentation (this feature)\n\n```text\n/Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/\n├── plan.md\n├── research.md\n├── data-model.md\n├── quickstart.md\n├── contracts/\n└── tasks.md\n```\n\n### Source Code (repository root)\n\n```text\n/Users/bricerising/git/brice@github/specify-poker/\napps/\n├── ui/\n│   ├── src/\n│   │   ├── pages/\n│   │   ├── components/\n│   │   ├── services/\n│   │   └── state/\n│   └── tests/\n└── api/\n    ├── src/\n    │   ├── http/\n    │   ├── ws/\n    │   ├── engine/\n    │   ├── models/\n    │   └── services/\n    └── tests/\n\npackages/\n└── shared/\n    ├── src/\n    │   ├── types/\n    │   ├── schemas/\n    │   └── rules/\n    └── tests/\n\ninfra/\n├── keycloak/\n├── grafana/\n├── otel/\n└── prometheus/\n\ndocker-compose.yml\n```\n\n**Structure Decision**: Use a web app monorepo with `apps/ui`, `apps/api`, and a\nshared package for domain types and validation. Infrastructure lives in `infra/`\nwith a single `docker-compose.yml` for local orchestration.\n\n## Complexity Tracking\n\nNo constitution violations.\nEOF\n","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:02:29.362670Z  INFO ToolCall: shell_command {"command":"mkdir -p /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/contracts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:02:46.250466Z  INFO ToolCall: shell_command {"command":"cat <<'EOF' > /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/research.md\n# Phase 0 Research: Play-Money Poker MVP\n\n## Decisions\n\n### Decision: TypeScript across UI, API, and shared domain\n**Rationale**: Single language reduces drift between client and server rules and\nsimplifies shared validation and message schemas.\n**Alternatives considered**: Split language stacks for UI/API (rejected for\nadded coordination cost).\n\n### Decision: React UI + Express API with WebSockets\n**Rationale**: React supports rapid UI iteration and Express provides a simple\nHTTP + WebSocket host for an MVP.\n**Alternatives considered**: Full-stack frameworks (rejected to keep MVP modular).\n\n### Decision: Keycloak OIDC with Google login\n**Rationale**: Meets secure multi-device access and federated login needs while\ncentralizing session management.\n**Alternatives considered**: Custom auth (rejected for security risk and time).\n\n### Decision: WebSocket real-time state plus Web Push notifications\n**Rationale**: WebSockets provide low-latency table updates while Web Push meets\npush notification requirements for turn alerts on inactive tabs/devices.\n**Alternatives considered**: Polling (rejected due to latency and cost).\n\n### Decision: Event-sourced hand log for determinism and auditability\n**Rationale**: Deterministic replay enables dispute review and testing.\n**Alternatives considered**: Snapshot-only storage (rejected due to weak audit).\n\n### Decision: In-memory gameplay state with optional JSON/SQLite persistence\n**Rationale**: Simplifies MVP while allowing future durability without refactor.\n**Alternatives considered**: Full relational DB for gameplay (deferred).\n\n### Decision: OpenTelemetry end-to-end with Grafana stack\n**Rationale**: Aligns with telemetry requirement and supports real-time\nobservability for hands, actions, and connectivity.\n**Alternatives considered**: Proprietary APM (rejected for cost/lock-in).\n\n### Decision: Local Docker Compose stack with pre-provisioned infra\n**Rationale**: One-command local startup for UI, API, auth, and observability.\n**Alternatives considered**: Manual service startup (rejected for dev friction).\n\n## Best Practices and Patterns\n\n- Use server-authoritative validation for every action and disallow client-side\n  state mutation.\n- Include monotonically increasing state version to handle out-of-order updates\n  and request resync.\n- Keep hole cards server-only; send to owner as a private payload.\n- Correlate telemetry using userId, tableId, handId, and connectionId.\n- Enforce rate limits for action and chat endpoints to reduce abuse.\nEOF\n","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:03:00.254867Z  INFO ToolCall: shell_command {"command":"cat <<'EOF' > /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/data-model.md\n# Data Model: Play-Money Poker MVP\n\n## Entities\n\n### UserProfile\n- **Fields**: userId, nickname, avatarUrl, stats.handsPlayed, stats.wins,\n  friends[]\n- **Validation**: nickname length 2-20, avatarUrl optional, friends unique\n- **Relationships**: 1:N with Table as owner, 1:N with Seat\n\n### Table\n- **Fields**: tableId, name, ownerId, config, status (lobby|in_hand),\n  createdAt\n- **Validation**: name required, maxPlayers 2-9\n- **Relationships**: 1:N with Seat, 1:N with Hand, 1:N with ChatMessage\n\n### TableConfig\n- **Fields**: smallBlind, bigBlind, ante(optional), maxPlayers, startingStack,\n  bettingStructure\n- **Validation**: bigBlind >= 2 * smallBlind, ante < smallBlind, startingStack > 0\n\n### Seat\n- **Fields**: seatId, userId(optional for empty), stack, status\n  (active|folded|all_in|disconnected|spectator)\n- **Validation**: seatId 0-8, stack >= 0\n- **Relationships**: N:1 with Table, N:1 with UserProfile\n\n### Hand\n- **Fields**: handId, tableId, buttonSeat, smallBlindSeat, bigBlindSeat,\n  communityCards[], pot(s), currentStreet, currentTurnSeat, currentBet,\n  minRaise, roundContributions, actionTimerDeadline, startedAt, endedAt\n- **Validation**: communityCards length 0-5, currentStreet in\n  preflop|flop|turn|river|showdown|ended\n- **Relationships**: 1:N with HandEvent\n\n### HandEvent\n- **Fields**: eventId, handId, type, payload, ts\n- **Validation**: type in HandStarted|BlindsPosted|CardsDealt|ActionTaken|\n  StreetDealt|PotUpdated|Showdown|HandEnded\n\n### ChatMessage\n- **Fields**: messageId, tableId, userId, message, ts, isMuted\n- **Validation**: message length <= 500, sanitized content\n\n## Relationships\n\n- **UserProfile** 1:N **Seat**\n- **UserProfile** 1:N **Table** (owner)\n- **Table** 1:N **Seat**\n- **Table** 1:N **Hand**\n- **Hand** 1:N **HandEvent**\n- **Table** 1:N **ChatMessage**\n\n## State Transitions\n\n### Hand Lifecycle\n- lobby -> in_hand on HandStarted\n- preflop -> flop -> turn -> river -> showdown -> ended\n- ended -> lobby when hand is complete and next hand setup begins\n\n### Seat Status\n- empty -> active on join seat\n- active -> folded on Fold\n- active -> all_in on Bet/Call raising to stack\n- active -> disconnected on disconnect event\n- disconnected -> active on reconnect\nEOF\n","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:03:31.427501Z  INFO ToolCall: shell_command {"command":"cat <<'EOF' > /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/contracts/openapi.yaml\nopenapi: 3.0.3\ninfo:\n  title: Play-Money Poker MVP API\n  version: 0.1.0\nservers:\n  - url: http://localhost:4000\n\ncomponents:\n  securitySchemes:\n    bearerAuth:\n      type: http\n      scheme: bearer\n      bearerFormat: JWT\n  schemas:\n    ErrorResponse:\n      type: object\n      required: [code, message]\n      properties:\n        code:\n          type: string\n        message:\n          type: string\n    UserProfile:\n      type: object\n      required: [userId, nickname, avatarUrl, stats]\n      properties:\n        userId:\n          type: string\n        nickname:\n          type: string\n        avatarUrl:\n          type: string\n          nullable: true\n        stats:\n          type: object\n          required: [handsPlayed, wins]\n          properties:\n            handsPlayed:\n              type: integer\n            wins:\n              type: integer\n        friends:\n          type: array\n          items:\n            type: string\n    TableConfig:\n      type: object\n      required: [smallBlind, bigBlind, maxPlayers, startingStack, bettingStructure]\n      properties:\n        smallBlind:\n          type: integer\n        bigBlind:\n          type: integer\n        ante:\n          type: integer\n          nullable: true\n        maxPlayers:\n          type: integer\n        startingStack:\n          type: integer\n        bettingStructure:\n          type: string\n          enum: [NoLimit]\n    TableSummary:\n      type: object\n      required: [tableId, name, config, seatsTaken, inProgress]\n      properties:\n        tableId:\n          type: string\n        name:\n          type: string\n        config:\n          $ref: '#/components/schemas/TableConfig'\n        seatsTaken:\n          type: integer\n        inProgress:\n          type: boolean\n    TableCreateRequest:\n      type: object\n      required: [name, config]\n      properties:\n        name:\n          type: string\n        config:\n          $ref: '#/components/schemas/TableConfig'\n    TableJoinRequest:\n      type: object\n      required: [seatId]\n      properties:\n        seatId:\n          type: integer\n    TableJoinResponse:\n      type: object\n      required: [tableId, seatId, wsUrl]\n      properties:\n        tableId:\n          type: string\n        seatId:\n          type: integer\n        wsUrl:\n          type: string\n    ModerationRequest:\n      type: object\n      required: [targetUserId]\n      properties:\n        targetUserId:\n          type: string\n\nsecurity:\n  - bearerAuth: []\n\npaths:\n  /api/health:\n    get:\n      summary: Health check\n      responses:\n        '200':\n          description: OK\n\n  /api/me:\n    get:\n      summary: Get current user profile\n      responses:\n        '200':\n          description: Profile\n          content:\n            application/json:\n              schema:\n                $ref: '#/components/schemas/UserProfile'\n        '401':\n          description: Unauthorized\n          content:\n            application/json:\n              schema:\n                $ref: '#/components/schemas/ErrorResponse'\n\n  /api/profile:\n    post:\n      summary: Update nickname and avatar\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              type: object\n              properties:\n                nickname:\n                  type: string\n                avatarUrl:\n                  type: string\n                  nullable: true\n      responses:\n        '200':\n          description: Updated profile\n          content:\n            application/json:\n              schema:\n                $ref: '#/components/schemas/UserProfile'\n        '400':\n          description: Validation error\n          content:\n            application/json:\n              schema:\n                $ref: '#/components/schemas/ErrorResponse'\n\n  /api/tables:\n    get:\n      summary: List lobby tables\n      responses:\n        '200':\n          description: Tables list\n          content:\n            application/json:\n              schema:\n                type: array\n                items:\n                  $ref: '#/components/schemas/TableSummary'\n    post:\n      summary: Create table\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              $ref: '#/components/schemas/TableCreateRequest'\n      responses:\n        '201':\n          description: Table created\n          content:\n            application/json:\n              schema:\n                $ref: '#/components/schemas/TableSummary'\n\n  /api/tables/{tableId}/join:\n    post:\n      summary: Join a seat at a table\n      parameters:\n        - name: tableId\n          in: path\n          required: true\n          schema:\n            type: string\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              $ref: '#/components/schemas/TableJoinRequest'\n      responses:\n        '200':\n          description: Join result\n          content:\n            application/json:\n              schema:\n                $ref: '#/components/schemas/TableJoinResponse'\n        '409':\n          description: Seat unavailable\n          content:\n            application/json:\n              schema:\n                $ref: '#/components/schemas/ErrorResponse'\n\n  /api/tables/{tableId}/leave:\n    post:\n      summary: Leave a table\n      parameters:\n        - name: tableId\n          in: path\n          required: true\n          schema:\n            type: string\n      responses:\n        '204':\n          description: Left table\n\n  /api/tables/{tableId}/mod/kick:\n    post:\n      summary: Kick a player (owner only)\n      parameters:\n        - name: tableId\n          in: path\n          required: true\n          schema:\n            type: string\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              $ref: '#/components/schemas/ModerationRequest'\n      responses:\n        '204':\n          description: Player kicked\n\n  /api/tables/{tableId}/mod/mute:\n    post:\n      summary: Mute a player (owner only)\n      parameters:\n        - name: tableId\n          in: path\n          required: true\n          schema:\n            type: string\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              $ref: '#/components/schemas/ModerationRequest'\n      responses:\n        '204':\n          description: Player muted\nEOF\n","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:03:38.692859Z  INFO ToolCall: shell_command {"command":"cat <<'EOF' > /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/contracts/ws-messages.md\n# WebSocket Message Contracts\n\n## Client -> Server\n\n- `SubscribeTable` { tableId }\n- `UnsubscribeTable` { tableId }\n- `JoinSeat` { tableId, seatId }\n- `LeaveTable` { tableId }\n- `Action` { tableId, handId, action: Fold|Check|Call|Bet|Raise, amount? }\n- `ChatSend` { tableId, message }\n- `Ping` { ts }\n\n## Server -> Client\n\n- `Welcome` { userId, connectionId }\n- `Error` { code, message, correlationId? }\n- `LobbyTablesUpdated` { tables[] }\n- `TableSnapshot` { tableState }\n- `TablePatch` { tableId, handId, patch }\n- `ActionResult` { tableId, handId, accepted, reason? }\n- `ChatMessage` { tableId, userId, message, ts }\n- `TimerUpdate` { tableId, handId, currentTurnSeat, deadlineTs }\n- `HandEvent` { tableId, handId, event }\nEOF\n","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:03:47.626209Z  INFO ToolCall: shell_command {"command":"cat <<'EOF' > /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/quickstart.md\n# Quickstart: Play-Money Poker MVP\n\n## Local Requirements\n\n- Docker Desktop or Docker Engine with Compose\n- Node.js 20 LTS\n\n## Start the Full Stack\n\n1. From repo root, run:\n   `docker compose up`\n2. Wait for services to become healthy.\n\n## Default Local URLs\n\n- UI: http://localhost:3000\n- API REST: http://localhost:4000/api\n- API WS: ws://localhost:4000/ws\n- Keycloak: http://localhost:8080\n- Grafana: http://localhost:3001\n\n## Expected Local Stack\n\n- ui: React app (dev server or production build)\n- api: Express server (REST + WebSocket)\n- keycloak: OIDC provider\n- keycloak-db: Postgres for Keycloak\n- otel-collector: receives OTLP from UI/API\n- prometheus: metrics store\n- tempo (or jaeger): traces store\n- loki: logs store (optional)\n- grafana: dashboards and datasources\n- reverse-proxy: optional local TLS and port unification\n\n## First-Time Setup Notes\n\n- Import the Keycloak realm config from `infra/keycloak/`.\n- Ensure the UI origin is allowed in Keycloak client settings.\n- Use demo users or enable self-registration for local testing.\n\n## Smoke Test\n\n1. Log in and enter the lobby.\n2. Create a table and join a seat.\n3. Open a second browser session to verify real-time updates and chat.\nEOF\n","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:03:51.868012Z  INFO ToolCall: shell_command {"command":".specify/scripts/bash/update-agent-context.sh codex","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:04:08.405969Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/plan.md
+@@
+ ## Complexity Tracking
+ 
+ No constitution violations.
++
++## Phase 0: Outline & Research
++
++**Unknowns**: None. All core technology choices and constraints were specified
++in the feature request.
++
++**Research Output**: /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/research.md
++
++## Phase 1: Design & Contracts
++
++**Data Model**: /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/data-model.md  
++**API Contracts**: /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/contracts/openapi.yaml  
++**WebSocket Contracts**: /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/contracts/ws-messages.md  
++**Quickstart**: /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/quickstart.md  
++**Agent Context Update**: /Users/bricerising/git/brice@github/specify-poker/AGENTS.md
++
++## Constitution Check (Post-Design)
++
++- Secure multi-device access plan (auth, session revocation, device linking): PASS
++- Realtime state sync design using push notifications: PASS
++- Telemetry event schema and collection plan: PASS
++- Deterministic game rules approach (seeded RNG, replayability): PASS
++- Confirmation of no on-platform payments: PASS
+*** End Patch
+2026-01-09T14:06:04.350678Z  INFO spawning ghost snapshot task
+2026-01-09T14:06:04.745162Z  INFO ghost snapshot blocking task finished
+2026-01-09T14:06:04.745216Z  INFO ghost commit captured: 6e878e3b3babad5e4cc9f2a1560cb8a2384f5fd2
+2026-01-09T14:06:04.745227Z  INFO ghost snapshot gate marked ready
+2026-01-09T14:06:08.549776Z  INFO ToolCall: shell_command {"command":"rm -rf /Users/bricerising/git/brice@github/specify-poker/specs/001-init-poker","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:07:03.136165Z  INFO spawning ghost snapshot task
+2026-01-09T14:07:03.518466Z  INFO ghost snapshot blocking task finished
+2026-01-09T14:07:03.518520Z  INFO ghost commit captured: 9e0edcc029ef605c50a0a13a24fe77c5aa1f653e
+2026-01-09T14:07:03.518532Z  INFO ghost snapshot gate marked ready
+2026-01-09T14:07:12.933564Z  INFO ToolCall: shell_command {"command":".specify/scripts/bash/check-prerequisites.sh --json","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:07:18.215927Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/plan.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:07:19.243782Z  INFO ToolCall: shell_command {"command":"sed -n '1,260p' /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/spec.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:07:20.614702Z  INFO ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/data-model.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:07:25.626776Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/contracts/openapi.yaml","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:07:26.698801Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/contracts/ws-messages.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:07:27.737023Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/research.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:07:28.931091Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/quickstart.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:07:33.516517Z  INFO ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/.specify/templates/tasks-template.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:11:19.825177Z  INFO ToolCall: shell_command {"command":"cat <<'EOF' > /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/tasks.md\n---\n\ndescription: \"Task list template for feature implementation\"\n---\n\n# Tasks: Play-Money Poker MVP\n\n**Input**: Design documents from `/specs/001-poker-mvp/`\n**Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/\n\n**Tests**: Tests are required for deterministic rules, sync correctness, and telemetry validation. The user also requested tests for each slice.\n\n**Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.\n\n## Format: `[ID] [P?] [Story] Description`\n\n- **[P]**: Can run in parallel (different files, no dependencies)\n- **[Story]**: Which user story this task belongs to (e.g., US1, US2, US3)\n- Include exact file paths in descriptions\n\n## Path Conventions\n\n- **Web app**: `apps/api/`, `apps/ui/`, `packages/shared/`\n- Paths shown below use absolute paths\n\n## Phase 1: Setup (Shared Infrastructure) — Milestone M1\n\n**Purpose**: Project initialization and basic structure\n\n- [ ] T001 Create monorepo scaffolding and base TS configs in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tsconfig.json, /Users/bricerising/git/brice@github/specify-poker/apps/api/tsconfig.json, /Users/bricerising/git/brice@github/specify-poker/packages/shared/tsconfig.json; Goal: workspace foundation; AC: TypeScript builds in all three packages; Tests: N/A; Obs: N/A (no runtime change)\n- [ ] T002 Initialize workspace scripts in /Users/bricerising/git/brice@github/specify-poker/package.json and /Users/bricerising/git/brice@github/specify-poker/tsconfig.base.json; Goal: consistent build/test commands; AC: repo-level build runs for ui/api/shared; Tests: N/A; Obs: N/A (no runtime change)\n- [ ] T003 [P] Configure lint/format in /Users/bricerising/git/brice@github/specify-poker/.eslintrc.cjs and /Users/bricerising/git/brice@github/specify-poker/.prettierrc; Goal: consistent style; AC: lint passes on empty project; Tests: N/A; Obs: N/A (no runtime change)\n- [ ] T004 [P] Scaffold Docker Compose + infra skeleton in /Users/bricerising/git/brice@github/specify-poker/docker-compose.yml and /Users/bricerising/git/brice@github/specify-poker/infra/{keycloak,otel,grafana,prometheus}/; Goal: local stack layout; AC: `docker compose config` validates; Tests: N/A; Obs: container healthchecks defined\n- [ ] T005 [P] Add minimal API and UI entrypoints in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/server.ts and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/main.tsx; Goal: bootable services; AC: API responds to /api/health; Tests: integration test in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/health.test.ts; Obs: log api.startup with timestamp\n- [ ] T006 [P] Add shared package exports in /Users/bricerising/git/brice@github/specify-poker/packages/shared/src/types/index.ts and /Users/bricerising/git/brice@github/specify-poker/packages/shared/src/schemas/index.ts; Goal: shared types entrypoint; AC: ui/api import from shared without build errors; Tests: N/A; Obs: N/A (type-only change)\n\n---\n\n## Phase 2: Foundational (Blocking Prerequisites) — Milestone M2\n\n**Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented\n\n**⚠️ CRITICAL**: No user story work can begin until this phase is complete\n\n- [ ] T007 Configure Keycloak service and realm import in /Users/bricerising/git/brice@github/specify-poker/docker-compose.yml and /Users/bricerising/git/brice@github/specify-poker/infra/keycloak/realm-export.json; Goal: auth provider ready; AC: realm `poker-local` loads on startup; Tests: compose healthcheck; Obs: Keycloak container healthcheck is green\n- [ ] T008 Implement API JWT auth middleware in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/middleware/auth.ts and wire into /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/router.ts; Goal: secure routes; AC: protected routes reject missing/invalid tokens; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/auth.test.ts; Obs: log auth.denied with reason\n- [ ] T009 Implement UI auth client and token handling in /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/auth.ts and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/apiClient.ts; Goal: authenticated UI sessions; AC: /api/me returns profile after login; Tests: e2e login in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/e2e/login.spec.ts; Obs: span ui.auth.login\n- [ ] T010 Implement WebSocket auth and connection registry in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/server.ts and /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/connectionRegistry.ts; Goal: secure realtime channel; AC: WS rejects invalid token; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/ws-auth.test.ts; Obs: metric poker_active_connections\n- [ ] T011 Define telemetry setup and event schema in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/observability/otel.ts, /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/observability/otel.ts, and /Users/bricerising/git/brice@github/specify-poker/infra/otel/collector-config.yaml; Goal: end-to-end tracing; AC: traces appear for HTTP + WS connect; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/otel-smoke.test.ts; Obs: spans api.http.request and ui.navigation exist\n- [ ] T012 Implement in-memory table registry + event store interface in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/tableRegistry.ts and /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/eventStore.ts; Goal: core state storage; AC: create/list tables and append/read events; Tests: unit in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/unit/eventStore.test.ts; Obs: log event_store.append\n- [ ] T013 Implement Web Push subscription service in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/pushNotifications.ts and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/pushClient.ts; Goal: turn alerts; AC: subscription register/unregister works; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/push-subscribe.test.ts; Obs: metric poker_push_notifications_total\n- [ ] T014 Add shared domain schemas/types in /Users/bricerising/git/brice@github/specify-poker/packages/shared/src/schemas/ and /Users/bricerising/git/brice@github/specify-poker/packages/shared/src/types/; Goal: consistent payload validation; AC: schema validation passes for sample payloads; Tests: unit in /Users/bricerising/git/brice@github/specify-poker/packages/shared/tests/schemas.test.ts; Obs: N/A (schema-only change)\n\n**Checkpoint**: Foundation ready - user story implementation can now begin in parallel\n\n---\n\n## Phase 3: User Story 1 - Join & Play a Hand (Priority: P1) 🎯 MVP — Milestone M3\n\n**Goal**: Players can join a table and complete a full hand with real-time updates.\n\n**Independent Test**: Two users join a seeded table, play a hand through showdown, and see consistent chip updates.\n\n### Tests for User Story 1\n\n- [ ] T015 [P] [US1] Add contract test for join/list and WS snapshot in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/contract/tables.contract.test.ts; Goal: validate REST/WS payloads; AC: contract test passes; Tests: contract; Obs: N/A (test-only)\n- [ ] T016 [P] [US1] Add integration test for full hand flow in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/hand-flow.test.ts; Goal: deterministic hand lifecycle; AC: scripted hand completes; Tests: integration; Obs: asserts hand_lifecycle spans exist\n\n### Implementation for User Story 1\n\n- [ ] T017 [US1] Implement hand state machine in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/handEngine.ts; Goal: deterministic street progression; AC: preflop→showdown transitions are correct; Tests: unit in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/unit/handEngine.test.ts; Obs: span poker.hand.transition\n- [ ] T018 [US1] Implement hand evaluation/showdown in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/handEval.ts; Goal: rank winners correctly; AC: sample hands match expected ranks; Tests: unit in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/unit/handEval.test.ts; Obs: metric poker_hand_evaluations_total\n- [ ] T019 [US1] Implement betting/action rules + side pots in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/actionRules.ts; Goal: legal action enforcement; AC: illegal actions rejected and side pots created; Tests: unit in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/unit/actionRules.test.ts; Obs: metric poker_actions_total{action_type}\n- [ ] T020 [US1] Implement WS table rooms and snapshots in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts; Goal: realtime state sync; AC: subscribers receive snapshot + updates; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/ws-table.test.ts; Obs: metric poker_table_updates_total\n- [ ] T021 [US1] Implement table list/join/leave endpoints in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/tables.ts; Goal: join seats and spectate; AC: join returns wsUrl and seat assignment; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/tables.test.ts; Obs: span poker.table.join\n- [ ] T022 [US1] Implement table UI page + state store in /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/pages/TablePage.tsx and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/state/tableStore.ts; Goal: render table state; AC: seats/pot/board update in realtime; Tests: component in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/components/TablePage.test.tsx; Obs: span ui.table.render\n- [ ] T023 [US1] Implement action bar and legal action derivation in /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/components/ActionBar.tsx and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/state/deriveLegalActions.ts; Goal: correct action controls; AC: only legal actions shown; Tests: unit in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/unit/deriveLegalActions.test.ts; Obs: span ui.action.submit\n- [ ] T024 [US1] Implement turn timer + disconnect handling in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/turnTimer.ts and /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/connectionManager.ts; Goal: auto-fold/check on expiry; AC: timeout triggers expected action; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/timer.test.ts; Obs: metric poker_timer_timeouts_total\n- [ ] T025 [US1] Wire event log + replay for audit in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/eventStore.ts and /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/audit.ts; Goal: replayable hand logs; AC: replay rebuilds state exactly; Tests: unit in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/unit/replay.test.ts; Obs: log hand.event_appended\n\n**Checkpoint**: User Story 1 is fully functional and testable independently\n\n---\n\n## Phase 4: User Story 2 - Create & Manage a Table (Priority: P2) — Milestone M4\n\n**Goal**: Players can create tables, see lobby updates, and moderate chat/players.\n\n**Independent Test**: A user creates a table, joins it, and kicks another user while lobby updates remain accurate.\n\n### Tests for User Story 2\n\n- [ ] T026 [P] [US2] Add contract test for create/moderation endpoints in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/contract/moderation.contract.test.ts; Goal: validate request/response schemas; AC: contract test passes; Tests: contract; Obs: N/A (test-only)\n- [ ] T027 [P] [US2] Add e2e lobby flow test in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/e2e/lobby-flow.spec.ts; Goal: create table and see lobby list; AC: e2e passes; Tests: e2e; Obs: span poker.table.create present\n\n### Implementation for User Story 2\n\n- [ ] T028 [US2] Implement create table endpoint in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/tables.ts; Goal: create tables with config; AC: tables appear in lobby list; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/create-table.test.ts; Obs: span poker.table.create\n- [ ] T029 [US2] Implement lobby list UI + polling/WS refresh in /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/pages/LobbyPage.tsx and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/lobbyApi.ts; Goal: show current tables; AC: lobby reflects changes within 2s; Tests: component in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/components/LobbyPage.test.tsx; Obs: span ui.lobby.render\n- [ ] T030 [US2] Implement create table form in /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/components/CreateTableForm.tsx; Goal: user can set blinds/max players/stack; AC: validation blocks invalid values; Tests: component in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/components/CreateTableForm.test.tsx; Obs: span ui.table.create_submit\n- [ ] T031 [US2] Implement chat send/broadcast in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/chatHub.ts and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/components/ChatPanel.tsx; Goal: table chat; AC: messages arrive to seated players; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/ws-chat.test.ts; Obs: metric poker_chat_messages_total\n- [ ] T032 [US2] Implement moderation endpoints + UI controls in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/moderation.ts and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/components/ModerationMenu.tsx; Goal: kick/mute actions; AC: owner can kick/mute successfully; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/moderation.test.ts; Obs: log moderation.action\n\n**Checkpoint**: User Stories 1 and 2 are independently functional\n\n---\n\n## Phase 5: User Story 3 - Profiles & Social Context (Priority: P3) — Milestone M5\n\n**Goal**: Players can update profiles, view stats, and manage friends.\n\n**Independent Test**: A user updates nickname/avatar and sees stats and friends list reflected in UI.\n\n### Tests for User Story 3\n\n- [ ] T033 [P] [US3] Add contract test for profile endpoints in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/contract/profile.contract.test.ts; Goal: validate profile schema; AC: contract test passes; Tests: contract; Obs: N/A (test-only)\n- [ ] T034 [P] [US3] Add e2e profile update test in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/e2e/profile-flow.spec.ts; Goal: ensure profile updates in UI; AC: e2e passes; Tests: e2e; Obs: span ui.profile.save\n\n### Implementation for User Story 3\n\n- [ ] T035 [US3] Implement /api/me and /api/profile in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/profile.ts; Goal: profile read/update; AC: nickname/avatar update persists; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/profile.test.ts; Obs: span poker.profile.update\n- [ ] T036 [US3] Implement stats tracking on hand end in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/statTracker.ts; Goal: track hands played and wins; AC: stats increment after hand end; Tests: unit in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/unit/statTracker.test.ts; Obs: metric poker_hands_completed_total\n- [ ] T037 [US3] Implement profile UI in /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/pages/ProfilePage.tsx and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/components/ProfileForm.tsx; Goal: edit nickname/avatar; AC: UI shows updated profile; Tests: component in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/components/ProfileForm.test.tsx; Obs: span ui.profile.render\n- [ ] T038 [US3] Implement friends list storage + UI in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/friendsService.ts and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/pages/FriendsPage.tsx; Goal: friends list persistence; AC: friends list saved and displayed; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/friends.test.ts; Obs: log friends.update\n\n**Checkpoint**: All user stories are independently functional\n\n---\n\n## Phase 6: Polish & Cross-Cutting Concerns — Milestone M6\n\n**Purpose**: Observability, reliability, and hardening across stories\n\n- [ ] T039 [P] Provision Grafana datasources/dashboards in /Users/bricerising/git/brice@github/specify-poker/infra/grafana/provisioning/ and /Users/bricerising/git/brice@github/specify-poker/infra/grafana/dashboards/poker-observability.json; Goal: runtime visibility; AC: dashboard loads with metrics; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/infra/grafana/tests/dashboard.spec.ts; Obs: panels for poker_actions_total and poker_active_connections\n- [ ] T040 [P] Configure OTel Collector and Prometheus scrape in /Users/bricerising/git/brice@github/specify-poker/infra/otel/collector-config.yaml and /Users/bricerising/git/brice@github/specify-poker/infra/prometheus/prometheus.yaml; Goal: metric/traces pipeline; AC: metrics appear in Prometheus; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/infra/prometheus/tests/scrape.spec.ts; Obs: metric poker_active_connections visible\n- [ ] T041 [P] Add full-stack smoke test in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/e2e/smoke.spec.ts; Goal: login, create table, join, play hand; AC: smoke test passes; Tests: e2e; Obs: trace includes hand lifecycle spans\n- [ ] T042 [P] Add rate limiting and input validation in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/middleware/rateLimit.ts and /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/validators.ts; Goal: abuse prevention; AC: excessive requests rejected; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/rate-limit.test.ts; Obs: metric poker_rate_limited_total\n- [ ] T043 [P] Harden resync/version mismatch handling in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/wsClient.ts; Goal: recover from out-of-order updates; AC: client resyncs on version gap; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/ws-resync.test.ts; Obs: metric poker_resync_total\n- [ ] T044 [P] Update quickstart for auth + dashboards in /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/quickstart.md; Goal: accurate onboarding; AC: quickstart covers Keycloak and Grafana steps; Tests: N/A; Obs: N/A (documentation only)\n\n---\n\n## Dependencies & Execution Order\n\n### Phase Dependencies\n\n- **Setup (M1)**: No dependencies - can start immediately\n- **Foundational (M2)**: Depends on Setup completion - BLOCKS all user stories\n- **User Stories (M3+)**: All depend on Foundational phase completion\n  - User stories can then proceed in parallel (if staffed)\n  - Or sequentially in priority order (P1 → P2 → P3)\n- **Polish (M6)**: Depends on all desired user stories being complete\n\n### User Story Dependencies\n\n- **User Story 1 (P1)**: Can start after Foundational (M2) - No dependencies on other stories\n- **User Story 2 (P2)**: Can start after Foundational (M2) - Integrates with US1 but independently testable\n- **User Story 3 (P3)**: Can start after Foundational (M2) - Independent from US1/US2\n\n### Within Each User Story\n\n- Tests MUST be written and FAIL before implementation\n- Models before services\n- Services before endpoints\n- Core implementation before integration\n- Story complete before moving to next priority\n\n### Parallel Opportunities\n\n- Tasks marked [P] can run in parallel (different files, no dependencies)\n- Once Foundational (M2) completes, User Stories can proceed in parallel if desired\n\n---\n\n## Parallel Examples\n\n### User Story 1\n\n```bash\nTask: \"Contract test for join/list and WS snapshot\"\nTask: \"Integration test for full hand flow\"\nTask: \"Hand evaluation/showdown implementation\"\n```\n\n### User Story 2\n\n```bash\nTask: \"Lobby page UI\"\nTask: \"Create table form\"\nTask: \"Chat send/broadcast\"\n```\n\n### User Story 3\n\n```bash\nTask: \"Profile endpoints\"\nTask: \"Profile UI\"\nTask: \"Friends list storage + UI\"\n```\n\n---\n\n## Implementation Strategy\n\n### MVP First (User Story 1 Only)\n\n1. Complete Phase 1: Setup (M1)\n2. Complete Phase 2: Foundational (M2)\n3. Complete Phase 3: User Story 1 (M3)\n4. **STOP and VALIDATE**: Test User Story 1 independently\n5. Demo MVP gameplay\n\n### Incremental Delivery\n\n1. Complete M1 + M2 → foundation ready\n2. Deliver M3 → validate gameplay + realtime sync\n3. Deliver M4 → add lobby management + moderation\n4. Deliver M5 → add profiles and social context\n5. Deliver M6 → observability + hardening\nEOF\n","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:11:25.969391Z  INFO ToolCall: shell_command {"command":"rg -n \"^- \\[ \\] T\" /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/tasks.md | wc -l","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:11:31.087060Z  INFO ToolCall: shell_command {"command":"rg -n \"\\[US1\\]\" /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/tasks.md | wc -l","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:11:34.568498Z  INFO ToolCall: shell_command {"command":"rg -n \"\\[US2\\]\" /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/tasks.md | wc -l","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:11:39.032743Z  INFO ToolCall: shell_command {"command":"rg -n \"\\[US3\\]\" /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/tasks.md | wc -l","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:13:42.513918Z  INFO Shutting down Codex instance
+2026-01-09T14:15:55.485827Z  INFO spawning ghost snapshot task
+2026-01-09T14:15:55.897034Z  INFO ghost snapshot blocking task finished
+2026-01-09T14:15:55.897258Z  INFO ghost commit captured: 038b42b8ce2d651fa2ff584143293df880c1ac24
+2026-01-09T14:15:55.897773Z  INFO ghost snapshot gate marked ready
+2026-01-09T14:15:58.524754Z  INFO ToolCall: shell_command {"command":".specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:16:01.120800Z  INFO ToolCall: shell_command {"command":"ls","workdir":"/Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp"}
+2026-01-09T14:16:05.624420Z  INFO ToolCall: shell_command {"command":"rg --files","workdir":"/Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/checklists"}
+2026-01-09T14:16:10.435934Z  INFO ToolCall: shell_command {"command":"python - <<'PY'\nfrom pathlib import Path\nimport re\np=Path('/Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/checklists/requirements.md')\ntext=p.read_text()\nlines=text.splitlines()\npat=re.compile(r'^- \\[( |x|X)\\]')\ntotal=completed=incomplete=0\nfor line in lines:\n    m=pat.match(line)\n    if not m: continue\n    total+=1\n    if m.group(1).lower()=='x':\n        completed+=1\n    else:\n        incomplete+=1\nprint(total, completed, incomplete)\nPY","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:16:14.195448Z  INFO ToolCall: shell_command {"command":"cat","workdir":"/Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/tasks.md"}
+2026-01-09T14:16:14.205620Z ERROR exec error: Not a directory (os error 20)
+2026-01-09T14:16:14.862438Z  INFO ToolCall: shell_command {"command":"cat","workdir":"/Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/plan.md"}
+2026-01-09T14:16:14.881821Z ERROR exec error: Not a directory (os error 20)
+2026-01-09T14:16:15.544692Z  INFO ToolCall: shell_command {"command":"cat","workdir":"/Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/data-model.md"}
+2026-01-09T14:16:15.553465Z ERROR exec error: Not a directory (os error 20)
+2026-01-09T14:16:16.198205Z  INFO ToolCall: shell_command {"command":"ls","workdir":"/Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/contracts"}
+2026-01-09T14:16:16.887119Z  INFO ToolCall: shell_command {"command":"cat","workdir":"/Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/research.md"}
+2026-01-09T14:16:16.901812Z ERROR exec error: Not a directory (os error 20)
+2026-01-09T14:16:17.744921Z  INFO ToolCall: shell_command {"command":"cat","workdir":"/Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/quickstart.md"}
+2026-01-09T14:16:17.759122Z ERROR exec error: Not a directory (os error 20)
+2026-01-09T14:16:22.314250Z  INFO ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/tasks.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:16:22.580439Z  INFO ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/plan.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:16:22.920765Z  INFO ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/data-model.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:16:23.560266Z  INFO ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/research.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:16:23.969536Z  INFO ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/quickstart.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:16:24.900000Z  INFO ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/contracts/openapi.yaml","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:16:26.175694Z  INFO ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/contracts/ws-messages.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:16:33.680776Z  INFO ToolCall: shell_command {"command":"ls","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:16:36.739929Z  INFO ToolCall: shell_command {"command":"git rev-parse --git-dir 2>/dev/null","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T14:16:41.463076Z  INFO ToolCall: shell_command {"command":"rg --files -g '.gitignore' -g '.dockerignore' -g '.eslintignore' -g '.prettierignore' -g '.npmignore' -g '.terraformignore' -g '.helmignore' -g 'eslint.config.*'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}

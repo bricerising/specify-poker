@@ -75,6 +75,19 @@
 - What happens when [boundary condition]?
 - How does system handle [error scenario]?
 
+## Constitution Requirements *(mandatory)*
+
+<!--
+  ACTION REQUIRED: Explain how this feature complies with each constitution rule.
+  If a requirement is not applicable, justify why.
+-->
+
+- **Secure multi-device access**: [How this feature enforces authenticated access]
+- **Realtime sync + push**: [How this feature participates in realtime state updates]
+- **Telemetry**: [Events collected and schema ownership]
+- **Deterministic rules**: [How deterministic behavior is preserved or verified]
+- **No platform payments**: [Statement confirming no payment flows are added]
+
 ## Requirements *(mandatory)*
 
 <!--
