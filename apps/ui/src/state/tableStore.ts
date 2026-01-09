@@ -1,0 +1,214 @@
+import { apiFetch, getApiBaseUrl } from "../services/apiClient";
+
+export interface TableConfig {
+  smallBlind: number;
+  bigBlind: number;
+  ante?: number | null;
+  maxPlayers: number;
+  startingStack: number;
+  bettingStructure: "NoLimit";
+}
+
+export interface TableSummary {
+  tableId: string;
+  name: string;
+  ownerId: string;
+  config: TableConfig;
+  seatsTaken: number;
+  inProgress: boolean;
+}
+
+export interface TableSeat {
+  seatId: number;
+  userId: string | null;
+  stack: number;
+  status: string;
+}
+
+export interface HandState {
+  handId: string;
+  currentStreet: string;
+  currentTurnSeat: number;
+  currentBet: number;
+  minRaise: number;
+  roundContributions: Record<number, number>;
+  communityCards: string[];
+  pots: { amount: number; eligibleSeatIds: number[] }[];
+  actionTimerDeadline: string | null;
+  bigBlind: number;
+}
+
+export interface TableState {
+  tableId: string;
+  name: string;
+  ownerId: string;
+  config: TableConfig;
+  seats: TableSeat[];
+  status: string;
+  hand: HandState | null;
+  version: number;
+}
+
+export interface TableStoreState {
+  tables: TableSummary[];
+  tableState: TableState | null;
+  seatId: number | null;
+  status: "idle" | "connecting" | "connected" | "error";
+  error?: string;
+  chatMessages: ChatMessage[];
+  chatError?: string;
+}
+
+export interface TableStore {
+  getState(): TableStoreState;
+  subscribe(listener: (state: TableStoreState) => void): () => void;
+  fetchTables(): Promise<void>;
+  joinSeat(tableId: string, seatId: number): Promise<void>;
+  subscribeTable(tableId: string): void;
+  sendAction(action: { type: string; amount?: number }): void;
+  subscribeChat(tableId: string): void;
+  sendChat(message: string): void;
+}
+
+export interface ChatMessage {
+  id: string;
+  userId: string;
+  text: string;
+  ts: string;
+}
+
+export function createTableStore(): TableStore {
+  let state: TableStoreState = {
+    tables: [],
+    tableState: null,
+    seatId: null,
+    status: "idle",
+    chatMessages: [],
+  };
+
+  const listeners = new Set<(state: TableStoreState) => void>();
+  let socket: WebSocket | null = null;
+
+  const notify = () => {
+    for (const listener of listeners) {
+      listener(state);
+    }
+  };
+
+  const setState = (next: Partial<TableStoreState>) => {
+    state = { ...state, ...next };
+    notify();
+  };
+
+  const connect = (wsUrl?: string) => {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      return;
+    }
+    const apiBase = getApiBaseUrl();
+    const baseUrl = wsUrl ?? apiBase.replace(/^http/, "ws") + "/ws";
+    setState({ status: "connecting" });
+    socket = new WebSocket(baseUrl);
+
+    socket.addEventListener("open", () => {
+      setState({ status: "connected" });
+    });
+
+    socket.addEventListener("close", () => {
+      setState({ status: "idle" });
+    });
+
+    socket.addEventListener("message", (event) => {
+      const message = JSON.parse(event.data as string);
+      if (message.type === "TableSnapshot" || message.type === "TablePatch") {
+        setState({ tableState: message.tableState });
+        return;
+      }
+      if (message.type === "ChatMessage") {
+        setState({ chatMessages: [...state.chatMessages, message.message], chatError: undefined });
+        return;
+      }
+      if (message.type === "ChatError") {
+        setState({ chatError: message.reason });
+      }
+    });
+  };
+
+  return {
+    getState: () => state,
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    fetchTables: async () => {
+      const response = await apiFetch("/api/tables");
+      const tables = (await response.json()) as TableSummary[];
+      setState({ tables });
+    },
+    joinSeat: async (tableId, seatId) => {
+      const response = await apiFetch(`/api/tables/${tableId}/join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seatId }),
+      });
+      const payload = await response.json();
+      setState({ seatId, chatMessages: [], chatError: undefined });
+      connect(payload.wsUrl);
+      if (socket) {
+        socket.addEventListener("open", () => {
+          socket?.send(JSON.stringify({ type: "SubscribeTable", tableId }));
+          socket?.send(JSON.stringify({ type: "SubscribeChat", tableId }));
+        });
+      }
+    },
+    subscribeTable: (tableId) => {
+      connect();
+      if (socket?.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: "SubscribeTable", tableId }));
+      } else {
+        socket?.addEventListener("open", () => {
+          socket?.send(JSON.stringify({ type: "SubscribeTable", tableId }));
+        });
+      }
+    },
+    sendAction: (action) => {
+      if (!socket || socket.readyState !== WebSocket.OPEN || !state.tableState?.hand) {
+        return;
+      }
+      socket.send(
+        JSON.stringify({
+          type: "Action",
+          tableId: state.tableState.tableId,
+          handId: state.tableState.hand.handId,
+          action: action.type,
+          amount: action.amount,
+        }),
+      );
+    },
+    subscribeChat: (tableId) => {
+      if (!socket) {
+        return;
+      }
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: "SubscribeChat", tableId }));
+      } else {
+        socket.addEventListener("open", () => {
+          socket?.send(JSON.stringify({ type: "SubscribeChat", tableId }));
+        });
+      }
+    },
+    sendChat: (message) => {
+      if (!socket || socket.readyState !== WebSocket.OPEN || !state.tableState) {
+        return;
+      }
+      socket.send(
+        JSON.stringify({
+          type: "ChatSend",
+          tableId: state.tableState.tableId,
+          message,
+        }),
+      );
+    },
+  };
+}
+
+export const tableStore = createTableStore();

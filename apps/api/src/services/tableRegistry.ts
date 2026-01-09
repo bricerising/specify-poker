@@ -1,21 +1,7 @@
 import { randomUUID } from "crypto";
 
-export interface TableConfig {
-  smallBlind: number;
-  bigBlind: number;
-  ante?: number | null;
-  maxPlayers: number;
-  startingStack: number;
-  bettingStructure: "NoLimit";
-}
-
-export interface TableSummary {
-  tableId: string;
-  name: string;
-  config: TableConfig;
-  seatsTaken: number;
-  inProgress: boolean;
-}
+import { ensureTableState } from "./tableState";
+import { TableSummary } from "./tableTypes";
 
 const tables = new Map<string, TableSummary>();
 
@@ -24,11 +10,13 @@ export function createTable(input: Omit<TableSummary, "tableId" | "seatsTaken" |
   const summary: TableSummary = {
     tableId,
     name: input.name,
+    ownerId: input.ownerId,
     config: input.config,
     seatsTaken: 0,
     inProgress: false,
   };
   tables.set(tableId, summary);
+  ensureTableState(summary);
   return summary;
 }
 
@@ -52,4 +40,21 @@ export function updateTable(tableId: string, updater: (table: TableSummary) => T
 
 export function resetTables() {
   tables.clear();
+}
+
+export function createDefaultTable() {
+  if (tables.size > 0) {
+    return null;
+  }
+  return createTable({
+    name: "Main Table",
+    ownerId: "system",
+    config: {
+      smallBlind: 5,
+      bigBlind: 10,
+      maxPlayers: 6,
+      startingStack: 500,
+      bettingStructure: "NoLimit",
+    },
+  });
 }

@@ -28,6 +28,10 @@ class InMemoryEventStore implements EventStore {
   list(handId: string) {
     return [...(this.eventsByHand.get(handId) ?? [])];
   }
+
+  reset() {
+    this.eventsByHand.clear();
+  }
 }
 
 export function createInMemoryEventStore() {
@@ -35,3 +39,7 @@ export function createInMemoryEventStore() {
 }
 
 export const eventStore = createInMemoryEventStore();
+
+export function resetEventStore() {
+  eventStore.reset();
+}

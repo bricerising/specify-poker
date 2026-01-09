@@ -38,7 +38,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
       claims,
     };
     return next();
-  } catch (error) {
+  } catch {
     return deny(res, "Invalid token");
   }
 }

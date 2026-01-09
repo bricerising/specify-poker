@@ -1,7 +1,10 @@
 import express from "express";
 
 import { authMiddleware } from "./middleware/auth";
+import { createAuditRouter } from "./routes/audit";
+import { createModerationRouter } from "./routes/moderation";
 import { createPushRouter } from "./routes/push";
+import { createTablesRouter } from "./routes/tables";
 
 export function createRouter() {
   const router = express.Router();
@@ -28,6 +31,9 @@ export function createRouter() {
   });
 
   router.use(createPushRouter());
+  router.use(createTablesRouter());
+  router.use(createModerationRouter());
+  router.use(createAuditRouter());
 
   return router;
 }

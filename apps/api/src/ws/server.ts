@@ -5,6 +5,9 @@ import { WebSocketServer } from "ws";
 import { verifyToken } from "../auth/jwt";
 import { getTracer } from "../observability/otel";
 import { registerConnection, unregisterConnection } from "./connectionRegistry";
+import { registerConnection as registerSeatConnection, unregisterConnection as unregisterSeatConnection } from "./connectionManager";
+import { attachChatHub } from "./chatHub";
+import { attachTableHub } from "./tableHub";
 
 export function attachWebSocketServer(server: http.Server) {
   const wss = new WebSocketServer({ server, path: "/ws" });
@@ -22,7 +25,7 @@ export function attachWebSocketServer(server: http.Server) {
     let claims;
     try {
       claims = verifyToken(token);
-    } catch (error) {
+    } catch {
       socket.close(1008, "Invalid token");
       return;
     }
@@ -35,6 +38,7 @@ export function attachWebSocketServer(server: http.Server) {
       userId,
       connectedAt: new Date().toISOString(),
     });
+    registerSeatConnection(connectionId, userId);
 
     const span = getTracer().startSpan("api.ws.connect", {
       attributes: {
@@ -52,8 +56,12 @@ export function attachWebSocketServer(server: http.Server) {
     );
     span.end();
 
+    attachTableHub(socket, userId, connectionId);
+    attachChatHub(socket, userId, connectionId);
+
     socket.on("close", () => {
       unregisterConnection(connectionId);
+      unregisterSeatConnection(connectionId);
     });
   });
 
