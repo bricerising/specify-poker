@@ -14989,3 +14989,231 @@
 +  input: Omit<TableSummary, "tableId" | "seatsTaken" | "inProgress" | "occupiedSeatIds">,
  ) {
 *** End Patch
+2026-01-09T22:01:05.586854Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/http/routes/tables.ts
+@@
+ import { getTracer } from "../../observability/otel";
+ import { createDefaultTable, createTable, listTables } from "../../services/tableRegistry";
+ import { joinSeat, leaveSeat } from "../../services/tableService";
++import { broadcastTableState } from "../../ws/tableHub";
+@@
+     const result = await joinSeat({
+       tableId: req.params.tableId,
+       seatId,
+       userId: auth.userId,
+     });
+ 
+     if (!result.ok) {
+       return res.status(409).json({ code: result.reason, message: "Seat unavailable" });
+     }
++
++    await broadcastTableState(req.params.tableId);
+@@
+     const result = await leaveSeat({ tableId: req.params.tableId, userId: auth.userId });
+     if (!result.ok) {
+       return res.status(404).json({ code: result.reason, message: "Not seated" });
+     }
++
++    await broadcastTableState(req.params.tableId);
+ 
+     return res.status(204).send();
+   });
+*** End Patch
+2026-01-09T22:02:41.888765Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/state/tableStore.ts
+@@
+       if (message.type === "ChatMessage") {
+         setState({ chatMessages: [...state.chatMessages, message.message], chatError: undefined });
+         return;
+       }
+       if (message.type === "ChatError") {
+         setState({ chatError: message.reason });
++        return;
++      }
++      if (message.type === "TimerUpdate") {
++        const handId = message.handId as string | undefined;
++        const deadlineTs = message.deadlineTs as string | undefined;
++        const currentTurnSeat = message.currentTurnSeat as number | undefined;
++        if (!state.tableState?.hand || state.tableState.hand.handId !== handId) {
++          return;
++        }
++        setState({
++          tableState: {
++            ...state.tableState,
++            hand: {
++              ...state.tableState.hand,
++              actionTimerDeadline: deadlineTs ?? null,
++              currentTurnSeat: currentTurnSeat ?? state.tableState.hand.currentTurnSeat,
++            },
++          },
++        });
+       }
+     });
+   };
+*** End Patch
+2026-01-09T22:03:36.264489Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"connectionManager|connectionRegistry\" apps","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T22:03:39.022130Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/api/src/ws/connectionManager.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T22:03:42.325272Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/api/src/ws/connectionRegistry.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T22:03:47.051387Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/api/src/ws/server.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T22:03:53.048776Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/api/src/services/redisClient.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T22:04:00.666690Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"getActiveConnections|resetConnections|registerConnection\\(\" apps/api","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T22:04:17.649092Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/ws/connectionRegistry.ts
+@@
+ export interface ConnectionInfo {
+   connectionId: string;
+   userId: string;
+   connectedAt: string;
+ }
+ 
+-const connections = new Map<string, ConnectionInfo>();
+ const CONNECTIONS_KEY = "poker:ws:connections";
+ 
+ export async function registerConnection(info: ConnectionInfo) {
+-  connections.set(info.connectionId, info);
+   const redis = await getRedisClient();
+   if (redis) {
+     await redis.hSet(CONNECTIONS_KEY, info.connectionId, JSON.stringify(info));
+   }
+ }
+ 
+ export async function unregisterConnection(connectionId: string) {
+-  connections.delete(connectionId);
+   const redis = await getRedisClient();
+   if (redis) {
+     await redis.hDel(CONNECTIONS_KEY, connectionId);
+   }
+ }
+ 
++export async function getConnection(connectionId: string) {
++  const redis = await getRedisClient();
++  if (!redis) {
++    return null;
++  }
++  const payload = await redis.hGet(CONNECTIONS_KEY, connectionId);
++  return payload ? (JSON.parse(payload) as ConnectionInfo) : null;
++}
++
+ export async function getActiveConnections() {
+   const redis = await getRedisClient();
+   if (!redis) {
+-    return Array.from(connections.values());
++    return [];
+   }
+   const entries = await redis.hGetAll(CONNECTIONS_KEY);
+-  const list = Object.values(entries).map((value) => JSON.parse(value) as ConnectionInfo);
+-  list.forEach((info) => connections.set(info.connectionId, info));
+-  return list;
++  return Object.values(entries).map((value) => JSON.parse(value) as ConnectionInfo);
+ }
+ 
+ export async function resetConnections() {
+-  connections.clear();
+   const redis = await getRedisClient();
+   if (redis) {
+     await redis.del(CONNECTIONS_KEY);
+   }
+ }
+*** End Patch
+2026-01-09T22:04:24.940570Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/ws/connectionManager.ts
+@@
+-import { markSeatDisconnected } from "../services/tableService";
+-
+-const connections = new Map<string, string>();
+-
+-export function registerConnection(connectionId: string, userId: string) {
+-  connections.set(connectionId, userId);
+-}
+-
+-export async function unregisterConnection(connectionId: string) {
+-  const userId = connections.get(connectionId);
+-  connections.delete(connectionId);
+-  if (userId) {
+-    await markSeatDisconnected(userId);
+-  }
+-}
++import { markSeatDisconnected } from "../services/tableService";
++import { getConnection } from "./connectionRegistry";
++
++export function registerConnection(_connectionId: string, _userId: string) {}
++
++export async function unregisterConnection(connectionId: string) {
++  const connection = await getConnection(connectionId);
++  if (connection?.userId) {
++    await markSeatDisconnected(connection.userId);
++  }
++}
+*** End Patch
+2026-01-09T22:04:42.235254Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/ws/server.ts
+@@
+-    void registerConnection({
++    await registerConnection({
+       connectionId,
+       userId,
+       connectedAt: new Date().toISOString(),
+     });
+*** End Patch
+2026-01-09T22:05:54.555169Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Delete File: apps/api/src/ws/connectionManager.ts
+*** End Patch
+2026-01-09T22:06:00.374118Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/ws/server.ts
+@@
+-import { registerConnection, unregisterConnection } from "./connectionRegistry";
+-import { registerConnection as registerSeatConnection, unregisterConnection as unregisterSeatConnection } from "./connectionManager";
++import { getConnection, registerConnection, unregisterConnection } from "./connectionRegistry";
+@@
+-    registerSeatConnection(connectionId, userId);
+-
+     const span = getTracer().startSpan("api.ws.connect", {
+       attributes: {
+         "poker.user_id": userId,
+         "poker.connection_id": connectionId,
+@@
+     socket.on("close", () => {
+-      void unregisterConnection(connectionId);
+-      void unregisterSeatConnection(connectionId);
++      void unregisterConnection(connectionId);
++      void getConnection(connectionId).then((connection) => {
++        if (connection?.userId) {
++          return import("../services/tableService").then((service) =>
++            service.markSeatDisconnected(connection.userId),
++          );
++        }
++        return undefined;
++      });
+     });
+   });
+*** End Patch
+2026-01-09T22:06:09.774160Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/ws/server.ts
+@@
+-import { verifyToken } from "../auth/jwt";
+-import { getTracer } from "../observability/otel";
+-import { getConnection, registerConnection, unregisterConnection } from "./connectionRegistry";
++import { verifyToken } from "../auth/jwt";
++import { getTracer } from "../observability/otel";
++import { markSeatDisconnected } from "../services/tableService";
++import { getConnection, registerConnection, unregisterConnection } from "./connectionRegistry";
+@@
+     socket.on("close", () => {
+-      void unregisterConnection(connectionId);
+-      void getConnection(connectionId).then((connection) => {
+-        if (connection?.userId) {
+-          return import("../services/tableService").then((service) =>
+-            service.markSeatDisconnected(connection.userId),
+-          );
+-        }
+-        return undefined;
+-      });
++      void getConnection(connectionId).then(async (connection) => {
++        if (connection?.userId) {
++          await markSeatDisconnected(connection.userId);
++        }
++        await unregisterConnection(connectionId);
++      });
+     });
+   });
+*** End Patch

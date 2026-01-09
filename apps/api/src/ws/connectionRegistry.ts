@@ -6,11 +6,9 @@ export interface ConnectionInfo {
   connectedAt: string;
 }
 
-const connections = new Map<string, ConnectionInfo>();
 const CONNECTIONS_KEY = "poker:ws:connections";
 
 export async function registerConnection(info: ConnectionInfo) {
-  connections.set(info.connectionId, info);
   const redis = await getRedisClient();
   if (redis) {
     await redis.hSet(CONNECTIONS_KEY, info.connectionId, JSON.stringify(info));
@@ -18,26 +16,31 @@ export async function registerConnection(info: ConnectionInfo) {
 }
 
 export async function unregisterConnection(connectionId: string) {
-  connections.delete(connectionId);
   const redis = await getRedisClient();
   if (redis) {
     await redis.hDel(CONNECTIONS_KEY, connectionId);
   }
 }
 
+export async function getConnection(connectionId: string) {
+  const redis = await getRedisClient();
+  if (!redis) {
+    return null;
+  }
+  const payload = await redis.hGet(CONNECTIONS_KEY, connectionId);
+  return payload ? (JSON.parse(payload) as ConnectionInfo) : null;
+}
+
 export async function getActiveConnections() {
   const redis = await getRedisClient();
   if (!redis) {
-    return Array.from(connections.values());
+    return [];
   }
   const entries = await redis.hGetAll(CONNECTIONS_KEY);
-  const list = Object.values(entries).map((value) => JSON.parse(value) as ConnectionInfo);
-  list.forEach((info) => connections.set(info.connectionId, info));
-  return list;
+  return Object.values(entries).map((value) => JSON.parse(value) as ConnectionInfo);
 }
 
 export async function resetConnections() {
-  connections.clear();
   const redis = await getRedisClient();
   if (redis) {
     await redis.del(CONNECTIONS_KEY);

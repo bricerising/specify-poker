@@ -169,6 +169,25 @@ export function createTableStore(): TableStore {
       }
       if (message.type === "ChatError") {
         setState({ chatError: message.reason });
+        return;
+      }
+      if (message.type === "TimerUpdate") {
+        const handId = message.handId as string | undefined;
+        const deadlineTs = message.deadlineTs as string | undefined;
+        const currentTurnSeat = message.currentTurnSeat as number | undefined;
+        if (!state.tableState?.hand || state.tableState.hand.handId !== handId) {
+          return;
+        }
+        setState({
+          tableState: {
+            ...state.tableState,
+            hand: {
+              ...state.tableState.hand,
+              actionTimerDeadline: deadlineTs ?? null,
+              currentTurnSeat: currentTurnSeat ?? state.tableState.hand.currentTurnSeat,
+            },
+          },
+        });
       }
     });
   };

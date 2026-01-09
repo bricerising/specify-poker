@@ -4,8 +4,8 @@ import { WebSocketServer } from "ws";
 
 import { verifyToken } from "../auth/jwt";
 import { getTracer } from "../observability/otel";
-import { registerConnection, unregisterConnection } from "./connectionRegistry";
-import { registerConnection as registerSeatConnection, unregisterConnection as unregisterSeatConnection } from "./connectionManager";
+import { markSeatDisconnected } from "../services/tableService";
+import { getConnection, registerConnection, unregisterConnection } from "./connectionRegistry";
 import { attachChatHub, handleChatPubSubEvent } from "./chatHub";
 import { attachTableHub, handleTablePubSubEvent, handleTimerPubSubEvent } from "./tableHub";
 import { initWsPubSub } from "./pubsub";
@@ -39,13 +39,11 @@ export function attachWebSocketServer(server: http.Server) {
     const userId = claims.sub ?? "unknown";
     const connectionId = randomUUID();
 
-    void registerConnection({
+    await registerConnection({
       connectionId,
       userId,
       connectedAt: new Date().toISOString(),
     });
-    registerSeatConnection(connectionId, userId);
-
     const span = getTracer().startSpan("api.ws.connect", {
       attributes: {
         "poker.user_id": userId,
@@ -66,8 +64,12 @@ export function attachWebSocketServer(server: http.Server) {
     attachChatHub(socket, userId, connectionId);
 
     socket.on("close", () => {
-      void unregisterConnection(connectionId);
-      void unregisterSeatConnection(connectionId);
+      void getConnection(connectionId).then(async (connection) => {
+        if (connection?.userId) {
+          await markSeatDisconnected(connection.userId);
+        }
+        await unregisterConnection(connectionId);
+      });
     });
   });
 

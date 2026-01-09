@@ -3,6 +3,7 @@ import express from "express";
 import { getTracer } from "../../observability/otel";
 import { createDefaultTable, createTable, listTables } from "../../services/tableRegistry";
 import { joinSeat, leaveSeat } from "../../services/tableService";
+import { broadcastTableState } from "../../ws/tableHub";
 
 export function createTablesRouter() {
   const router = express.Router();
@@ -89,6 +90,8 @@ export function createTablesRouter() {
       return res.status(409).json({ code: result.reason, message: "Seat unavailable" });
     }
 
+    await broadcastTableState(req.params.tableId);
+
     const protocol = req.secure ? "wss" : "ws";
     const host = req.headers.host ?? "localhost:4000";
     const wsUrl = `${protocol}://${host}/ws?token=${auth.token}`;
@@ -119,6 +122,8 @@ export function createTablesRouter() {
     if (!result.ok) {
       return res.status(404).json({ code: result.reason, message: "Not seated" });
     }
+
+    await broadcastTableState(req.params.tableId);
 
     return res.status(204).send();
   });
