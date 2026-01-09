@@ -16,8 +16,13 @@ interface TablePageProps {
 export function TablePage({ store = tableStore }: TablePageProps) {
   const [state, setState] = useState(store.getState());
   const [userId, setUserId] = useState<string | null>(null);
+  const [now, setNow] = useState(Date.now());
 
   useEffect(() => store.subscribe(setState), [store]);
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 500);
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     fetchProfile()
@@ -63,6 +68,13 @@ export function TablePage({ store = tableStore }: TablePageProps) {
   const pot = hand?.pots.reduce((sum, entry) => sum + entry.amount, 0) ?? 0;
   const communityCards = hand?.communityCards ?? [];
   const privateCards = state.privateHoleCards ?? [];
+  const deadline = hand?.actionTimerDeadline ? Date.parse(hand.actionTimerDeadline) : null;
+  const remainingMs = deadline ? Math.max(0, deadline - now) : null;
+  const remainingSeconds = remainingMs !== null ? Math.ceil(remainingMs / 1000) : null;
+  const minutes = remainingSeconds !== null ? Math.floor(remainingSeconds / 60) : null;
+  const seconds = remainingSeconds !== null ? remainingSeconds % 60 : null;
+  const countdown =
+    minutes !== null && seconds !== null ? `${minutes}:${String(seconds).padStart(2, "0")}` : null;
 
   const renderCards = (cards: string[], fallback: string) => {
     if (cards.length === 0) {
@@ -101,6 +113,12 @@ export function TablePage({ store = tableStore }: TablePageProps) {
               {hand?.currentTurnSeat !== undefined ? `Seat ${hand.currentTurnSeat + 1}` : "-"}
             </strong>
           </div>
+          {countdown ? (
+            <div className="timer-pill">
+              <span>Action Timer</span>
+              <strong>{remainingSeconds === 0 ? "Acting now" : countdown}</strong>
+            </div>
+          ) : null}
           <div>
             <div className="meta-line">Board</div>
             <div className="card-row">{renderCards(communityCards, "Waiting")}</div>
@@ -119,7 +137,7 @@ export function TablePage({ store = tableStore }: TablePageProps) {
                 className={`seat-card${seat.seatId === state.seatId ? " is-you" : ""}`}
               >
                 <strong>Seat {seat.seatId + 1}</strong>
-                <div>{seat.userId ?? "Open seat"}</div>
+                <div>{seat.nickname ?? seat.userId ?? "Open seat"}</div>
                 <div>Stack: {seat.stack}</div>
                 <div>Status: {seat.status}</div>
               </div>

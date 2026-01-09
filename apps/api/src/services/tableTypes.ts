@@ -13,5 +13,6 @@ export interface TableSummary {
   ownerId: string;
   config: TableConfig;
   seatsTaken: number;
+  occupiedSeatIds: number[];
   inProgress: boolean;
 }

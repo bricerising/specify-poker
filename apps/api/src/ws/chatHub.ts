@@ -3,6 +3,7 @@ import WebSocket from "ws";
 
 import { getTableState } from "../services/tableState";
 import { isUserMuted } from "../services/moderationService";
+import { getProfile } from "../services/profileService";
 import { WsPubSubMessage, publishChatEvent } from "./pubsub";
 import { checkWsRateLimit, parseChatMessage, parseTableId } from "./validators";
 
@@ -110,12 +111,15 @@ async function handleChatSend(client: ChatConnection, payload: { tableId: string
     return;
   }
 
+  const profile = await getProfile(client.userId);
+
   await broadcast(tableId, {
     type: "ChatMessage",
     tableId,
     message: {
       id: randomUUID(),
       userId: client.userId,
+      nickname: profile.nickname,
       text: parsed.text,
       ts: new Date().toISOString(),
     },

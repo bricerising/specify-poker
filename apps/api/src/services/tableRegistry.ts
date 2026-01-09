@@ -13,7 +13,7 @@ function cacheTable(summary: TableSummary) {
 }
 
 export async function createTable(
-  input: Omit<TableSummary, "tableId" | "seatsTaken" | "inProgress">,
+  input: Omit<TableSummary, "tableId" | "seatsTaken" | "inProgress" | "occupiedSeatIds">,
 ) {
   const tableId = randomUUID();
   const summary: TableSummary = {
@@ -22,6 +22,7 @@ export async function createTable(
     ownerId: input.ownerId,
     config: input.config,
     seatsTaken: 0,
+    occupiedSeatIds: [],
     inProgress: false,
   };
   const redis = await getRedisClient();

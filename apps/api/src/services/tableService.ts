@@ -14,10 +14,12 @@ async function syncSummary(tableId: string) {
     if (!state) {
       return summary;
     }
-    const seatsTaken = state.seats.filter((seat) => seat.userId && seat.status !== "empty").length;
+    const occupiedSeats = state.seats.filter((seat) => seat.userId && seat.status !== "empty");
+    const seatsTaken = occupiedSeats.length;
     return {
       ...summary,
       seatsTaken,
+      occupiedSeatIds: occupiedSeats.map((seat) => seat.seatId),
       inProgress: state.status === "in_hand",
     };
   });

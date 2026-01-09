@@ -3,6 +3,7 @@ import React, { useState } from "react";
 export interface ChatMessage {
   id: string;
   userId: string;
+  nickname?: string;
   text: string;
   ts: string;
 }
@@ -35,7 +36,7 @@ export function ChatPanel({ messages, onSend, error }: ChatPanelProps) {
         ) : (
           messages.map((entry) => (
             <div key={entry.id} className="chat-message">
-              <strong>{entry.userId}</strong>: {entry.text}
+              <strong>{entry.nickname ?? entry.userId}</strong>: {entry.text}
             </div>
           ))
         )}

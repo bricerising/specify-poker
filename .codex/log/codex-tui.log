@@ -14266,3 +14266,726 @@
      return direct;
    }
 *** End Patch
+2026-01-09T21:48:22.162096Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg --files -g '*grafana*' -g '*dashboard*'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:48:24.519619Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"ls infra/grafana/provisioning/dashboards","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:48:27.387148Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat infra/grafana/provisioning/dashboards/dashboards.yaml","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:48:29.522461Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"grafana\" infra docker-compose.yml","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:48:32.096600Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '90,130p' docker-compose.yml","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:48:34.395781Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat infra/grafana/tests/dashboard.spec.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:48:40.833484Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"ls infra/grafana","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:48:49.068548Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: docker-compose.yml
+@@
+   grafana:
+     image: grafana/grafana:10.3.1
+     ports:
+       - "3001:3000"
+     volumes:
+-      - ./infra/grafana:/etc/grafana/provisioning
++      - ./infra/grafana/provisioning:/etc/grafana/provisioning
++      - ./infra/grafana/dashboards:/etc/grafana/dashboards
+*** End Patch
+2026-01-09T21:48:52.197521Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: infra/grafana/provisioning/dashboards/dashboards.yaml
+@@
+     disableDeletion: false
+     editable: true
+     options:
+-      path: /etc/grafana/provisioning/dashboards
++      path: /etc/grafana/dashboards
+*** End Patch
+2026-01-09T21:49:11.417060Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"ChatMessage|chat\" apps/ui/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:49:15.828460Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"ChatMessage|ChatSend\" apps/api packages","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:49:18.483795Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/api/src/ws/chatHub.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:49:23.197946Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"profile\" apps/api/src -g '*.ts'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:49:26.882410Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/api/src/services/profileService.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:49:33.237259Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '70,120p' apps/api/tests/integration/ws-chat.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:49:42.744374Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/ws/chatHub.ts
+@@
+ import { randomUUID } from "crypto";
+ import WebSocket from "ws";
+ 
+ import { getTableState } from "../services/tableState";
+ import { isUserMuted } from "../services/moderationService";
++import { getProfile } from "../services/profileService";
+ import { WsPubSubMessage, publishChatEvent } from "./pubsub";
+ import { checkWsRateLimit, parseChatMessage, parseTableId } from "./validators";
+@@
+   if (await isUserMuted(tableId, client.userId)) {
+     send(client.socket, { type: "ChatError", tableId, reason: "muted" });
+     return;
+   }
+ 
++  const profile = await getProfile(client.userId);
++
+   await broadcast(tableId, {
+     type: "ChatMessage",
+     tableId,
+     message: {
+       id: randomUUID(),
+       userId: client.userId,
++      nickname: profile.nickname,
+       text: parsed.text,
+       ts: new Date().toISOString(),
+     },
+   });
+ }
+*** End Patch
+2026-01-09T21:49:48.645227Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/components/ChatPanel.tsx
+@@
+ export interface ChatMessage {
+   id: string;
+   userId: string;
++  nickname?: string;
+   text: string;
+   ts: string;
+ }
+@@
+           messages.map((entry) => (
+             <div key={entry.id} className="chat-message">
+-              <strong>{entry.userId}</strong>: {entry.text}
++              <strong>{entry.nickname ?? entry.userId}</strong>: {entry.text}
+             </div>
+           ))
+         )}
+*** End Patch
+2026-01-09T21:51:07.217421Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"listTables|TableSummary|/api/tables\" apps/api apps/ui/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:51:12.164482Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/api/src/services/tableTypes.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:51:14.997898Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/api/src/http/routes/tables.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:51:19.096188Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/api/src/services/tableRegistry.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:51:21.582948Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/api/src/services/tableService.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:51:33.450796Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/services/tableTypes.ts
+@@
+ export interface TableSummary {
+   tableId: string;
+   name: string;
+   ownerId: string;
+   config: TableConfig;
+   seatsTaken: number;
++  occupiedSeatIds: number[];
+   inProgress: boolean;
+ }
+*** End Patch
+2026-01-09T21:51:37.710156Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/services/tableRegistry.ts
+@@
+   const summary: TableSummary = {
+     tableId,
+     name: input.name,
+     ownerId: input.ownerId,
+     config: input.config,
+     seatsTaken: 0,
++    occupiedSeatIds: [],
+     inProgress: false,
+   };
+*** End Patch
+2026-01-09T21:51:42.672446Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/services/tableService.ts
+@@
+   const state = await getTableState(tableId);
+   return updateTable(tableId, (summary) => {
+     if (!state) {
+       return summary;
+     }
+-    const seatsTaken = state.seats.filter((seat) => seat.userId && seat.status !== "empty").length;
++    const occupiedSeats = state.seats.filter((seat) => seat.userId && seat.status !== "empty");
++    const seatsTaken = occupiedSeats.length;
+     return {
+       ...summary,
+       seatsTaken,
++      occupiedSeatIds: occupiedSeats.map((seat) => seat.seatId),
+       inProgress: state.status === "in_hand",
+     };
+   });
+ }
+*** End Patch
+2026-01-09T21:51:47.358630Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/state/tableStore.ts
+@@
+ export interface TableSummary {
+   tableId: string;
+   name: string;
+   ownerId: string;
+   config: TableConfig;
+   seatsTaken: number;
++  occupiedSeatIds: number[];
+   inProgress: boolean;
+ }
+*** End Patch
+2026-01-09T21:51:54.541013Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/pages/LobbyPage.tsx
+@@
+-  const tableRows = tables.map((table, index) => {
+-    const seatButtons = Array.from({ length: table.config.maxPlayers }, (_, index) => (
+-      <button
+-        key={`${table.tableId}-seat-${index}`}
+-        type="button"
+-        className="btn btn-seat"
+-        onClick={() => joinSeat(table.tableId, index)}
+-      >
+-        Join Seat {index + 1}
+-      </button>
+-    ));
++  const tableRows = tables.map((table, index) => {
++    const occupied = new Set(table.occupiedSeatIds ?? []);
++    const seatButtons = Array.from({ length: table.config.maxPlayers }, (_, index) => {
++      const isTaken = occupied.has(index);
++      return (
++        <button
++          key={`${table.tableId}-seat-${index}`}
++          type="button"
++          className="btn btn-seat"
++          onClick={() => joinSeat(table.tableId, index)}
++          disabled={isTaken}
++        >
++          {isTaken ? `Seat ${index + 1} Taken` : `Join Seat ${index + 1}`}
++        </button>
++      );
++    });
+*** End Patch
+2026-01-09T21:52:30.795148Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/pages/TablePage.tsx
+@@
+ export function TablePage({ store = tableStore }: TablePageProps) {
+   const [state, setState] = useState(store.getState());
+   const [userId, setUserId] = useState<string | null>(null);
++  const [now, setNow] = useState(Date.now());
+ 
+   useEffect(() => store.subscribe(setState), [store]);
++  useEffect(() => {
++    const interval = window.setInterval(() => setNow(Date.now()), 500);
++    return () => window.clearInterval(interval);
++  }, []);
+@@
+   const communityCards = hand?.communityCards ?? [];
+   const privateCards = state.privateHoleCards ?? [];
++  const deadline = hand?.actionTimerDeadline ? Date.parse(hand.actionTimerDeadline) : null;
++  const remainingMs = deadline ? Math.max(0, deadline - now) : null;
++  const remainingSeconds = remainingMs !== null ? Math.ceil(remainingMs / 1000) : null;
++  const minutes = remainingSeconds !== null ? Math.floor(remainingSeconds / 60) : null;
++  const seconds = remainingSeconds !== null ? remainingSeconds % 60 : null;
++  const countdown =
++    minutes !== null && seconds !== null ? `${minutes}:${String(seconds).padStart(2, "0")}` : null;
+ 
+   const renderCards = (cards: string[], fallback: string) => {
+@@
+           <div className="fact">
+             <span>Current Turn</span>
+             <strong>
+               {hand?.currentTurnSeat !== undefined ? `Seat ${hand.currentTurnSeat + 1}` : "-"}
+             </strong>
+           </div>
++          {countdown ? (
++            <div className="timer-pill">
++              <span>Action Timer</span>
++              <strong>{remainingSeconds === 0 ? "Acting now" : countdown}</strong>
++            </div>
++          ) : null}
+           <div>
+             <div className="meta-line">Board</div>
+             <div className="card-row">{renderCards(communityCards, "Waiting")}</div>
+           </div>
+*** End Patch
+2026-01-09T21:52:39.187000Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/public/styles.css
+@@
+ .fact strong {
+   color: var(--text);
+   font-weight: 600;
+ }
+ 
++.timer-pill {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++  gap: 12px;
++  padding: 8px 12px;
++  border-radius: 999px;
++  background: rgba(244, 193, 105, 0.2);
++  border: 1px solid rgba(244, 193, 105, 0.6);
++  color: var(--text);
++  font-size: 13px;
++  text-transform: uppercase;
++  letter-spacing: 0.8px;
++}
++
++.timer-pill strong {
++  font-size: 16px;
++  letter-spacing: 1px;
++}
++
+*** End Patch
+2026-01-09T21:53:22.504699Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/api/src/services/tableState.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:53:28.034214Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/api/src/engine/types.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:53:33.063713Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"rg -n \"TableSnapshot|TablePatch\" apps/api/src/ws","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:53:36.554922Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/api/src/ws/tableHub.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:54:12.252567Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/ui/tests/components/TablePage.test.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:54:18.324926Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"cat apps/api/tests/contract/tables.contract.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:54:57.644309Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/ws/tableHub.ts
+@@
+-import WebSocket from "ws";
+-
+-import { TableState } from "../engine/types";
++import WebSocket from "ws";
++
++import { TableSeat, TableState } from "../engine/types";
+ import { applyTableAction, joinSeat, leaveSeat, reconnectSeat } from "../services/tableService";
++import { getProfile } from "../services/profileService";
+ import { getTableState } from "../services/tableState";
+ import { scheduleTurnTimeout, clearTurnTimeout } from "../services/turnTimer";
+ import { WsPubSubMessage, publishTableEvent, publishTimerEvent } from "./pubsub";
+ import { checkWsRateLimit, parseActionType, parseSeatId, parseTableId } from "./validators";
+@@
+ const clients = new Map<string, ClientConnection>();
+ const tableSubscriptions = new Map<string, Set<string>>();
+ 
++type TableSeatView = TableSeat & { nickname?: string };
++type TableStateView = Omit<TableState, "seats"> & { seats: TableSeatView[] };
++
+ function send(socket: WebSocket, message: Record<string, unknown>) {
+   if (socket.readyState === WebSocket.OPEN) {
+     socket.send(JSON.stringify(message));
+   }
+ }
+@@
+ function redactTableState(tableState: TableState | null) {
+   if (!tableState || !tableState.hand) {
+     return tableState;
+   }
+@@
+   };
+ }
+ 
++async function withSeatNicknames(tableState: TableState | null): Promise<TableStateView | null> {
++  if (!tableState) {
++    return tableState;
++  }
++  const ids = Array.from(
++    new Set(tableState.seats.map((seat) => seat.userId).filter((id): id is string => Boolean(id))),
++  );
++  if (ids.length === 0) {
++    return tableState as TableStateView;
++  }
++  const entries = await Promise.all(
++    ids.map(async (id) => {
++      try {
++        const profile = await getProfile(id);
++        return [id, profile.nickname] as const;
++      } catch {
++        return [id, id] as const;
++      }
++    }),
++  );
++  const nicknameMap = new Map(entries);
++  return {
++    ...tableState,
++    seats: tableState.seats.map((seat) => ({
++      ...seat,
++      nickname: seat.userId ? nicknameMap.get(seat.userId) : undefined,
++    })),
++  };
++}
++
++async function buildTableStatePayload(tableState: TableState | null) {
++  return withSeatNicknames(redactTableState(tableState));
++}
++
+ export async function broadcastTableState(tableId: string) {
+   const tableState = await getTableState(tableId);
+   if (!tableState) {
+     return;
+   }
++  const payload = await buildTableStatePayload(tableState);
+   await broadcastTable(tableId, {
+     type: "TablePatch",
+     tableId,
+     handId: tableState.hand?.handId,
+-    tableState: redactTableState(tableState),
++    tableState: payload,
+   });
+ }
+@@
+   const tableState = (await reconnectSeat({ tableId, userId: client.userId })) ?? (await getTableState(tableId));
+   if (tableState) {
+-    send(client.socket, { type: "TableSnapshot", tableState: redactTableState(tableState) });
++    const payload = await buildTableStatePayload(tableState);
++    send(client.socket, { type: "TableSnapshot", tableState: payload });
+     if (tableState.hand) {
+       const seat = tableState.seats.find((entry) => entry.userId === client.userId);
+@@
+   if (result.ok && result.tableState) {
++    const payload = await buildTableStatePayload(result.tableState);
+     await broadcastTable(payload.tableId, {
+       type: "TablePatch",
+-      tableId: payload.tableId,
+-      handId: result.tableState.hand?.handId,
+-      tableState: redactTableState(result.tableState),
++      tableId: payload.tableId,
++      handId: result.tableState.hand?.handId,
++      tableState: payload,
+     });
+     await scheduleTurn(payload.tableId);
+   }
+ }
+@@
+   const result = await applyTableAction({
+     tableId,
+     seatId: seat.seatId,
+@@
+   if (result.ok && result.tableState) {
++    const payload = await buildTableStatePayload(result.tableState);
+     await broadcastTable(tableId, {
+       type: "TablePatch",
+       tableId,
+       handId: result.tableState.hand?.handId,
+-      tableState: redactTableState(result.tableState),
++      tableState: payload,
+     });
+     await scheduleTurn(tableId);
+   }
+ }
+@@
+   const result = await joinSeat({
+     tableId: payload.tableId,
+     seatId: payload.seatId,
+     userId: client.userId,
+   });
+ 
+   if (result.ok && result.tableState) {
++    const payload = await buildTableStatePayload(result.tableState);
+     await broadcastTable(payload.tableId, {
+       type: "TablePatch",
+-      tableId: payload.tableId,
+-      handId: result.tableState.hand?.handId,
+-      tableState: redactTableState(result.tableState),
++      tableId: payload.tableId,
++      handId: result.tableState.hand?.handId,
++      tableState: payload,
+     });
+     await scheduleTurn(payload.tableId);
+   }
+ }
+@@
+   const result = await leaveSeat({ tableId: payload.tableId, userId: client.userId });
+   if (result.ok && result.tableState) {
++    const payload = await buildTableStatePayload(result.tableState);
+     await broadcastTable(payload.tableId, {
+       type: "TablePatch",
+-      tableId: payload.tableId,
+-      handId: result.tableState.hand?.handId,
+-      tableState: redactTableState(result.tableState),
++      tableId: payload.tableId,
++      handId: result.tableState.hand?.handId,
++      tableState: payload,
+     });
+   }
+ }
+@@
+   const tableState = (await reconnectSeat({ tableId, userId: client.userId })) ?? (await getTableState(tableId));
+   if (!tableState) {
+     return;
+   }
+-  send(client.socket, { type: "TableSnapshot", tableState: redactTableState(tableState) });
++  const payload = await buildTableStatePayload(tableState);
++  send(client.socket, { type: "TableSnapshot", tableState: payload });
+   if (tableState.hand) {
+     const seat = tableState.seats.find((entry) => entry.userId === client.userId);
+*** End Patch
+2026-01-09T21:55:02.392291Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '1,120p' apps/api/src/ws/tableHub.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:55:06.254781Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '120,240p' apps/api/src/ws/tableHub.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:55:10.026154Z  INFO codex_core::stream_events_utils: ToolCall: shell_command {"command":"sed -n '240,360p' apps/api/src/ws/tableHub.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T21:55:18.015169Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/ws/tableHub.ts
+@@
+-import WebSocket from "ws";
+-
+-import { TableState } from "../engine/types";
++import WebSocket from "ws";
++
++import { TableSeat, TableState } from "../engine/types";
+ import { applyTableAction, joinSeat, leaveSeat, reconnectSeat } from "../services/tableService";
++import { getProfile } from "../services/profileService";
+ import { getTableState } from "../services/tableState";
+ import { scheduleTurnTimeout, clearTurnTimeout } from "../services/turnTimer";
+ import { WsPubSubMessage, publishTableEvent, publishTimerEvent } from "./pubsub";
+ import { checkWsRateLimit, parseActionType, parseSeatId, parseTableId } from "./validators";
+@@
+ const clients = new Map<string, ClientConnection>();
+ const tableSubscriptions = new Map<string, Set<string>>();
+ 
++type TableSeatView = TableSeat & { nickname?: string };
++type TableStateView = Omit<TableState, "seats"> & { seats: TableSeatView[] };
++
+*** End Patch
+2026-01-09T21:55:29.998912Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/ws/tableHub.ts
+@@
+ function redactTableState(tableState: TableState | null) {
+   if (!tableState || !tableState.hand) {
+     return tableState;
+   }
+   const { hand } = tableState;
+   return {
+     ...tableState,
+     hand: {
+       ...hand,
+       holeCards: {},
+       deck: [],
+     },
+   };
+ }
+ 
++async function withSeatNicknames(tableState: TableState | null): Promise<TableStateView | null> {
++  if (!tableState) {
++    return tableState;
++  }
++  const ids = Array.from(
++    new Set(tableState.seats.map((seat) => seat.userId).filter((id): id is string => Boolean(id))),
++  );
++  if (ids.length === 0) {
++    return tableState as TableStateView;
++  }
++  const entries = await Promise.all(
++    ids.map(async (id) => {
++      try {
++        const profile = await getProfile(id);
++        return [id, profile.nickname] as const;
++      } catch {
++        return [id, id] as const;
++      }
++    }),
++  );
++  const nicknameMap = new Map(entries);
++  return {
++    ...tableState,
++    seats: tableState.seats.map((seat) => ({
++      ...seat,
++      nickname: seat.userId ? nicknameMap.get(seat.userId) : undefined,
++    })),
++  };
++}
++
++async function buildTableStatePayload(tableState: TableState | null) {
++  return withSeatNicknames(redactTableState(tableState));
++}
++
+ export async function broadcastTableState(tableId: string) {
+   const tableState = await getTableState(tableId);
+   if (!tableState) {
+     return;
+   }
++  const payload = await buildTableStatePayload(tableState);
+   await broadcastTable(tableId, {
+     type: "TablePatch",
+     tableId,
+     handId: tableState.hand?.handId,
+-    tableState: redactTableState(tableState),
++    tableState: payload,
+   });
+ }
+*** End Patch
+2026-01-09T21:55:35.171410Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/ws/tableHub.ts
+@@
+       });
+       if (result.ok && result.tableState) {
++        const payload = await buildTableStatePayload(result.tableState);
+         await broadcastTable(tableId, {
+           type: "TablePatch",
+           tableId,
+           handId: result.tableState.hand?.handId,
+-          tableState: redactTableState(result.tableState),
++          tableState: payload,
+         });
+         await scheduleTurn(tableId);
+       }
+*** End Patch
+2026-01-09T21:55:40.619297Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/ws/tableHub.ts
+@@
+   const tableState = (await reconnectSeat({ tableId, userId: client.userId })) ?? (await getTableState(tableId));
+   if (tableState) {
+-    send(client.socket, { type: "TableSnapshot", tableState: redactTableState(tableState) });
++    const payload = await buildTableStatePayload(tableState);
++    send(client.socket, { type: "TableSnapshot", tableState: payload });
+     if (tableState.hand) {
+       const seat = tableState.seats.find((entry) => entry.userId === client.userId);
+*** End Patch
+2026-01-09T21:55:45.662875Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/ws/tableHub.ts
+@@
+   if (result.ok && result.tableState) {
++    const payload = await buildTableStatePayload(result.tableState);
+     await broadcastTable(tableId, {
+       type: "TablePatch",
+       tableId,
+       handId: result.tableState.hand?.handId,
+-      tableState: redactTableState(result.tableState),
++      tableState: payload,
+     });
+     await scheduleTurn(tableId);
+   }
+*** End Patch
+2026-01-09T21:55:54.417251Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/ws/tableHub.ts
+@@
+   if (result.ok && result.tableState) {
++    const payload = await buildTableStatePayload(result.tableState);
+     await broadcastTable(payload.tableId, {
+       type: "TablePatch",
+-      tableId: payload.tableId,
+-      handId: result.tableState.hand?.handId,
+-      tableState: redactTableState(result.tableState),
++      tableId: payload.tableId,
++      handId: result.tableState.hand?.handId,
++      tableState: payload,
+     });
+     await scheduleTurn(payload.tableId);
+   }
+ }
+@@
+   const result = await leaveSeat({ tableId: payload.tableId, userId: client.userId });
+   if (result.ok && result.tableState) {
++    const payload = await buildTableStatePayload(result.tableState);
+     await broadcastTable(payload.tableId, {
+       type: "TablePatch",
+-      tableId: payload.tableId,
+-      handId: result.tableState.hand?.handId,
+-      tableState: redactTableState(result.tableState),
++      tableId: payload.tableId,
++      handId: result.tableState.hand?.handId,
++      tableState: payload,
+     });
+   }
+ }
+*** End Patch
+2026-01-09T21:56:00.256214Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/ws/tableHub.ts
+@@
+   const tableState = (await reconnectSeat({ tableId, userId: client.userId })) ?? (await getTableState(tableId));
+   if (!tableState) {
+     return;
+   }
+-  send(client.socket, { type: "TableSnapshot", tableState: redactTableState(tableState) });
++  const payload = await buildTableStatePayload(tableState);
++  send(client.socket, { type: "TableSnapshot", tableState: payload });
+   if (tableState.hand) {
+     const seat = tableState.seats.find((entry) => entry.userId === client.userId);
+*** End Patch
+2026-01-09T21:56:07.173029Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/state/tableStore.ts
+@@
+ export interface TableSeat {
+   seatId: number;
+   userId: string | null;
++  nickname?: string;
+   stack: number;
+   status: string;
+ }
+*** End Patch
+2026-01-09T21:56:14.524869Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/pages/TablePage.tsx
+@@
+             {state.tableState.seats.map((seat) => (
+               <div
+                 key={seat.seatId}
+                 className={`seat-card${seat.seatId === state.seatId ? " is-you" : ""}`}
+               >
+                 <strong>Seat {seat.seatId + 1}</strong>
+-                <div>{seat.userId ?? "Open seat"}</div>
++                <div>{seat.nickname ?? seat.userId ?? "Open seat"}</div>
+                 <div>Stack: {seat.stack}</div>
+                 <div>Status: {seat.status}</div>
+               </div>
+             ))}
+*** End Patch
+2026-01-09T21:56:20.144514Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/components/ModerationMenu.tsx
+@@
+           <div key={seat.seatId} className="moderation-seat">
+             <div>
+-              <strong>Seat {seat.seatId + 1}</strong>: {seat.userId}
++              <strong>Seat {seat.seatId + 1}</strong>: {seat.nickname ?? seat.userId}
+             </div>
+*** End Patch
+2026-01-09T21:56:39.118835Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/ws/tableHub.ts
+@@
+   const tableState = await getTableState(tableId);
+   if (!tableState) {
+     return;
+   }
+   const payload = await buildTableStatePayload(tableState);
++  if (!payload) {
++    return;
++  }
+   await broadcastTable(tableId, {
+     type: "TablePatch",
+     tableId,
+@@
+       if (result.ok && result.tableState) {
+         const payload = await buildTableStatePayload(result.tableState);
++        if (!payload) {
++          return;
++        }
+         await broadcastTable(tableId, {
+           type: "TablePatch",
+           tableId,
+@@
+   const tableState = (await reconnectSeat({ tableId, userId: client.userId })) ?? (await getTableState(tableId));
+   if (tableState) {
+     const payload = await buildTableStatePayload(tableState);
++    if (!payload) {
++      return;
++    }
+     send(client.socket, { type: "TableSnapshot", tableState: payload });
+     if (tableState.hand) {
+@@
+   if (result.ok && result.tableState) {
+     const payload = await buildTableStatePayload(result.tableState);
++    if (!payload) {
++      return;
++    }
+     await broadcastTable(tableId, {
+       type: "TablePatch",
+       tableId,
+@@
+   if (result.ok && result.tableState) {
+     const payload = await buildTableStatePayload(result.tableState);
++    if (!payload) {
++      return;
++    }
+     await broadcastTable(payload.tableId, {
+       type: "TablePatch",
+@@
+   const result = await leaveSeat({ tableId: payload.tableId, userId: client.userId });
+   if (result.ok && result.tableState) {
+     const payload = await buildTableStatePayload(result.tableState);
++    if (!payload) {
++      return;
++    }
+     await broadcastTable(payload.tableId, {
+       type: "TablePatch",
+@@
+   const tableState = (await reconnectSeat({ tableId, userId: client.userId })) ?? (await getTableState(tableId));
+   if (!tableState) {
+     return;
+   }
+   const payload = await buildTableStatePayload(tableState);
++  if (!payload) {
++    return;
++  }
+   send(client.socket, { type: "TableSnapshot", tableState: payload });
+*** End Patch
+2026-01-09T21:57:30.927851Z  INFO codex_core::stream_events_utils: ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/services/tableRegistry.ts
+@@
+ export async function createTable(
+-  input: Omit<TableSummary, "tableId" | "seatsTaken" | "inProgress">,
++  input: Omit<TableSummary, "tableId" | "seatsTaken" | "inProgress" | "occupiedSeatIds">,
+ ) {
+*** End Patch

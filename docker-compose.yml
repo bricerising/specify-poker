@@ -99,7 +99,8 @@ services:
     ports:
       - "3001:3000"
     volumes:
-      - ./infra/grafana:/etc/grafana/provisioning
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning
+      - ./infra/grafana/dashboards:/etc/grafana/dashboards
     depends_on:
       - prometheus
     healthcheck:

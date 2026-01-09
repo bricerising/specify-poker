@@ -17,12 +17,14 @@ export interface TableSummary {
   ownerId: string;
   config: TableConfig;
   seatsTaken: number;
+  occupiedSeatIds: number[];
   inProgress: boolean;
 }
 
 export interface TableSeat {
   seatId: number;
   userId: string | null;
+  nickname?: string;
   stack: number;
   status: string;
 }

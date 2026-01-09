@@ -1,7 +1,8 @@
 import WebSocket from "ws";
 
-import { TableState } from "../engine/types";
+import { TableSeat, TableState } from "../engine/types";
 import { applyTableAction, joinSeat, leaveSeat, reconnectSeat } from "../services/tableService";
+import { getProfile } from "../services/profileService";
 import { getTableState } from "../services/tableState";
 import { scheduleTurnTimeout, clearTurnTimeout } from "../services/turnTimer";
 import { WsPubSubMessage, publishTableEvent, publishTimerEvent } from "./pubsub";
@@ -16,6 +17,9 @@ interface ClientConnection {
 
 const clients = new Map<string, ClientConnection>();
 const tableSubscriptions = new Map<string, Set<string>>();
+
+type TableSeatView = TableSeat & { nickname?: string };
+type TableStateView = Omit<TableState, "seats"> & { seats: TableSeatView[] };
 
 function send(socket: WebSocket, message: Record<string, unknown>) {
   if (socket.readyState === WebSocket.OPEN) {
@@ -89,16 +93,54 @@ function redactTableState(tableState: TableState | null) {
   };
 }
 
+async function withSeatNicknames(tableState: TableState | null): Promise<TableStateView | null> {
+  if (!tableState) {
+    return tableState;
+  }
+  const ids = Array.from(
+    new Set(tableState.seats.map((seat) => seat.userId).filter((id): id is string => Boolean(id))),
+  );
+  if (ids.length === 0) {
+    return tableState as TableStateView;
+  }
+  const entries = await Promise.all(
+    ids.map(async (id) => {
+      try {
+        const profile = await getProfile(id);
+        return [id, profile.nickname] as const;
+      } catch {
+        return [id, id] as const;
+      }
+    }),
+  );
+  const nicknameMap = new Map(entries);
+  return {
+    ...tableState,
+    seats: tableState.seats.map((seat) => ({
+      ...seat,
+      nickname: seat.userId ? nicknameMap.get(seat.userId) : undefined,
+    })),
+  };
+}
+
+async function buildTableStatePayload(tableState: TableState | null) {
+  return withSeatNicknames(redactTableState(tableState));
+}
+
 export async function broadcastTableState(tableId: string) {
   const tableState = await getTableState(tableId);
   if (!tableState) {
+    return;
+  }
+  const payload = await buildTableStatePayload(tableState);
+  if (!payload) {
     return;
   }
   await broadcastTable(tableId, {
     type: "TablePatch",
     tableId,
     handId: tableState.hand?.handId,
-    tableState: redactTableState(tableState),
+    tableState: payload,
   });
 }
 
@@ -129,11 +171,15 @@ async function scheduleTurn(tableId: string) {
         allowInactive: true,
       });
       if (result.ok && result.tableState) {
+        const payload = await buildTableStatePayload(result.tableState);
+        if (!payload) {
+          return;
+        }
         await broadcastTable(tableId, {
           type: "TablePatch",
           tableId,
           handId: result.tableState.hand?.handId,
-          tableState: redactTableState(result.tableState),
+          tableState: payload,
         });
         await scheduleTurn(tableId);
       }
@@ -158,7 +204,11 @@ async function handleSubscribe(client: ClientConnection, tableId: string) {
 
   const tableState = (await reconnectSeat({ tableId, userId: client.userId })) ?? (await getTableState(tableId));
   if (tableState) {
-    send(client.socket, { type: "TableSnapshot", tableState: redactTableState(tableState) });
+    const payload = await buildTableStatePayload(tableState);
+    if (!payload) {
+      return;
+    }
+    send(client.socket, { type: "TableSnapshot", tableState: payload });
     if (tableState.hand) {
       const seat = tableState.seats.find((entry) => entry.userId === client.userId);
       const holeCards = seat ? tableState.hand.holeCards[seat.seatId] : undefined;
@@ -261,11 +311,15 @@ async function handleAction(client: ClientConnection, payload: {
   });
 
   if (result.ok && result.tableState) {
+    const payload = await buildTableStatePayload(result.tableState);
+    if (!payload) {
+      return;
+    }
     await broadcastTable(tableId, {
       type: "TablePatch",
       tableId,
       handId: result.tableState.hand?.handId,
-      tableState: redactTableState(result.tableState),
+      tableState: payload,
     });
     await scheduleTurn(tableId);
   }
@@ -279,11 +333,15 @@ async function handleJoinSeat(client: ClientConnection, payload: { tableId: stri
   });
 
   if (result.ok && result.tableState) {
+    const payload = await buildTableStatePayload(result.tableState);
+    if (!payload) {
+      return;
+    }
     await broadcastTable(payload.tableId, {
       type: "TablePatch",
       tableId: payload.tableId,
       handId: result.tableState.hand?.handId,
-      tableState: redactTableState(result.tableState),
+      tableState: payload,
     });
     await scheduleTurn(payload.tableId);
   }
@@ -292,11 +350,15 @@ async function handleJoinSeat(client: ClientConnection, payload: { tableId: stri
 async function handleLeaveTable(client: ClientConnection, payload: { tableId: string }) {
   const result = await leaveSeat({ tableId: payload.tableId, userId: client.userId });
   if (result.ok && result.tableState) {
+    const payload = await buildTableStatePayload(result.tableState);
+    if (!payload) {
+      return;
+    }
     await broadcastTable(payload.tableId, {
       type: "TablePatch",
       tableId: payload.tableId,
       handId: result.tableState.hand?.handId,
-      tableState: redactTableState(result.tableState),
+      tableState: payload,
     });
   }
 }
@@ -306,7 +368,11 @@ async function handleResync(client: ClientConnection, tableId: string) {
   if (!tableState) {
     return;
   }
-  send(client.socket, { type: "TableSnapshot", tableState: redactTableState(tableState) });
+  const payload = await buildTableStatePayload(tableState);
+  if (!payload) {
+    return;
+  }
+  send(client.socket, { type: "TableSnapshot", tableState: payload });
   if (tableState.hand) {
     const seat = tableState.seats.find((entry) => entry.userId === client.userId);
     const holeCards = seat ? tableState.hand.holeCards[seat.seatId] : undefined;

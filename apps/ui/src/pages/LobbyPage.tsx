@@ -68,16 +68,21 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
   };
 
   const tableRows = tables.map((table, index) => {
-    const seatButtons = Array.from({ length: table.config.maxPlayers }, (_, index) => (
-      <button
-        key={`${table.tableId}-seat-${index}`}
-        type="button"
-        className="btn btn-seat"
-        onClick={() => joinSeat(table.tableId, index)}
-      >
-        Join Seat {index + 1}
-      </button>
-    ));
+    const occupied = new Set(table.occupiedSeatIds ?? []);
+    const seatButtons = Array.from({ length: table.config.maxPlayers }, (_, index) => {
+      const isTaken = occupied.has(index);
+      return (
+        <button
+          key={`${table.tableId}-seat-${index}`}
+          type="button"
+          className="btn btn-seat"
+          onClick={() => joinSeat(table.tableId, index)}
+          disabled={isTaken}
+        >
+          {isTaken ? `Seat ${index + 1} Taken` : `Join Seat ${index + 1}`}
+        </button>
+      );
+    });
     return (
       <div
         key={table.tableId}
