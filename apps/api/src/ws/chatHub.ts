@@ -3,6 +3,7 @@ import WebSocket from "ws";
 
 import { getTableState } from "../services/tableState";
 import { isUserMuted } from "../services/moderationService";
+import { checkWsRateLimit, parseChatMessage, parseTableId } from "./validators";
 
 interface ChatConnection {
   socket: WebSocket;
@@ -75,9 +76,14 @@ function handleUnsubscribe(client: ChatConnection, tableId: string) {
 
 function handleChatSend(client: ChatConnection, payload: { tableId: string; message?: string }) {
   const tableId = payload.tableId;
-  const text = String(payload.message ?? "").trim();
-  if (!text) {
-    send(client.socket, { type: "ChatError", tableId, reason: "empty_message" });
+  const parsed = parseChatMessage(payload.message);
+  if (!parsed.ok) {
+    send(client.socket, { type: "ChatError", tableId, reason: parsed.reason });
+    return;
+  }
+  const rate = checkWsRateLimit(client.connectionId, "chat");
+  if (!rate.ok) {
+    send(client.socket, { type: "ChatError", tableId, reason: "rate_limited" });
     return;
   }
 
@@ -97,7 +103,7 @@ function handleChatSend(client: ChatConnection, payload: { tableId: string; mess
     message: {
       id: randomUUID(),
       userId: client.userId,
-      text,
+      text: parsed.text,
       ts: new Date().toISOString(),
     },
   });
@@ -122,16 +128,30 @@ export function attachChatHub(socket: WebSocket, userId: string, connectionId: s
 
     const type = message.type;
     if (type === "SubscribeChat") {
-      handleSubscribe(client, message.tableId as string);
+      const tableId = parseTableId(message.tableId);
+      if (!tableId) {
+        send(client.socket, { type: "ChatError", tableId: null, reason: "invalid_table" });
+        return;
+      }
+      handleSubscribe(client, tableId);
       return;
     }
     if (type === "UnsubscribeChat") {
-      handleUnsubscribe(client, message.tableId as string);
+      const tableId = parseTableId(message.tableId);
+      if (!tableId) {
+        return;
+      }
+      handleUnsubscribe(client, tableId);
       return;
     }
     if (type === "ChatSend") {
+      const tableId = parseTableId(message.tableId);
+      if (!tableId) {
+        send(client.socket, { type: "ChatError", tableId: null, reason: "invalid_table" });
+        return;
+      }
       handleChatSend(client, {
-        tableId: message.tableId as string,
+        tableId,
         message: message.message as string | undefined,
       });
     }

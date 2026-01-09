@@ -30,10 +30,10 @@ export function CreateTableForm({ onCreate }: CreateTableFormProps) {
     if (!Number.isFinite(parsed.smallBlind) || parsed.smallBlind <= 0) {
       return false;
     }
-    if (!Number.isFinite(parsed.bigBlind) || parsed.bigBlind < parsed.smallBlind) {
+    if (!Number.isFinite(parsed.bigBlind) || parsed.bigBlind < parsed.smallBlind * 2) {
       return false;
     }
-    if (!Number.isInteger(parsed.maxPlayers) || parsed.maxPlayers < 2) {
+    if (!Number.isInteger(parsed.maxPlayers) || parsed.maxPlayers < 2 || parsed.maxPlayers > 9) {
       return false;
     }
     if (!Number.isFinite(parsed.startingStack) || parsed.startingStack <= parsed.bigBlind) {
@@ -88,6 +88,7 @@ export function CreateTableForm({ onCreate }: CreateTableFormProps) {
         <input
           type="number"
           min={2}
+          max={9}
           value={maxPlayers}
           onChange={(event) => setMaxPlayers(event.target.value)}
         />

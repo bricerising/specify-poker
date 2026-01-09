@@ -80,8 +80,12 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
       <div key={table.tableId}>
         <div>{table.name}</div>
         <div>
+          Blinds: {table.config.smallBlind}/{table.config.bigBlind}
+        </div>
+        <div>
           {table.seatsTaken}/{table.config.maxPlayers} seats
         </div>
+        <div>Status: {table.inProgress ? "In Hand" : "Lobby"}</div>
         <div>{seatButtons}</div>
       </div>
     );

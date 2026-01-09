@@ -2,7 +2,9 @@ version: "3.9"
 
 services:
   ui:
-    build: ./apps/ui
+    build:
+      context: .
+      dockerfile: apps/ui/Dockerfile
     ports:
       - "3000:3000"
     healthcheck:
@@ -12,11 +14,15 @@ services:
       retries: 3
 
   api:
-    build: ./apps/api
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
     ports:
       - "4000:4000"
     environment:
       PORT: "4000"
+      KEYCLOAK_URL: "http://keycloak:8080"
+      KEYCLOAK_REALM: "poker-local"
     depends_on:
       - keycloak
       - otel-collector

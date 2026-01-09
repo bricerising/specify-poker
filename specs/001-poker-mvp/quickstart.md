@@ -17,6 +17,7 @@
 - API REST: http://localhost:4000/api
 - API WS: ws://localhost:4000/ws
 - Keycloak: http://localhost:8080
+- Prometheus: http://localhost:9090
 - Grafana: http://localhost:3001
 
 ## Expected Local Stack
@@ -37,9 +38,12 @@
 - Import the Keycloak realm config from `infra/keycloak/`.
 - Ensure the UI origin is allowed in Keycloak client settings.
 - Use demo users or enable self-registration for local testing.
+- Grafana provisions the "Poker Observability" dashboard automatically.
+- In Grafana, confirm the Prometheus data source points to `http://prometheus:9090`.
 
 ## Smoke Test
 
 1. Log in and enter the lobby.
 2. Create a table and join a seat.
 3. Open a second browser session to verify real-time updates and chat.
+4. Open Grafana and confirm the Poker Observability dashboard loads.

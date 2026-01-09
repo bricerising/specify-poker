@@ -31,11 +31,15 @@ export function createTablesRouter() {
     if (!Number.isFinite(smallBlind) || smallBlind <= 0) {
       return res.status(400).json({ code: "invalid_small_blind", message: "smallBlind required" });
     }
-    if (!Number.isFinite(bigBlind) || bigBlind < smallBlind) {
-      return res.status(400).json({ code: "invalid_big_blind", message: "bigBlind required" });
+    if (!Number.isFinite(bigBlind) || bigBlind < smallBlind * 2) {
+      return res
+        .status(400)
+        .json({ code: "invalid_big_blind", message: "bigBlind must be >= 2 * smallBlind" });
     }
-    if (!Number.isInteger(maxPlayers) || maxPlayers < 2) {
-      return res.status(400).json({ code: "invalid_max_players", message: "maxPlayers required" });
+    if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 9) {
+      return res
+        .status(400)
+        .json({ code: "invalid_max_players", message: "maxPlayers must be 2-9" });
     }
     if (!Number.isFinite(startingStack) || startingStack <= bigBlind) {
       return res.status(400).json({ code: "invalid_starting_stack", message: "startingStack required" });

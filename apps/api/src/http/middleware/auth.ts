@@ -19,7 +19,10 @@ function deny(res: Response, reason: string) {
   res.status(401).json({ code: "auth_denied", message: reason });
 }
 
-export function authMiddleware(req: Request, res: Response, next: NextFunction) {
+export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
+  if (req.method === "OPTIONS") {
+    return next();
+  }
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) {
     return deny(res, "Missing bearer token");
@@ -31,7 +34,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
   }
 
   try {
-    const claims = verifyToken(token);
+    const claims = await verifyToken(token);
     req.auth = {
       userId: claims.sub ?? "unknown",
       token,

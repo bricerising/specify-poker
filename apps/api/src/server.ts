@@ -20,7 +20,8 @@ export function createApp(options: { useInMemoryTelemetry?: boolean } = {}) {
 export function createServer(options: { useInMemoryTelemetry?: boolean } = {}) {
   const app = createApp(options);
   const server = http.createServer(app);
-  attachWebSocketServer(server);
+  const wss = attachWebSocketServer(server);
+  (server as http.Server & { wss?: ReturnType<typeof attachWebSocketServer> }).wss = wss;
   return server;
 }
 
@@ -35,4 +36,19 @@ if (require.main === module) {
       port,
     });
   });
+
+  const shutdown = (signal: string) => {
+    console.log("api.shutdown", { ts: new Date().toISOString(), signal });
+    const wss = (server as http.Server & { wss?: ReturnType<typeof attachWebSocketServer> }).wss;
+    wss?.close();
+    server.close(() => {
+      process.exit(0);
+    });
+    setTimeout(() => {
+      process.exit(1);
+    }, 5000).unref();
+  };
+
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
 }

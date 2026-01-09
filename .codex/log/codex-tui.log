@@ -5277,3 +5277,3462 @@
 2026-01-09T15:36:19.079917Z  INFO ToolCall: shell_command {"command":"rg -n \"Chat\" /Users/bricerising/git/brice@github/specify-poker/apps/ui/src -g '*.ts' -g '*.tsx'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
 2026-01-09T15:36:22.051384Z  INFO ToolCall: shell_command {"command":"sed -n '1,260p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/state/tableStore.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
 2026-01-09T15:36:42.195263Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/tableRegistry.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:37:13.558641Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/contracts/openapi.yaml
+@@
+-    ModerationRequest:
+-      type: object
+-      required: [targetUserId]
+-      properties:
+-        targetUserId:
+-          type: string
++    ModerationRequest:
++      type: object
++      required: [seatId]
++      properties:
++        seatId:
++          type: integer
+@@
+-  /api/tables/{tableId}/mod/kick:
++  /api/tables/{tableId}/moderation/kick:
+     post:
+       summary: Kick a player (owner only)
+@@
+-      responses:
+-        '204':
+-          description: Player kicked
++      responses:
++        '200':
++          description: Player kicked
++          content:
++            application/json:
++              schema:
++                type: object
++                required: [tableId, seatId, userId, action]
++                properties:
++                  tableId:
++                    type: string
++                  seatId:
++                    type: integer
++                  userId:
++                    type: string
++                  action:
++                    type: string
++                    enum: [kick]
+@@
+-  /api/tables/{tableId}/mod/mute:
++  /api/tables/{tableId}/moderation/mute:
+     post:
+       summary: Mute a player (owner only)
+@@
+-      responses:
+-        '204':
+-          description: Player muted
++      responses:
++        '200':
++          description: Player muted
++          content:
++            application/json:
++              schema:
++                type: object
++                required: [tableId, seatId, userId, action]
++                properties:
++                  tableId:
++                    type: string
++                  seatId:
++                    type: integer
++                  userId:
++                    type: string
++                  action:
++                    type: string
++                    enum: [mute]
+*** End Patch
+2026-01-09T15:37:23.084363Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/contracts/ws-messages.md
+@@
+ - `SubscribeTable` { tableId }
+ - `UnsubscribeTable` { tableId }
+ - `JoinSeat` { tableId, seatId }
+ - `LeaveTable` { tableId }
+ - `Action` { tableId, handId, action: Fold|Check|Call|Bet|Raise, amount? }
++- `SubscribeChat` { tableId }
++- `UnsubscribeChat` { tableId }
+ - `ChatSend` { tableId, message }
+ - `Ping` { ts }
+@@
+ - `Welcome` { userId, connectionId }
+ - `Error` { code, message, correlationId? }
+ - `LobbyTablesUpdated` { tables[] }
+ - `TableSnapshot` { tableState }
+ - `TablePatch` { tableId, handId, patch }
+ - `ActionResult` { tableId, handId, accepted, reason? }
+-- `ChatMessage` { tableId, userId, message, ts }
++- `ChatSubscribed` { tableId }
++- `ChatError` { tableId, reason }
++- `ChatMessage` { tableId, message: { id, userId, text, ts } }
+ - `TimerUpdate` { tableId, handId, currentTurnSeat, deadlineTs }
+ - `HandEvent` { tableId, handId, event }
+*** End Patch
+2026-01-09T15:37:50.526510Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/tasks.md
+@@
+-- [ ] T026 [P] [US2] Add contract test for create/moderation endpoints in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/contract/moderation.contract.test.ts; Goal: validate request/response schemas; AC: contract test passes; Tests: contract; Obs: N/A (test-only)
+-- [ ] T027 [P] [US2] Add e2e lobby flow test in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/e2e/lobby-flow.spec.ts; Goal: create table and see lobby list; AC: e2e passes; Tests: e2e; Obs: span poker.table.create present
++- [X] T026 [P] [US2] Add contract test for create/moderation endpoints in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/contract/moderation.contract.test.ts; Goal: validate request/response schemas; AC: contract test passes; Tests: contract; Obs: N/A (test-only)
++- [X] T027 [P] [US2] Add e2e lobby flow test in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/e2e/lobby-flow.spec.ts; Goal: create table and see lobby list; AC: e2e passes; Tests: e2e; Obs: span poker.table.create present
+@@
+-- [ ] T028 [US2] Implement create table endpoint in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/tables.ts; Goal: create tables with config; AC: tables appear in lobby list; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/create-table.test.ts; Obs: span poker.table.create
+-- [ ] T029 [US2] Implement lobby list UI + polling/WS refresh in /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/pages/LobbyPage.tsx and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/lobbyApi.ts; Goal: show current tables; AC: lobby reflects changes within 2s; Tests: component in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/components/LobbyPage.test.tsx; Obs: span ui.lobby.render
+-- [ ] T030 [US2] Implement create table form in /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/components/CreateTableForm.tsx; Goal: user can set blinds/max players/stack; AC: validation blocks invalid values; Tests: component in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/components/CreateTableForm.test.tsx; Obs: span ui.table.create_submit
+-- [ ] T031 [US2] Implement chat send/broadcast in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/chatHub.ts and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/components/ChatPanel.tsx; Goal: table chat; AC: messages arrive to seated players; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/ws-chat.test.ts; Obs: metric poker_chat_messages_total
+-- [ ] T032 [US2] Implement moderation endpoints + UI controls in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/moderation.ts and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/components/ModerationMenu.tsx; Goal: kick/mute actions; AC: owner can kick/mute successfully; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/moderation.test.ts; Obs: log moderation.action
++- [X] T028 [US2] Implement create table endpoint in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/tables.ts; Goal: create tables with config; AC: tables appear in lobby list; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/create-table.test.ts; Obs: span poker.table.create
++- [X] T029 [US2] Implement lobby list UI + polling/WS refresh in /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/pages/LobbyPage.tsx and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/lobbyApi.ts; Goal: show current tables; AC: lobby reflects changes within 2s; Tests: component in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/components/LobbyPage.test.tsx; Obs: span ui.lobby.render
++- [X] T030 [US2] Implement create table form in /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/components/CreateTableForm.tsx; Goal: user can set blinds/max players/stack; AC: validation blocks invalid values; Tests: component in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/components/CreateTableForm.test.tsx; Obs: span ui.table.create_submit
++- [X] T031 [US2] Implement chat send/broadcast in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/chatHub.ts and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/components/ChatPanel.tsx; Goal: table chat; AC: messages arrive to seated players; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/ws-chat.test.ts; Obs: metric poker_chat_messages_total
++- [X] T032 [US2] Implement moderation endpoints + UI controls in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/moderation.ts and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/components/ModerationMenu.tsx; Goal: kick/mute actions; AC: owner can kick/mute successfully; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/moderation.test.ts; Obs: log moderation.action
+*** End Patch
+2026-01-09T15:37:57.485737Z  INFO ToolCall: shell_command {"command":"rg --files -g 'profile*' -g 'friends*' /Users/bricerising/git/brice@github/specify-poker/apps","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:38:03.424763Z  INFO ToolCall: shell_command {"command":"rg -n \"profile|friends\" /Users/bricerising/git/brice@github/specify-poker/apps/api/src /Users/bricerising/git/brice@github/specify-poker/apps/ui/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:38:07.640469Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/router.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:38:12.540462Z  INFO ToolCall: shell_command {"command":"rg -n \"HandEnded|hand ended|hand_end|hand end\" /Users/bricerising/git/brice@github/specify-poker/apps/api/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:38:18.272250Z  INFO ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/tableService.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:38:31.996598Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/spec.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:38:38.168626Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/App.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:38:44.115573Z  INFO ToolCall: shell_command {"command":"rg --files /Users/bricerising/git/brice@github/specify-poker/apps/ui/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:38:48.992534Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/main.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:39:02.288827Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/components/TablePage.test.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:39:07.666080Z  INFO ToolCall: shell_command {"command":"rg --files /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/components","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:39:11.011571Z  INFO ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/components/CreateTableForm.test.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:39:17.050835Z  INFO ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/server.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:39:40.473148Z  INFO ToolCall: shell_command {"command":"sed -n '1,260p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/handEngine.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:39:46.097841Z  INFO ToolCall: shell_command {"command":"sed -n '260,560p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/handEngine.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:39:51.970074Z  INFO ToolCall: shell_command {"command":"sed -n '1,260p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/types.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:40:37.328377Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/pages/TablePage.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:40:48.598658Z  INFO ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/auth.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:40:54.949256Z  INFO ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/middleware/auth.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:41:03.039784Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/e2e/login.spec.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:41:14.446601Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/apiClient.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:41:33.604553Z  INFO interrupt received: abort current task, if any
+2026-01-09T15:41:52.601513Z  INFO spawning ghost snapshot task
+2026-01-09T15:41:52.985124Z  INFO ghost snapshot blocking task finished
+2026-01-09T15:41:52.985159Z  INFO ghost commit captured: 9004dcb6018c69101791f2197e1dd6041ae2340b
+2026-01-09T15:41:52.985172Z  INFO ghost snapshot gate marked ready
+2026-01-09T15:42:31.383124Z  INFO spawning ghost snapshot task
+2026-01-09T15:42:31.752756Z  INFO ghost snapshot blocking task finished
+2026-01-09T15:42:31.752793Z  INFO ghost commit captured: 4f6af78880f619db42833e25438bcfabb433b935
+2026-01-09T15:42:31.752803Z  INFO ghost snapshot gate marked ready
+2026-01-09T15:42:41.648206Z  INFO ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/components/LobbyPage.test.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:42:50.402541Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/tables.ts
+@@
+-    if (!Number.isFinite(bigBlind) || bigBlind < smallBlind) {
+-      return res.status(400).json({ code: "invalid_big_blind", message: "bigBlind required" });
++    if (!Number.isFinite(bigBlind) || bigBlind < smallBlind * 2) {
++      return res
++        .status(400)
++        .json({ code: "invalid_big_blind", message: "bigBlind must be >= 2 * smallBlind" });
+     }
+-    if (!Number.isInteger(maxPlayers) || maxPlayers < 2) {
+-      return res.status(400).json({ code: "invalid_max_players", message: "maxPlayers required" });
++    if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > 9) {
++      return res
++        .status(400)
++        .json({ code: "invalid_max_players", message: "maxPlayers must be 2-9" });
+     }
+*** End Patch
+2026-01-09T15:42:59.051123Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/components/CreateTableForm.tsx
+@@
+-    if (!Number.isFinite(parsed.bigBlind) || parsed.bigBlind < parsed.smallBlind) {
++    if (!Number.isFinite(parsed.bigBlind) || parsed.bigBlind < parsed.smallBlind * 2) {
+       return false;
+     }
+-    if (!Number.isInteger(parsed.maxPlayers) || parsed.maxPlayers < 2) {
++    if (!Number.isInteger(parsed.maxPlayers) || parsed.maxPlayers < 2 || parsed.maxPlayers > 9) {
+       return false;
+     }
+@@
+         Max Players
+         <input
+           type="number"
+           min={2}
++          max={9}
+           value={maxPlayers}
+           onChange={(event) => setMaxPlayers(event.target.value)}
+         />
+*** End Patch
+2026-01-09T15:43:06.235540Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/pages/LobbyPage.tsx
+@@
+     return (
+       <div key={table.tableId}>
+         <div>{table.name}</div>
++        <div>
++          Blinds: {table.config.smallBlind}/{table.config.bigBlind}
++        </div>
+         <div>
+           {table.seatsTaken}/{table.config.maxPlayers} seats
+         </div>
++        <div>Status: {table.inProgress ? "In Hand" : "Lobby"}</div>
+         <div>{seatButtons}</div>
+       </div>
+     );
+   });
+*** End Patch
+2026-01-09T15:43:18.308627Z  INFO ToolCall: shell_command {"command":"rg --files /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:43:26.094303Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:43:29.981800Z  INFO ToolCall: shell_command {"command":"sed -n '240,520p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:45:20.267046Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/unit/handEngine.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:45:31.021922Z  INFO ToolCall: update_plan {"explanation":"Implement Milestone 5 across API, engine, UI, and tests after fixing M4 gaps.", "plan":[{"step":"Add profile/friends services plus API routes (/api/me, /api/profile, /api/friends) and wire into router; align contracts as needed.", "status":"in_progress"},{"step":"Implement stat tracking with hand winners capture and integrate into table flow; add unit/integration tests.", "status":"pending"},{"step":"Build profile/friends UI (pages + form) and lightweight navigation; add component/e2e tests.", "status":"pending"},{"step":"Update tasks checklist and verify Milestone 5 completion status.", "status":"pending"}]}
+2026-01-09T15:45:50.272212Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/friendsService.ts
++const friendsByUser = new Map<string, string[]>();
++
++export function getFriends(userId: string) {
++  return friendsByUser.get(userId) ?? [];
++}
++
++export function setFriends(userId: string, friends: string[]) {
++  const unique = Array.from(new Set(friends));
++  friendsByUser.set(userId, unique);
++  return unique;
++}
++
++export function resetFriends() {
++  friendsByUser.clear();
++}
+*** End Patch
+2026-01-09T15:46:04.811797Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/profileService.ts
++import { getFriends } from "./friendsService";
++
++export interface UserStats {
++  handsPlayed: number;
++  wins: number;
++}
++
++export interface UserProfile {
++  userId: string;
++  nickname: string;
++  avatarUrl: string | null;
++  stats: UserStats;
++  friends: string[];
++}
++
++interface StoredProfile {
++  nickname: string;
++  avatarUrl: string | null;
++  stats: UserStats;
++}
++
++const profiles = new Map<string, StoredProfile>();
++
++function createDefaultProfile(userId: string, defaults?: { nickname?: string; avatarUrl?: string | null }) {
++  return {
++    nickname: defaults?.nickname ?? userId,
++    avatarUrl: defaults?.avatarUrl ?? null,
++    stats: {
++      handsPlayed: 0,
++      wins: 0,
++    },
++  };
++}
++
++function ensureProfile(userId: string, defaults?: { nickname?: string; avatarUrl?: string | null }) {
++  const existing = profiles.get(userId);
++  if (existing) {
++    return existing;
++  }
++  const created = createDefaultProfile(userId, defaults);
++  profiles.set(userId, created);
++  return created;
++}
++
++export function getProfile(userId: string, defaults?: { nickname?: string; avatarUrl?: string | null }): UserProfile {
++  const stored = ensureProfile(userId, defaults);
++  return {
++    userId,
++    nickname: stored.nickname,
++    avatarUrl: stored.avatarUrl,
++    stats: { ...stored.stats },
++    friends: getFriends(userId),
++  };
++}
++
++export function updateProfile(
++  userId: string,
++  updates: { nickname?: string; avatarUrl?: string | null },
++  defaults?: { nickname?: string; avatarUrl?: string | null },
++) {
++  const stored = ensureProfile(userId, defaults);
++  if (typeof updates.nickname === "string") {
++    stored.nickname = updates.nickname;
++  }
++  if (updates.avatarUrl !== undefined) {
++    stored.avatarUrl = updates.avatarUrl;
++  }
++  profiles.set(userId, stored);
++  return getProfile(userId);
++}
++
++export function recordHandStats(userId: string, outcome: { played: boolean; won: boolean }) {
++  const stored = ensureProfile(userId);
++  if (outcome.played) {
++    stored.stats.handsPlayed += 1;
++  }
++  if (outcome.won) {
++    stored.stats.wins += 1;
++  }
++  profiles.set(userId, stored);
++}
++
++export function resetProfiles() {
++  profiles.clear();
++}
+*** End Patch
+2026-01-09T15:46:22.116761Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/profile.ts
++import express from "express";
++
++import { getProfile, updateProfile } from "../../services/profileService";
++import { getFriends, setFriends } from "../../services/friendsService";
++
++function requireAuth(req: express.Request, res: express.Response) {
++  const auth = req.auth;
++  if (!auth) {
++    res.status(401).json({ code: "auth_denied", message: "Missing auth" });
++    return null;
++  }
++  return auth;
++}
++
++function normalizeNickname(input: unknown) {
++  if (input === undefined) {
++    return undefined;
++  }
++  const nickname = String(input).trim();
++  return nickname.length === 0 ? null : nickname;
++}
++
++function normalizeAvatarUrl(input: unknown) {
++  if (input === undefined) {
++    return undefined;
++  }
++  if (input === null) {
++    return null;
++  }
++  const avatarUrl = String(input).trim();
++  return avatarUrl.length === 0 ? null : avatarUrl;
++}
++
++export function createProfileRouter() {
++  const router = express.Router();
++
++  router.get("/api/me", (req, res) => {
++    const auth = requireAuth(req, res);
++    if (!auth) {
++      return;
++    }
++    const nickname = (auth.claims?.preferred_username as string | undefined) ?? auth.userId;
++    const avatarUrl = (auth.claims?.picture as string | undefined) ?? null;
++    res.status(200).json(getProfile(auth.userId, { nickname, avatarUrl }));
++  });
++
++  router.post("/api/profile", (req, res) => {
++    const auth = requireAuth(req, res);
++    if (!auth) {
++      return;
++    }
++
++    const nickname = normalizeNickname(req.body?.nickname);
++    if (nickname === null) {
++      return res.status(400).json({ code: "invalid_nickname", message: "nickname required" });
++    }
++    if (nickname !== undefined && (nickname.length < 2 || nickname.length > 20)) {
++      return res
++        .status(400)
++        .json({ code: "invalid_nickname", message: "nickname must be 2-20 chars" });
++    }
++
++    const avatarUrl = normalizeAvatarUrl(req.body?.avatarUrl);
++
++    const defaults = {
++      nickname: (auth.claims?.preferred_username as string | undefined) ?? auth.userId,
++      avatarUrl: (auth.claims?.picture as string | undefined) ?? null,
++    };
++
++    res.status(200).json(updateProfile(auth.userId, { nickname, avatarUrl }, defaults));
++  });
++
++  router.get("/api/friends", (req, res) => {
++    const auth = requireAuth(req, res);
++    if (!auth) {
++      return;
++    }
++    res.status(200).json({ friends: getFriends(auth.userId) });
++  });
++
++  router.put("/api/friends", (req, res) => {
++    const auth = requireAuth(req, res);
++    if (!auth) {
++      return;
++    }
++
++    const friends = req.body?.friends;
++    if (!Array.isArray(friends)) {
++      return res.status(400).json({ code: "invalid_friends", message: "friends must be an array" });
++    }
++    if (!friends.every((entry) => typeof entry === "string")) {
++      return res.status(400).json({ code: "invalid_friends", message: "friends must be strings" });
++    }
++
++    const cleaned = friends.map((entry) => entry.trim()).filter((entry) => entry.length > 0);
++    res.status(200).json({ friends: setFriends(auth.userId, cleaned) });
++  });
++
++  return router;
++}
+*** End Patch
+2026-01-09T15:46:31.231555Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/router.ts
+@@
+ import { authMiddleware } from "./middleware/auth";
+ import { createAuditRouter } from "./routes/audit";
+ import { createModerationRouter } from "./routes/moderation";
++import { createProfileRouter } from "./routes/profile";
+ import { createPushRouter } from "./routes/push";
+ import { createTablesRouter } from "./routes/tables";
+@@
+-  router.get("/api/me", (req, res) => {
+-    const userId = req.auth?.userId ?? "unknown";
+-    const nickname = (req.auth?.claims?.preferred_username as string | undefined) ?? userId;
+-    const avatarUrl = (req.auth?.claims?.picture as string | undefined) ?? null;
+-
+-    res.status(200).json({
+-      userId,
+-      nickname,
+-      avatarUrl,
+-      stats: { handsPlayed: 0, wins: 0 },
+-      friends: [],
+-    });
+-  });
+-
+   router.use(createPushRouter());
+   router.use(createTablesRouter());
+   router.use(createModerationRouter());
++  router.use(createProfileRouter());
+   router.use(createAuditRouter());
+*** End Patch
+2026-01-09T15:46:43.159097Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/contracts/openapi.yaml
+@@
+     TableJoinResponse:
+       type: object
+       required: [tableId, seatId, wsUrl]
+       properties:
+         tableId:
+           type: string
+         seatId:
+           type: integer
+         wsUrl:
+           type: string
++    FriendsList:
++      type: object
++      required: [friends]
++      properties:
++        friends:
++          type: array
++          items:
++            type: string
+@@
+   /api/profile:
+     post:
+       summary: Update nickname and avatar
+@@
+         '400':
+           description: Validation error
+           content:
+             application/json:
+               schema:
+                 $ref: '#/components/schemas/ErrorResponse'
++
++  /api/friends:
++    get:
++      summary: List friends
++      responses:
++        '200':
++          description: Friends list
++          content:
++            application/json:
++              schema:
++                $ref: '#/components/schemas/FriendsList'
++    put:
++      summary: Update friends list
++      requestBody:
++        required: true
++        content:
++          application/json:
++            schema:
++              $ref: '#/components/schemas/FriendsList'
++      responses:
++        '200':
++          description: Updated friends list
++          content:
++            application/json:
++              schema:
++                $ref: '#/components/schemas/FriendsList'
+*** End Patch
+2026-01-09T15:46:55.297382Z  INFO ToolCall: shell_command {"command":"rg -n \"metric\" /Users/bricerising/git/brice@github/specify-poker/apps/api/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:47:00.508596Z  INFO ToolCall: shell_command {"command":"rg -n \"hand_evaluations|poker_\" /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/handEval.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:47:06.457251Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/handEval.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:47:21.103262Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/types.ts
+@@
+ export interface HandState {
+   handId: string;
+   tableId: string;
+   buttonSeat: number;
+   smallBlindSeat: number;
+   bigBlindSeat: number;
+   communityCards: string[];
+   pots: Pot[];
+   currentStreet: HandStreet;
+   currentTurnSeat: number;
+   currentBet: number;
+   minRaise: number;
+   roundContributions: Record<number, number>;
+   totalContributions: Record<number, number>;
+   actedSeats: number[];
+   actionTimerDeadline: string | null;
+   startedAt: string;
+   endedAt: string | null;
+   deck: string[];
+   holeCards: Record<number, [string, string]>;
+   bigBlind: number;
++  winners?: number[];
+ }
+*** End Patch
+2026-01-09T15:47:30.287353Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/handEngine.ts
+@@
+     deck,
+     holeCards,
+     bigBlind: table.config.bigBlind,
++    winners: undefined,
+   };
+@@
+-  const { winners } = evaluateWinners(players, hand.communityCards);
++  const { winners } = evaluateWinners(players, hand.communityCards);
++  hand.winners = winners;
+@@
+   if (remaining.length === 1) {
++    hand.winners = remaining.map((seat) => seat.seatId);
+     remaining[0].stack += hand.pots.reduce((sum, pot) => sum + pot.amount, 0);
+*** End Patch
+2026-01-09T15:47:38.086922Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/state/tableStore.ts
+@@
+ export interface HandState {
+   handId: string;
+   currentStreet: string;
+   currentTurnSeat: number;
+   currentBet: number;
+   minRaise: number;
+   roundContributions: Record<number, number>;
+   communityCards: string[];
+   pots: { amount: number; eligibleSeatIds: number[] }[];
+   actionTimerDeadline: string | null;
+   bigBlind: number;
++  winners?: number[];
+ }
+*** End Patch
+2026-01-09T15:47:44.195985Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/statTracker.ts
++import { recordHandStats } from "../services/profileService";
++import { HandState, TableSeat } from "./types";
++
++export function recordHandCompletion(hand: HandState, seats: TableSeat[]) {
++  const winners = new Set(hand.winners ?? []);
++  for (const seat of seats) {
++    if (!seat.userId || seat.status === "empty") {
++      continue;
++    }
++    recordHandStats(seat.userId, {
++      played: true,
++      won: winners.has(seat.seatId),
++    });
++  }
++}
+*** End Patch
+2026-01-09T15:47:56.302968Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/tableService.ts
+@@
+-import { applyAction } from "../engine/handEngine";
++import { applyAction } from "../engine/handEngine";
++import { recordHandCompletion } from "../engine/statTracker";
+@@
+-  if (result.table.hand) {
++  const handEnded = result.table.hand?.currentStreet === "ended" && previousStreet !== "ended";
++
++  if (handEnded && result.table.hand) {
++    recordHandCompletion(result.table.hand, result.table.seats);
++  }
++
++  if (result.table.hand) {
+     recordEvent(result.table.hand.handId, "ActionTaken", {
+       action: options.action,
+       snapshot: result.table.hand,
+@@
+-    if (result.table.hand.currentStreet === "ended") {
++    if (result.table.hand.currentStreet === "ended") {
+       recordEvent(result.table.hand.handId, "HandEnded", { snapshot: result.table.hand });
+     }
+   }
+*** End Patch
+2026-01-09T15:48:14.724613Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/unit/statTracker.test.ts
++import { describe, expect, it } from "vitest";
++
++import { recordHandCompletion } from "../../src/engine/statTracker";
++import { HandState, TableSeat } from "../../src/engine/types";
++import { getProfile, resetProfiles } from "../../src/services/profileService";
++
++describe("stat tracker", () => {
++  it("increments hands played and wins for winners", () => {
++    resetProfiles();
++
++    const hand: HandState = {
++      handId: "hand-1",
++      tableId: "table-1",
++      buttonSeat: 0,
++      smallBlindSeat: 0,
++      bigBlindSeat: 1,
++      communityCards: [],
++      pots: [],
++      currentStreet: "ended",
++      currentTurnSeat: 0,
++      currentBet: 0,
++      minRaise: 0,
++      roundContributions: { 0: 0, 1: 0 },
++      totalContributions: { 0: 0, 1: 0 },
++      actedSeats: [],
++      actionTimerDeadline: null,
++      startedAt: "2026-01-01T00:00:00.000Z",
++      endedAt: "2026-01-01T00:01:00.000Z",
++      deck: [],
++      holeCards: {},
++      bigBlind: 10,
++      winners: [1],
++    };
++
++    const seats: TableSeat[] = [
++      { seatId: 0, userId: "u1", stack: 100, status: "active" },
++      { seatId: 1, userId: "u2", stack: 100, status: "active" },
++    ];
++
++    recordHandCompletion(hand, seats);
++
++    expect(getProfile("u1").stats).toEqual({ handsPlayed: 1, wins: 0 });
++    expect(getProfile("u2").stats).toEqual({ handsPlayed: 1, wins: 1 });
++  });
++});
+*** End Patch
+2026-01-09T15:48:34.933705Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/contract/profile.contract.test.ts
++import jwt from "jsonwebtoken";
++import request from "supertest";
++import { describe, expect, it } from "vitest";
++
++import { createServer } from "../../src/server";
++import { resetFriends } from "../../src/services/friendsService";
++import { resetProfiles } from "../../src/services/profileService";
++
++const secret = "test-secret";
++
++function signToken(userId: string) {
++  return jwt.sign(
++    { sub: userId, preferred_username: "Ace", picture: "https://example.com/avatar.png" },
++    secret,
++    {
++      algorithm: "HS256",
++      issuer: "test-issuer",
++      audience: "test-audience",
++    },
++  );
++}
++
++describe("profile contract", () => {
++  it("returns and updates the current user profile", async () => {
++    process.env.JWT_HS256_SECRET = secret;
++    process.env.JWT_ISSUER = "test-issuer";
++    process.env.JWT_AUDIENCE = "test-audience";
++
++    resetProfiles();
++    resetFriends();
++
++    const server = createServer({ useInMemoryTelemetry: true });
++    await new Promise<void>((resolve) => server.listen(0, resolve));
++
++    const token = signToken("user-1");
++
++    const meResponse = await request(server)
++      .get("/api/me")
++      .set("Authorization", `Bearer ${token}`);
++
++    expect(meResponse.status).toBe(200);
++    expect(meResponse.body).toMatchObject({
++      userId: "user-1",
++      nickname: "Ace",
++      avatarUrl: "https://example.com/avatar.png",
++      stats: { handsPlayed: 0, wins: 0 },
++      friends: [],
++    });
++
++    const updateResponse = await request(server)
++      .post("/api/profile")
++      .set("Authorization", `Bearer ${token}`)
++      .send({ nickname: "RiverRat", avatarUrl: null });
++
++    expect(updateResponse.status).toBe(200);
++    expect(updateResponse.body).toMatchObject({
++      userId: "user-1",
++      nickname: "RiverRat",
++      avatarUrl: null,
++    });
++
++    server.close();
++  });
++});
+*** End Patch
+2026-01-09T15:48:47.629493Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/profile.test.ts
++import jwt from "jsonwebtoken";
++import request from "supertest";
++import { describe, expect, it } from "vitest";
++
++import { createApp } from "../../src/server";
++import { resetFriends } from "../../src/services/friendsService";
++import { resetProfiles } from "../../src/services/profileService";
++
++const secret = "test-secret";
++
++function signToken(userId: string) {
++  return jwt.sign(
++    { sub: userId },
++    secret,
++    {
++      algorithm: "HS256",
++      issuer: "test-issuer",
++      audience: "test-audience",
++    },
++  );
++}
++
++describe("profile endpoints", () => {
++  it("updates nickname and avatar", async () => {
++    process.env.JWT_HS256_SECRET = secret;
++    process.env.JWT_ISSUER = "test-issuer";
++    process.env.JWT_AUDIENCE = "test-audience";
++
++    resetProfiles();
++    resetFriends();
++
++    const app = createApp({ useInMemoryTelemetry: true });
++    const token = signToken("user-1");
++
++    const updateResponse = await request(app)
++      .post("/api/profile")
++      .set("Authorization", `Bearer ${token}`)
++      .send({ nickname: "ChipStack", avatarUrl: "https://example.com/avatar.png" });
++
++    expect(updateResponse.status).toBe(200);
++    expect(updateResponse.body).toMatchObject({
++      userId: "user-1",
++      nickname: "ChipStack",
++      avatarUrl: "https://example.com/avatar.png",
++    });
++
++    const meResponse = await request(app)
++      .get("/api/me")
++      .set("Authorization", `Bearer ${token}`);
++
++    expect(meResponse.status).toBe(200);
++    expect(meResponse.body).toMatchObject({
++      userId: "user-1",
++      nickname: "ChipStack",
++      avatarUrl: "https://example.com/avatar.png",
++    });
++  });
++});
+*** End Patch
+2026-01-09T15:49:00.228010Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/friends.test.ts
++import jwt from "jsonwebtoken";
++import request from "supertest";
++import { describe, expect, it } from "vitest";
++
++import { createApp } from "../../src/server";
++import { resetFriends } from "../../src/services/friendsService";
++import { resetProfiles } from "../../src/services/profileService";
++
++const secret = "test-secret";
++
++function signToken(userId: string) {
++  return jwt.sign(
++    { sub: userId },
++    secret,
++    {
++      algorithm: "HS256",
++      issuer: "test-issuer",
++      audience: "test-audience",
++    },
++  );
++}
++
++describe("friends endpoints", () => {
++  it("stores and returns friends list", async () => {
++    process.env.JWT_HS256_SECRET = secret;
++    process.env.JWT_ISSUER = "test-issuer";
++    process.env.JWT_AUDIENCE = "test-audience";
++
++    resetProfiles();
++    resetFriends();
++
++    const app = createApp({ useInMemoryTelemetry: true });
++    const token = signToken("user-1");
++
++    const updateResponse = await request(app)
++      .put("/api/friends")
++      .set("Authorization", `Bearer ${token}`)
++      .send({ friends: ["friend-a", "friend-b", "friend-a"] });
++
++    expect(updateResponse.status).toBe(200);
++    expect(updateResponse.body).toEqual({ friends: ["friend-a", "friend-b"] });
++
++    const listResponse = await request(app)
++      .get("/api/friends")
++      .set("Authorization", `Bearer ${token}`);
++
++    expect(listResponse.status).toBe(200);
++    expect(listResponse.body).toEqual({ friends: ["friend-a", "friend-b"] });
++
++    const profileResponse = await request(app)
++      .get("/api/me")
++      .set("Authorization", `Bearer ${token}`);
++
++    expect(profileResponse.body.friends).toEqual(["friend-a", "friend-b"]);
++  });
++});
+*** End Patch
+2026-01-09T15:49:20.216384Z  INFO ToolCall: shell_command {"command":"rg -n \"fetchCurrentProfile\" /Users/bricerising/git/brice@github/specify-poker/apps/ui/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:49:49.990841Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/profileApi.ts
++import { apiFetch } from "./apiClient";
++
++export interface UserProfile {
++  userId: string;
++  nickname: string;
++  avatarUrl: string | null;
++  stats: {
++    handsPlayed: number;
++    wins: number;
++  };
++  friends: string[];
++}
++
++export async function fetchProfile() {
++  const response = await apiFetch("/api/me");
++  return (await response.json()) as UserProfile;
++}
++
++export async function updateProfile(input: { nickname: string; avatarUrl: string | null }) {
++  const response = await apiFetch("/api/profile", {
++    method: "POST",
++    headers: { "Content-Type": "application/json" },
++    body: JSON.stringify(input),
++  });
++  return (await response.json()) as UserProfile;
++}
+*** End Patch
+2026-01-09T15:49:57.141663Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/friendsApi.ts
++import { apiFetch } from "./apiClient";
++
++export async function fetchFriends() {
++  const response = await apiFetch("/api/friends");
++  const payload = (await response.json()) as { friends: string[] };
++  return payload.friends;
++}
++
++export async function updateFriends(friends: string[]) {
++  const response = await apiFetch("/api/friends", {
++    method: "PUT",
++    headers: { "Content-Type": "application/json" },
++    body: JSON.stringify({ friends }),
++  });
++  const payload = (await response.json()) as { friends: string[] };
++  return payload.friends;
++}
+*** End Patch
+2026-01-09T15:50:09.141893Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/components/ProfileForm.tsx
++import React, { useMemo, useState } from "react";
++
++interface ProfileFormProps {
++  initialNickname: string;
++  initialAvatarUrl: string | null;
++  onSave: (input: { nickname: string; avatarUrl: string | null }) => Promise<void> | void;
++}
++
++export function ProfileForm({ initialNickname, initialAvatarUrl, onSave }: ProfileFormProps) {
++  const [nickname, setNickname] = useState(initialNickname);
++  const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl ?? "");
++  const [error, setError] = useState<string | null>(null);
++
++  const isValid = useMemo(() => {
++    const trimmed = nickname.trim();
++    if (trimmed.length < 2 || trimmed.length > 20) {
++      return false;
++    }
++    return true;
++  }, [nickname]);
++
++  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
++    event.preventDefault();
++    if (!isValid) {
++      setError("Nickname must be 2-20 characters.");
++      return;
++    }
++    setError(null);
++    await onSave({
++      nickname: nickname.trim(),
++      avatarUrl: avatarUrl.trim() ? avatarUrl.trim() : null,
++    });
++  };
++
++  return (
++    <form onSubmit={handleSubmit}>
++      <h3>Profile</h3>
++      <label>
++        Nickname
++        <input value={nickname} onChange={(event) => setNickname(event.target.value)} />
++      </label>
++      <label>
++        Avatar URL
++        <input value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} />
++      </label>
++      <button type="submit" disabled={!isValid}>
++        Save Profile
++      </button>
++      {error ? <div role="alert">{error}</div> : null}
++    </form>
++  );
++}
+*** End Patch
+2026-01-09T15:50:26.206769Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/pages/ProfilePage.tsx
++import React, { useEffect, useState } from "react";
++import { trace } from "@opentelemetry/api";
++
++import { ProfileForm } from "../components/ProfileForm";
++import { fetchProfile, updateProfile, UserProfile } from "../services/profileApi";
++
++interface ProfilePageProps {
++  onProfileUpdated?: (profile: UserProfile) => void;
++}
++
++export function ProfilePage({ onProfileUpdated }: ProfilePageProps) {
++  const [profile, setProfile] = useState<UserProfile | null>(null);
++  const [error, setError] = useState<string | null>(null);
++  const [status, setStatus] = useState<"idle" | "loading">("idle");
++
++  const loadProfile = async () => {
++    setStatus("loading");
++    try {
++      const next = await fetchProfile();
++      setProfile(next);
++      onProfileUpdated?.(next);
++      setError(null);
++    } catch (err) {
++      const message = err instanceof Error ? err.message : "Unable to load profile";
++      setError(message);
++    } finally {
++      setStatus("idle");
++    }
++  };
++
++  useEffect(() => {
++    loadProfile();
++  }, []);
++
++  useEffect(() => {
++    if (!profile) {
++      return;
++    }
++    const tracer = trace.getTracer("ui");
++    const span = tracer.startSpan("ui.profile.render", {
++      attributes: {
++        "poker.user_id": profile.userId,
++      },
++    });
++    span.end();
++  }, [profile?.userId]);
++
++  const handleSave = async (input: { nickname: string; avatarUrl: string | null }) => {
++    try {
++      const updated = await updateProfile(input);
++      setProfile(updated);
++      onProfileUpdated?.(updated);
++      setError(null);
++    } catch (err) {
++      const message = err instanceof Error ? err.message : "Unable to update profile";
++      setError(message);
++    }
++  };
++
++  if (!profile) {
++    return <div>{status === "loading" ? "Loading profile..." : "Profile unavailable."}</div>;
++  }
++
++  return (
++    <section>
++      <h2>Profile & Stats</h2>
++      <div>Nickname: {profile.nickname}</div>
++      <div>Hands Played: {profile.stats.handsPlayed}</div>
++      <div>Wins: {profile.stats.wins}</div>
++      <ProfileForm
++        initialNickname={profile.nickname}
++        initialAvatarUrl={profile.avatarUrl}
++        onSave={handleSave}
++      />
++      {error ? <div role="alert">{error}</div> : null}
++    </section>
++  );
++}
+*** End Patch
+2026-01-09T15:50:40.946901Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/pages/FriendsPage.tsx
++import React, { useEffect, useState } from "react";
++
++import { fetchFriends, updateFriends } from "../services/friendsApi";
++
++export function FriendsPage() {
++  const [friends, setFriends] = useState<string[]>([]);
++  const [newFriend, setNewFriend] = useState("");
++  const [error, setError] = useState<string | null>(null);
++
++  const loadFriends = async () => {
++    try {
++      const next = await fetchFriends();
++      setFriends(next);
++      setError(null);
++    } catch (err) {
++      const message = err instanceof Error ? err.message : "Unable to load friends";
++      setError(message);
++    }
++  };
++
++  useEffect(() => {
++    loadFriends();
++  }, []);
++
++  const persistFriends = async (next: string[]) => {
++    try {
++      const updated = await updateFriends(next);
++      setFriends(updated);
++      setError(null);
++    } catch (err) {
++      const message = err instanceof Error ? err.message : "Unable to update friends";
++      setError(message);
++    }
++  };
++
++  const handleAdd = async () => {
++    const trimmed = newFriend.trim();
++    if (!trimmed) {
++      return;
++    }
++    setNewFriend("");
++    await persistFriends([...friends, trimmed]);
++  };
++
++  const handleRemove = async (friend: string) => {
++    await persistFriends(friends.filter((entry) => entry !== friend));
++  };
++
++  return (
++    <section>
++      <h2>Friends</h2>
++      <div>
++        <label>
++          Add Friend
++          <input
++            value={newFriend}
++            onChange={(event) => setNewFriend(event.target.value)}
++          />
++        </label>
++        <button type="button" onClick={handleAdd}>
++          Add
++        </button>
++      </div>
++      <div>
++        {friends.length === 0 ? (
++          <div>No friends yet.</div>
++        ) : (
++          friends.map((friend) => (
++            <div key={friend}>
++              {friend}
++              <button type="button" onClick={() => handleRemove(friend)}>
++                Remove
++              </button>
++            </div>
++          ))
++        )}
++      </div>
++      {error ? <div role="alert">{error}</div> : null}
++    </section>
++  );
++}
+*** End Patch
+2026-01-09T15:50:48.976302Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/pages/TablePage.tsx
+@@
+-import { fetchCurrentProfile } from "../services/auth";
++import { fetchProfile } from "../services/profileApi";
+@@
+-    fetchCurrentProfile()
+-      .then((profile: { userId?: string }) => {
+-        setUserId(profile.userId ?? null);
++    fetchProfile()
++      .then((profile) => {
++        setUserId(profile.userId ?? null);
+       })
+       .catch((error: Error) => {
+         console.warn("profile.fetch.failed", { message: error.message });
+       });
+*** End Patch
+2026-01-09T15:50:57.683080Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/auth.ts
+@@
+-export async function fetchCurrentProfile() {
+-  const response = await apiFetch("/api/me");
+-  return response.json();
+-}
+*** End Patch
+2026-01-09T15:51:06.916701Z  INFO ToolCall: shell_command {"command":"sed -n '1,40p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/auth.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T15:51:13.867956Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/auth.ts
+@@
+-import { apiFetch } from "./apiClient";
+-
+*** End Patch
+2026-01-09T15:51:33.828793Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/main.tsx
+@@
+ import { LobbyPage } from "./pages/LobbyPage";
+ import { TablePage } from "./pages/TablePage";
++import { ProfilePage } from "./pages/ProfilePage";
++import { FriendsPage } from "./pages/FriendsPage";
+ import { initUiTelemetry, recordNavigation } from "./observability/otel";
+ import { buildLoginUrl, hydrateTokenFromHash, isAuthenticated } from "./services/auth";
+ import { tableStore } from "./state/tableStore";
++import { fetchProfile, UserProfile } from "./services/profileApi";
+@@
+ function PokerApp() {
+   const [state, setState] = React.useState(tableStore.getState());
++  const [view, setView] = React.useState<"lobby" | "profile" | "friends">("lobby");
++  const [profile, setProfile] = React.useState<UserProfile | null>(null);
+ 
+   React.useEffect(() => tableStore.subscribe(setState), []);
++  React.useEffect(() => {
++    fetchProfile()
++      .then((data) => setProfile(data))
++      .catch((error: Error) => {
++        console.warn("profile.fetch.failed", { message: error.message });
++      });
++  }, []);
++
++  const header = profile ? <div>Signed in as {profile.nickname}</div> : null;
+ 
+   if (state.tableState) {
+-    return <TablePage store={tableStore} />;
++    return (
++      <div>
++        {header}
++        <TablePage store={tableStore} />
++      </div>
++    );
+   }
+ 
+-  return <LobbyPage store={tableStore} />;
++  return (
++    <div>
++      {header}
++      <nav>
++        <button type="button" onClick={() => setView("lobby")}>
++          Lobby
++        </button>
++        <button type="button" onClick={() => setView("profile")}>
++          Profile
++        </button>
++        <button type="button" onClick={() => setView("friends")}>
++          Friends
++        </button>
++      </nav>
++      {view === "lobby" ? <LobbyPage store={tableStore} /> : null}
++      {view === "profile" ? <ProfilePage onProfileUpdated={setProfile} /> : null}
++      {view === "friends" ? <FriendsPage /> : null}
++    </div>
++  );
+ }
+*** End Patch
+2026-01-09T15:51:57.684154Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/components/ProfileForm.test.tsx
++import React from "react";
++import { renderToString } from "react-dom/server";
++import { describe, expect, it } from "vitest";
++
++import { ProfileForm } from "../../src/components/ProfileForm";
++
++describe("ProfileForm", () => {
++  it("disables submit when nickname is too short", () => {
++    const html = renderToString(
++      <ProfileForm
++        initialNickname="A"
++        initialAvatarUrl={null}
++        onSave={() => {}}
++      />,
++    );
++    expect(html).toContain("Save Profile");
++    expect(html).toContain("disabled");
++  });
++});
+*** End Patch
+2026-01-09T15:52:15.431734Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/e2e/profile-flow.spec.ts
++import { expect, test } from "@playwright/test";
++
++test("profile flow updates nickname", async ({ page }) => {
++  let profile = {
++    userId: "user-1",
++    nickname: "Ace",
++    avatarUrl: null,
++    stats: { handsPlayed: 1, wins: 0 },
++    friends: [],
++  };
++
++  await page.route("**/api/me", async (route) => {
++    await route.fulfill({
++      status: 200,
++      contentType: "application/json",
++      body: JSON.stringify(profile),
++    });
++  });
++
++  await page.route("**/api/profile", async (route, request) => {
++    const payload = JSON.parse(request.postData() ?? "{}") as {
++      nickname?: string;
++      avatarUrl?: string | null;
++    };
++    profile = {
++      ...profile,
++      nickname: payload.nickname ?? profile.nickname,
++      avatarUrl: payload.avatarUrl ?? profile.avatarUrl,
++    };
++    await route.fulfill({
++      status: 200,
++      contentType: "application/json",
++      body: JSON.stringify(profile),
++    });
++  });
++
++  await page.addInitScript(() => {
++    window.localStorage.setItem("poker.auth.token", "test-token");
++  });
++
++  await page.goto("http://localhost:3000");
++  await page.getByRole("button", { name: "Profile" }).click();
++
++  await page.getByLabel("Nickname").fill("RiverRat");
++  await page.getByRole("button", { name: "Save Profile" }).click();
++
++  await expect(page.getByText("Nickname: RiverRat")).toBeVisible();
++});
+*** End Patch
+2026-01-09T15:52:28.305197Z  INFO ToolCall: update_plan {"plan":[{"step":"Add profile/friends services plus API routes (/api/me, /api/profile, /api/friends) and wire into router; align contracts as needed.","status":"completed"},{"step":"Implement stat tracking with hand winners capture and integrate into table flow; add unit/integration tests.","status":"completed"},{"step":"Build profile/friends UI (pages + form) and lightweight navigation; add component/e2e tests.","status":"in_progress"},{"step":"Update tasks checklist and verify Milestone 5 completion status.","status":"pending"}]}
+2026-01-09T15:52:34.245824Z  INFO ToolCall: update_plan {"plan":[{"step":"Add profile/friends services plus API routes (/api/me, /api/profile, /api/friends) and wire into router; align contracts as needed.","status":"completed"},{"step":"Implement stat tracking with hand winners capture and integrate into table flow; add unit/integration tests.","status":"completed"},{"step":"Build profile/friends UI (pages + form) and lightweight navigation; add component/e2e tests.","status":"completed"},{"step":"Update tasks checklist and verify Milestone 5 completion status.","status":"in_progress"}]}
+2026-01-09T15:52:58.408765Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/tasks.md
+@@
+-- [ ] T033 [P] [US3] Add contract test for profile endpoints in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/contract/profile.contract.test.ts; Goal: validate profile schema; AC: contract test passes; Tests: contract; Obs: N/A (test-only)
+-- [ ] T034 [P] [US3] Add e2e profile update test in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/e2e/profile-flow.spec.ts; Goal: ensure profile updates in UI; AC: e2e passes; Tests: e2e; Obs: span ui.profile.save
++- [X] T033 [P] [US3] Add contract test for profile endpoints in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/contract/profile.contract.test.ts; Goal: validate profile schema; AC: contract test passes; Tests: contract; Obs: N/A (test-only)
++- [X] T034 [P] [US3] Add e2e profile update test in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/e2e/profile-flow.spec.ts; Goal: ensure profile updates in UI; AC: e2e passes; Tests: e2e; Obs: span ui.profile.save
+@@
+-- [ ] T035 [US3] Implement /api/me and /api/profile in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/profile.ts; Goal: profile read/update; AC: nickname/avatar update persists; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/profile.test.ts; Obs: span poker.profile.update
+-- [ ] T036 [US3] Implement stats tracking on hand end in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/statTracker.ts; Goal: track hands played and wins; AC: stats increment after hand end; Tests: unit in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/unit/statTracker.test.ts; Obs: metric poker_hands_completed_total
+-- [ ] T037 [US3] Implement profile UI in /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/pages/ProfilePage.tsx and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/components/ProfileForm.tsx; Goal: edit nickname/avatar; AC: UI shows updated profile; Tests: component in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/components/ProfileForm.test.tsx; Obs: span ui.profile.render
+-- [ ] T038 [US3] Implement friends list storage + UI in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/friendsService.ts and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/pages/FriendsPage.tsx; Goal: friends list persistence; AC: friends list saved and displayed; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/friends.test.ts; Obs: log friends.update
++- [X] T035 [US3] Implement /api/me and /api/profile in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/profile.ts; Goal: profile read/update; AC: nickname/avatar update persists; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/profile.test.ts; Obs: span poker.profile.update
++- [X] T036 [US3] Implement stats tracking on hand end in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/statTracker.ts; Goal: track hands played and wins; AC: stats increment after hand end; Tests: unit in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/unit/statTracker.test.ts; Obs: metric poker_hands_completed_total
++- [X] T037 [US3] Implement profile UI in /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/pages/ProfilePage.tsx and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/components/ProfileForm.tsx; Goal: edit nickname/avatar; AC: UI shows updated profile; Tests: component in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/components/ProfileForm.test.tsx; Obs: span ui.profile.render
++- [X] T038 [US3] Implement friends list storage + UI in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/friendsService.ts and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/pages/FriendsPage.tsx; Goal: friends list persistence; AC: friends list saved and displayed; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/friends.test.ts; Obs: log friends.update
+*** End Patch
+2026-01-09T15:53:05.137945Z  INFO ToolCall: update_plan {"plan":[{"step":"Add profile/friends services plus API routes (/api/me, /api/profile, /api/friends) and wire into router; align contracts as needed.","status":"completed"},{"step":"Implement stat tracking with hand winners capture and integrate into table flow; add unit/integration tests.","status":"completed"},{"step":"Build profile/friends UI (pages + form) and lightweight navigation; add component/e2e tests.","status":"completed"},{"step":"Update tasks checklist and verify Milestone 5 completion status.","status":"completed"}]}
+2026-01-09T18:47:05.007636Z  INFO spawning ghost snapshot task
+2026-01-09T18:47:05.463130Z  INFO ghost snapshot blocking task finished
+2026-01-09T18:47:05.463175Z  INFO ghost commit captured: 0840c536a7d72b1a423fe8344c654152270d9b11
+2026-01-09T18:47:05.463187Z  INFO ghost snapshot gate marked ready
+2026-01-09T18:47:16.099934Z  INFO ToolCall: shell_command {"command":".specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:47:20.267755Z  INFO ToolCall: shell_command {"command":"rg --files /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/checklists","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:47:26.994762Z  INFO ToolCall: shell_command {"command":"rg -n -- \"- \\[( |x|X)\\]\" /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/checklists/requirements.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:47:31.304855Z  INFO ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/tasks.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:47:32.279536Z  INFO ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/plan.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:47:38.009195Z  INFO ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/data-model.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:47:38.901815Z  INFO ToolCall: shell_command {"command":"ls -la /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/contracts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:47:39.827288Z  INFO ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/research.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:47:40.985146Z  INFO ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/quickstart.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:48:23.413179Z  INFO ToolCall: shell_command {"command":"git rev-parse --git-dir 2>/dev/null","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:48:23.506178Z  INFO ToolCall: shell_command {"command":"rg --files -g 'Dockerfile*' /Users/bricerising/git/brice@github/specify-poker","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:48:23.656641Z  INFO ToolCall: shell_command {"command":"rg --files -g '.eslintrc*' -g 'eslint.config.*' /Users/bricerising/git/brice@github/specify-poker","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:48:23.803347Z  INFO ToolCall: shell_command {"command":"rg --files -g '.prettierrc*' /Users/bricerising/git/brice@github/specify-poker","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:48:23.924344Z  INFO ToolCall: shell_command {"command":"rg --files -g '.npmrc' -g 'package.json' /Users/bricerising/git/brice@github/specify-poker","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:48:24.281747Z  INFO ToolCall: shell_command {"command":"rg --files -g '*.tf' /Users/bricerising/git/brice@github/specify-poker","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:48:28.022951Z  INFO ToolCall: shell_command {"command":"rg --files -g '.gitignore' -g '.dockerignore' -g '.eslintignore' -g '.prettierignore' -g '.npmignore' -g '.terraformignore' -g '.helmignore' /Users/bricerising/git/brice@github/specify-poker","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:48:41.157491Z  INFO ToolCall: shell_command {"command":"rg --files /Users/bricerising/git/brice@github/specify-poker/infra","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:48:47.748996Z  INFO ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/infra/otel/collector-config.yaml","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:48:53.383683Z  INFO ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/infra/prometheus/prometheus.yaml","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:49:02.131492Z  INFO ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/docker-compose.yml","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:49:15.785287Z  INFO ToolCall: shell_command {"command":"cat /Users/bricerising/git/brice@github/specify-poker/package.json","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:50:26.979260Z  INFO ToolCall: update_plan {"explanation":"Review M5 then deliver M6 polish tasks (observability config, smoke tests, hardening).","plan":[{"step":"Review M5 implementation against tasks and contracts; confirm any blockers.","status":"in_progress"},{"step":"Provision Grafana dashboards/datasources and update OTel/Prometheus configs with tests.","status":"pending"},{"step":"Add smoke test plus API rate limiting and WS input validation.","status":"pending"},{"step":"Implement WS resync handling (server + UI ws client) and update quickstart/tasks.","status":"pending"}]}
+2026-01-09T18:50:32.195366Z  INFO ToolCall: update_plan {"plan":[{"step":"Review M5 implementation against tasks and contracts; confirm any blockers.","status":"completed"},{"step":"Provision Grafana dashboards/datasources and update OTel/Prometheus configs with tests.","status":"in_progress"},{"step":"Add smoke test plus API rate limiting and WS input validation.","status":"pending"},{"step":"Implement WS resync handling (server + UI ws client) and update quickstart/tasks.","status":"pending"}]}
+2026-01-09T18:50:57.183115Z  INFO ToolCall: shell_command {"command":"sed -n '1,220p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/components/ActionBar.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:51:04.000596Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/state/deriveLegalActions.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:52:15.515492Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/infra/grafana/provisioning/datasources/datasource.yaml
++apiVersion: 1
++
++datasources:
++  - name: Prometheus
++    uid: PROMETHEUS
++    type: prometheus
++    access: proxy
++    url: http://prometheus:9090
++    isDefault: true
+*** End Patch
+2026-01-09T18:52:22.470524Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/infra/grafana/provisioning/dashboards/dashboards.yaml
++apiVersion: 1
++
++providers:
++  - name: poker-dashboards
++    type: file
++    disableDeletion: false
++    editable: true
++    options:
++      path: /etc/grafana/provisioning/dashboards
+*** End Patch
+2026-01-09T18:52:36.627938Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/infra/grafana/dashboards/poker-observability.json
++{
++  "annotations": {
++    "list": [
++      {
++        "builtIn": 1,
++        "datasource": "-- Grafana --",
++        "enable": true,
++        "hide": true,
++        "iconColor": "rgba(0, 211, 255, 1)",
++        "name": "Annotations & Alerts",
++        "type": "dashboard"
++      }
++    ]
++  },
++  "editable": true,
++  "panels": [
++    {
++      "datasource": {
++        "type": "prometheus",
++        "uid": "PROMETHEUS"
++      },
++      "fieldConfig": {
++        "defaults": {},
++        "overrides": []
++      },
++      "gridPos": {
++        "h": 8,
++        "w": 12,
++        "x": 0,
++        "y": 0
++      },
++      "id": 1,
++      "options": {
++        "legend": {
++          "displayMode": "list",
++          "placement": "bottom"
++        }
++      },
++      "targets": [
++        {
++          "expr": "poker_actions_total",
++          "legendFormat": "actions",
++          "refId": "A"
++        }
++      ],
++      "title": "Poker Actions Total",
++      "type": "timeseries"
++    },
++    {
++      "datasource": {
++        "type": "prometheus",
++        "uid": "PROMETHEUS"
++      },
++      "fieldConfig": {
++        "defaults": {},
++        "overrides": []
++      },
++      "gridPos": {
++        "h": 8,
++        "w": 12,
++        "x": 12,
++        "y": 0
++      },
++      "id": 2,
++      "options": {
++        "legend": {
++          "displayMode": "list",
++          "placement": "bottom"
++        }
++      },
++      "targets": [
++        {
++          "expr": "poker_active_connections",
++          "legendFormat": "connections",
++          "refId": "A"
++        }
++      ],
++      "title": "Active Connections",
++      "type": "timeseries"
++    }
++  ],
++  "refresh": "10s",
++  "schemaVersion": 38,
++  "style": "dark",
++  "tags": ["poker"],
++  "templating": {
++    "list": []
++  },
++  "time": {
++    "from": "now-15m",
++    "to": "now"
++  },
++  "title": "Poker Observability",
++  "uid": "poker-observability",
++  "version": 1
++}
+*** End Patch
+2026-01-09T18:52:46.445962Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/infra/grafana/tests/dashboard.spec.ts
++import { describe, expect, it } from "vitest";
++import { readFileSync } from "fs";
++import { join } from "path";
++
++describe("grafana dashboard", () => {
++  it("includes poker metrics panels", () => {
++    const dashboardPath = join(__dirname, "..", "dashboards", "poker-observability.json");
++    const payload = JSON.parse(readFileSync(dashboardPath, "utf8")) as {
++      panels?: Array<{ targets?: Array<{ expr?: string }> }>;
++    };
++
++    const expressions = (payload.panels ?? [])
++      .flatMap((panel) => panel.targets ?? [])
++      .map((target) => target.expr ?? "");
++
++    expect(expressions).toContain("poker_actions_total");
++    expect(expressions).toContain("poker_active_connections");
++  });
++});
+*** End Patch
+2026-01-09T18:52:53.712529Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/infra/otel/collector-config.yaml
+@@
+ exporters:
+   logging:
++  prometheus:
++    endpoint: "0.0.0.0:8889"
++    resource_to_telemetry_conversion:
++      enabled: true
+@@
+     metrics:
+       receivers: [otlp]
+       processors: [batch]
+-      exporters: [logging]
++      exporters: [logging, prometheus]
+*** End Patch
+2026-01-09T18:53:02.308113Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/infra/prometheus/tests/scrape.spec.ts
++import { describe, expect, it } from "vitest";
++import { readFileSync } from "fs";
++import { join } from "path";
++
++describe("prometheus config", () => {
++  it("scrapes otel collector metrics", () => {
++    const configPath = join(__dirname, "..", "prometheus.yaml");
++    const config = readFileSync(configPath, "utf8");
++    expect(config).toContain("otel-collector:8889");
++  });
++});
+*** End Patch
+2026-01-09T18:53:13.213575Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/middleware/rateLimit.ts
++import { NextFunction, Request, Response } from "express";
++
++type Bucket = {
++  count: number;
++  resetAt: number;
++};
++
++const buckets = new Map<string, Bucket>();
++
++const windowMs = Number(process.env.RATE_LIMIT_WINDOW_MS ?? 60000);
++const maxRequests = Number(process.env.RATE_LIMIT_MAX ?? 60);
++
++function getBucket(key: string, now: number) {
++  const existing = buckets.get(key);
++  if (existing && existing.resetAt > now) {
++    return existing;
++  }
++  const next = { count: 0, resetAt: now + windowMs };
++  buckets.set(key, next);
++  return next;
++}
++
++export function rateLimitMiddleware(req: Request, res: Response, next: NextFunction) {
++  const key = req.auth?.userId ?? req.ip ?? "anonymous";
++  const now = Date.now();
++  const bucket = getBucket(key, now);
++  bucket.count += 1;
++
++  if (bucket.count > maxRequests) {
++    res
++      .status(429)
++      .json({ code: "rate_limited", message: "Too many requests, slow down." });
++    return;
++  }
++
++  next();
++}
++
++export function resetRateLimit() {
++  buckets.clear();
++}
+*** End Patch
+2026-01-09T18:53:21.667740Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/router.ts
+@@
+ import { authMiddleware } from "./middleware/auth";
++import { rateLimitMiddleware } from "./middleware/rateLimit";
+ import { createAuditRouter } from "./routes/audit";
+ import { createModerationRouter } from "./routes/moderation";
+ import { createProfileRouter } from "./routes/profile";
+@@
+   router.use(express.json());
+   router.use("/api", authMiddleware);
++  router.use("/api", rateLimitMiddleware);
+*** End Patch
+2026-01-09T18:53:39.388342Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/validators.ts
++const allowedActions = new Set(["Fold", "Check", "Call", "Bet", "Raise"]);
++const maxChatLength = 500;
++const seatMin = 0;
++const seatMax = 8;
++
++const rateBuckets = new Map<string, { count: number; resetAt: number }>();
++const wsWindowMs = Number(process.env.WS_RATE_LIMIT_WINDOW_MS ?? 10000);
++const wsMax = Number(process.env.WS_RATE_LIMIT_MAX ?? 20);
++
++function getRateBucket(key: string, now: number) {
++  const existing = rateBuckets.get(key);
++  if (existing && existing.resetAt > now) {
++    return existing;
++  }
++  const next = { count: 0, resetAt: now + wsWindowMs };
++  rateBuckets.set(key, next);
++  return next;
++}
++
++export function checkWsRateLimit(connectionId: string, channel: "chat" | "action") {
++  const key = `${connectionId}:${channel}`;
++  const now = Date.now();
++  const bucket = getRateBucket(key, now);
++  bucket.count += 1;
++  if (bucket.count > wsMax) {
++    return { ok: false as const };
++  }
++  return { ok: true as const };
++}
++
++export function parseTableId(value: unknown) {
++  if (typeof value !== "string") {
++    return null;
++  }
++  const trimmed = value.trim();
++  return trimmed.length > 0 ? trimmed : null;
++}
++
++export function parseSeatId(value: unknown) {
++  const seatId = Number(value);
++  if (!Number.isInteger(seatId) || seatId < seatMin || seatId > seatMax) {
++    return null;
++  }
++  return seatId;
++}
++
++export function parseActionType(value: unknown) {
++  if (typeof value !== "string") {
++    return null;
++  }
++  return allowedActions.has(value) ? value : null;
++}
++
++export function parseChatMessage(value: unknown) {
++  const text = typeof value === "string" ? value.trim() : "";
++  if (!text) {
++    return { ok: false as const, reason: "empty_message" };
++  }
++  if (text.length > maxChatLength) {
++    return { ok: false as const, reason: "message_too_long" };
++  }
++  return { ok: true as const, text };
++}
++
++export function resetWsRateLimit() {
++  rateBuckets.clear();
++}
+*** End Patch
+2026-01-09T18:53:54.804640Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/chatHub.ts
+@@
+ import { getTableState } from "../services/tableState";
+ import { isUserMuted } from "../services/moderationService";
++import { checkWsRateLimit, parseChatMessage, parseTableId } from "./validators";
+@@
+ function handleSubscribe(client: ChatConnection, tableId: string) {
+@@
+ }
+ 
+ function handleUnsubscribe(client: ChatConnection, tableId: string) {
+@@
+ }
+ 
+ function handleChatSend(client: ChatConnection, payload: { tableId: string; message?: string }) {
+-  const tableId = payload.tableId;
+-  const text = String(payload.message ?? "").trim();
+-  if (!text) {
+-    send(client.socket, { type: "ChatError", tableId, reason: "empty_message" });
++  const tableId = payload.tableId;
++  const parsed = parseChatMessage(payload.message);
++  if (!parsed.ok) {
++    send(client.socket, { type: "ChatError", tableId, reason: parsed.reason });
+     return;
+   }
++  const rate = checkWsRateLimit(client.connectionId, "chat");
++  if (!rate.ok) {
++    send(client.socket, { type: "ChatError", tableId, reason: "rate_limited" });
++    return;
++  }
+ 
+   if (!isSeated(tableId, client.userId)) {
+     send(client.socket, { type: "ChatError", tableId, reason: "not_seated" });
+     return;
+   }
+@@
+ 
+   broadcast(tableId, {
+     type: "ChatMessage",
+     tableId,
+     message: {
+       id: randomUUID(),
+       userId: client.userId,
+-      text,
++      text: parsed.text,
+       ts: new Date().toISOString(),
+     },
+   });
+ }
+@@
+     const type = message.type;
+     if (type === "SubscribeChat") {
+-      handleSubscribe(client, message.tableId as string);
++      const tableId = parseTableId(message.tableId);
++      if (!tableId) {
++        send(client.socket, { type: "ChatError", tableId: null, reason: "invalid_table" });
++        return;
++      }
++      handleSubscribe(client, tableId);
+       return;
+     }
+     if (type === "UnsubscribeChat") {
+-      handleUnsubscribe(client, message.tableId as string);
++      const tableId = parseTableId(message.tableId);
++      if (!tableId) {
++        return;
++      }
++      handleUnsubscribe(client, tableId);
+       return;
+     }
+     if (type === "ChatSend") {
++      const tableId = parseTableId(message.tableId);
++      if (!tableId) {
++        send(client.socket, { type: "ChatError", tableId: null, reason: "invalid_table" });
++        return;
++      }
+       handleChatSend(client, {
+-        tableId: message.tableId as string,
++        tableId,
+         message: message.message as string | undefined,
+       });
+     }
+   });
+*** End Patch
+2026-01-09T18:54:19.933455Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts
+@@
+ import { applyTableAction, joinSeat, leaveSeat } from "../services/tableService";
+ import { getTableState } from "../services/tableState";
+ import { scheduleTurnTimeout, clearTurnTimeout } from "../services/turnTimer";
++import { checkWsRateLimit, parseActionType, parseSeatId, parseTableId } from "./validators";
+@@
+ function handleAction(client: ClientConnection, payload: {
+   tableId: string;
+   handId?: string;
+   action: string;
+   amount?: number;
+ }) {
+   const tableId = payload.tableId;
+@@
+-  const result = applyTableAction({
++  const rate = checkWsRateLimit(client.connectionId, "action");
++  if (!rate.ok) {
++    send(client.socket, {
++      type: "ActionResult",
++      tableId,
++      handId: payload.handId,
++      accepted: false,
++      reason: "rate_limited",
++    });
++    return;
++  }
++
++  const actionType = parseActionType(payload.action);
++  if (!actionType) {
++    send(client.socket, {
++      type: "ActionResult",
++      tableId,
++      handId: payload.handId,
++      accepted: false,
++      reason: "invalid_action",
++    });
++    return;
++  }
++
++  const result = applyTableAction({
+     tableId,
+     seatId: seat.seatId,
+     action: {
+-      type: payload.action as "Fold" | "Check" | "Call" | "Bet" | "Raise",
++      type: actionType as "Fold" | "Check" | "Call" | "Bet" | "Raise",
+       amount: payload.amount,
+     },
+   });
+@@
+ function handleJoinSeat(client: ClientConnection, payload: { tableId: string; seatId: number }) {
+@@
+ }
+ 
+ function handleLeaveTable(client: ClientConnection, payload: { tableId: string }) {
+@@
+ }
+ 
++function handleResync(client: ClientConnection, tableId: string) {
++  const tableState = getTableState(tableId);
++  if (!tableState) {
++    return;
++  }
++  send(client.socket, { type: "TableSnapshot", tableState });
++  scheduleTurn(tableId);
++}
++
+ export function attachTableHub(socket: WebSocket, userId: string, connectionId: string) {
+@@
+     const type = message.type;
+     if (type === "SubscribeTable") {
+-      handleSubscribe(client, message.tableId as string);
++      const tableId = parseTableId(message.tableId);
++      if (!tableId) {
++        send(client.socket, { type: "Error", code: "invalid_table", message: "Missing tableId" });
++        return;
++      }
++      handleSubscribe(client, tableId);
+       return;
+     }
+     if (type === "UnsubscribeTable") {
+-      handleUnsubscribe(client, message.tableId as string);
++      const tableId = parseTableId(message.tableId);
++      if (!tableId) {
++        return;
++      }
++      handleUnsubscribe(client, tableId);
+       return;
+     }
+     if (type === "JoinSeat") {
++      const tableId = parseTableId(message.tableId);
++      const seatId = parseSeatId(message.seatId);
++      if (!tableId || seatId === null) {
++        send(client.socket, { type: "Error", code: "invalid_seat", message: "Invalid seat" });
++        return;
++      }
+       handleJoinSeat(client, {
+-        tableId: message.tableId as string,
+-        seatId: Number(message.seatId),
++        tableId,
++        seatId,
+       });
+       return;
+     }
+     if (type === "LeaveTable") {
+-      handleLeaveTable(client, { tableId: message.tableId as string });
++      const tableId = parseTableId(message.tableId);
++      if (!tableId) {
++        return;
++      }
++      handleLeaveTable(client, { tableId });
+       return;
+     }
+     if (type === "Action") {
++      const tableId = parseTableId(message.tableId);
++      if (!tableId) {
++        send(client.socket, { type: "ActionResult", accepted: false, reason: "invalid_table" });
++        return;
++      }
+       handleAction(client, {
+-        tableId: message.tableId as string,
++        tableId,
+         handId: message.handId as string,
+         action: message.action as string,
+         amount: message.amount as number | undefined,
+       });
+       return;
+     }
++    if (type === "ResyncTable") {
++      const tableId = parseTableId(message.tableId);
++      if (!tableId) {
++        return;
++      }
++      handleResync(client, tableId);
++    }
+   });
+*** End Patch
+2026-01-09T18:54:32.840437Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/wsClient.ts
++import { trace } from "@opentelemetry/api";
++
++export function isStaleVersion(currentVersion: number | null, incomingVersion: number) {
++  return currentVersion !== null && incomingVersion <= currentVersion;
++}
++
++export function shouldResync(currentVersion: number | null, incomingVersion: number) {
++  return currentVersion !== null && incomingVersion > currentVersion + 1;
++}
++
++export function requestResync(socket: WebSocket | null, tableId: string) {
++  if (!socket || socket.readyState !== WebSocket.OPEN) {
++    return;
++  }
++  const tracer = trace.getTracer("ui");
++  const span = tracer.startSpan("ui.table.resync");
++  span.end();
++
++  socket.send(JSON.stringify({ type: "ResyncTable", tableId }));
++}
+*** End Patch
+2026-01-09T18:54:43.895141Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/state/tableStore.ts
+@@
+ import { apiFetch, getApiBaseUrl } from "../services/apiClient";
++import { isStaleVersion, requestResync, shouldResync } from "../services/wsClient";
+@@
+     socket.addEventListener("message", (event) => {
+       const message = JSON.parse(event.data as string);
+       if (message.type === "TableSnapshot" || message.type === "TablePatch") {
+-        setState({ tableState: message.tableState });
++        const incoming = message.tableState as TableState | undefined;
++        if (!incoming) {
++          return;
++        }
++        const currentVersion = state.tableState?.version ?? null;
++        const incomingVersion = incoming.version ?? 0;
++        if (isStaleVersion(currentVersion, incomingVersion)) {
++          return;
++        }
++        if (shouldResync(currentVersion, incomingVersion)) {
++          requestResync(socket, incoming.tableId);
++        }
++        setState({ tableState: incoming });
+         return;
+       }
+*** End Patch
+2026-01-09T18:54:50.060560Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/contracts/ws-messages.md
+@@
+ - `SubscribeTable` { tableId }
+ - `UnsubscribeTable` { tableId }
++- `ResyncTable` { tableId }
+ - `JoinSeat` { tableId, seatId }
+*** End Patch
+2026-01-09T18:55:03.076867Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/rate-limit.test.ts
++import jwt from "jsonwebtoken";
++import request from "supertest";
++import { describe, expect, it } from "vitest";
++
++import { createApp } from "../../src/server";
++import { resetRateLimit } from "../../src/http/middleware/rateLimit";
++
++const secret = "test-secret";
++
++function signToken(userId: string) {
++  return jwt.sign(
++    { sub: userId },
++    secret,
++    {
++      algorithm: "HS256",
++      issuer: "test-issuer",
++      audience: "test-audience",
++    },
++  );
++}
++
++describe("rate limiting", () => {
++  it("returns 429 when exceeding the limit", async () => {
++    process.env.JWT_HS256_SECRET = secret;
++    process.env.JWT_ISSUER = "test-issuer";
++    process.env.JWT_AUDIENCE = "test-audience";
++    process.env.RATE_LIMIT_WINDOW_MS = "60000";
++    process.env.RATE_LIMIT_MAX = "2";
++
++    resetRateLimit();
++
++    const app = createApp({ useInMemoryTelemetry: true });
++    const token = signToken("user-1");
++
++    const requestWithAuth = () =>
++      request(app).get("/api/me").set("Authorization", `Bearer ${token}`);
++
++    const first = await requestWithAuth();
++    const second = await requestWithAuth();
++    const third = await requestWithAuth();
++
++    expect(first.status).toBe(200);
++    expect(second.status).toBe(200);
++    expect(third.status).toBe(429);
++  });
++});
+*** End Patch
+2026-01-09T18:55:22.811792Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/ws-resync.test.ts
++import jwt from "jsonwebtoken";
++import { AddressInfo } from "net";
++import WebSocket from "ws";
++import { describe, expect, it } from "vitest";
++
++import { createServer } from "../../src/server";
++import { createTable, resetTables } from "../../src/services/tableRegistry";
++import { resetTableStates } from "../../src/services/tableState";
++
++const secret = "test-secret";
++
++function signToken(userId: string) {
++  return jwt.sign(
++    { sub: userId },
++    secret,
++    {
++      algorithm: "HS256",
++      issuer: "test-issuer",
++      audience: "test-audience",
++    },
++  );
++}
++
++describe("ws resync", () => {
++  it("responds with a table snapshot on resync request", async () => {
++    process.env.JWT_HS256_SECRET = secret;
++    process.env.JWT_ISSUER = "test-issuer";
++    process.env.JWT_AUDIENCE = "test-audience";
++
++    resetTables();
++    resetTableStates();
++
++    const summary = createTable({
++      name: "Resync Table",
++      ownerId: "owner-1",
++      config: {
++        smallBlind: 5,
++        bigBlind: 10,
++        maxPlayers: 4,
++        startingStack: 200,
++        bettingStructure: "NoLimit",
++      },
++    });
++
++    const server = createServer({ useInMemoryTelemetry: true });
++    await new Promise<void>((resolve) => server.listen(0, resolve));
++    const port = (server.address() as AddressInfo).port;
++
++    const token = signToken("user-a");
++    const ws = new WebSocket(`ws://localhost:${port}/ws?token=${token}`);
++
++    await new Promise<void>((resolve) => ws.on("open", () => resolve()));
++
++    let snapshots = 0;
++    const snapshotPromise = new Promise<void>((resolve, reject) => {
++      const timeout = setTimeout(() => reject(new Error("snapshot timeout")), 2000);
++      ws.on("message", (data) => {
++        const message = JSON.parse(data.toString());
++        if (message.type === "TableSnapshot") {
++          snapshots += 1;
++          if (snapshots === 2) {
++            clearTimeout(timeout);
++            resolve();
++          }
++        }
++      });
++    });
++
++    ws.send(JSON.stringify({ type: "SubscribeTable", tableId: summary.tableId }));
++    ws.send(JSON.stringify({ type: "ResyncTable", tableId: summary.tableId }));
++
++    await snapshotPromise;
++    expect(snapshots).toBe(2);
++
++    ws.close();
++    server.close();
++  });
++});
+*** End Patch
+2026-01-09T18:55:58.723182Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/e2e/smoke.spec.ts
++import { expect, test } from "@playwright/test";
++
++test("smoke flow: login, create table, join, play hand", async ({ page }) => {
++  const tables: Array<Record<string, unknown>> = [];
++  const tableId = "table-1";
++
++  await page.route("**/api/me", async (route) => {
++    await route.fulfill({
++      status: 200,
++      contentType: "application/json",
++      body: JSON.stringify({
++        userId: "user-1",
++        nickname: "Ace",
++        avatarUrl: null,
++        stats: { handsPlayed: 0, wins: 0 },
++        friends: [],
++      }),
++    });
++  });
++
++  await page.route("**/api/tables", async (route, request) => {
++    if (request.method() === "GET") {
++      await route.fulfill({
++        status: 200,
++        contentType: "application/json",
++        body: JSON.stringify(tables),
++      });
++      return;
++    }
++
++    if (request.method() === "POST") {
++      const payload = JSON.parse(request.postData() ?? "{}") as {
++        name?: string;
++        config?: Record<string, number>;
++      };
++      const created = {
++        tableId,
++        name: payload.name ?? "New Table",
++        ownerId: "user-1",
++        config: {
++          smallBlind: payload.config?.smallBlind ?? 5,
++          bigBlind: payload.config?.bigBlind ?? 10,
++          maxPlayers: payload.config?.maxPlayers ?? 6,
++          startingStack: payload.config?.startingStack ?? 500,
++          bettingStructure: "NoLimit",
++        },
++        seatsTaken: 0,
++        inProgress: false,
++      };
++      tables.splice(0, tables.length, created);
++      await route.fulfill({
++        status: 201,
++        contentType: "application/json",
++        body: JSON.stringify(created),
++      });
++      return;
++    }
++
++    await route.continue();
++  });
++
++  await page.route("**/api/tables/*/join", async (route) => {
++    await route.fulfill({
++      status: 200,
++      contentType: "application/json",
++      body: JSON.stringify({ tableId, seatId: 0, wsUrl: "ws://mock" }),
++    });
++  });
++
++  await page.addInitScript(() => {
++    window.localStorage.setItem("poker.auth.token", "test-token");
++
++    class MockWebSocket {
++      static OPEN = 1;
++      readyState = MockWebSocket.OPEN;
++      url: string;
++      listeners: Record<string, Array<(event: { data?: string }) => void>> = {
++        open: [],
++        close: [],
++        message: [],
++      };
++      tableState = {
++        tableId: "table-1",
++        name: "High Stakes",
++        ownerId: "user-1",
++        config: {
++          smallBlind: 5,
++          bigBlind: 10,
++          maxPlayers: 6,
++          startingStack: 500,
++          bettingStructure: "NoLimit",
++        },
++        seats: [
++          { seatId: 0, userId: "user-1", stack: 500, status: "active" },
++          { seatId: 1, userId: null, stack: 0, status: "empty" },
++        ],
++        status: "in_hand",
++        hand: {
++          handId: "hand-1",
++          currentStreet: "preflop",
++          currentTurnSeat: 0,
++          currentBet: 0,
++          minRaise: 10,
++          roundContributions: { 0: 0, 1: 0 },
++          communityCards: [],
++          pots: [{ amount: 0, eligibleSeatIds: [0] }],
++          actionTimerDeadline: null,
++          bigBlind: 10,
++        },
++        version: 1,
++      };
++
++      constructor(url: string) {
++        this.url = url;
++        setTimeout(() => this.emit("open"), 0);
++      }
++
++      addEventListener(type: string, callback: (event: { data?: string }) => void) {
++        this.listeners[type]?.push(callback);
++      }
++
++      emit(type: string, event: { data?: string } = {}) {
++        for (const callback of this.listeners[type] ?? []) {
++          callback(event);
++        }
++      }
++
++      send(data: string) {
++        const message = JSON.parse(data) as { type: string; tableId?: string };
++        if (message.type === "SubscribeTable") {
++          this.emit("message", {
++            data: JSON.stringify({ type: "TableSnapshot", tableState: this.tableState }),
++          });
++        }
++        if (message.type === "Action") {
++          this.tableState = {
++            ...this.tableState,
++            hand: {
++              ...this.tableState.hand,
++              currentStreet: "ended",
++            },
++            version: this.tableState.version + 1,
++          };
++          this.emit("message", {
++            data: JSON.stringify({ type: "TablePatch", tableState: this.tableState }),
++          });
++        }
++      }
++
++      close() {
++        this.readyState = 3;
++        this.emit("close");
++      }
++    }
++
++    // @ts-expect-error - test override
++    window.WebSocket = MockWebSocket;
++  });
++
++  await page.goto("http://localhost:3000");
++
++  await page.getByLabel("Name").fill("High Stakes");
++  await page.getByRole("button", { name: "Create Table" }).click();
++  await page.getByRole("button", { name: "Join Seat 1" }).click();
++
++  await expect(page.getByText("Table ID: table-1")).toBeVisible();
++  await page.getByRole("button", { name: "Check" }).click();
++  await expect(page.getByText("Street: ended")).toBeVisible();
++});
+*** End Patch
+2026-01-09T18:56:11.547879Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/quickstart.md
+@@
+ ## Default Local URLs
+ 
+ - UI: http://localhost:3000
+ - API REST: http://localhost:4000/api
+ - API WS: ws://localhost:4000/ws
+ - Keycloak: http://localhost:8080
++- Prometheus: http://localhost:9090
+ - Grafana: http://localhost:3001
+@@
+ ## First-Time Setup Notes
+ 
+ - Import the Keycloak realm config from `infra/keycloak/`.
+ - Ensure the UI origin is allowed in Keycloak client settings.
+ - Use demo users or enable self-registration for local testing.
++- Grafana provisions the "Poker Observability" dashboard automatically.
++- In Grafana, confirm the Prometheus data source points to `http://prometheus:9090`.
+@@
+ ## Smoke Test
+ 
+ 1. Log in and enter the lobby.
+ 2. Create a table and join a seat.
+ 3. Open a second browser session to verify real-time updates and chat.
++4. Open Grafana and confirm the Poker Observability dashboard loads.
+*** End Patch
+2026-01-09T18:56:38.641389Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/tasks.md
+@@
+-- [ ] T039 [P] Provision Grafana datasources/dashboards in /Users/bricerising/git/brice@github/specify-poker/infra/grafana/provisioning/ and /Users/bricerising/git/brice@github/specify-poker/infra/grafana/dashboards/poker-observability.json; Goal: runtime visibility; AC: dashboard loads with metrics; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/infra/grafana/tests/dashboard.spec.ts; Obs: panels for poker_actions_total and poker_active_connections
+-- [ ] T040 [P] Configure OTel Collector and Prometheus scrape in /Users/bricerising/git/brice@github/specify-poker/infra/otel/collector-config.yaml and /Users/bricerising/git/brice@github/specify-poker/infra/prometheus/prometheus.yaml; Goal: metric/traces pipeline; AC: metrics appear in Prometheus; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/infra/prometheus/tests/scrape.spec.ts; Obs: metric poker_active_connections visible
+-- [ ] T041 [P] Add full-stack smoke test in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/e2e/smoke.spec.ts; Goal: login, create table, join, play hand; AC: smoke test passes; Tests: e2e; Obs: trace includes hand lifecycle spans
+-- [ ] T042 [P] Add rate limiting and input validation in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/middleware/rateLimit.ts and /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/validators.ts; Goal: abuse prevention; AC: excessive requests rejected; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/rate-limit.test.ts; Obs: metric poker_rate_limited_total
+-- [ ] T043 [P] Harden resync/version mismatch handling in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/wsClient.ts; Goal: recover from out-of-order updates; AC: client resyncs on version gap; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/ws-resync.test.ts; Obs: metric poker_resync_total
+-- [ ] T044 [P] Update quickstart for auth + dashboards in /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/quickstart.md; Goal: accurate onboarding; AC: quickstart covers Keycloak and Grafana steps; Tests: N/A; Obs: N/A (documentation only)
++- [X] T039 [P] Provision Grafana datasources/dashboards in /Users/bricerising/git/brice@github/specify-poker/infra/grafana/provisioning/ and /Users/bricerising/git/brice@github/specify-poker/infra/grafana/dashboards/poker-observability.json; Goal: runtime visibility; AC: dashboard loads with metrics; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/infra/grafana/tests/dashboard.spec.ts; Obs: panels for poker_actions_total and poker_active_connections
++- [X] T040 [P] Configure OTel Collector and Prometheus scrape in /Users/bricerising/git/brice@github/specify-poker/infra/otel/collector-config.yaml and /Users/bricerising/git/brice@github/specify-poker/infra/prometheus/prometheus.yaml; Goal: metric/traces pipeline; AC: metrics appear in Prometheus; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/infra/prometheus/tests/scrape.spec.ts; Obs: metric poker_active_connections visible
++- [X] T041 [P] Add full-stack smoke test in /Users/bricerising/git/brice@github/specify-poker/apps/ui/tests/e2e/smoke.spec.ts; Goal: login, create table, join, play hand; AC: smoke test passes; Tests: e2e; Obs: trace includes hand lifecycle spans
++- [X] T042 [P] Add rate limiting and input validation in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/middleware/rateLimit.ts and /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/validators.ts; Goal: abuse prevention; AC: excessive requests rejected; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/rate-limit.test.ts; Obs: metric poker_rate_limited_total
++- [X] T043 [P] Harden resync/version mismatch handling in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/wsClient.ts; Goal: recover from out-of-order updates; AC: client resyncs on version gap; Tests: integration in /Users/bricerising/git/brice@github/specify-poker/apps/api/tests/integration/ws-resync.test.ts; Obs: metric poker_resync_total
++- [X] T044 [P] Update quickstart for auth + dashboards in /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/quickstart.md; Goal: accurate onboarding; AC: quickstart covers Keycloak and Grafana steps; Tests: N/A; Obs: N/A (documentation only)
+*** End Patch
+2026-01-09T18:56:50.357566Z  INFO ToolCall: update_plan {"plan":[{"step":"Review M5 implementation against tasks and contracts; confirm any blockers.","status":"completed"},{"step":"Provision Grafana dashboards/datasources and update OTel/Prometheus configs with tests.","status":"completed"},{"step":"Add smoke test plus API rate limiting and WS input validation.","status":"completed"},{"step":"Implement WS resync handling (server + UI ws client) and update quickstart/tasks.","status":"completed"}]}
+2026-01-09T18:57:15.210348Z  INFO Shutting down Codex instance
+2026-01-09T18:57:27.753734Z  INFO spawning ghost snapshot task
+2026-01-09T18:57:28.195508Z  INFO ghost snapshot blocking task finished
+2026-01-09T18:57:28.195761Z  INFO ghost commit captured: ead99c083d6405be2a59a694f7b8243c46c45c03
+2026-01-09T18:57:28.196261Z  INFO ghost snapshot gate marked ready
+2026-01-09T18:57:32.243696Z  INFO ToolCall: shell_command {"command":"rg --files -g '*milestone*' -g '*MILESTONE*' -g '*plan*' -g '*roadmap*'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:57:34.991555Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' specs/001-poker-mvp/plan.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:57:39.468131Z  INFO ToolCall: shell_command {"command":"sed -n '200,400p' specs/001-poker-mvp/plan.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:57:42.012911Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' specs/001-poker-mvp/tasks.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:57:51.642554Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' apps/api/src/http/routes/profile.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:57:51.737118Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' apps/api/src/engine/statTracker.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:57:52.432065Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' apps/api/src/services/friendsService.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:57:55.536930Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' apps/api/src/services/profileService.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:57:56.201918Z  INFO interrupt received: abort current task, if any
+2026-01-09T18:58:05.631047Z  INFO spawning ghost snapshot task
+2026-01-09T18:58:06.036534Z  INFO ghost snapshot blocking task finished
+2026-01-09T18:58:06.036588Z  INFO ghost commit captured: fe5f4acedb76da468f36231088fadf5470a6577b
+2026-01-09T18:58:06.036599Z  INFO ghost snapshot gate marked ready
+2026-01-09T18:58:11.259091Z  INFO ToolCall: shell_command {"command":".specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:58:17.093172Z  INFO ToolCall: shell_command {"command":"rg --files /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/checklists","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:58:21.296280Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/checklists/requirements.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:58:26.657054Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/data-model.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:58:26.771656Z  INFO ToolCall: shell_command {"command":"ls -la /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/contracts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:58:26.925517Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/research.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:58:28.256303Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/quickstart.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:58:31.555932Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/contracts/openapi.yaml","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:58:32.759681Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/contracts/ws-messages.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:58:39.097751Z  INFO ToolCall: shell_command {"command":"rg --files -g '.gitignore' -g '.dockerignore' -g '.eslintignore' -g '.prettierignore' -g '.npmignore' -g '.terraformignore' -g '.helmignore' -g 'eslint.config.*' -g '.eslintrc*' -g '.prettierrc*' -g 'Dockerfile*'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:58:39.778924Z  INFO ToolCall: shell_command {"command":"git rev-parse --git-dir 2>/dev/null","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:58:40.411766Z  INFO ToolCall: shell_command {"command":"rg --files -g '*.tf'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:58:41.369600Z  INFO ToolCall: shell_command {"command":"rg --files -g 'Chart.yaml' -g 'charts/**'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:58:45.461337Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' .gitignore","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:58:45.881485Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' .dockerignore","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:58:46.564364Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' .eslintignore","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:58:47.293863Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' .prettierignore","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:58:48.638837Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' .npmignore","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:58:59.427926Z  INFO ToolCall: shell_command {"command":"rg --files -g 'apps/api/tests/contract/profile.contract.test.ts' -g 'apps/ui/tests/e2e/profile-flow.spec.ts' -g 'apps/api/src/http/routes/profile.ts' -g 'apps/api/src/engine/statTracker.ts' -g 'apps/ui/src/pages/ProfilePage.tsx' -g 'apps/ui/src/components/ProfileForm.tsx' -g 'apps/api/src/services/friendsService.ts' -g 'apps/ui/src/pages/FriendsPage.tsx'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:59:03.324504Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' apps/api/tests/contract/profile.contract.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:59:03.490076Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' apps/ui/tests/e2e/profile-flow.spec.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:59:03.923797Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' apps/ui/src/pages/ProfilePage.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:59:04.690414Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' apps/ui/src/components/ProfileForm.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:59:05.835859Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' apps/ui/src/pages/FriendsPage.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:59:20.888115Z  INFO ToolCall: shell_command {"command":"rg \"recordHandCompletion\" -n apps/api/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:59:26.009623Z  INFO ToolCall: shell_command {"command":"sed -n '80,160p' apps/api/src/services/tableService.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:59:36.041468Z  INFO ToolCall: shell_command {"command":"rg --files -g 'infra/grafana/provisioning/**' -g 'infra/grafana/dashboards/poker-observability.json' -g 'infra/grafana/tests/dashboard.spec.ts' -g 'infra/otel/collector-config.yaml' -g 'infra/prometheus/prometheus.yaml' -g 'infra/prometheus/tests/scrape.spec.ts' -g 'apps/ui/tests/e2e/smoke.spec.ts' -g 'apps/api/src/http/middleware/rateLimit.ts' -g 'apps/api/src/ws/validators.ts' -g 'apps/api/tests/integration/rate-limit.test.ts' -g 'apps/api/src/ws/tableHub.ts' -g 'apps/ui/src/services/wsClient.ts' -g 'apps/api/tests/integration/ws-resync.test.ts' -g 'specs/001-poker-mvp/quickstart.md'","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:59:47.567502Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' apps/ui/src/services/profileApi.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:59:52.185461Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' apps/ui/src/services/friendsApi.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T18:59:55.396021Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' apps/ui/src/services/apiClient.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:00:10.290143Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' apps/api/src/http/middleware/rateLimit.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:00:10.381346Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' apps/api/src/ws/validators.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:00:10.496508Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' apps/api/src/ws/tableHub.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:00:10.965491Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' apps/ui/src/services/wsClient.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:00:14.954393Z  INFO ToolCall: shell_command {"command":"sed -n '240,520p' apps/api/src/ws/tableHub.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:00:27.907026Z  INFO ToolCall: shell_command {"command":"rg \"winners\" -n apps/api/src/engine apps/api/src/services","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:01:04.108247Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/http/routes/profile.ts
+@@
+ function normalizeAvatarUrl(input: unknown) {
+   if (input === undefined) {
+     return undefined;
+   }
+   if (input === null) {
+     return null;
+   }
+   const avatarUrl = String(input).trim();
+   return avatarUrl.length === 0 ? null : avatarUrl;
+ }
+ 
++function normalizeDefaultNickname(primary: string | undefined, fallback: string) {
++  const primaryTrimmed = primary?.trim() ?? "";
++  const fallbackTrimmed = fallback.trim();
++  let candidate = primaryTrimmed.length >= 2 ? primaryTrimmed : fallbackTrimmed;
++  if (candidate.length < 2) {
++    candidate = "Player";
++  }
++  return candidate.length > 20 ? candidate.slice(0, 20) : candidate;
++}
++
+ export function createProfileRouter() {
+   const router = express.Router();
+ 
+   router.get("/api/me", (req, res) => {
+     const auth = requireAuth(req, res);
+@@
+-    const nickname = (auth.claims?.preferred_username as string | undefined) ?? auth.userId;
++    const nickname = normalizeDefaultNickname(
++      auth.claims?.preferred_username as string | undefined,
++      auth.userId,
++    );
+     const avatarUrl = (auth.claims?.picture as string | undefined) ?? null;
+     res.status(200).json(getProfile(auth.userId, { nickname, avatarUrl }));
+   });
+@@
+-    const defaults = {
+-      nickname: (auth.claims?.preferred_username as string | undefined) ?? auth.userId,
++    const defaults = {
++      nickname: normalizeDefaultNickname(
++        auth.claims?.preferred_username as string | undefined,
++        auth.userId,
++      ),
+       avatarUrl: (auth.claims?.picture as string | undefined) ?? null,
+     };
+*** End Patch
+2026-01-09T19:01:11.585145Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/components/ProfileForm.tsx
+@@
+-import React, { useMemo, useState } from "react";
++import React, { useEffect, useMemo, useState } from "react";
+@@
+ export function ProfileForm({ initialNickname, initialAvatarUrl, onSave }: ProfileFormProps) {
+   const [nickname, setNickname] = useState(initialNickname);
+   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl ?? "");
+   const [error, setError] = useState<string | null>(null);
+ 
++  useEffect(() => {
++    setNickname(initialNickname);
++    setAvatarUrl(initialAvatarUrl ?? "");
++  }, [initialNickname, initialAvatarUrl]);
++
+   const isValid = useMemo(() => {
+     const trimmed = nickname.trim();
+     if (trimmed.length < 2 || trimmed.length > 20) {
+       return false;
+*** End Patch
+2026-01-09T19:01:28.007592Z  INFO ToolCall: shell_command {"command":"python - <<'PY'\nimport re\nfrom pathlib import Path\npath=Path('/Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/checklists/requirements.md')\ntext=path.read_text()\nitems=re.findall(r'^- \\[( |x|X)\\]',text,flags=re.M)\nprint(len(items), sum(1 for m in items if m.lower()=='x'), sum(1 for m in items if m==' '))\nPY","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:01:58.969675Z  INFO spawning ghost snapshot task
+2026-01-09T19:01:59.373092Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:01:59.373162Z  INFO ghost commit captured: 00df77d9b8957e4c1cde671976aec681e8a836c0
+2026-01-09T19:01:59.373172Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:02:02.378878Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' /Users/bricerising/git/brice@github/specify-poker/.codex/skills/.system/skill-creator/SKILL.md","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:02:07.597355Z  INFO ToolCall: shell_command {"command":"ls -la /Users/bricerising/git/brice@github/specify-poker/.codex/skills","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:02:18.214896Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: .codex/skills/run-tests-lint/SKILL.md
++---
++name: run-tests-lint
++description: Run the repository test suite and lint checks, report results, and note any failures or required approvals.
++---
++
++# Run Tests and Lint
++
++Use this skill when the user asks to run tests, check linting, or validate CI-style checks.
++
++## Workflow
++
++1. From repo root, run:
++   - `npm test`
++   - `npm run lint`
++2. If either command fails due to sandbox limits, rerun with required approval.
++3. Summarize pass/fail status and highlight any failing test files or lint errors.
++4. If commands are missing, check `package.json` scripts and report the gap.
+*** End Patch
+2026-01-09T19:02:33.398423Z  INFO ToolCall: shell_command {"command":"mkdir -p /Users/bricerising/git/brice@github/specify-poker/.codex/skills/run-tests-lint","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:02:38.019535Z  INFO ToolCall: shell_command {"command":"mkdir -p /Users/bricerising/git/brice@github/specify-poker/.codex/skills/run-tests-lint","workdir":"/Users/bricerising/git/brice@github/specify-poker","sandbox_permissions":"require_escalated","justification":"Need to create a new skill directory under .codex/skills."}
+2026-01-09T19:02:56.077410Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: .codex/skills/run-tests-lint/SKILL.md
++---
++name: run-tests-lint
++description: Run the repository test suite and lint checks, report results, and note any failures or required approvals.
++---
++
++# Run Tests and Lint
++
++Use this skill when the user asks to run tests, check linting, or validate CI-style checks.
++
++## Workflow
++
++1. From repo root, run:
++   - `npm test`
++   - `npm run lint`
++2. If either command fails due to sandbox limits, rerun with required approval.
++3. Summarize pass/fail status and highlight any failing test files or lint errors.
++4. If commands are missing, check `package.json` scripts and report the gap.
+*** End Patch
+2026-01-09T19:03:17.156386Z  INFO spawning ghost snapshot task
+2026-01-09T19:03:17.550967Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:03:17.551021Z  INFO ghost commit captured: 1caeef14a3927fdd7eb577b83b2238348efc87ea
+2026-01-09T19:03:17.551032Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:03:22.429045Z  INFO ToolCall: shell_command {"command":"npm test","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:03:27.153723Z  INFO ToolCall: shell_command {"command":"npm run lint","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:03:56.761302Z  INFO spawning ghost snapshot task
+2026-01-09T19:03:57.147497Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:03:57.147547Z  INFO ghost commit captured: 2a71b366457748f9c35e941b38cecc2cafe1a35b
+2026-01-09T19:03:57.147558Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:04:03.621232Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: .codex/skills/run-tests-lint/SKILL.md
+@@
+-1. From repo root, run:
++1. From repo root, run `nvm use 20` to select Node.js 20 LTS.
++2. Then run:
+    - `npm test`
+    - `npm run lint`
+-2. If either command fails due to sandbox limits, rerun with required approval.
+-3. Summarize pass/fail status and highlight any failing test files or lint errors.
+-4. If commands are missing, check `package.json` scripts and report the gap.
++3. If either command fails due to sandbox limits, rerun with required approval.
++4. Summarize pass/fail status and highlight any failing test files or lint errors.
++5. If commands are missing, check `package.json` scripts and report the gap.
+*** End Patch
+2026-01-09T19:04:14.637528Z  INFO spawning ghost snapshot task
+2026-01-09T19:04:15.024511Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:04:15.024558Z  INFO ghost commit captured: ceea3485341c28e2b55b8302f3d5cbc5e976be74
+2026-01-09T19:04:15.024568Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:04:17.282661Z  INFO ToolCall: shell_command {"command":"nvm use 20","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:05:22.479462Z  INFO spawning ghost snapshot task
+2026-01-09T19:05:22.870353Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:05:22.870399Z  INFO ghost commit captured: b08d974404f4b87b96ad98b7ada3dd6db42080ff
+2026-01-09T19:05:22.870410Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:05:26.562418Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' apps/api/tests/integration/rate-limit.test.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:05:35.679704Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/http/middleware/rateLimit.ts
+@@
+-const windowMs = Number(process.env.RATE_LIMIT_WINDOW_MS ?? 60000);
+-const maxRequests = Number(process.env.RATE_LIMIT_MAX ?? 60);
++function getWindowMs() {
++  return Number(process.env.RATE_LIMIT_WINDOW_MS ?? 60000);
++}
++
++function getMaxRequests() {
++  return Number(process.env.RATE_LIMIT_MAX ?? 60);
++}
+@@
+-  const next = { count: 0, resetAt: now + windowMs };
++  const next = { count: 0, resetAt: now + getWindowMs() };
+   buckets.set(key, next);
+   return next;
+ }
+@@
+-  if (bucket.count > maxRequests) {
++  if (bucket.count > getMaxRequests()) {
+*** End Patch
+2026-01-09T19:06:15.497818Z  INFO spawning ghost snapshot task
+2026-01-09T19:06:15.892988Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:06:15.893048Z  INFO ghost commit captured: f7b733808706c8633db8654821ea4a12c71afa66
+2026-01-09T19:06:15.893060Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:06:19.553098Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' packages/shared/tsconfig.json","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:06:24.828695Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: packages/shared/tsconfig.json
+@@
+-  "include": ["src", "tests"]
++  "include": ["src"]
+ }
+*** End Patch
+2026-01-09T19:07:28.109362Z  INFO spawning ghost snapshot task
+2026-01-09T19:07:28.558435Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:07:28.558506Z  INFO ghost commit captured: fcd35b1a4e0fa2dd48a0a925e6f3a7062aee7328
+2026-01-09T19:07:28.558521Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:07:32.923905Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' apps/api/tsconfig.json","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:07:37.838683Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/tsconfig.json
+@@
+-  "include": ["src", "tests"]
++  "include": ["src"]
+ }
+*** End Patch
+2026-01-09T19:08:00.902519Z  INFO spawning ghost snapshot task
+2026-01-09T19:08:01.324343Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:08:01.324408Z  INFO ghost commit captured: d045ec746e820a160967f0d857a1e7b387587203
+2026-01-09T19:08:01.324421Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:08:05.319825Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' apps/api/src/auth/jwt.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:08:06.054961Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' apps/api/src/services/tableState.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:08:06.811642Z  INFO ToolCall: shell_command {"command":"sed -n '1,240p' apps/api/src/ws/chatHub.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:08:07.549302Z  INFO ToolCall: shell_command {"command":"sed -n '1,220p' apps/api/src/ws/server.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:08:08.474910Z  INFO ToolCall: shell_command {"command":"sed -n '1,320p' apps/api/src/ws/tableHub.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:08:11.634393Z  INFO ToolCall: shell_command {"command":"sed -n '320,520p' apps/api/src/ws/tableHub.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:08:16.545933Z  INFO ToolCall: shell_command {"command":"rg \"function startHand\" -n apps/api/src/engine/handEngine.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:08:22.589283Z  INFO ToolCall: shell_command {"command":"sed -n '60,140p' apps/api/src/engine/handEngine.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:08:26.219647Z  INFO ToolCall: shell_command {"command":"sed -n '140,260p' apps/api/src/engine/handEngine.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:08:31.480028Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' apps/api/src/engine/types.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:08:50.857768Z  INFO ToolCall: shell_command {"command":"sed -n '1,80p' apps/api/src/engine/handEngine.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:09:09.622688Z  INFO ToolCall: shell_command {"command":"cat package.json","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:09:15.488739Z  INFO ToolCall: shell_command {"command":"cat apps/api/package.json","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:09:30.143803Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' apps/ui/tsconfig.json","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:09:36.520724Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/auth/jwt.ts
+@@
+-import jwt, { JwtPayload } from "jsonwebtoken";
++import jwt, { Algorithm, JwtPayload } from "jsonwebtoken";
+@@
+-  const algorithms = publicKey ? ["RS256"] : ["HS256"];
++  const algorithms: Algorithm[] = publicKey ? ["RS256"] : ["HS256"];
+*** End Patch
+2026-01-09T19:09:43.050971Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/engine/handEngine.ts
+@@
+-export function startHand(table: TableState, options: { deck?: string[]; now?: () => string } = {}) {
++export function startHand(
++  table: TableState,
++  options: { deck?: string[]; now?: () => string } = {},
++): TableState {
+@@
+-  return {
++  return {
+     ...table,
+-    status: "in_hand",
++    status: "in_hand",
+     hand,
+     version: table.version + 1,
+   };
+ }
+*** End Patch
+2026-01-09T19:09:49.739004Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/tsconfig.json
+@@
+-  "include": ["src", "tests"]
++  "include": ["src"]
+ }
+*** End Patch
+2026-01-09T19:09:54.235598Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/package.json
+@@
+   "devDependencies": {
+     "@types/express": "^4.17.21",
+     "@types/jsonwebtoken": "^9.0.6",
++    "@types/ws": "^8.5.10",
+     "@types/supertest": "^2.0.16",
+     "supertest": "^6.3.4"
+   }
+ }
+*** End Patch
+2026-01-09T19:11:07.413016Z  INFO spawning ghost snapshot task
+2026-01-09T19:11:07.862343Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:11:07.862399Z  INFO ghost commit captured: 718496e2c4d2c31c263976b4117263592f04ff75
+2026-01-09T19:11:07.862411Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:11:10.801485Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' docker-compose.yml","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:11:15.851344Z  INFO ToolCall: shell_command {"command":"rg --files -g 'Dockerfile*' apps ui api apps/ui apps/api","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:11:19.673227Z  INFO ToolCall: shell_command {"command":"rg --files -g 'Dockerfile*' apps","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:11:23.809967Z  INFO ToolCall: shell_command {"command":"ls -la apps/ui","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:11:28.956884Z  INFO ToolCall: shell_command {"command":"cat apps/ui/package.json","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:11:34.601401Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' apps/ui/src/main.tsx","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:11:42.576411Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' apps/api/src/server.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:11:58.213088Z  INFO ToolCall: shell_command {"command":"rg --files -g 'index.html' apps/ui","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:12:11.318668Z  INFO ToolCall: shell_command {"command":"ls -la package-lock.json","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:12:19.133027Z  INFO ToolCall: shell_command {"command":"rg \"@specify-poker/shared|packages/shared|shared\" apps/api/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:12:59.600997Z  INFO ToolCall: shell_command {"command":"ls -la apps/ui/dist","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:13:26.207322Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/tsconfig.json
+@@
+   "compilerOptions": {
+     "module": "CommonJS",
+     "outDir": "dist",
+     "rootDir": "src",
+-    "types": ["node"]
++    "types": ["node", "ws"]
+   },
+   "include": ["src"]
+ }
+*** End Patch
+2026-01-09T19:13:33.304434Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: apps/api/Dockerfile
++FROM node:20-alpine
++
++WORKDIR /app
++
++COPY package.json package-lock.json tsconfig.base.json ./
++COPY apps/api/package.json apps/api/tsconfig.json ./apps/api/
++COPY apps/api/src ./apps/api/src
++COPY packages/shared/package.json packages/shared/tsconfig.json ./packages/shared/
++COPY packages/shared/src ./packages/shared/src
++
++RUN npm ci
++RUN npm run build --workspace=@specify-poker/api
++
++EXPOSE 4000
++
++CMD ["node", "apps/api/dist/server.js"]
+*** End Patch
+2026-01-09T19:13:40.041440Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: apps/ui/Dockerfile
++FROM node:20-alpine
++
++WORKDIR /app
++
++COPY package.json package-lock.json tsconfig.base.json ./
++COPY apps/ui/package.json apps/ui/tsconfig.json ./apps/ui/
++COPY apps/ui/src ./apps/ui/src
++COPY apps/ui/public ./apps/ui/public
++
++RUN npm ci
++RUN npm run build --workspace=@specify-poker/ui
++
++EXPOSE 3000
++
++CMD ["node", "apps/ui/server.js"]
+*** End Patch
+2026-01-09T19:13:59.047934Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: apps/ui/server.js
++const http = require("http");
++const fs = require("fs");
++const path = require("path");
++
++const port = Number(process.env.PORT ?? 3000);
++const distDir = path.join(__dirname, "dist");
++const publicDir = path.join(__dirname, "public");
++
++const contentTypes = new Map([
++  [".html", "text/html; charset=utf-8"],
++  [".js", "text/javascript; charset=utf-8"],
++  [".css", "text/css; charset=utf-8"],
++  [".json", "application/json; charset=utf-8"],
++  [".svg", "image/svg+xml"],
++]);
++
++function sendFile(res, filePath) {
++  fs.readFile(filePath, (err, data) => {
++    if (err) {
++      res.writeHead(404);
++      res.end("Not found");
++      return;
++    }
++    const ext = path.extname(filePath);
++    const contentType = contentTypes.get(ext) ?? "application/octet-stream";
++    res.writeHead(200, { "Content-Type": contentType });
++    res.end(data);
++  });
++}
++
++http
++  .createServer((req, res) => {
++    const urlPath = (req.url ?? "/").split("?")[0] ?? "/";
++    if (urlPath === "/" || urlPath === "/index.html") {
++      return sendFile(res, path.join(publicDir, "index.html"));
++    }
++
++    const relativePath = urlPath.replace(/^\/+/, "");
++    const candidate = path.join(distDir, relativePath);
++    return sendFile(res, candidate);
++  })
++  .listen(port, () => {
++    console.log("ui.startup", { ts: new Date().toISOString(), port });
++  });
+*** End Patch
+2026-01-09T19:14:05.281837Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Add File: apps/ui/public/index.html
++<!doctype html>
++<html lang="en">
++  <head>
++    <meta charset="utf-8" />
++    <meta name="viewport" content="width=device-width, initial-scale=1" />
++    <title>Specify Poker MVP</title>
++  </head>
++  <body>
++    <div id="root"></div>
++    <script type="importmap">
++      {
++        "imports": {
++          "react": "https://esm.sh/react@18.2.0",
++          "react-dom/client": "https://esm.sh/react-dom@18.2.0/client"
++        }
++      }
++    </script>
++    <script type="module" src="/main.js"></script>
++  </body>
++</html>
+*** End Patch
+2026-01-09T19:14:10.954392Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/package.json
+@@
+   "scripts": {
+-    "build": "tsc -p tsconfig.json"
++    "build": "tsc -p tsconfig.json",
++    "start": "node server.js"
+   },
+*** End Patch
+2026-01-09T19:14:16.490792Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: docker-compose.yml
+@@
+   ui:
+-    build: ./apps/ui
++    build:
++      context: .
++      dockerfile: apps/ui/Dockerfile
+     ports:
+       - "3000:3000"
+@@
+   api:
+-    build: ./apps/api
++    build:
++      context: .
++      dockerfile: apps/api/Dockerfile
+     ports:
+       - "4000:4000"
+*** End Patch
+2026-01-09T19:16:39.464870Z  INFO spawning ghost snapshot task
+2026-01-09T19:16:39.922634Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:16:39.922693Z  INFO ghost commit captured: 08d2f571496cbec3a0ba8004610c7134db6c9dfa
+2026-01-09T19:16:39.922705Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:16:47.545469Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/Dockerfile
+@@
+ COPY package.json package-lock.json tsconfig.base.json ./
+ COPY apps/ui/package.json apps/ui/tsconfig.json ./apps/ui/
+ COPY apps/ui/src ./apps/ui/src
++COPY apps/ui/server.js ./apps/ui/server.js
+ COPY apps/ui/public ./apps/ui/public
+*** End Patch
+2026-01-09T19:17:25.141106Z  INFO spawning ghost snapshot task
+2026-01-09T19:17:25.587537Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:17:25.587603Z  INFO ghost commit captured: 7bf2f6bf4a7893e4e8e7008f2207a678c12fcb39
+2026-01-09T19:17:25.587617Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:17:39.327730Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/server.ts
+@@
+ export function createServer(options: { useInMemoryTelemetry?: boolean } = {}) {
+   const app = createApp(options);
+   const server = http.createServer(app);
+-  attachWebSocketServer(server);
++  const wss = attachWebSocketServer(server);
++  (server as http.Server & { wss?: ReturnType<typeof attachWebSocketServer> }).wss = wss;
+   return server;
+ }
+@@
+ if (require.main === module) {
+   const port = Number(process.env.PORT ?? 4000);
+   const server = createServer();
+   server.listen(port, () => {
+     console.log("api.startup", {
+       ts: new Date().toISOString(),
+       port,
+     });
+   });
++
++  const shutdown = (signal: string) => {
++    console.log("api.shutdown", { ts: new Date().toISOString(), signal });
++    const wss = (server as http.Server & { wss?: ReturnType<typeof attachWebSocketServer> }).wss;
++    wss?.close();
++    server.close(() => {
++      process.exit(0);
++    });
++    setTimeout(() => {
++      process.exit(1);
++    }, 5000).unref();
++  };
++
++  process.on("SIGTERM", shutdown);
++  process.on("SIGINT", shutdown);
+ }
+*** End Patch
+2026-01-09T19:18:35.442547Z  INFO spawning ghost snapshot task
+2026-01-09T19:18:35.911402Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:18:35.911462Z  INFO ghost commit captured: 743cb34d706c76073c87d34eb4bc563f4d082951
+2026-01-09T19:18:35.911476Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:18:43.160140Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/public/index.html
+@@
+         "imports": {
+           "react": "https://esm.sh/react@18.2.0",
+-          "react-dom/client": "https://esm.sh/react-dom@18.2.0/client"
++          "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
++          "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
++          "react/jsx-dev-runtime": "https://esm.sh/react@18.2.0/jsx-dev-runtime"
+         }
+       }
+     </script>
+*** End Patch
+2026-01-09T19:20:19.201037Z  INFO spawning ghost snapshot task
+2026-01-09T19:20:19.643083Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:20:19.643142Z  INFO ghost commit captured: e1c13e99ef2b5560fb997996c193a60ba65ede42
+2026-01-09T19:20:19.643154Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:20:34.145386Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/server.js
+@@
+ function sendFile(res, filePath) {
+   fs.readFile(filePath, (err, data) => {
+     if (err) {
+       res.writeHead(404);
+       res.end("Not found");
+       return;
+     }
+     const ext = path.extname(filePath);
+     const contentType = contentTypes.get(ext) ?? "application/octet-stream";
+     res.writeHead(200, { "Content-Type": contentType });
+     res.end(data);
+   });
+ }
+ 
++function resolveAssetPath(relativePath) {
++  const direct = path.join(distDir, relativePath);
++  if (fs.existsSync(direct)) {
++    return direct;
++  }
++  if (!path.extname(relativePath)) {
++    const withJs = `${relativePath}.js`;
++    const candidate = path.join(distDir, withJs);
++    if (fs.existsSync(candidate)) {
++      return candidate;
++    }
++  }
++  return direct;
++}
++
+ http
+   .createServer((req, res) => {
+     const urlPath = (req.url ?? "/").split("?")[0] ?? "/";
+     if (urlPath === "/" || urlPath === "/index.html") {
+       return sendFile(res, path.join(publicDir, "index.html"));
+     }
+ 
+     const relativePath = urlPath.replace(/^\/+/, "");
+-    const candidate = path.join(distDir, relativePath);
++    const candidate = resolveAssetPath(relativePath);
+     return sendFile(res, candidate);
+   })
+*** End Patch
+2026-01-09T19:20:56.170862Z  INFO spawning ghost snapshot task
+2026-01-09T19:20:56.632278Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:20:56.632351Z  INFO ghost commit captured: 7e15f55d9ef63486d86100e7ca8ba101a13deef5
+2026-01-09T19:20:56.632363Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:21:04.144379Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/server.js
+@@
+-http
+-  .createServer((req, res) => {
++const server = http.createServer((req, res) => {
+     const urlPath = (req.url ?? "/").split("?")[0] ?? "/";
+     if (urlPath === "/" || urlPath === "/index.html") {
+       return sendFile(res, path.join(publicDir, "index.html"));
+     }
+@@
+     const relativePath = urlPath.replace(/^\/+/, "");
+     const candidate = resolveAssetPath(relativePath);
+     return sendFile(res, candidate);
+-  })
+-  .listen(port, () => {
+-    console.log("ui.startup", { ts: new Date().toISOString(), port });
+-  });
++  });
++
++server.listen(port, () => {
++  console.log("ui.startup", { ts: new Date().toISOString(), port });
++});
++
++function shutdown(signal) {
++  console.log("ui.shutdown", { ts: new Date().toISOString(), signal });
++  server.close(() => {
++    process.exit(0);
++  });
++  setTimeout(() => {
++    process.exit(1);
++  }, 3000).unref();
++}
++
++process.on("SIGTERM", shutdown);
++process.on("SIGINT", shutdown);
+*** End Patch
+2026-01-09T19:21:58.652352Z  INFO spawning ghost snapshot task
+2026-01-09T19:21:59.114783Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:21:59.114849Z  INFO ghost commit captured: b4dc327d0a4564a096477d1215199fcd6fcd11cf
+2026-01-09T19:21:59.114860Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:22:05.487559Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/public/index.html
+@@
+         "imports": {
+           "react": "https://esm.sh/react@18.2.0",
+           "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+           "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
+-          "react/jsx-dev-runtime": "https://esm.sh/react@18.2.0/jsx-dev-runtime"
++          "react/jsx-dev-runtime": "https://esm.sh/react@18.2.0/jsx-dev-runtime",
++          "@opentelemetry/api": "https://esm.sh/@opentelemetry/api@1.8.0"
+         }
+       }
+     </script>
+*** End Patch
+2026-01-09T19:22:34.515842Z  INFO spawning ghost snapshot task
+2026-01-09T19:22:34.977109Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:22:34.977199Z  INFO ghost commit captured: 381797ac54d8b58024d715ad53c8969eefc09123
+2026-01-09T19:22:34.977228Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:22:42.047707Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/public/index.html
+@@
+           "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
+           "react/jsx-dev-runtime": "https://esm.sh/react@18.2.0/jsx-dev-runtime",
+-          "@opentelemetry/api": "https://esm.sh/@opentelemetry/api@1.8.0"
++          "@opentelemetry/api": "https://esm.sh/@opentelemetry/api@1.8.0",
++          "@opentelemetry/sdk-trace-base": "https://esm.sh/@opentelemetry/sdk-trace-base@1.22.0"
+         }
+       }
+     </script>
+*** End Patch
+2026-01-09T19:22:54.571193Z  INFO spawning ghost snapshot task
+2026-01-09T19:22:55.052040Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:22:55.052110Z  INFO ghost commit captured: 9a4719f6af0ab077cfdd0282c9822b0faa67de73
+2026-01-09T19:22:55.052121Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:23:00.167651Z  INFO ToolCall: shell_command {"command":"rg \"from \\\"@\" -n apps/ui/src","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:24:05.199476Z  INFO spawning ghost snapshot task
+2026-01-09T19:24:05.662284Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:24:05.662347Z  INFO ghost commit captured: eb0c1f3e5f205508e92b8b6cb0db2eb56a8cdad4
+2026-01-09T19:24:05.662361Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:24:09.187695Z  INFO ToolCall: shell_command {"command":"rg \"response_type|token|implicit\" -n infra/keycloak specs/001-poker-mvp","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:24:15.126613Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' apps/ui/src/services/auth.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:24:52.308945Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/services/auth.ts
+@@
+ const DEFAULT_KEYCLOAK_URL = "http://localhost:8080";
+ const DEFAULT_REALM = "poker-local";
+ const DEFAULT_CLIENT_ID = "poker-ui";
++const PKCE_STORAGE_KEY = "poker.auth.pkce_verifier";
+@@
+ export function isAuthenticated() {
+   return Boolean(getToken());
+ }
+ 
+-export function buildLoginUrl(redirectUri: string) {
++function getKeycloakConfig() {
+   const keycloakUrl =
+     (window as Window & { __KEYCLOAK_URL__?: string }).__KEYCLOAK_URL__ ??
+     DEFAULT_KEYCLOAK_URL;
+   const realm =
+     (window as Window & { __KEYCLOAK_REALM__?: string }).__KEYCLOAK_REALM__ ?? DEFAULT_REALM;
+   const clientId =
+     (window as Window & { __KEYCLOAK_CLIENT_ID__?: string }).__KEYCLOAK_CLIENT_ID__ ??
+     DEFAULT_CLIENT_ID;
++  return { keycloakUrl, realm, clientId };
++}
+ 
+-  const authorizeUrl = `${keycloakUrl}/realms/${realm}/protocol/openid-connect/auth`;
+-  const params = new URLSearchParams({
+-    client_id: clientId,
+-    redirect_uri: redirectUri,
+-    response_type: "token",
+-    scope: "openid profile",
+-  });
+-
+-  return `${authorizeUrl}?${params.toString()}`;
++function base64UrlEncode(data: ArrayBuffer) {
++  const bytes = new Uint8Array(data);
++  let binary = "";
++  bytes.forEach((byte) => {
++    binary += String.fromCharCode(byte);
++  });
++  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+ }
+ 
+-export function hydrateTokenFromHash() {
+-  if (!window.location.hash) {
+-    return null;
+-  }
++async function sha256(input: string) {
++  const encoder = new TextEncoder();
++  const data = encoder.encode(input);
++  const digest = await crypto.subtle.digest("SHA-256", data);
++  return base64UrlEncode(digest);
++}
+ 
+-  const hash = window.location.hash.replace(/^#/, "");
+-  const params = new URLSearchParams(hash);
+-  const accessToken = params.get("access_token");
++function createVerifier() {
++  const bytes = new Uint8Array(32);
++  crypto.getRandomValues(bytes);
++  return base64UrlEncode(bytes.buffer);
++}
++
++export async function startLogin(redirectUri: string) {
++  const { keycloakUrl, realm, clientId } = getKeycloakConfig();
++  const verifier = createVerifier();
++  const challenge = await sha256(verifier);
++
++  sessionStorage.setItem(PKCE_STORAGE_KEY, verifier);
++
++  const authorizeUrl = `${keycloakUrl}/realms/${realm}/protocol/openid-connect/auth`;
++  const params = new URLSearchParams({
++    client_id: clientId,
++    redirect_uri: redirectUri,
++    response_type: "code",
++    scope: "openid profile",
++    code_challenge: challenge,
++    code_challenge_method: "S256",
++  });
++
++  window.location.assign(`${authorizeUrl}?${params.toString()}`);
++}
++
++export async function hydrateTokenFromCallback() {
++  const params = new URLSearchParams(window.location.search);
++  const code = params.get("code");
++  if (!code) {
++    return null;
++  }
++
++  const verifier = sessionStorage.getItem(PKCE_STORAGE_KEY);
++  if (!verifier) {
++    throw new Error("Missing PKCE verifier");
++  }
++
++  const { keycloakUrl, realm, clientId } = getKeycloakConfig();
++  const tokenUrl = `${keycloakUrl}/realms/${realm}/protocol/openid-connect/token`;
++  const body = new URLSearchParams({
++    grant_type: "authorization_code",
++    code,
++    client_id: clientId,
++    redirect_uri: window.location.origin,
++    code_verifier: verifier,
++  });
++
++  const response = await fetch(tokenUrl, {
++    method: "POST",
++    headers: { "Content-Type": "application/x-www-form-urlencoded" },
++    body,
++  });
++
++  if (!response.ok) {
++    throw new Error(`Token exchange failed: ${response.status}`);
++  }
++
++  const payload = (await response.json()) as { access_token?: string };
++  const accessToken = payload.access_token ?? null;
+ 
+   if (accessToken) {
+     setToken(accessToken);
+-    window.history.replaceState({}, document.title, window.location.pathname);
++    sessionStorage.removeItem(PKCE_STORAGE_KEY);
++    window.history.replaceState({}, document.title, window.location.pathname);
+   }
+ 
+   return accessToken;
+ }
+*** End Patch
+2026-01-09T19:25:01.001285Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/main.tsx
+@@
+-import { buildLoginUrl, hydrateTokenFromHash, isAuthenticated } from "./services/auth";
++import { hydrateTokenFromCallback, isAuthenticated, startLogin } from "./services/auth";
+@@
+-initUiTelemetry();
+-recordNavigation(window.location.pathname);
+-hydrateTokenFromHash();
++initUiTelemetry();
++recordNavigation(window.location.pathname);
+@@
+ root.render(
+   <React.StrictMode>
+     <div>
+       <h1>Specify Poker MVP</h1>
+-      {isAuthenticated() ? (
+-        <PokerApp />
+-      ) : (
+-        <a href={buildLoginUrl(window.location.origin)}>Login</a>
+-      )}
++      {new URLSearchParams(window.location.search).has("code") ? (
++        <div>Signing in...</div>
++      ) : isAuthenticated() ? (
++        <PokerApp />
++      ) : (
++        <button type="button" onClick={() => startLogin(window.location.origin)}>
++          Login
++        </button>
++      )}
+     </div>
+   </React.StrictMode>,
+ );
++
++hydrateTokenFromCallback().catch((error: Error) => {
++  console.warn("auth.callback.failed", { message: error.message });
++});
+*** End Patch
+2026-01-09T19:26:53.708289Z  INFO spawning ghost snapshot task
+2026-01-09T19:26:54.164238Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:26:54.164301Z  INFO ghost commit captured: 52c1d392127ce2a8dfdab6cc2a65d7953c60a6f1
+2026-01-09T19:26:54.164316Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:27:00.811183Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' apps/api/src/http/middleware/auth.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:27:07.704845Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' apps/api/src/http/router.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:27:16.888256Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/http/middleware/auth.ts
+@@
+ export function authMiddleware(req: Request, res: Response, next: NextFunction) {
++  if (req.method === "OPTIONS") {
++    return next();
++  }
+   const header = req.headers.authorization;
+   if (!header?.startsWith("Bearer ")) {
+     return deny(res, "Missing bearer token");
+   }
+*** End Patch
+2026-01-09T19:27:25.284553Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/http/router.ts
+@@
+ export function createRouter() {
+   const router = express.Router();
++  const allowedOrigin = process.env.CORS_ORIGIN ?? "http://localhost:3000";
+ 
+   router.get("/api/health", (_req, res) => {
+     res.status(200).json({ status: "ok" });
+   });
+ 
+   router.use(express.json());
++  router.use((req, res, next) => {
++    res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
++    res.setHeader("Access-Control-Allow-Credentials", "true");
++    res.setHeader(
++      "Access-Control-Allow-Headers",
++      "Authorization, Content-Type, Accept, X-Requested-With",
++    );
++    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
++    if (req.method === "OPTIONS") {
++      res.status(204).end();
++      return;
++    }
++    next();
++  });
+   router.use("/api", authMiddleware);
+   router.use("/api", rateLimitMiddleware);
+*** End Patch
+2026-01-09T19:28:25.941734Z  INFO spawning ghost snapshot task
+2026-01-09T19:28:26.390169Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:28:26.390230Z  INFO ghost commit captured: f3f876e490024986ea8835ddfaec2766b1a6d8c0
+2026-01-09T19:28:26.390241Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:28:48.228349Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/ui/src/main.tsx
+@@
+-import { hydrateTokenFromCallback, isAuthenticated, startLogin } from "./services/auth";
++import { hydrateTokenFromCallback, isAuthenticated, startLogin } from "./services/auth";
+@@
+-root.render(
+-  <React.StrictMode>
+-    <div>
+-      <h1>Specify Poker MVP</h1>
+-      {new URLSearchParams(window.location.search).has("code") ? (
+-        <div>Signing in...</div>
+-      ) : isAuthenticated() ? (
+-        <PokerApp />
+-      ) : (
+-        <button type="button" onClick={() => startLogin(window.location.origin)}>
+-          Login
+-        </button>
+-      )}
+-    </div>
+-  </React.StrictMode>,
+-);
+-
+-hydrateTokenFromCallback().catch((error: Error) => {
+-  console.warn("auth.callback.failed", { message: error.message });
+-});
++function AppRoot() {
++  const hasAuthCode = new URLSearchParams(window.location.search).has("code");
++  const [authStatus, setAuthStatus] = React.useState<"checking" | "authed" | "anon">(() => {
++    if (hasAuthCode) {
++      return "checking";
++    }
++    return isAuthenticated() ? "authed" : "anon";
++  });
++
++  React.useEffect(() => {
++    if (authStatus !== "checking") {
++      return;
++    }
++    hydrateTokenFromCallback()
++      .then(() => {
++        setAuthStatus(isAuthenticated() ? "authed" : "anon");
++      })
++      .catch((error: Error) => {
++        console.warn("auth.callback.failed", { message: error.message });
++        setAuthStatus("anon");
++      });
++  }, [authStatus]);
++
++  return (
++    <div>
++      <h1>Specify Poker MVP</h1>
++      {authStatus === "checking" ? (
++        <div>Signing in...</div>
++      ) : authStatus === "authed" ? (
++        <PokerApp />
++      ) : (
++        <button type="button" onClick={() => startLogin(window.location.origin)}>
++          Login
++        </button>
++      )}
++    </div>
++  );
++}
++
++root.render(
++  <React.StrictMode>
++    <AppRoot />
++  </React.StrictMode>,
++);
+*** End Patch
+2026-01-09T19:29:49.205026Z  INFO spawning ghost snapshot task
+2026-01-09T19:29:49.686734Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:29:49.686792Z  INFO ghost commit captured: 0cfbf429950c876c45ebf26a726ad18539d95bbf
+2026-01-09T19:29:49.686802Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:29:53.781710Z  INFO ToolCall: shell_command {"command":"rg \"publicKey|public_key|clientId|poker-ui|realm\" -n infra/keycloak/realm-export.json","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:29:59.435611Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' infra/keycloak/realm-export.json","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:30:26.273087Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/auth/jwt.ts
+@@
+-import jwt, { Algorithm, JwtPayload } from "jsonwebtoken";
++import jwt, { Algorithm, JwtPayload } from "jsonwebtoken";
+@@
+-export function verifyToken(token: string): VerifiedToken {
++let cachedPublicKey: string | null = null;
++
++function formatPublicKey(input: string) {
++  const wrapped = input.match(/.{1,64}/g)?.join("\n") ?? input;
++  return `-----BEGIN PUBLIC KEY-----\n${wrapped}\n-----END PUBLIC KEY-----`;
++}
++
++async function fetchPublicKey() {
++  if (cachedPublicKey) {
++    return cachedPublicKey;
++  }
++  const keycloakUrl = process.env.KEYCLOAK_URL ?? "http://localhost:8080";
++  const realm = process.env.KEYCLOAK_REALM ?? "poker-local";
++  const response = await fetch(`${keycloakUrl}/realms/${realm}`);
++  if (!response.ok) {
++    throw new Error(`Failed to load Keycloak realm config (${response.status})`);
++  }
++  const payload = (await response.json()) as { public_key?: string };
++  if (!payload.public_key) {
++    throw new Error("Keycloak realm public key missing");
++  }
++  cachedPublicKey = formatPublicKey(payload.public_key);
++  return cachedPublicKey;
++}
++
++export async function verifyToken(token: string): Promise<VerifiedToken> {
+   const issuer = process.env.JWT_ISSUER;
+   const audience = process.env.JWT_AUDIENCE;
+-  const publicKey = process.env.JWT_PUBLIC_KEY;
+   const secret = process.env.JWT_HS256_SECRET;
+-  const key = publicKey ?? secret;
++  const publicKey = process.env.JWT_PUBLIC_KEY ?? (secret ? null : await fetchPublicKey());
++  const key = publicKey ?? secret;
+ 
+   if (!key) {
+     throw new Error("JWT verification key is missing");
+   }
+@@
+-  return jwt.verify(token, key, {
++  return jwt.verify(token, key, {
+     algorithms,
+     issuer,
+     audience,
+   }) as VerifiedToken;
+ }
+*** End Patch
+2026-01-09T19:30:35.262845Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/http/middleware/auth.ts
+@@
+-export function authMiddleware(req: Request, res: Response, next: NextFunction) {
++export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
+   if (req.method === "OPTIONS") {
+     return next();
+   }
+@@
+-  try {
+-    const claims = verifyToken(token);
++  try {
++    const claims = await verifyToken(token);
+     req.auth = {
+       userId: claims.sub ?? "unknown",
+       token,
+       claims,
+     };
+*** End Patch
+2026-01-09T19:30:39.846245Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: docker-compose.yml
+@@
+   api:
+     build:
+       context: .
+       dockerfile: apps/api/Dockerfile
+     ports:
+       - "4000:4000"
+     environment:
+       PORT: "4000"
++      KEYCLOAK_URL: "http://keycloak:8080"
++      KEYCLOAK_REALM: "poker-local"
+*** End Patch
+2026-01-09T19:31:17.701270Z  INFO spawning ghost snapshot task
+2026-01-09T19:31:18.149211Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:31:18.149275Z  INFO ghost commit captured: d32c9e1d29f2564d2e8b844ef6ee869e1c7b8b3a
+2026-01-09T19:31:18.149286Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:31:24.184835Z  INFO ToolCall: shell_command {"command":"sed -n '1,120p' apps/api/src/ws/server.ts","workdir":"/Users/bricerising/git/brice@github/specify-poker"}
+2026-01-09T19:31:31.967384Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/ws/server.ts
+@@
+-  wss.on("connection", (socket, request) => {
++  wss.on("connection", async (socket, request) => {
+@@
+-    let claims;
+-    try {
+-      claims = verifyToken(token);
++    let claims;
++    try {
++      claims = await verifyToken(token);
+     } catch {
+       socket.close(1008, "Invalid token");
+       return;
+     }
+*** End Patch
+2026-01-09T19:32:27.882202Z  INFO spawning ghost snapshot task
+2026-01-09T19:32:28.332558Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:32:28.332622Z  INFO ghost commit captured: 416de566b7504ba78cab03797a941535155d8803
+2026-01-09T19:32:28.332633Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:33:14.638250Z  INFO spawning ghost snapshot task
+2026-01-09T19:33:15.088270Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:33:15.088332Z  INFO ghost commit captured: dd7967de8a582ca17cfa898f5225b0b21fcba878
+2026-01-09T19:33:15.088344Z  INFO ghost snapshot gate marked ready
+2026-01-09T19:34:24.932418Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: apps/api/src/auth/jwt.ts
+@@
+-import jwt, { Algorithm, JwtPayload } from "jsonwebtoken";
++import jwt, { Algorithm, JwtPayload } from "jsonwebtoken";
+@@
+-let cachedPublicKey: string | null = null;
++let cachedPublicKey: string | null = null;
++const jwksCache = new Map<string, string>();
+@@
+-function formatPublicKey(input: string) {
+-  const wrapped = input.match(/.{1,64}/g)?.join("\n") ?? input;
+-  return `-----BEGIN PUBLIC KEY-----\n${wrapped}\n-----END PUBLIC KEY-----`;
++function wrapPemLines(input: string) {
++  return input.match(/.{1,64}/g)?.join("\n") ?? input;
++}
++
++function formatPublicKey(input: string) {
++  if (input.includes("BEGIN PUBLIC KEY")) {
++    return input;
++  }
++  return `-----BEGIN PUBLIC KEY-----\n${wrapPemLines(input)}\n-----END PUBLIC KEY-----`;
++}
++
++function formatCertificate(input: string) {
++  if (input.includes("BEGIN CERTIFICATE")) {
++    return input;
++  }
++  return `-----BEGIN CERTIFICATE-----\n${wrapPemLines(input)}\n-----END CERTIFICATE-----`;
+ }
+ 
+ async function fetchPublicKey() {
+@@
+-  cachedPublicKey = formatPublicKey(payload.public_key);
++  cachedPublicKey = formatPublicKey(payload.public_key);
+   return cachedPublicKey;
+ }
+ 
++async function fetchJwksKey(kid: string) {
++  const cached = jwksCache.get(kid);
++  if (cached) {
++    return cached;
++  }
++  const keycloakUrl = process.env.KEYCLOAK_URL ?? "http://localhost:8080";
++  const realm = process.env.KEYCLOAK_REALM ?? "poker-local";
++  const response = await fetch(
++    `${keycloakUrl}/realms/${realm}/protocol/openid-connect/certs`,
++  );
++  if (!response.ok) {
++    throw new Error(`Failed to load Keycloak JWKS (${response.status})`);
++  }
++  const payload = (await response.json()) as { keys?: Array<{ kid?: string; x5c?: string[] }> };
++  const match = payload.keys?.find((key) => key.kid === kid);
++  const cert = match?.x5c?.[0];
++  if (!cert) {
++    throw new Error("Keycloak JWKS does not include matching certificate");
++  }
++  const formatted = formatCertificate(cert);
++  jwksCache.set(kid, formatted);
++  return formatted;
++}
++
+ export async function verifyToken(token: string): Promise<VerifiedToken> {
+   const issuer = process.env.JWT_ISSUER;
+   const audience = process.env.JWT_AUDIENCE;
+   const secret = process.env.JWT_HS256_SECRET;
+-  const publicKey = process.env.JWT_PUBLIC_KEY ?? (secret ? null : await fetchPublicKey());
+-  const key = publicKey ?? secret;
++  const decoded = jwt.decode(token, { complete: true });
++  const header = decoded && typeof decoded === "object" ? decoded.header : null;
++
++  const publicKey = process.env.JWT_PUBLIC_KEY
++    ? formatPublicKey(process.env.JWT_PUBLIC_KEY)
++    : null;
++
++  let key = publicKey ?? (secret ? secret : null);
++  if (!key) {
++    const kid = header?.kid;
++    if (kid) {
++      key = await fetchJwksKey(kid);
++    } else {
++      key = await fetchPublicKey();
++    }
++  }
+ 
+   if (!key) {
+     throw new Error("JWT verification key is missing");
+   }
+ 
+-  const algorithms: Algorithm[] = publicKey ? ["RS256"] : ["HS256"];
++  const algorithms: Algorithm[] = secret ? ["HS256"] : ["RS256"];
+ 
+   return jwt.verify(token, key, {
+     algorithms,
+     issuer,
+*** End Patch
+2026-01-09T19:36:54.758860Z  INFO spawning ghost snapshot task
+2026-01-09T19:36:55.221432Z  INFO ghost snapshot blocking task finished
+2026-01-09T19:36:55.221501Z  INFO ghost commit captured: 072b1fe8d29724a68df62f8c220b5af3348daaf1
+2026-01-09T19:36:55.221515Z  INFO ghost snapshot gate marked ready

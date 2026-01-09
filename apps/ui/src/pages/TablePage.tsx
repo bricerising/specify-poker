@@ -6,7 +6,7 @@ import { ChatPanel } from "../components/ChatPanel";
 import { ModerationMenu } from "../components/ModerationMenu";
 import { deriveLegalActions } from "../state/deriveLegalActions";
 import { TableStore, tableStore } from "../state/tableStore";
-import { fetchCurrentProfile } from "../services/auth";
+import { fetchProfile } from "../services/profileApi";
 
 interface TablePageProps {
   store?: TableStore;
@@ -19,8 +19,8 @@ export function TablePage({ store = tableStore }: TablePageProps) {
   useEffect(() => store.subscribe(setState), [store]);
 
   useEffect(() => {
-    fetchCurrentProfile()
-      .then((profile: { userId?: string }) => {
+    fetchProfile()
+      .then((profile) => {
         setUserId(profile.userId ?? null);
       })
       .catch((error: Error) => {

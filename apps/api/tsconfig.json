@@ -4,7 +4,7 @@
     "module": "CommonJS",
     "outDir": "dist",
     "rootDir": "src",
-    "types": ["node"]
+    "types": ["node", "ws"]
   },
-  "include": ["src", "tests"]
+  "include": ["src"]
 }

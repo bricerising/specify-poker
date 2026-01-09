@@ -9,6 +9,10 @@ processors:
 
 exporters:
   logging:
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    resource_to_telemetry_conversion:
+      enabled: true
 
 service:
   pipelines:
@@ -19,4 +23,4 @@ service:
     metrics:
       receivers: [otlp]
       processors: [batch]
-      exporters: [logging]
+      exporters: [logging, prometheus]

@@ -2,7 +2,8 @@
   "name": "@specify-poker/ui",
   "private": true,
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "start": "node server.js"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.8.0",

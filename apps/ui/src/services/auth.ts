@@ -1,9 +1,8 @@
-import { apiFetch } from "./apiClient";
-
 const TOKEN_KEY = "poker.auth.token";
 const DEFAULT_KEYCLOAK_URL = "http://localhost:8080";
 const DEFAULT_REALM = "poker-local";
 const DEFAULT_CLIENT_ID = "poker-ui";
+const PKCE_STORAGE_KEY = "poker.auth.pkce_verifier";
 
 export function setToken(token: string) {
   localStorage.setItem(TOKEN_KEY, token);
@@ -21,7 +20,7 @@ export function isAuthenticated() {
   return Boolean(getToken());
 }
 
-export function buildLoginUrl(redirectUri: string) {
+function getKeycloakConfig() {
   const keycloakUrl =
     (window as Window & { __KEYCLOAK_URL__?: string }).__KEYCLOAK_URL__ ??
     DEFAULT_KEYCLOAK_URL;
@@ -30,36 +29,91 @@ export function buildLoginUrl(redirectUri: string) {
   const clientId =
     (window as Window & { __KEYCLOAK_CLIENT_ID__?: string }).__KEYCLOAK_CLIENT_ID__ ??
     DEFAULT_CLIENT_ID;
+  return { keycloakUrl, realm, clientId };
+}
+
+function base64UrlEncode(data: ArrayBuffer) {
+  const bytes = new Uint8Array(data);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function sha256(input: string) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(input);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return base64UrlEncode(digest);
+}
+
+function createVerifier() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return base64UrlEncode(bytes.buffer);
+}
+
+export async function startLogin(redirectUri: string) {
+  const { keycloakUrl, realm, clientId } = getKeycloakConfig();
+  const verifier = createVerifier();
+  const challenge = await sha256(verifier);
+
+  sessionStorage.setItem(PKCE_STORAGE_KEY, verifier);
 
   const authorizeUrl = `${keycloakUrl}/realms/${realm}/protocol/openid-connect/auth`;
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
-    response_type: "token",
+    response_type: "code",
     scope: "openid profile",
+    code_challenge: challenge,
+    code_challenge_method: "S256",
   });
 
-  return `${authorizeUrl}?${params.toString()}`;
+  window.location.assign(`${authorizeUrl}?${params.toString()}`);
 }
 
-export function hydrateTokenFromHash() {
-  if (!window.location.hash) {
+export async function hydrateTokenFromCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  if (!code) {
     return null;
   }
 
-  const hash = window.location.hash.replace(/^#/, "");
-  const params = new URLSearchParams(hash);
-  const accessToken = params.get("access_token");
+  const verifier = sessionStorage.getItem(PKCE_STORAGE_KEY);
+  if (!verifier) {
+    throw new Error("Missing PKCE verifier");
+  }
+
+  const { keycloakUrl, realm, clientId } = getKeycloakConfig();
+  const tokenUrl = `${keycloakUrl}/realms/${realm}/protocol/openid-connect/token`;
+  const body = new URLSearchParams({
+    grant_type: "authorization_code",
+    code,
+    client_id: clientId,
+    redirect_uri: window.location.origin,
+    code_verifier: verifier,
+  });
+
+  const response = await fetch(tokenUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Token exchange failed: ${response.status}`);
+  }
+
+  const payload = (await response.json()) as { access_token?: string };
+  const accessToken = payload.access_token ?? null;
 
   if (accessToken) {
     setToken(accessToken);
+    sessionStorage.removeItem(PKCE_STORAGE_KEY);
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 
   return accessToken;
-}
-
-export async function fetchCurrentProfile() {
-  const response = await apiFetch("/api/me");
-  return response.json();
 }

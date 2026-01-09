@@ -74,7 +74,10 @@ function dealCards(deck: string[], count: number) {
   return deck.splice(0, count);
 }
 
-export function startHand(table: TableState, options: { deck?: string[]; now?: () => string } = {}) {
+export function startHand(
+  table: TableState,
+  options: { deck?: string[]; now?: () => string } = {},
+): TableState {
   const now = options.now ?? (() => new Date().toISOString());
   const occupied = findOccupiedSeats(table.seats).filter((seat) => seat.status === "active");
   if (occupied.length < 2) {
@@ -135,6 +138,7 @@ export function startHand(table: TableState, options: { deck?: string[]; now?: (
     deck,
     holeCards,
     bigBlind: table.config.bigBlind,
+    winners: undefined,
   };
 
   hand.pots = calculatePots(hand.totalContributions, getFoldedSeatIds(table.seats));
@@ -227,6 +231,7 @@ function settleShowdown(hand: HandState, seats: TableSeat[]) {
     players[seat.seatId] = hand.holeCards[seat.seatId] ?? [];
   }
   const { winners } = evaluateWinners(players, hand.communityCards);
+  hand.winners = winners;
 
   const potTotal = hand.pots.reduce((sum, pot) => sum + pot.amount, 0);
   if (winners.length > 0 && potTotal > 0) {
@@ -323,6 +328,7 @@ export function applyAction(
 
   const remaining = activeSeatsRemaining(table.seats);
   if (remaining.length === 1) {
+    hand.winners = remaining.map((seat) => seat.seatId);
     remaining[0].stack += hand.pots.reduce((sum, pot) => sum + pot.amount, 0);
     for (const seat of table.seats) {
       if (seat.status === "folded" || seat.status === "all_in") {

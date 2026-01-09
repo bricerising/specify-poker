@@ -1,4 +1,5 @@
 import { apiFetch, getApiBaseUrl } from "../services/apiClient";
+import { isStaleVersion, requestResync, shouldResync } from "../services/wsClient";
 
 export interface TableConfig {
   smallBlind: number;
@@ -36,6 +37,7 @@ export interface HandState {
   pots: { amount: number; eligibleSeatIds: number[] }[];
   actionTimerDeadline: string | null;
   bigBlind: number;
+  winners?: number[];
 }
 
 export interface TableState {
@@ -120,7 +122,19 @@ export function createTableStore(): TableStore {
     socket.addEventListener("message", (event) => {
       const message = JSON.parse(event.data as string);
       if (message.type === "TableSnapshot" || message.type === "TablePatch") {
-        setState({ tableState: message.tableState });
+        const incoming = message.tableState as TableState | undefined;
+        if (!incoming) {
+          return;
+        }
+        const currentVersion = state.tableState?.version ?? null;
+        const incomingVersion = incoming.version ?? 0;
+        if (isStaleVersion(currentVersion, incomingVersion)) {
+          return;
+        }
+        if (shouldResync(currentVersion, incomingVersion)) {
+          requestResync(socket, incoming.tableId);
+        }
+        setState({ tableState: incoming });
         return;
       }
       if (message.type === "ChatMessage") {

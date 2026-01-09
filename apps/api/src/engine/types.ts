@@ -37,6 +37,7 @@ export interface HandState {
   deck: string[];
   holeCards: Record<number, [string, string]>;
   bigBlind: number;
+  winners?: number[];
 }
 
 export interface TableState {

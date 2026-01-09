@@ -12,7 +12,7 @@ import { attachTableHub } from "./tableHub";
 export function attachWebSocketServer(server: http.Server) {
   const wss = new WebSocketServer({ server, path: "/ws" });
 
-  wss.on("connection", (socket, request) => {
+  wss.on("connection", async (socket, request) => {
     const requestUrl = request.url ?? "";
     const url = new URL(requestUrl, `http://${request.headers.host ?? "localhost"}`);
     const token = url.searchParams.get("token");
@@ -24,7 +24,7 @@ export function attachWebSocketServer(server: http.Server) {
 
     let claims;
     try {
-      claims = verifyToken(token);
+      claims = await verifyToken(token);
     } catch {
       socket.close(1008, "Invalid token");
       return;

@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 
 import { HandActionInput } from "../engine/types";
 import { applyAction } from "../engine/handEngine";
+import { recordHandCompletion } from "../engine/statTracker";
 import { getTracer } from "../observability/otel";
 import { eventStore, HandEvent } from "./eventStore";
 import { getTable, updateTable } from "./tableRegistry";
@@ -107,6 +108,12 @@ export function applyTableAction(options: {
       },
     });
     span.end();
+  }
+
+  const handEnded = result.table.hand?.currentStreet === "ended" && previousStreet !== "ended";
+
+  if (handEnded && result.table.hand) {
+    recordHandCompletion(result.table.hand, result.table.seats);
   }
 
   if (result.table.hand) {

@@ -3,6 +3,7 @@ import WebSocket from "ws";
 import { applyTableAction, joinSeat, leaveSeat } from "../services/tableService";
 import { getTableState } from "../services/tableState";
 import { scheduleTurnTimeout, clearTurnTimeout } from "../services/turnTimer";
+import { checkWsRateLimit, parseActionType, parseSeatId, parseTableId } from "./validators";
 
 interface ClientConnection {
   socket: WebSocket;
@@ -149,11 +150,35 @@ function handleAction(client: ClientConnection, payload: {
     return;
   }
 
+  const rate = checkWsRateLimit(client.connectionId, "action");
+  if (!rate.ok) {
+    send(client.socket, {
+      type: "ActionResult",
+      tableId,
+      handId: payload.handId,
+      accepted: false,
+      reason: "rate_limited",
+    });
+    return;
+  }
+
+  const actionType = parseActionType(payload.action);
+  if (!actionType) {
+    send(client.socket, {
+      type: "ActionResult",
+      tableId,
+      handId: payload.handId,
+      accepted: false,
+      reason: "invalid_action",
+    });
+    return;
+  }
+
   const result = applyTableAction({
     tableId,
     seatId: seat.seatId,
     action: {
-      type: payload.action as "Fold" | "Check" | "Call" | "Bet" | "Raise",
+      type: actionType as "Fold" | "Check" | "Call" | "Bet" | "Raise",
       amount: payload.amount,
     },
   });
@@ -207,6 +232,15 @@ function handleLeaveTable(client: ClientConnection, payload: { tableId: string }
   }
 }
 
+function handleResync(client: ClientConnection, tableId: string) {
+  const tableState = getTableState(tableId);
+  if (!tableState) {
+    return;
+  }
+  send(client.socket, { type: "TableSnapshot", tableState });
+  scheduleTurn(tableId);
+}
+
 export function attachTableHub(socket: WebSocket, userId: string, connectionId: string) {
   const client: ClientConnection = {
     socket,
@@ -226,32 +260,63 @@ export function attachTableHub(socket: WebSocket, userId: string, connectionId: 
 
     const type = message.type;
     if (type === "SubscribeTable") {
-      handleSubscribe(client, message.tableId as string);
+      const tableId = parseTableId(message.tableId);
+      if (!tableId) {
+        send(client.socket, { type: "Error", code: "invalid_table", message: "Missing tableId" });
+        return;
+      }
+      handleSubscribe(client, tableId);
       return;
     }
     if (type === "UnsubscribeTable") {
-      handleUnsubscribe(client, message.tableId as string);
+      const tableId = parseTableId(message.tableId);
+      if (!tableId) {
+        return;
+      }
+      handleUnsubscribe(client, tableId);
       return;
     }
     if (type === "JoinSeat") {
+      const tableId = parseTableId(message.tableId);
+      const seatId = parseSeatId(message.seatId);
+      if (!tableId || seatId === null) {
+        send(client.socket, { type: "Error", code: "invalid_seat", message: "Invalid seat" });
+        return;
+      }
       handleJoinSeat(client, {
-        tableId: message.tableId as string,
-        seatId: Number(message.seatId),
+        tableId,
+        seatId,
       });
       return;
     }
     if (type === "LeaveTable") {
-      handleLeaveTable(client, { tableId: message.tableId as string });
+      const tableId = parseTableId(message.tableId);
+      if (!tableId) {
+        return;
+      }
+      handleLeaveTable(client, { tableId });
       return;
     }
     if (type === "Action") {
+      const tableId = parseTableId(message.tableId);
+      if (!tableId) {
+        send(client.socket, { type: "ActionResult", accepted: false, reason: "invalid_table" });
+        return;
+      }
       handleAction(client, {
-        tableId: message.tableId as string,
+        tableId,
         handId: message.handId as string,
         action: message.action as string,
         amount: message.amount as number | undefined,
       });
       return;
+    }
+    if (type === "ResyncTable") {
+      const tableId = parseTableId(message.tableId);
+      if (!tableId) {
+        return;
+      }
+      handleResync(client, tableId);
     }
   });
 
