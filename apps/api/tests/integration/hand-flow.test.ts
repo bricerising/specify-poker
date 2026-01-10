@@ -154,7 +154,7 @@ describe("hand flow", () => {
         } else {
           sendAction(wsB, action);
         }
-        tableState = (await nextPatch).tableState;
+        tableState = (await nextPatch).patch;
         guard += 1;
       }
     };

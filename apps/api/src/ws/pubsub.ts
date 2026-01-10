@@ -3,7 +3,7 @@ import { createClient, RedisClientType } from "redis";
 
 import { getRedisUrl } from "../services/redisClient";
 
-type WsChannel = "table" | "chat" | "timer";
+type WsChannel = "table" | "chat" | "timer" | "lobby";
 
 export type WsPubSubMessage = {
   channel: WsChannel;
@@ -26,6 +26,7 @@ export async function initWsPubSub(handlers: {
   onTableEvent: (message: WsPubSubMessage) => void;
   onChatEvent: (message: WsPubSubMessage) => void;
   onTimerEvent: (message: WsPubSubMessage) => void;
+  onLobbyEvent: (message: WsPubSubMessage) => void;
 }) {
   const url = getRedisUrl();
   if (!url) {
@@ -68,6 +69,10 @@ export async function initWsPubSub(handlers: {
     }
     if (parsed.channel === "timer") {
       handlers.onTimerEvent(parsed);
+      return;
+    }
+    if (parsed.channel === "lobby") {
+      handlers.onLobbyEvent(parsed);
     }
   });
 
@@ -95,4 +100,8 @@ export async function publishChatEvent(tableId: string, payload: Record<string, 
 
 export async function publishTimerEvent(tableId: string, payload: Record<string, unknown>) {
   return publish({ channel: "timer", tableId, payload });
+}
+
+export async function publishLobbyEvent(tables: unknown[]) {
+  return publish({ channel: "lobby", tableId: "lobby", payload: { tables } });
 }

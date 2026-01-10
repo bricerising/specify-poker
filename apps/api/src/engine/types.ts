@@ -1,6 +1,6 @@
 import { TableConfig } from "../services/tableTypes";
 
-export type SeatStatus = "empty" | "active" | "folded" | "all_in" | "disconnected";
+export type SeatStatus = "empty" | "active" | "folded" | "all_in" | "disconnected" | "spectator";
 export type HandStreet = "preflop" | "flop" | "turn" | "river" | "showdown" | "ended";
 export type HandActionType = "Fold" | "Check" | "Call" | "Bet" | "Raise";
 
@@ -28,6 +28,7 @@ export interface HandState {
   currentTurnSeat: number;
   currentBet: number;
   minRaise: number;
+  raiseCapped: boolean;
   roundContributions: Record<number, number>;
   totalContributions: Record<number, number>;
   actedSeats: number[];

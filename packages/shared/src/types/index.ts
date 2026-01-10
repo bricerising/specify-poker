@@ -47,5 +47,5 @@ export interface TableJoinResponse {
 }
 
 export interface ModerationRequest {
-  targetUserId: UserId;
+  seatId: number;
 }

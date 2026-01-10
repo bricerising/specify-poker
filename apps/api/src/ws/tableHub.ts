@@ -1,10 +1,22 @@
 import WebSocket from "ws";
 
-import { TableSeat, TableState } from "../engine/types";
+import { HandState, TableSeat, TableState } from "../engine/types";
+import { HandEvent } from "../services/eventStore";
+import { onHandEvent } from "../services/handEvents";
 import { applyTableAction, joinSeat, leaveSeat, reconnectSeat } from "../services/tableService";
 import { getProfile } from "../services/profileService";
 import { getTableState } from "../services/tableState";
+import { notifyTurn } from "../services/pushSender";
 import { scheduleTurnTimeout, clearTurnTimeout } from "../services/turnTimer";
+import {
+  recordActionAttempt,
+  recordActionRejected,
+  recordRateLimit,
+  recordTurnTimeout,
+  recordWsError,
+  recordWsMessage,
+  updateActiveTableSubscriptions,
+} from "../observability/metrics";
 import { WsPubSubMessage, publishTableEvent, publishTimerEvent } from "./pubsub";
 import { checkWsRateLimit, parseActionType, parseSeatId, parseTableId } from "./validators";
 
@@ -17,6 +29,8 @@ interface ClientConnection {
 
 const clients = new Map<string, ClientConnection>();
 const tableSubscriptions = new Map<string, Set<string>>();
+const lastTurnNotified = new Map<string, { handId: string; seatId: number }>();
+let handEventListenerAttached = false;
 
 type TableSeatView = TableSeat & { nickname?: string };
 type TableStateView = Omit<TableState, "seats"> & { seats: TableSeatView[] };
@@ -25,6 +39,35 @@ function send(socket: WebSocket, message: Record<string, unknown>) {
   if (socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify(message));
   }
+}
+
+function canReceiveHoleCards(seat: TableSeat | undefined) {
+  if (!seat || !seat.userId) {
+    return false;
+  }
+  return seat.status !== "spectator" && seat.status !== "empty";
+}
+
+function redactHandSnapshot(snapshot: HandState) {
+  return {
+    ...snapshot,
+    holeCards: {},
+    deck: [],
+  };
+}
+
+function redactHandEvent(event: HandEvent): HandEvent {
+  const snapshot = event.payload?.snapshot;
+  if (!snapshot || typeof snapshot !== "object") {
+    return event;
+  }
+  return {
+    ...event,
+    payload: {
+      ...event.payload,
+      snapshot: redactHandSnapshot(snapshot as HandState),
+    },
+  };
 }
 
 async function broadcastTableLocal(tableId: string, message: Record<string, unknown>) {
@@ -40,7 +83,7 @@ async function broadcastTableLocal(tableId: string, message: Record<string, unkn
       if (tableState?.hand) {
         const seat = tableState.seats.find((entry) => entry.userId === client.userId);
         const holeCards = seat ? tableState.hand.holeCards[seat.seatId] : undefined;
-        if (holeCards && holeCards.length === 2) {
+        if (canReceiveHoleCards(seat) && holeCards && holeCards.length === 2) {
           send(client.socket, {
             type: "HoleCards",
             tableId,
@@ -140,7 +183,7 @@ export async function broadcastTableState(tableId: string) {
     type: "TablePatch",
     tableId,
     handId: tableState.hand?.handId,
-    tableState: payload,
+    patch: payload,
   });
 }
 
@@ -148,7 +191,18 @@ async function scheduleTurn(tableId: string) {
   const state = await getTableState(tableId);
   if (!state?.hand || state.hand.currentStreet === "ended") {
     clearTurnTimeout(tableId);
+    lastTurnNotified.delete(tableId);
     return;
+  }
+
+  const { hand } = state;
+  const last = lastTurnNotified.get(tableId);
+  if (!last || last.handId !== hand.handId || last.seatId !== hand.currentTurnSeat) {
+    const seat = state.seats.find((entry) => entry.seatId === hand.currentTurnSeat);
+    if (seat?.userId && seat.status !== "spectator" && seat.status !== "empty") {
+      lastTurnNotified.set(tableId, { handId: hand.handId, seatId: hand.currentTurnSeat });
+      await notifyTurn(seat.userId, state.name, state.tableId, hand.currentTurnSeat);
+    }
   }
 
   const durationMs = Number(process.env.TURN_TIMER_MS ?? 20000);
@@ -156,6 +210,7 @@ async function scheduleTurn(tableId: string) {
     tableId,
     durationMs,
     onTimeout: async () => {
+      recordTurnTimeout();
       const current = await getTableState(tableId);
       if (!current?.hand) {
         return;
@@ -179,7 +234,7 @@ async function scheduleTurn(tableId: string) {
           type: "TablePatch",
           tableId,
           handId: result.tableState.hand?.handId,
-          tableState: payload,
+          patch: payload,
         });
         await scheduleTurn(tableId);
       }
@@ -197,7 +252,10 @@ async function scheduleTurn(tableId: string) {
 }
 
 async function handleSubscribe(client: ClientConnection, tableId: string) {
-  client.subscriptions.add(tableId);
+  if (!client.subscriptions.has(tableId)) {
+    client.subscriptions.add(tableId);
+    updateActiveTableSubscriptions(1);
+  }
   const subscribers = tableSubscriptions.get(tableId) ?? new Set<string>();
   subscribers.add(client.connectionId);
   tableSubscriptions.set(tableId, subscribers);
@@ -212,7 +270,7 @@ async function handleSubscribe(client: ClientConnection, tableId: string) {
     if (tableState.hand) {
       const seat = tableState.seats.find((entry) => entry.userId === client.userId);
       const holeCards = seat ? tableState.hand.holeCards[seat.seatId] : undefined;
-      if (holeCards && holeCards.length === 2) {
+      if (canReceiveHoleCards(seat) && holeCards && holeCards.length === 2) {
         send(client.socket, {
           type: "HoleCards",
           tableId,
@@ -227,7 +285,9 @@ async function handleSubscribe(client: ClientConnection, tableId: string) {
 }
 
 function handleUnsubscribe(client: ClientConnection, tableId: string) {
-  client.subscriptions.delete(tableId);
+  if (client.subscriptions.delete(tableId)) {
+    updateActiveTableSubscriptions(-1);
+  }
   const subscribers = tableSubscriptions.get(tableId);
   if (!subscribers) {
     return;
@@ -244,6 +304,7 @@ async function handleAction(client: ClientConnection, payload: {
   action: string;
   amount?: number;
 }) {
+  recordActionAttempt();
   const tableId = payload.tableId;
   const tableState = await getTableState(tableId);
   if (!tableState || !tableState.hand) {
@@ -254,6 +315,7 @@ async function handleAction(client: ClientConnection, payload: {
       accepted: false,
       reason: "no_hand",
     });
+    recordActionRejected("no_hand");
     return;
   }
 
@@ -266,6 +328,7 @@ async function handleAction(client: ClientConnection, payload: {
       accepted: false,
       reason: "not_seated",
     });
+    recordActionRejected("not_seated");
     return;
   }
 
@@ -278,6 +341,8 @@ async function handleAction(client: ClientConnection, payload: {
       accepted: false,
       reason: "rate_limited",
     });
+    recordRateLimit("ws_action");
+    recordActionRejected("rate_limited");
     return;
   }
 
@@ -290,6 +355,7 @@ async function handleAction(client: ClientConnection, payload: {
       accepted: false,
       reason: "invalid_action",
     });
+    recordActionRejected("invalid_action");
     return;
   }
 
@@ -319,7 +385,7 @@ async function handleAction(client: ClientConnection, payload: {
       type: "TablePatch",
       tableId,
       handId: result.tableState.hand?.handId,
-      tableState: payload,
+      patch: payload,
     });
     await scheduleTurn(tableId);
   }
@@ -341,7 +407,7 @@ async function handleJoinSeat(client: ClientConnection, payload: { tableId: stri
       type: "TablePatch",
       tableId: payload.tableId,
       handId: result.tableState.hand?.handId,
-      tableState: payload,
+      patch: payload,
     });
     await scheduleTurn(payload.tableId);
   }
@@ -358,7 +424,7 @@ async function handleLeaveTable(client: ClientConnection, payload: { tableId: st
       type: "TablePatch",
       tableId: payload.tableId,
       handId: result.tableState.hand?.handId,
-      tableState: payload,
+      patch: payload,
     });
   }
 }
@@ -376,7 +442,7 @@ async function handleResync(client: ClientConnection, tableId: string) {
   if (tableState.hand) {
     const seat = tableState.seats.find((entry) => entry.userId === client.userId);
     const holeCards = seat ? tableState.hand.holeCards[seat.seatId] : undefined;
-    if (holeCards && holeCards.length === 2) {
+    if (canReceiveHoleCards(seat) && holeCards && holeCards.length === 2) {
       send(client.socket, {
         type: "HoleCards",
         tableId,
@@ -390,6 +456,18 @@ async function handleResync(client: ClientConnection, tableId: string) {
 }
 
 export function attachTableHub(socket: WebSocket, userId: string, connectionId: string) {
+  if (!handEventListenerAttached) {
+    onHandEvent((notification) => {
+      const sanitized = redactHandEvent(notification.event);
+      void broadcastTable(notification.tableId, {
+        type: "HandEvent",
+        tableId: notification.tableId,
+        handId: notification.handId,
+        event: sanitized,
+      });
+    });
+    handEventListenerAttached = true;
+  }
   const client: ClientConnection = {
     socket,
     userId,
@@ -403,13 +481,16 @@ export function attachTableHub(socket: WebSocket, userId: string, connectionId: 
     try {
       message = JSON.parse(data.toString());
     } catch {
+      recordWsError("invalid_json");
       return;
     }
 
     const type = message.type;
     if (type === "SubscribeTable") {
+      recordWsMessage("SubscribeTable");
       const tableId = parseTableId(message.tableId);
       if (!tableId) {
+        recordWsError("invalid_table");
         send(client.socket, { type: "Error", code: "invalid_table", message: "Missing tableId" });
         return;
       }
@@ -417,6 +498,7 @@ export function attachTableHub(socket: WebSocket, userId: string, connectionId: 
       return;
     }
     if (type === "UnsubscribeTable") {
+      recordWsMessage("UnsubscribeTable");
       const tableId = parseTableId(message.tableId);
       if (!tableId) {
         return;
@@ -425,9 +507,11 @@ export function attachTableHub(socket: WebSocket, userId: string, connectionId: 
       return;
     }
     if (type === "JoinSeat") {
+      recordWsMessage("JoinSeat");
       const tableId = parseTableId(message.tableId);
       const seatId = parseSeatId(message.seatId);
       if (!tableId || seatId === null) {
+        recordWsError("invalid_seat");
         send(client.socket, { type: "Error", code: "invalid_seat", message: "Invalid seat" });
         return;
       }
@@ -438,6 +522,7 @@ export function attachTableHub(socket: WebSocket, userId: string, connectionId: 
       return;
     }
     if (type === "LeaveTable") {
+      recordWsMessage("LeaveTable");
       const tableId = parseTableId(message.tableId);
       if (!tableId) {
         return;
@@ -446,8 +531,10 @@ export function attachTableHub(socket: WebSocket, userId: string, connectionId: 
       return;
     }
     if (type === "Action") {
+      recordWsMessage("Action");
       const tableId = parseTableId(message.tableId);
       if (!tableId) {
+        recordActionRejected("invalid_table");
         send(client.socket, { type: "ActionResult", accepted: false, reason: "invalid_table" });
         return;
       }
@@ -460,6 +547,7 @@ export function attachTableHub(socket: WebSocket, userId: string, connectionId: 
       return;
     }
     if (type === "ResyncTable") {
+      recordWsMessage("ResyncTable");
       const tableId = parseTableId(message.tableId);
       if (!tableId) {
         return;

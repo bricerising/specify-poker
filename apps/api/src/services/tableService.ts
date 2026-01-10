@@ -3,8 +3,18 @@ import { randomUUID } from "crypto";
 import { HandActionInput } from "../engine/types";
 import { applyAction } from "../engine/handEngine";
 import { recordHandCompletion } from "../engine/statTracker";
+import {
+  recordActionResult,
+  recordHandEnded,
+  recordHandShowdown,
+  recordHandStarted,
+  recordTableJoin,
+  recordTableLeave,
+  recordTableReconnect,
+} from "../observability/metrics";
 import { getTracer } from "../observability/otel";
 import { eventStore, HandEvent } from "./eventStore";
+import { emitHandEvent } from "./handEvents";
 import { getTable, updateTable } from "./tableRegistry";
 import { ensureTableState, getTableState, listTableStates, startHandIfReady, updateTableState } from "./tableState";
 
@@ -25,7 +35,7 @@ async function syncSummary(tableId: string) {
   });
 }
 
-async function recordEvent(handId: string, type: string, payload: Record<string, unknown>) {
+async function recordEvent(tableId: string, handId: string, type: string, payload: Record<string, unknown>) {
   const event: HandEvent = {
     eventId: randomUUID(),
     handId,
@@ -34,6 +44,7 @@ async function recordEvent(handId: string, type: string, payload: Record<string,
     ts: new Date().toISOString(),
   };
   await eventStore.append(event);
+  emitHandEvent({ tableId, handId, event });
 }
 
 export async function joinSeat(options: { tableId: string; seatId: number; userId: string }) {
@@ -54,6 +65,7 @@ export async function joinSeat(options: { tableId: string; seatId: number; userI
       seat.status = "active";
       await updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
       await syncSummary(state.tableId);
+      recordTableReconnect();
       return { ok: true, tableState: await getTableState(state.tableId) };
     }
     return { ok: false, reason: "already_seated" as const };
@@ -63,6 +75,7 @@ export async function joinSeat(options: { tableId: string; seatId: number; userI
     seat.status = "active";
     await updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
     await syncSummary(state.tableId);
+    recordTableReconnect();
     return { ok: true, tableState: await getTableState(state.tableId) };
   }
 
@@ -72,15 +85,17 @@ export async function joinSeat(options: { tableId: string; seatId: number; userI
 
   seat.userId = options.userId;
   seat.stack = summary.config.startingStack;
-  seat.status = "active";
+  seat.status = state.status === "in_hand" ? "spectator" : "active";
 
   const updated = { ...state, version: state.version + 1 };
   await updateTableState(state.tableId, () => updated);
   await syncSummary(state.tableId);
+  recordTableJoin();
 
   const handState = await startHandIfReady(state.tableId);
   if (handState?.hand) {
-    await recordEvent(handState.hand.handId, "HandStarted", { snapshot: handState.hand });
+    await recordEvent(state.tableId, handState.hand.handId, "HandStarted", { snapshot: handState.hand });
+    recordHandStarted(handState.hand.handId);
     await syncSummary(state.tableId);
   }
 
@@ -104,6 +119,7 @@ export async function leaveSeat(options: { tableId: string; userId: string }) {
 
   await updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
   await syncSummary(state.tableId);
+  recordTableLeave();
 
   return { ok: true, tableState: await getTableState(state.tableId) };
 }
@@ -126,6 +142,19 @@ export async function applyTableAction(options: {
   await updateTableState(options.tableId, () => result.table);
   await syncSummary(options.tableId);
 
+  const actionSpan = getTracer().startSpan("poker.action", {
+    attributes: {
+      "poker.table_id": options.tableId,
+      "poker.seat_id": options.seatId,
+      "poker.action_type": options.action.type,
+      "poker.action_amount": options.action.amount ?? 0,
+      "poker.action_accepted": result.accepted,
+      "poker.action_reason": result.reason ?? "",
+    },
+  });
+  actionSpan.end();
+  recordActionResult(options.action.type, result.accepted, result.reason ?? undefined);
+
   if (previousStreet && result.table.hand?.currentStreet && previousStreet !== result.table.hand.currentStreet) {
     const span = getTracer().startSpan("poker.hand.transition", {
       attributes: {
@@ -140,21 +169,39 @@ export async function applyTableAction(options: {
   const handEnded = result.table.hand?.currentStreet === "ended" && previousStreet !== "ended";
 
   if (handEnded && result.table.hand) {
+    const totalPot = result.table.hand.pots.reduce((sum, pot) => sum + pot.amount, 0);
+    const winners = result.table.hand.winners ?? [];
+    const outcomeSpan = getTracer().startSpan("poker.hand.outcome", {
+      attributes: {
+        "poker.table_id": options.tableId,
+        "poker.hand_id": result.table.hand.handId,
+        "poker.total_pot": totalPot,
+        "poker.winner_count": winners.length,
+        "poker.winner_seats": winners.join(","),
+      },
+    });
+    outcomeSpan.end();
+    recordHandEnded(result.table.hand.handId);
     await recordHandCompletion(result.table.hand, result.table.seats);
   }
 
   if (result.table.hand) {
-    await recordEvent(result.table.hand.handId, "ActionTaken", {
+    await recordEvent(options.tableId, result.table.hand.handId, "ActionTaken", {
       action: options.action,
       snapshot: result.table.hand,
     });
 
     if (result.table.hand.currentStreet === "showdown") {
-      await recordEvent(result.table.hand.handId, "Showdown", { snapshot: result.table.hand });
+      await recordEvent(options.tableId, result.table.hand.handId, "Showdown", {
+        snapshot: result.table.hand,
+      });
+      recordHandShowdown();
     }
 
     if (result.table.hand.currentStreet === "ended") {
-      await recordEvent(result.table.hand.handId, "HandEnded", { snapshot: result.table.hand });
+      await recordEvent(options.tableId, result.table.hand.handId, "HandEnded", {
+        snapshot: result.table.hand,
+      });
     }
   }
 
@@ -162,7 +209,10 @@ export async function applyTableAction(options: {
   if (handEnded) {
     const nextState = await startHandIfReady(options.tableId);
     if (nextState?.hand && nextState.hand.handId !== result.table.hand?.handId) {
-      await recordEvent(nextState.hand.handId, "HandStarted", { snapshot: nextState.hand });
+      await recordEvent(options.tableId, nextState.hand.handId, "HandStarted", {
+        snapshot: nextState.hand,
+      });
+      recordHandStarted(nextState.hand.handId);
       finalState = nextState;
       await syncSummary(options.tableId);
     }
@@ -195,5 +245,6 @@ export async function reconnectSeat(options: { tableId: string; userId: string }
   seat.status = "active";
   await updateTableState(state.tableId, () => ({ ...state, version: state.version + 1 }));
   await syncSummary(state.tableId);
+  recordTableReconnect();
   return getTableState(state.tableId);
 }

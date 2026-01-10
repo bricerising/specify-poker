@@ -20,6 +20,7 @@ describe("stat tracker", () => {
       currentTurnSeat: 0,
       currentBet: 0,
       minRaise: 0,
+      raiseCapped: false,
       roundContributions: { 0: 0, 1: 0 },
       totalContributions: { 0: 0, 1: 0 },
       actedSeats: [],

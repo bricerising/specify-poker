@@ -4,7 +4,7 @@ import { HandState, TableSeat } from "./types";
 export async function recordHandCompletion(hand: HandState, seats: TableSeat[]) {
   const winners = new Set(hand.winners ?? []);
   for (const seat of seats) {
-    if (!seat.userId || seat.status === "empty") {
+    if (!seat.userId || seat.status === "empty" || seat.status === "spectator") {
       continue;
     }
     await recordHandStats(seat.userId, {

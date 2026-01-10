@@ -116,7 +116,7 @@ async function waitForMessage(ws, predicate, timeoutMs = 1000) {
                 else {
                     sendAction(wsB, action);
                 }
-                tableState = (await nextPatch).tableState;
+                tableState = (await nextPatch).patch;
                 guard += 1;
             }
         };

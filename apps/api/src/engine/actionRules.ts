@@ -18,6 +18,7 @@ export function deriveLegalActions(hand: HandState, seat: TableSeat): LegalActio
 
   const actions: LegalAction[] = [];
   const toCall = getCallAmount(hand, seat);
+  const canRaise = !hand.raiseCapped || !hand.actedSeats.includes(seat.seatId);
 
   actions.push({ type: "Fold" });
 
@@ -29,7 +30,7 @@ export function deriveLegalActions(hand: HandState, seat: TableSeat): LegalActio
       } else {
         const contributed = hand.roundContributions[seat.seatId] ?? 0;
         const maxTotal = seat.stack + contributed;
-        if (maxTotal > hand.currentBet) {
+        if (canRaise && maxTotal > hand.currentBet) {
           const minRaise = Math.min(hand.currentBet + hand.minRaise, maxTotal);
           actions.push({
             type: "Raise",
@@ -43,7 +44,7 @@ export function deriveLegalActions(hand: HandState, seat: TableSeat): LegalActio
     actions.push({ type: "Call", maxAmount: Math.min(toCall, seat.stack) });
     const contributed = hand.roundContributions[seat.seatId] ?? 0;
     const maxTotal = seat.stack + contributed;
-    if (maxTotal > hand.currentBet) {
+    if (canRaise && maxTotal > hand.currentBet) {
       const minRaise = Math.min(hand.currentBet + hand.minRaise, maxTotal);
       actions.push({
         type: "Raise",

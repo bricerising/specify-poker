@@ -24,7 +24,7 @@ function signToken(userId: string) {
 
 type TablePatch = {
   type: string;
-  tableState: {
+  patch: {
     hand: { currentStreet: string };
     seats: { status: string }[];
   };
@@ -81,8 +81,8 @@ describe("turn timer", () => {
       });
     });
 
-    expect(patch.tableState.hand.currentStreet).toBe("preflop");
-    expect(patch.tableState.seats[0].status).toBe("active");
+    expect(patch.patch.hand.currentStreet).toBe("preflop");
+    expect(patch.patch.seats[0].status).toBe("active");
 
     wsA.close();
     server.close();

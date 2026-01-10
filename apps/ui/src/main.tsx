@@ -8,6 +8,7 @@ import { FriendsPage } from "./pages/FriendsPage";
 import { PokerArt } from "./components/PokerArt";
 import { initUiTelemetry, recordNavigation } from "./observability/otel";
 import { clearToken, hydrateTokenFromCallback, isAuthenticated, startLogin } from "./services/auth";
+import { ensurePushSubscription } from "./services/pushManager";
 import { tableStore } from "./state/tableStore";
 import { fetchProfile, UserProfile } from "./services/profileApi";
 
@@ -34,6 +35,12 @@ function PokerApp() {
       .catch((error: Error) => {
         console.warn("profile.fetch.failed", { message: error.message });
       });
+  }, []);
+
+  React.useEffect(() => {
+    ensurePushSubscription().catch((error: Error) => {
+      console.warn("push.subscribe.failed", { message: error.message });
+    });
   }, []);
 
   const handleClearToken = () => {

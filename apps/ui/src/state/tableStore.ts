@@ -35,7 +35,9 @@ export interface HandState {
   currentTurnSeat: number;
   currentBet: number;
   minRaise: number;
+  raiseCapped: boolean;
   roundContributions: Record<number, number>;
+  actedSeats: number[];
   communityCards: string[];
   pots: { amount: number; eligibleSeatIds: number[] }[];
   actionTimerDeadline: string | null;
@@ -70,6 +72,7 @@ export interface TableStore {
   getState(): TableStoreState;
   subscribe(listener: (state: TableStoreState) => void): () => void;
   fetchTables(): Promise<void>;
+  subscribeLobby(): void;
   joinSeat(tableId: string, seatId: number): Promise<void>;
   subscribeTable(tableId: string): void;
   sendAction(action: { type: string; amount?: number }): void;
@@ -134,7 +137,9 @@ export function createTableStore(): TableStore {
     socket.addEventListener("message", (event) => {
       const message = JSON.parse(event.data as string);
       if (message.type === "TableSnapshot" || message.type === "TablePatch") {
-        const incoming = message.tableState as TableState | undefined;
+        const incoming = message.type === "TableSnapshot"
+          ? (message.tableState as TableState | undefined)
+          : (message.patch as TableState | undefined);
         if (!incoming) {
           return;
         }
@@ -171,6 +176,13 @@ export function createTableStore(): TableStore {
         setState({ chatError: message.reason });
         return;
       }
+      if (message.type === "LobbyTablesUpdated") {
+        const tables = message.tables as TableSummary[] | undefined;
+        if (tables) {
+          setState({ tables });
+        }
+        return;
+      }
       if (message.type === "TimerUpdate") {
         const handId = message.handId as string | undefined;
         const deadlineTs = message.deadlineTs as string | undefined;
@@ -203,6 +215,9 @@ export function createTableStore(): TableStore {
       const tables = (await response.json()) as TableSummary[];
       setState({ tables });
     },
+    subscribeLobby: () => {
+      connect();
+    },
     joinSeat: async (tableId, seatId) => {
       const response = await apiFetch(`/api/tables/${tableId}/join`, {
         method: "POST",
@@ -212,11 +227,18 @@ export function createTableStore(): TableStore {
       const payload = await response.json();
       setState({ seatId, chatMessages: [], chatError: undefined, privateHoleCards: null, privateHandId: null });
       connect(payload.wsUrl);
-      if (socket) {
-        socket.addEventListener("open", () => {
-          socket?.send(JSON.stringify({ type: "SubscribeTable", tableId }));
-          socket?.send(JSON.stringify({ type: "SubscribeChat", tableId }));
-        });
+      const subscribe = () => {
+        socket?.send(JSON.stringify({ type: "SubscribeTable", tableId }));
+        socket?.send(JSON.stringify({ type: "SubscribeChat", tableId }));
+      };
+      if (socket?.readyState === WebSocket.OPEN) {
+        subscribe();
+      } else if (socket) {
+        const handleOpen = () => {
+          subscribe();
+          socket?.removeEventListener("open", handleOpen);
+        };
+        socket.addEventListener("open", handleOpen);
       }
     },
     subscribeTable: (tableId) => {

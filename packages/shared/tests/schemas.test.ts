@@ -44,8 +44,8 @@ describe("shared schemas", () => {
     };
 
     expect(userProfileSchema.parse(profile)).toEqual(profile);
-    expect(moderationRequestSchema.parse({ targetUserId: "user-2" })).toEqual({
-      targetUserId: "user-2",
+    expect(moderationRequestSchema.parse({ seatId: 2 })).toEqual({
+      seatId: 2,
     });
   });
 

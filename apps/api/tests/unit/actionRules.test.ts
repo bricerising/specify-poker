@@ -16,6 +16,7 @@ function createHand(overrides: Partial<HandState> = {}): HandState {
     currentTurnSeat: 0,
     currentBet: 10,
     minRaise: 10,
+    raiseCapped: false,
     roundContributions: { 0: 0, 1: 10 },
     totalContributions: { 0: 0, 1: 10 },
     actedSeats: [],
@@ -53,6 +54,20 @@ describe("action rules", () => {
 
     const raise = deriveLegalActions(hand, seat).find((action) => action.type === "Raise");
     expect(raise).toEqual({ type: "Raise", minAmount: 15, maxAmount: 15 });
+  });
+
+  it("blocks raises for seats that already acted after a capped raise", () => {
+    const hand = createHand({
+      currentBet: 20,
+      minRaise: 10,
+      raiseCapped: true,
+      actedSeats: [0],
+      roundContributions: { 0: 10, 1: 20 },
+    });
+    const seat: TableSeat = { seatId: 0, userId: "u1", stack: 100, status: "active" };
+
+    const raise = deriveLegalActions(hand, seat).find((action) => action.type === "Raise");
+    expect(raise).toBeUndefined();
   });
 
   it("creates side pots based on contributions", () => {

@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from "express";
+import { recordRateLimit } from "../../observability/metrics";
 
 type Bucket = {
   count: number;
@@ -32,6 +33,7 @@ export function rateLimitMiddleware(req: Request, res: Response, next: NextFunct
   bucket.count += 1;
 
   if (bucket.count > getMaxRequests()) {
+    recordRateLimit("http");
     res
       .status(429)
       .json({ code: "rate_limited", message: "Too many requests, slow down." });

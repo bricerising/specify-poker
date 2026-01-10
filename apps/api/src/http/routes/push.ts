@@ -1,9 +1,18 @@
 import express from "express";
 
 import { pushNotifications } from "../../services/pushNotifications";
+import { getVapidPublicKey } from "../../services/pushSender";
 
 export function createPushRouter() {
   const router = express.Router();
+
+  router.get("/api/push/vapid", (_req, res) => {
+    const publicKey = getVapidPublicKey();
+    if (!publicKey) {
+      return res.status(503).json({ code: "vapid_missing", message: "VAPID key not configured" });
+    }
+    return res.status(200).json({ publicKey });
+  });
 
   router.post("/api/push/subscribe", async (req, res) => {
     if (!req.auth) {

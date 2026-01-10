@@ -61,8 +61,8 @@ function signToken(userId) {
                 }
             });
         });
-        (0, vitest_1.expect)(patch.tableState.hand.currentStreet).toBe("ended");
-        (0, vitest_1.expect)(patch.tableState.seats[0].status).toBe("active");
+        (0, vitest_1.expect)(patch.patch.hand.currentStreet).toBe("ended");
+        (0, vitest_1.expect)(patch.patch.seats[0].status).toBe("active");
         wsA.close();
         server.close();
     });

@@ -38,7 +38,13 @@
 
 - Import the Keycloak realm config from `infra/keycloak/`.
 - Ensure the UI origin is allowed in Keycloak client settings.
+- To enable Google login, create a Google OAuth client and add a Keycloak Identity Provider:
+  - Redirect URI: `http://localhost:8080/realms/poker-local/broker/google/endpoint`
+  - In Keycloak Admin UI, add Identity Providers -> Google, then set the client ID/secret.
 - Use demo users or enable self-registration for local testing.
+- For turn notifications, generate VAPID keys and set env vars before starting the stack:
+  - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (e.g. `mailto:you@example.com`)
+  - Example: `npx web-push generate-vapid-keys`
 - Grafana provisions the "Poker Observability" dashboard automatically.
 - In Grafana, confirm the Prometheus data source points to `http://prometheus:9090`.
 

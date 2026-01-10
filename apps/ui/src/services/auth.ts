@@ -1,3 +1,5 @@
+import { trace } from "@opentelemetry/api";
+
 const TOKEN_KEY = "poker.auth.token";
 const DEFAULT_KEYCLOAK_URL = "http://localhost:8080";
 const DEFAULT_REALM = "poker-local";
@@ -60,6 +62,13 @@ export async function startLogin(redirectUri: string) {
   const challenge = await sha256(verifier);
 
   sessionStorage.setItem(PKCE_STORAGE_KEY, verifier);
+  const tracer = trace.getTracer("ui");
+  const span = tracer.startSpan("ui.auth.start", {
+    attributes: {
+      "auth.provider": "keycloak",
+    },
+  });
+  span.end();
 
   const authorizeUrl = `${keycloakUrl}/realms/${realm}/protocol/openid-connect/auth`;
   const params = new URLSearchParams({
@@ -111,6 +120,13 @@ export async function hydrateTokenFromCallback() {
 
   if (accessToken) {
     setToken(accessToken);
+    const tracer = trace.getTracer("ui");
+    const span = tracer.startSpan("ui.auth.login", {
+      attributes: {
+        "auth.provider": "keycloak",
+      },
+    });
+    span.end();
     sessionStorage.removeItem(PKCE_STORAGE_KEY);
     window.history.replaceState({}, document.title, window.location.pathname);
   }

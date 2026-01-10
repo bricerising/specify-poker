@@ -13,6 +13,8 @@ export interface HandState {
   currentTurnSeat: number;
   roundContributions: Record<number, number>;
   bigBlind: number;
+  raiseCapped: boolean;
+  actedSeats: number[];
 }
 
 export interface TableState {
@@ -41,6 +43,7 @@ export function deriveLegalActions(table: TableState, seatId: number): LegalActi
 
   const contributed = hand.roundContributions[seatId] ?? 0;
   const toCall = Math.max(0, hand.currentBet - contributed);
+  const canRaise = !hand.raiseCapped || !hand.actedSeats.includes(seatId);
   const actions: LegalAction[] = [{ type: "Fold" }];
 
   if (toCall <= 0) {
@@ -49,7 +52,7 @@ export function deriveLegalActions(table: TableState, seatId: number): LegalActi
       actions.push({ type: "Bet", minAmount: hand.bigBlind, maxAmount: seat.stack });
     } else {
       const maxTotal = seat.stack + contributed;
-      if (maxTotal > hand.currentBet) {
+      if (canRaise && maxTotal > hand.currentBet) {
         const minRaise = Math.min(hand.currentBet + hand.minRaise, maxTotal);
         actions.push({ type: "Raise", minAmount: minRaise, maxAmount: maxTotal });
       }
@@ -57,7 +60,7 @@ export function deriveLegalActions(table: TableState, seatId: number): LegalActi
   } else {
     actions.push({ type: "Call", maxAmount: Math.min(toCall, seat.stack) });
     const maxTotal = seat.stack + contributed;
-    if (maxTotal > hand.currentBet) {
+    if (canRaise && maxTotal > hand.currentBet) {
       const minRaise = Math.min(hand.currentBet + hand.minRaise, maxTotal);
       actions.push({ type: "Raise", minAmount: minRaise, maxAmount: maxTotal });
     }

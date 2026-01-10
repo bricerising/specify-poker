@@ -102,6 +102,8 @@ test("smoke flow: login, create table, join, play hand", async ({ page }) => {
           currentBet: 0,
           minRaise: 10,
           roundContributions: { 0: 0, 1: 0 },
+          raiseCapped: false,
+          actedSeats: [],
           communityCards: [],
           pots: [{ amount: 0, eligibleSeatIds: [0] }],
           actionTimerDeadline: null,
@@ -142,7 +144,7 @@ test("smoke flow: login, create table, join, play hand", async ({ page }) => {
             version: this.tableState.version + 1,
           };
           this.emit("message", {
-            data: JSON.stringify({ type: "TablePatch", tableState: this.tableState }),
+            data: JSON.stringify({ type: "TablePatch", patch: this.tableState }),
           });
         }
       }

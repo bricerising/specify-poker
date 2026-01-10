@@ -36,7 +36,7 @@ export function CreateTableForm({ onCreate }: CreateTableFormProps) {
     if (!Number.isInteger(parsed.maxPlayers) || parsed.maxPlayers < 2 || parsed.maxPlayers > 9) {
       return false;
     }
-    if (!Number.isFinite(parsed.startingStack) || parsed.startingStack <= parsed.bigBlind) {
+    if (!Number.isFinite(parsed.startingStack) || parsed.startingStack <= 0) {
       return false;
     }
     return true;

@@ -3,7 +3,8 @@ import { trace } from "@opentelemetry/api";
 
 import { CreateTableForm } from "../components/CreateTableForm";
 import { PokerArt } from "../components/PokerArt";
-import { createTable, listTables } from "../services/lobbyApi";
+import { createTable } from "../services/lobbyApi";
+import { fetchProfile, UserProfile } from "../services/profileApi";
 import { TableStore, tableStore, TableSummary } from "../state/tableStore";
 
 interface LobbyPageProps {
@@ -11,15 +12,15 @@ interface LobbyPageProps {
 }
 
 export function LobbyPage({ store = tableStore }: LobbyPageProps) {
-  const [tables, setTables] = useState<TableSummary[]>([]);
+  const [tables, setTables] = useState<TableSummary[]>(store.getState().tables);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "loading">("idle");
+  const [profile, setProfile] = useState<UserProfile | null>(null);
 
   const loadTables = async () => {
     setStatus("loading");
     try {
-      const next = await listTables();
-      setTables(next);
+      await store.fetchTables();
       setError(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to load lobby";
@@ -30,9 +31,18 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
   };
 
   useEffect(() => {
+    const unsubscribe = store.subscribe((next) => setTables(next.tables));
     loadTables();
-    const interval = window.setInterval(loadTables, 2000);
-    return () => window.clearInterval(interval);
+    store.subscribeLobby();
+    return () => unsubscribe();
+  }, [store]);
+
+  useEffect(() => {
+    fetchProfile()
+      .then((data) => setProfile(data))
+      .catch((err: Error) => {
+        console.warn("profile.fetch.failed", { message: err.message });
+      });
   }, []);
 
   useEffect(() => {
@@ -111,6 +121,8 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
     );
   });
 
+  const profileInitials = profile ? profile.nickname.slice(0, 2).toUpperCase() : "";
+
   return (
     <section className="page">
       <div className="page-header">
@@ -121,7 +133,37 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
         </div>
         <PokerArt variant="hero" />
       </div>
-      <CreateTableForm onCreate={handleCreate} />
+      <div className="table-grid">
+        <CreateTableForm onCreate={handleCreate} />
+        {profile ? (
+          <div className="card profile-panel">
+            <h3>Your Profile</h3>
+            <div className="profile-summary">
+              <div className="avatar">
+                {profile.avatarUrl ? (
+                  <img src={profile.avatarUrl} alt={`${profile.nickname} avatar`} />
+                ) : (
+                  <span>{profileInitials}</span>
+                )}
+              </div>
+              <div>
+                <div className="meta-line">Nickname</div>
+                <div className="table-name">{profile.nickname}</div>
+              </div>
+            </div>
+            <div className="stat-grid">
+              <div className="stat">
+                <strong>{profile.stats.handsPlayed}</strong>
+                Hands Played
+              </div>
+              <div className="stat">
+                <strong>{profile.stats.wins}</strong>
+                Wins
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
       <div className="table-list">
         {status === "loading" ? <div className="meta-line">Loading tables...</div> : null}
         {tableRows.length === 0 ? <div className="meta-line">No tables yet.</div> : tableRows}

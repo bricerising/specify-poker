@@ -113,6 +113,25 @@ components:
       properties:
         seatId:
           type: integer
+    PushSubscription:
+      type: object
+      required: [endpoint]
+      properties:
+        endpoint:
+          type: string
+        keys:
+          type: object
+          properties:
+            p256dh:
+              type: string
+            auth:
+              type: string
+    VapidPublicKey:
+      type: object
+      required: [publicKey]
+      properties:
+        publicKey:
+          type: string
 
 security:
   - bearerAuth: []
@@ -124,6 +143,63 @@ paths:
       responses:
         '200':
           description: OK
+
+  /api/push/vapid:
+    get:
+      summary: Get VAPID public key
+      responses:
+        '200':
+          description: VAPID public key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VapidPublicKey'
+        '503':
+          description: VAPID missing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/push/subscribe:
+    post:
+      summary: Register push subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushSubscription'
+      responses:
+        '204':
+          description: Subscription stored
+        '400':
+          description: Invalid subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      summary: Remove push subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint]
+              properties:
+                endpoint:
+                  type: string
+      responses:
+        '204':
+          description: Subscription removed
+        '400':
+          description: Invalid subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/me:
     get:

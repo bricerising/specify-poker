@@ -7,7 +7,7 @@ import { ModerationMenu } from "../components/ModerationMenu";
 import { PokerArt } from "../components/PokerArt";
 import { deriveLegalActions } from "../state/deriveLegalActions";
 import { TableStore, tableStore } from "../state/tableStore";
-import { fetchProfile } from "../services/profileApi";
+import { fetchProfile, UserProfile } from "../services/profileApi";
 
 interface TablePageProps {
   store?: TableStore;
@@ -15,7 +15,7 @@ interface TablePageProps {
 
 export function TablePage({ store = tableStore }: TablePageProps) {
   const [state, setState] = useState(store.getState());
-  const [userId, setUserId] = useState<string | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => store.subscribe(setState), [store]);
@@ -26,8 +26,8 @@ export function TablePage({ store = tableStore }: TablePageProps) {
 
   useEffect(() => {
     fetchProfile()
-      .then((profile) => {
-        setUserId(profile.userId ?? null);
+      .then((data) => {
+        setProfile(data);
       })
       .catch((error: Error) => {
         console.warn("profile.fetch.failed", { message: error.message });
@@ -87,6 +87,9 @@ export function TablePage({ store = tableStore }: TablePageProps) {
     ));
   };
 
+  const profileInitials = profile ? profile.nickname.slice(0, 2).toUpperCase() : "";
+  const userId = profile?.userId ?? null;
+
   return (
     <section className="page">
       <div className="page-header">
@@ -144,9 +147,37 @@ export function TablePage({ store = tableStore }: TablePageProps) {
             ))}
           </div>
         </div>
+        {profile ? (
+          <div className="card profile-panel">
+            <h3>Your Profile</h3>
+            <div className="profile-summary">
+              <div className="avatar">
+                {profile.avatarUrl ? (
+                  <img src={profile.avatarUrl} alt={`${profile.nickname} avatar`} />
+                ) : (
+                  <span>{profileInitials}</span>
+                )}
+              </div>
+              <div>
+                <div className="meta-line">Nickname</div>
+                <div className="table-name">{profile.nickname}</div>
+              </div>
+            </div>
+            <div className="stat-grid">
+              <div className="stat">
+                <strong>{profile.stats.handsPlayed}</strong>
+                Hands Played
+              </div>
+              <div className="stat">
+                <strong>{profile.stats.wins}</strong>
+                Wins
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
       <div className="table-actions">
-        <ActionBar actions={actions} onAction={(action) => store.sendAction(action)} />
+        <ActionBar actions={actions} pot={pot} onAction={(action) => store.sendAction(action)} />
         <ChatPanel
           messages={state.chatMessages}
           onSend={(message) => store.sendChat(message)}

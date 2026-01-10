@@ -140,6 +140,15 @@ description: "Task list template for feature implementation"
 
 ---
 
+## Phase 6b: Spec Alignment Updates — Milestone M6.1
+
+- [X] T045 [P] [Spec] Add spectator seat handling for mid-hand joins in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/tableService.ts, /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/tableState.ts, /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/handEngine.ts, and /Users/bricerising/git/brice@github/specify-poker/apps/api/src/engine/statTracker.ts; Goal: join mid-hand as spectator until next hand; AC: spectator seats are ignored during the current hand and activated for the next; Tests: N/A; Obs: N/A (state-only change)
+- [X] T046 [P] [Spec] Add Web Push turn notifications and subscription flow in /Users/bricerising/git/brice@github/specify-poker/apps/api/src/services/pushSender.ts, /Users/bricerising/git/brice@github/specify-poker/apps/api/src/http/routes/push.ts, /Users/bricerising/git/brice@github/specify-poker/apps/api/src/ws/tableHub.ts, /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/services/pushManager.ts, and /Users/bricerising/git/brice@github/specify-poker/apps/ui/public/sw.js; Goal: notify players when it is their turn; AC: push registration succeeds with VAPID keys and notifications fire on turn changes; Tests: N/A; Obs: metric poker_push_notifications_total
+- [X] T047 [P] [Spec] Document Google login and VAPID configuration in /Users/bricerising/git/brice@github/specify-poker/specs/001-poker-mvp/quickstart.md and /Users/bricerising/git/brice@github/specify-poker/docker-compose.yml; Goal: local setup includes Google IdP and push key guidance; AC: quickstart includes Keycloak IdP and VAPID steps; Tests: N/A; Obs: N/A (documentation only)
+- [X] T048 [P] [Spec] Add action sizing presets and slider in /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/components/ActionBar.tsx and /Users/bricerising/git/brice@github/specify-poker/apps/ui/src/pages/TablePage.tsx; Goal: 1/2 pot, pot, and all-in shortcuts; AC: players can size bets quickly with presets; Tests: N/A; Obs: span ui.action.submit
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

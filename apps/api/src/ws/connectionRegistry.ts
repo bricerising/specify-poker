@@ -1,3 +1,4 @@
+import { updateActiveConnections } from "../observability/metrics";
 import { getRedisClient } from "../services/redisClient";
 
 export interface ConnectionInfo {
@@ -13,6 +14,7 @@ export async function registerConnection(info: ConnectionInfo) {
   if (redis) {
     await redis.hSet(CONNECTIONS_KEY, info.connectionId, JSON.stringify(info));
   }
+  updateActiveConnections(1);
 }
 
 export async function unregisterConnection(connectionId: string) {
@@ -20,6 +22,7 @@ export async function unregisterConnection(connectionId: string) {
   if (redis) {
     await redis.hDel(CONNECTIONS_KEY, connectionId);
   }
+  updateActiveConnections(-1);
 }
 
 export async function getConnection(connectionId: string) {

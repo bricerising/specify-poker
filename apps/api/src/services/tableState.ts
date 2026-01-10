@@ -119,10 +119,19 @@ export async function startHandIfReady(tableId: string) {
     if (state.status === "in_hand") {
       return state;
     }
-    const readySeats = state.seats.filter((seat) => seat.status === "active");
+    let promoted = false;
+    const seats = state.seats.map((seat) => {
+      if (seat.status === "spectator") {
+        promoted = true;
+        return { ...seat, status: "active" as const };
+      }
+      return seat;
+    });
+    const nextState = promoted ? { ...state, seats } : state;
+    const readySeats = nextState.seats.filter((seat) => seat.status === "active");
     if (readySeats.length < 2) {
-      return state;
+      return nextState;
     }
-    return startHand(state);
+    return startHand(nextState);
   });
 }

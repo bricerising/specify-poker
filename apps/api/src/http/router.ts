@@ -2,6 +2,7 @@ import express from "express";
 
 import { authMiddleware } from "./middleware/auth";
 import { rateLimitMiddleware } from "./middleware/rateLimit";
+import { renderPrometheusMetrics } from "../observability/metrics";
 import { createAuditRouter } from "./routes/audit";
 import { createModerationRouter } from "./routes/moderation";
 import { createProfileRouter } from "./routes/profile";
@@ -14,6 +15,10 @@ export function createRouter() {
 
   router.get("/api/health", (_req, res) => {
     res.status(200).json({ status: "ok" });
+  });
+  router.get("/metrics", (_req, res) => {
+    res.setHeader("Content-Type", "text/plain; version=0.0.4");
+    res.status(200).send(renderPrometheusMetrics());
   });
 
   router.use(express.json());

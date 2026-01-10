@@ -25,6 +25,8 @@ export function createTablesRouter() {
     const bigBlind = Number(config.bigBlind);
     const maxPlayers = Number(config.maxPlayers);
     const startingStack = Number(config.startingStack);
+    const anteInput = config.ante;
+    const ante = anteInput === undefined || anteInput === null ? anteInput : Number(anteInput);
 
     if (!name) {
       return res.status(400).json({ code: "invalid_name", message: "name required" });
@@ -42,8 +44,16 @@ export function createTablesRouter() {
         .status(400)
         .json({ code: "invalid_max_players", message: "maxPlayers must be 2-9" });
     }
-    if (!Number.isFinite(startingStack) || startingStack <= bigBlind) {
+    if (!Number.isFinite(startingStack) || startingStack <= 0) {
       return res.status(400).json({ code: "invalid_starting_stack", message: "startingStack required" });
+    }
+    if (ante !== undefined && ante !== null) {
+      if (!Number.isFinite(ante) || ante < 0) {
+        return res.status(400).json({ code: "invalid_ante", message: "ante must be >= 0" });
+      }
+      if (ante >= smallBlind) {
+        return res.status(400).json({ code: "invalid_ante", message: "ante must be < smallBlind" });
+      }
     }
 
     const summary = await createTable({
@@ -52,6 +62,7 @@ export function createTablesRouter() {
       config: {
         smallBlind,
         bigBlind,
+        ...(ante !== undefined ? { ante } : {}),
         maxPlayers,
         startingStack,
         bettingStructure: "NoLimit",

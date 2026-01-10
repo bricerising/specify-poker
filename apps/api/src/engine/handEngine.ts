@@ -133,6 +133,7 @@ export function startHand(
     currentTurnSeat: getActionOrderSeat(table.seats, bigBlindSeat),
     currentBet: bigBlindAmount,
     minRaise: table.config.bigBlind,
+    raiseCapped: false,
     roundContributions,
     totalContributions,
     actedSeats: [],
@@ -229,6 +230,7 @@ function advanceStreet(hand: HandState, seats: TableSeat[], now: () => string) {
   hand.roundContributions = resetRoundContributions(seats);
   hand.currentBet = 0;
   hand.minRaise = hand.bigBlind;
+  hand.raiseCapped = false;
   hand.currentTurnSeat = getActionOrderSeat(seats, hand.buttonSeat);
   hand.actionTimerDeadline = null;
   hand.actedSeats = [];
@@ -245,7 +247,9 @@ function advanceStreet(hand: HandState, seats: TableSeat[], now: () => string) {
 }
 
 function settleShowdown(hand: HandState, seats: TableSeat[]) {
-  const eligibleSeats = seats.filter((seat) => seat.status !== "folded" && seat.userId);
+  const eligibleSeats = seats.filter(
+    (seat) => seat.userId && seat.status !== "folded" && seat.status !== "spectator",
+  );
   const players: Record<number, string[]> = {};
   for (const seat of eligibleSeats) {
     players[seat.seatId] = hand.holeCards[seat.seatId] ?? [];
@@ -332,6 +336,8 @@ export function applyAction(
   }
 
   const now = options.now ?? (() => new Date().toISOString());
+  const previousMinRaise = hand.minRaise;
+  let resetActedSeats = false;
 
   if (action.type === "Fold") {
     seat.status = "folded";
@@ -351,8 +357,10 @@ export function applyAction(
     seat.stack -= amount;
     hand.currentBet = amount;
     hand.minRaise = amount;
+    hand.raiseCapped = false;
     hand.roundContributions[seatId] = amount;
     hand.totalContributions[seatId] = (hand.totalContributions[seatId] ?? 0) + amount;
+    resetActedSeats = true;
     if (seat.stack === 0) {
       seat.status = "all_in";
     }
@@ -362,7 +370,13 @@ export function applyAction(
     const additional = amount - (hand.roundContributions[seatId] ?? 0);
     seat.stack -= Math.max(0, additional);
     hand.currentBet = amount;
-    hand.minRaise = Math.max(raiseSize, hand.minRaise);
+    if (raiseSize >= previousMinRaise) {
+      hand.minRaise = raiseSize;
+      hand.raiseCapped = false;
+      resetActedSeats = true;
+    } else {
+      hand.raiseCapped = true;
+    }
     hand.roundContributions[seatId] = amount;
     hand.totalContributions[seatId] = (hand.totalContributions[seatId] ?? 0) + Math.max(0, additional);
     if (seat.stack === 0) {
@@ -371,7 +385,9 @@ export function applyAction(
   }
 
   hand.pots = calculatePots(hand.totalContributions, getFoldedSeatIds(table.seats));
-  if (!hand.actedSeats.includes(seatId)) {
+  if (resetActedSeats) {
+    hand.actedSeats = [seatId];
+  } else if (!hand.actedSeats.includes(seatId)) {
     hand.actedSeats.push(seatId);
   }
 

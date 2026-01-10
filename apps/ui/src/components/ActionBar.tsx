@@ -5,10 +5,11 @@ import { ActionType, LegalAction } from "../state/deriveLegalActions";
 
 interface ActionBarProps {
   actions: LegalAction[];
+  pot: number;
   onAction: (action: { type: ActionType; amount?: number }) => void;
 }
 
-export function ActionBar({ actions, onAction }: ActionBarProps) {
+export function ActionBar({ actions, pot, onAction }: ActionBarProps) {
   const [amount, setAmount] = useState("0");
 
   const actionable = useMemo(() => actions.map((action) => action.type), [actions]);
@@ -19,6 +20,21 @@ export function ActionBar({ actions, onAction }: ActionBarProps) {
     }
     return map;
   }, [actions]);
+
+  const betLimits = constraints.get("Raise") ?? constraints.get("Bet");
+  const rangeMin = betLimits?.min ?? 0;
+  const rangeMax = betLimits?.max ?? 0;
+
+  const clampAmount = (value: number) => {
+    let resolved = Number.isNaN(value) ? 0 : value;
+    if (betLimits?.min !== undefined) {
+      resolved = Math.max(resolved, betLimits.min);
+    }
+    if (betLimits?.max !== undefined) {
+      resolved = Math.min(resolved, betLimits.max);
+    }
+    return Math.max(0, Math.floor(resolved));
+  };
 
   React.useEffect(() => {
     const raise = actions.find((action) => action.type === "Raise");
@@ -78,6 +94,36 @@ export function ActionBar({ actions, onAction }: ActionBarProps) {
           onChange={(event) => setAmount(event.target.value)}
         />
       </label>
+      {betLimits ? (
+        <>
+          <label className="field">
+            <span className="field-label">Bet sizing</span>
+            <input
+              type="range"
+              min={rangeMin}
+              max={rangeMax}
+              step={1}
+              value={clampAmount(Number(amount))}
+              onChange={(event) => setAmount(String(clampAmount(Number(event.target.value))))}
+            />
+          </label>
+          <div className="action-buttons">
+            <button type="button" className="btn btn-ghost" onClick={() => setAmount(String(clampAmount(pot / 2)))}>
+              1/2 Pot
+            </button>
+            <button type="button" className="btn btn-ghost" onClick={() => setAmount(String(clampAmount(pot)))}>
+              Pot
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setAmount(String(clampAmount(betLimits.max ?? 0)))}
+            >
+              All-in
+            </button>
+          </div>
+        </>
+      ) : null}
       <div className="action-buttons">
         {actionable.map((action) => (
           <button

@@ -2,14 +2,23 @@ import { z } from "zod";
 
 export const schemaVersion = "0.1.0";
 
-export const tableConfigSchema = z.object({
-  smallBlind: z.number().int().positive(),
-  bigBlind: z.number().int().positive(),
-  ante: z.number().int().nonnegative().nullable().optional(),
-  maxPlayers: z.number().int().min(2).max(9),
-  startingStack: z.number().int().positive(),
-  bettingStructure: z.literal("NoLimit"),
-});
+export const tableConfigSchema = z
+  .object({
+    smallBlind: z.number().int().positive(),
+    bigBlind: z.number().int().positive(),
+    ante: z.number().int().nonnegative().nullable().optional(),
+    maxPlayers: z.number().int().min(2).max(9),
+    startingStack: z.number().int().positive(),
+    bettingStructure: z.literal("NoLimit"),
+  })
+  .refine((data) => data.bigBlind >= data.smallBlind * 2, {
+    message: "bigBlind must be >= 2 * smallBlind",
+    path: ["bigBlind"],
+  })
+  .refine((data) => data.ante == null || data.ante < data.smallBlind, {
+    message: "ante must be < smallBlind",
+    path: ["ante"],
+  });
 
 export const userProfileSchema = z.object({
   userId: z.string(),
@@ -46,5 +55,5 @@ export const tableJoinResponseSchema = z.object({
 });
 
 export const moderationRequestSchema = z.object({
-  targetUserId: z.string(),
+  seatId: z.number().int().min(0).max(8),
 });

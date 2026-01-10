@@ -7,6 +7,7 @@ import { getTracer } from "../observability/otel";
 import { markSeatDisconnected } from "../services/tableService";
 import { getConnection, registerConnection, unregisterConnection } from "./connectionRegistry";
 import { attachChatHub, handleChatPubSubEvent } from "./chatHub";
+import { attachLobbyHub, handleLobbyPubSubEvent, initLobbyHub } from "./lobbyHub";
 import { attachTableHub, handleTablePubSubEvent, handleTimerPubSubEvent } from "./tableHub";
 import { initWsPubSub } from "./pubsub";
 
@@ -16,7 +17,9 @@ export function attachWebSocketServer(server: http.Server) {
     onTableEvent: handleTablePubSubEvent,
     onChatEvent: handleChatPubSubEvent,
     onTimerEvent: handleTimerPubSubEvent,
+    onLobbyEvent: handleLobbyPubSubEvent,
   });
+  initLobbyHub();
 
   wss.on("connection", async (socket, request) => {
     const requestUrl = request.url ?? "";
@@ -62,12 +65,21 @@ export function attachWebSocketServer(server: http.Server) {
 
     attachTableHub(socket, userId, connectionId);
     attachChatHub(socket, userId, connectionId);
+    attachLobbyHub(socket, connectionId);
 
     socket.on("close", () => {
       void getConnection(connectionId).then(async (connection) => {
-        if (connection?.userId) {
-          await markSeatDisconnected(connection.userId);
+        const disconnectedUser = connection?.userId ?? userId;
+        if (disconnectedUser) {
+          await markSeatDisconnected(disconnectedUser);
         }
+        const span = getTracer().startSpan("poker.ws.disconnect", {
+          attributes: {
+            "poker.user_id": disconnectedUser ?? "unknown",
+            "poker.connection_id": connectionId,
+          },
+        });
+        span.end();
         await unregisterConnection(connectionId);
       });
     });

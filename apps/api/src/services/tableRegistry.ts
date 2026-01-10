@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 
 import { getRedisClient } from "./redisClient";
+import { emitLobbyUpdate } from "./lobbyEvents";
 import { ensureTableState } from "./tableState";
 import { TableSummary } from "./tableTypes";
 
@@ -31,6 +32,7 @@ export async function createTable(
   }
   cacheTable(summary);
   await ensureTableState(summary);
+  emitLobbyUpdate();
   return summary;
 }
 
@@ -72,6 +74,7 @@ export async function updateTable(tableId: string, updater: (table: TableSummary
     await redis.hSet(TABLES_KEY, tableId, JSON.stringify(next));
   }
   cacheTable(next);
+  emitLobbyUpdate();
   return next;
 }
 
@@ -81,6 +84,7 @@ export async function resetTables() {
   if (redis) {
     await redis.del(TABLES_KEY);
   }
+  emitLobbyUpdate();
 }
 
 export async function createDefaultTable() {
