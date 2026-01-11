@@ -22,7 +22,7 @@ components:
           type: string
     UserProfile:
       type: object
-      required: [userId, nickname, avatarUrl, stats]
+      required: [userId, nickname, avatarUrl, stats, friends]
       properties:
         userId:
           type: string
@@ -61,20 +61,80 @@ components:
         bettingStructure:
           type: string
           enum: [NoLimit]
+    TableCreateConfig:
+      type: object
+      required: [smallBlind, bigBlind, maxPlayers, startingStack]
+      properties:
+        smallBlind:
+          type: integer
+        bigBlind:
+          type: integer
+        ante:
+          type: integer
+          nullable: true
+        maxPlayers:
+          type: integer
+        startingStack:
+          type: integer
     TableSummary:
       type: object
-      required: [tableId, name, config, seatsTaken, inProgress]
+      required: [tableId, name, ownerId, config, seatsTaken, occupiedSeatIds, inProgress]
       properties:
         tableId:
           type: string
         name:
           type: string
+        ownerId:
+          type: string
         config:
           $ref: '#/components/schemas/TableConfig'
         seatsTaken:
           type: integer
+        occupiedSeatIds:
+          type: array
+          items:
+            type: integer
         inProgress:
           type: boolean
+    TableSeat:
+      type: object
+      required: [seatId, userId, stack, status]
+      properties:
+        seatId:
+          type: integer
+        userId:
+          type: string
+          nullable: true
+        stack:
+          type: integer
+        status:
+          type: string
+          enum: [empty, active, folded, all_in, disconnected, spectator]
+    TableState:
+      type: object
+      required: [tableId, name, ownerId, config, seats, status, hand, version]
+      properties:
+        tableId:
+          type: string
+        name:
+          type: string
+        ownerId:
+          type: string
+        config:
+          $ref: '#/components/schemas/TableConfig'
+        seats:
+          type: array
+          items:
+            $ref: '#/components/schemas/TableSeat'
+        status:
+          type: string
+          enum: [lobby, in_hand]
+        hand:
+          allOf:
+            - $ref: '#/components/schemas/HandState'
+          nullable: true
+        version:
+          type: integer
     TableCreateRequest:
       type: object
       required: [name, config]
@@ -82,13 +142,14 @@ components:
         name:
           type: string
         config:
-          $ref: '#/components/schemas/TableConfig'
+          $ref: '#/components/schemas/TableCreateConfig'
     TableJoinRequest:
       type: object
       required: [seatId]
       properties:
         seatId:
           type: integer
+          description: Zero-based seat index. Invalid seat ids are rejected with a 409 error.
     TableJoinResponse:
       type: object
       required: [tableId, seatId, wsUrl]
@@ -113,6 +174,8 @@ components:
       properties:
         seatId:
           type: integer
+          minimum: 0
+          maximum: 8
     PushSubscription:
       type: object
       required: [endpoint]
@@ -132,6 +195,134 @@ components:
       properties:
         publicKey:
           type: string
+    Pot:
+      type: object
+      required: [amount, eligibleSeatIds]
+      properties:
+        amount:
+          type: integer
+        eligibleSeatIds:
+          type: array
+          items:
+            type: integer
+    HandState:
+      type: object
+      required:
+        [
+          handId,
+          tableId,
+          buttonSeat,
+          smallBlindSeat,
+          bigBlindSeat,
+          communityCards,
+          pots,
+          currentStreet,
+          currentTurnSeat,
+          currentBet,
+          minRaise,
+          raiseCapped,
+          roundContributions,
+          totalContributions,
+          actedSeats,
+          actionTimerDeadline,
+          startedAt,
+          endedAt,
+          bigBlind
+        ]
+      properties:
+        handId:
+          type: string
+        tableId:
+          type: string
+        buttonSeat:
+          type: integer
+        smallBlindSeat:
+          type: integer
+        bigBlindSeat:
+          type: integer
+        communityCards:
+          type: array
+          items:
+            type: string
+        pots:
+          type: array
+          items:
+            $ref: '#/components/schemas/Pot'
+        currentStreet:
+          type: string
+          enum: [preflop, flop, turn, river, showdown, ended]
+        currentTurnSeat:
+          type: integer
+        currentBet:
+          type: integer
+        minRaise:
+          type: integer
+        raiseCapped:
+          type: boolean
+        roundContributions:
+          type: object
+          additionalProperties:
+            type: integer
+        totalContributions:
+          type: object
+          additionalProperties:
+            type: integer
+        actedSeats:
+          type: array
+          items:
+            type: integer
+        actionTimerDeadline:
+          type: string
+          nullable: true
+        startedAt:
+          type: string
+        endedAt:
+          type: string
+          nullable: true
+        bigBlind:
+          type: integer
+        winners:
+          type: array
+          items:
+            type: integer
+        holeCards:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        deck:
+          type: array
+          items:
+            type: string
+    HandEvent:
+      type: object
+      required: [eventId, handId, type, payload, ts]
+      properties:
+        eventId:
+          type: string
+        handId:
+          type: string
+        type:
+          type: string
+        payload:
+          type: object
+        ts:
+          type: string
+    AuditResponse:
+      type: object
+      required: [handId, events, replay]
+      properties:
+        handId:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/HandEvent'
+        replay:
+          allOf:
+            - $ref: '#/components/schemas/HandState'
+          nullable: true
 
 security:
   - bearerAuth: []
@@ -140,9 +331,22 @@ paths:
   /api/health:
     get:
       summary: Health check
+      security: []
       responses:
         '200':
           description: OK
+
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      security: []
+      responses:
+        '200':
+          description: Metrics payload
+          content:
+            text/plain:
+              schema:
+                type: string
 
   /api/push/vapid:
     get:
@@ -156,6 +360,12 @@ paths:
                 $ref: '#/components/schemas/VapidPublicKey'
         '503':
           description: VAPID missing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
           content:
             application/json:
               schema:
@@ -179,6 +389,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     delete:
       summary: Remove push subscription
       requestBody:
@@ -196,6 +412,12 @@ paths:
           description: Subscription removed
         '400':
           description: Invalid subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
           content:
             application/json:
               schema:
@@ -246,6 +468,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/friends:
     get:
@@ -257,6 +485,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FriendsList'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     put:
       summary: Update friends list
       requestBody:
@@ -272,6 +506,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FriendsList'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/tables:
     get:
@@ -285,6 +531,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/TableSummary'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     post:
       summary: Create table
       requestBody:
@@ -300,6 +552,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TableSummary'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/tables/{tableId}/join:
     post:
@@ -323,8 +587,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TableJoinResponse'
+        '400':
+          description: Validation error (seatId missing or non-integer)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: Seat unavailable
+          description: Seat unavailable, already seated, or table missing
           content:
             application/json:
               schema:
@@ -342,6 +618,18 @@ paths:
       responses:
         '204':
           description: Left table
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not seated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/tables/{tableId}/moderation/kick:
     post:
@@ -365,7 +653,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [tableId, seatId, userId, action]
+                required: [tableId, seatId, userId, action, tableState]
                 properties:
                   tableId:
                     type: string
@@ -376,6 +664,32 @@ paths:
                   action:
                     type: string
                     enum: [kick]
+                  tableState:
+                    $ref: '#/components/schemas/TableState'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Table or seat not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Unable to kick
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/tables/{tableId}/moderation/mute:
     post:
@@ -410,3 +724,44 @@ paths:
                   action:
                     type: string
                     enum: [mute]
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Table or seat not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/audit/{handId}:
+    get:
+      summary: Fetch redacted hand events and replay snapshot
+      parameters:
+        - name: handId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Audit payload (holeCards and deck are redacted)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

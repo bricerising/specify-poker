@@ -2,7 +2,7 @@
 
 **Feature Branch**: `001-poker-mvp`  
 **Created**: 2026-01-09  
-**Status**: Draft  
+**Status**: Implemented  
 **Input**: User description: "Build a web-based poker website (MVP) for play-money
 Texas Hold’em. Users: - Users can create a nickname and avatar. - Authenticate
 users using keycloak. - Support logging in with google accounts. - Basic
@@ -25,6 +25,7 @@ disconnects during a hand, auto-fold when action is required; allow reconnect.
 Non-functional: - Real-time updates (table state should feel instant). - Prevent
 obvious cheating: server-authoritative game state, no client deciding outcomes.
 - Auditability: keep an event log per hand (actions + timestamps) for debugging.
+- Rate limit HTTP and WebSocket actions to mitigate abuse.
 - Basic moderation controls for table owner: kick a player, mute chat. Out of
 scope (explicitly): - Real money, payments, cashout - Multi-table tournaments -
 Complex auth (email/password), compliance features"
@@ -121,9 +122,9 @@ the lobby and table without impacting gameplay.
 - **FR-001**: System MUST authenticate users via Keycloak and allow Google login.
 - **FR-002**: System MUST allow users to set a nickname and avatar.
 - **FR-003**: System MUST show a lobby listing available tables with name, blinds,
-  max players, seats taken, and in-progress status.
+  max players, seats taken, occupied seat ids, owner id, and in-progress status.
 - **FR-004**: System MUST allow users to create a table with name, blinds,
-  max players (2–9), and starting chip stack.
+  optional ante, max players (2–9), and starting chip stack.
 - **FR-005**: System MUST allow users to join an open seat or spectate if a hand
   is in progress.
 - **FR-006**: System MUST present only legal actions (fold, check/call, bet/raise)
@@ -134,27 +135,36 @@ the lobby and table without impacting gameplay.
   outcomes or alter game state.
 - **FR-009**: System MUST update table state for all players in real time.
 - **FR-010**: System MUST apply a turn timer and auto-fold or auto-check on expiry.
-- **FR-011**: System MUST store a per-hand event log with timestamps for audit.
-- **FR-012**: System MUST support per-table chat with basic moderation (kick, mute).
+- **FR-011**: System MUST store a per-hand event log with timestamps for audit,
+  and expose a redacted replay endpoint for debugging.
+- **FR-012**: System MUST support per-table chat with basic moderation (kick, mute),
+  and restrict chat participation to seated players.
 - **FR-013**: System MUST track basic user stats (hands played, wins) and display
   them in profile views; a win is counted when a player wins any portion of a pot.
 - **FR-014**: System MUST protect private hole cards from non-owning players and
-  spectators.
+  spectators by redacting snapshots and sending hole cards only to the owning seat.
 - **FR-015**: System MUST allow players to reconnect and resync their current
   table state.
 - **FR-016**: System MUST provide a friends list capability that can be empty or
   unused without impacting gameplay.
 - **FR-017**: System MUST provide turn notifications to keep multi-device users
   in sync when they are not actively viewing the table.
+- **FR-018**: System MUST version table state updates and allow clients to resync
+  when out-of-order updates are detected; table patches deliver full state payloads.
+- **FR-019**: System MUST expose a Prometheus-compatible metrics endpoint and emit
+  OpenTelemetry traces for core gameplay events.
 
 ### Key Entities *(include if feature involves data)*
 
 - **UserProfile**: User identity, nickname, avatar, stats, and friends list.
 - **Table**: Table configuration, seats, owner, and current status.
+- **TableSummary**: Lobby view of table status and occupied seats.
+- **TableState**: Versioned table state for gameplay sync.
 - **Seat**: Player occupancy, stack, and status at a table.
 - **Hand**: Hand lifecycle, community cards, pot(s), and outcome.
 - **HandEvent**: Timestamped game actions for audit and replay.
 - **ChatMessage**: Per-table message with author and timestamp.
+- **PushSubscription**: Web push subscription endpoint and keys.
 
 ## Success Criteria *(mandatory)*
 
@@ -172,6 +182,8 @@ the lobby and table without impacting gameplay.
 
 ## Assumptions
 
-- Default turn timer is 20 seconds and is not configurable in the MVP.
+- Default turn timer is 20 seconds and can be overridden via configuration.
 - Friends list is stored and displayed but does not include invitations or
   presence indicators in the MVP.
+- Ante configuration is accepted by the API but the UI does not expose it.
+- If no tables exist, a default "Main Table" is created for the lobby.

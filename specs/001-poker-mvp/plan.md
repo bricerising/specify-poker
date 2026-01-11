@@ -17,9 +17,9 @@ actions, reconnection, chat, and basic moderation.
 
 **Language/Version**: TypeScript (Node.js 20 LTS, React 18)
 **Primary Dependencies**: React UI, Express API, Keycloak (OIDC), WebSocket
-transport, OpenTelemetry SDKs, Grafana stack, Docker Compose
+transport, OpenTelemetry SDKs, Grafana stack, Redis, Web Push, Docker Compose
 **Storage**: Keycloak Postgres for auth; gameplay state in memory with optional
-JSON/SQLite persistence for event logs
+Redis persistence for tables, profiles, friends, and events
 **Testing**: Vitest for unit/integration, React Testing Library for UI,
 Playwright for smoke tests, fast-check optional for property tests
 **Target Platform**: Modern browsers and Linux containers
@@ -73,10 +73,11 @@ apps/
 │   └── tests/
 └── api/
     ├── src/
+    │   ├── auth/
     │   ├── http/
     │   ├── ws/
     │   ├── engine/
-    │   ├── models/
+    │   ├── observability/
     │   └── services/
     └── tests/
 
@@ -85,7 +86,7 @@ packages/
     ├── src/
     │   ├── types/
     │   ├── schemas/
-    │   └── rules/
+    │   └── index.ts
     └── tests/
 
 infra/

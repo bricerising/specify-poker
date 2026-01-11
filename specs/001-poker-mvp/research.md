@@ -27,8 +27,9 @@ push notification requirements for turn alerts on inactive tabs/devices.
 **Rationale**: Deterministic replay enables dispute review and testing.
 **Alternatives considered**: Snapshot-only storage (rejected due to weak audit).
 
-### Decision: In-memory gameplay state with optional JSON/SQLite persistence
-**Rationale**: Simplifies MVP while allowing future durability without refactor.
+### Decision: In-memory gameplay state with optional Redis persistence + pubsub
+**Rationale**: Keeps the MVP simple while allowing durability and multi-instance
+fanout when Redis is configured.
 **Alternatives considered**: Full relational DB for gameplay (deferred).
 
 ### Decision: OpenTelemetry end-to-end with Grafana stack

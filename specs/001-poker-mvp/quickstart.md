@@ -16,23 +16,21 @@
 - UI: http://localhost:3000
 - API REST: http://localhost:4000/api
 - API WS: ws://localhost:4000/ws
+- API Metrics: http://localhost:4000/metrics
 - Keycloak: http://localhost:8080
 - Prometheus: http://localhost:9090
 - Grafana: http://localhost:3001
 
 ## Expected Local Stack
 
-- ui: React app (dev server or production build)
+- ui: React app (static server)
 - api: Express server (REST + WebSocket)
 - keycloak: OIDC provider
 - keycloak-db: Postgres for Keycloak
-- redis: in-memory store for tables, hands, profiles, friends, and moderation
+- redis: state store for tables, profiles, friends, moderation, push, and events
 - otel-collector: receives OTLP from UI/API
 - prometheus: metrics store
-- tempo (or jaeger): traces store
-- loki: logs store (optional)
 - grafana: dashboards and datasources
-- reverse-proxy: optional local TLS and port unification
 
 ## First-Time Setup Notes
 
