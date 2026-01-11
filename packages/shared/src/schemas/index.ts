@@ -34,8 +34,10 @@ export const userProfileSchema = z.object({
 export const tableSummarySchema = z.object({
   tableId: z.string(),
   name: z.string().min(1),
+  ownerId: z.string(),
   config: tableConfigSchema,
   seatsTaken: z.number().int().nonnegative(),
+  occupiedSeatIds: z.array(z.number().int().min(0).max(8)),
   inProgress: z.boolean(),
 });
 

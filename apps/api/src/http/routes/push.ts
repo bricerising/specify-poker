@@ -6,7 +6,10 @@ import { getVapidPublicKey } from "../../services/pushSender";
 export function createPushRouter() {
   const router = express.Router();
 
-  router.get("/api/push/vapid", (_req, res) => {
+  router.get("/api/push/vapid", (req, res) => {
+    if (!req.auth) {
+      return res.status(401).json({ code: "auth_denied", message: "Unauthorized" });
+    }
     const publicKey = getVapidPublicKey();
     if (!publicKey) {
       return res.status(503).json({ code: "vapid_missing", message: "VAPID key not configured" });

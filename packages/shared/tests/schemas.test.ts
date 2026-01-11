@@ -22,8 +22,10 @@ describe("shared schemas", () => {
     const summary = {
       tableId: "table-1",
       name: "Friendly Table",
+      ownerId: "user-1",
       config,
       seatsTaken: 0,
+      occupiedSeatIds: [],
       inProgress: false,
     };
 

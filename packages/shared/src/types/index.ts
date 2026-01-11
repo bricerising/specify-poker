@@ -26,8 +26,10 @@ export interface TableConfig {
 export interface TableSummary {
   tableId: TableId;
   name: string;
+  ownerId: UserId;
   config: TableConfig;
   seatsTaken: number;
+  occupiedSeatIds: number[];
   inProgress: boolean;
 }
 
