@@ -15,6 +15,152 @@
   "editable": true,
   "panels": [
     {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "User Journey & Sessions",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
+      "id": 101,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "poker_active_connections",
+          "legendFormat": "Active Users",
+          "refId": "A"
+        }
+      ],
+      "title": "Active Users",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "s" },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
+      "id": 102,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(poker_session_duration_seconds_sum[5m])) / sum(rate(poker_session_duration_seconds_count[5m]))",
+          "legendFormat": "Avg Session Duration",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg Session Duration",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 1 },
+      "id": 103,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(poker_session_hands_played_sum[5m])) / sum(rate(poker_session_hands_played_count[5m]))",
+          "legendFormat": "Hands per Session",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg Hands per Session",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 1 },
+      "id": 104,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(poker_sessions_total[5m])) * 300",
+          "legendFormat": "Sessions (5m)",
+          "refId": "A"
+        }
+      ],
+      "title": "New Sessions (5m)",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+      "id": 200,
+      "title": "User Friction Points",
+      "type": "row"
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "PROMETHEUS"
@@ -23,12 +169,323 @@
         "defaults": {},
         "overrides": []
       },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 0
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "id": 201,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       },
+      "targets": [
+        {
+          "expr": "sum by (reason) (rate(poker_seat_join_failures_total[5m]))",
+          "legendFormat": "{{reason}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Seat Join Failures by Reason",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "id": 202,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (reason) (rate(poker_action_rejections_total[5m]))",
+          "legendFormat": "{{reason}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Action Rejections by Reason",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "id": 203,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(poker_turn_timeouts_total[5m])",
+          "legendFormat": "Turn Timeouts",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(poker_action_time_exceeded_total[5m])",
+          "legendFormat": "Late Actions (>80% timer)",
+          "refId": "B"
+        },
+        {
+          "expr": "rate(poker_ws_reconnects_total[5m])",
+          "legendFormat": "WS Reconnects",
+          "refId": "C"
+        }
+      ],
+      "title": "Time Pressure & Connection Issues",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "id": 300,
+      "title": "Player Quality & Engagement",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "min": 0, "max": 1 },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 17 },
+      "id": 301,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(poker_vpip_actions_total[5m])) / sum(rate(poker_hands_started_total[5m]))",
+          "legendFormat": "VPIP",
+          "refId": "A"
+        }
+      ],
+      "title": "VPIP (Voluntarily Put $ In Pot)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "min": 0, "max": 1 },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 17 },
+      "id": 302,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(poker_pfr_actions_total[5m])) / sum(rate(poker_hands_started_total[5m]))",
+          "legendFormat": "PFR",
+          "refId": "A"
+        }
+      ],
+      "title": "PFR (Pre-Flop Raise)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "s" },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 17 },
+      "id": 303,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(poker_decision_time_seconds_sum[5m])) / sum(rate(poker_decision_time_seconds_count[5m]))",
+          "legendFormat": "Avg Decision Time",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg Decision Time",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "min": 0, "max": 1 },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 17 },
+      "id": 304,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(poker_hands_won_total[5m])) / sum(rate(poker_hands_ended_total[5m]))",
+          "legendFormat": "Win Rate",
+          "refId": "A"
+        }
+      ],
+      "title": "Win Rate",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+      "id": 305,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(poker_vpip_actions_total[5m])",
+          "legendFormat": "VPIP Actions",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(poker_pfr_actions_total[5m])",
+          "legendFormat": "PFR Actions",
+          "refId": "B"
+        },
+        {
+          "expr": "rate(poker_allin_actions_total[5m])",
+          "legendFormat": "All-ins",
+          "refId": "C"
+        },
+        {
+          "expr": "rate(poker_fold_to_raise_total[5m])",
+          "legendFormat": "Fold to Raise",
+          "refId": "D"
+        }
+      ],
+      "title": "Player Action Patterns",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 23 },
+      "id": 306,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(poker_hands_won_total[5m])",
+          "legendFormat": "Hands Won",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(poker_showdown_wins_total[5m])",
+          "legendFormat": "Showdown Wins",
+          "refId": "B"
+        },
+        {
+          "expr": "rate(poker_hands_won_total[5m]) - rate(poker_showdown_wins_total[5m])",
+          "legendFormat": "Non-Showdown Wins",
+          "refId": "C"
+        }
+      ],
+      "title": "Win Breakdown",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+      "id": 400,
+      "title": "Game Flow & Activity",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
       "id": 1,
       "options": {
         "legend": {
@@ -55,12 +512,7 @@
         "defaults": {},
         "overrides": []
       },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 0
-      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
       "id": 2,
       "options": {
         "legend": {
@@ -87,12 +539,7 @@
         "defaults": {},
         "overrides": []
       },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 8
-      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
       "id": 3,
       "options": {
         "legend": {
@@ -119,44 +566,7 @@
         "defaults": {},
         "overrides": []
       },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
-      "id": 4,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "expr": "sum by (reason) (rate(poker_action_rejections_total[5m]))",
-          "legendFormat": "{{reason}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Action Rejections (5m rate)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PROMETHEUS"
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 16
-      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
       "id": 5,
       "options": {
         "legend": {
@@ -185,17 +595,10 @@
         "uid": "PROMETHEUS"
       },
       "fieldConfig": {
-        "defaults": {
-          "unit": "s"
-        },
+        "defaults": { "unit": "s" },
         "overrides": []
       },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 16
-      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
       "id": 6,
       "options": {
         "legend": {
@@ -227,13 +630,8 @@
         "defaults": {},
         "overrides": []
       },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 24
-      },
-      "id": 7,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
+      "id": 10,
       "options": {
         "legend": {
           "displayMode": "list",
@@ -242,13 +640,25 @@
       },
       "targets": [
         {
-          "expr": "rate(poker_turn_timeouts_total[5m])",
-          "legendFormat": "timeouts",
+          "expr": "rate(poker_table_joins_total[5m])",
+          "legendFormat": "joins",
           "refId": "A"
+        },
+        {
+          "expr": "rate(poker_table_leaves_total[5m])",
+          "legendFormat": "leaves",
+          "refId": "B"
         }
       ],
-      "title": "Turn Timeouts (5m rate)",
+      "title": "Seat Joins vs Leaves (5m rate)",
       "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 56 },
+      "id": 500,
+      "title": "System Health",
+      "type": "row"
     },
     {
       "datasource": {
@@ -259,12 +669,7 @@
         "defaults": {},
         "overrides": []
       },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 24
-      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 57 },
       "id": 8,
       "options": {
         "legend": {
@@ -291,12 +696,7 @@
         "defaults": {},
         "overrides": []
       },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 32
-      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 57 },
       "id": 9,
       "options": {
         "legend": {
@@ -323,49 +723,7 @@
         "defaults": {},
         "overrides": []
       },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 32
-      },
-      "id": 10,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "expr": "rate(poker_table_joins_total[5m])",
-          "legendFormat": "joins",
-          "refId": "A"
-        },
-        {
-          "expr": "rate(poker_table_leaves_total[5m])",
-          "legendFormat": "leaves",
-          "refId": "B"
-        }
-      ],
-      "title": "Seat Joins vs Leaves (5m rate)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PROMETHEUS"
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 40
-      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 57 },
       "id": 11,
       "options": {
         "legend": {
@@ -397,12 +755,7 @@
         "defaults": {},
         "overrides": []
       },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 40
-      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 65 },
       "id": 12,
       "options": {
         "legend": {
@@ -419,12 +772,39 @@
       ],
       "title": "Chat Errors (5m rate)",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 65 },
+      "id": 501,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (code) (rate(poker_ws_errors_total[5m]))",
+          "legendFormat": "{{code}}",
+          "refId": "A"
+        }
+      ],
+      "title": "WebSocket Errors by Code",
+      "type": "timeseries"
     }
   ],
   "refresh": "10s",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["poker"],
+  "tags": ["poker", "ux"],
   "templating": {
     "list": []
   },
@@ -434,5 +814,5 @@
   },
   "title": "Poker Observability",
   "uid": "poker-observability",
-  "version": 1
+  "version": 2
 }

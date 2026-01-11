@@ -5,12 +5,20 @@ import { applyAction } from "../engine/handEngine";
 import { recordHandCompletion } from "../engine/statTracker";
 import {
   recordActionResult,
+  recordAllinAction,
+  recordDecisionTime,
+  recordFoldToRaise,
   recordHandEnded,
   recordHandShowdown,
   recordHandStarted,
+  recordHandWon,
+  recordPfrAction,
+  recordSeatJoinFailure,
+  recordShowdownWin,
   recordTableJoin,
   recordTableLeave,
   recordTableReconnect,
+  recordVpipAction,
 } from "../observability/metrics";
 import { getTracer } from "../observability/otel";
 import { eventStore, HandEvent } from "./eventStore";
@@ -50,12 +58,14 @@ async function recordEvent(tableId: string, handId: string, type: string, payloa
 export async function joinSeat(options: { tableId: string; seatId: number; userId: string }) {
   const summary = await getTable(options.tableId);
   if (!summary) {
+    recordSeatJoinFailure("missing_table");
     return { ok: false, reason: "missing_table" as const };
   }
   const state = await ensureTableState(summary);
 
   const seat = state.seats.find((entry) => entry.seatId === options.seatId);
   if (!seat) {
+    recordSeatJoinFailure("seat_unavailable");
     return { ok: false, reason: "seat_unavailable" as const };
   }
 
@@ -68,6 +78,7 @@ export async function joinSeat(options: { tableId: string; seatId: number; userI
       recordTableReconnect();
       return { ok: true, tableState: await getTableState(state.tableId) };
     }
+    recordSeatJoinFailure("already_seated");
     return { ok: false, reason: "already_seated" as const };
   }
 
@@ -80,6 +91,7 @@ export async function joinSeat(options: { tableId: string; seatId: number; userI
   }
 
   if (seat.status !== "empty") {
+    recordSeatJoinFailure("seat_taken");
     return { ok: false, reason: "seat_unavailable" as const };
   }
 
@@ -155,6 +167,35 @@ export async function applyTableAction(options: {
   actionSpan.end();
   recordActionResult(options.action.type, result.accepted, result.reason ?? undefined);
 
+  // Record player quality metrics when action is accepted
+  if (result.accepted && state.hand) {
+    const actionType = options.action.type;
+    const currentStreet = previousStreet;
+    const currentBet = state.hand.currentBet ?? 0;
+    const playerContribution = state.hand.roundContributions[options.seatId] ?? 0;
+
+    // VPIP: Voluntary Put money In Pot (Call, Bet, Raise - not posting blinds)
+    if (actionType === "Call" || actionType === "Bet" || actionType === "Raise") {
+      recordVpipAction();
+    }
+
+    // PFR: Pre-Flop Raise
+    if (currentStreet === "preflop" && actionType === "Raise") {
+      recordPfrAction();
+    }
+
+    // All-in detection: when player puts all their chips in
+    const seat = state.seats.find((s) => s.seatId === options.seatId);
+    if (seat && options.action.amount && options.action.amount >= seat.stack) {
+      recordAllinAction();
+    }
+
+    // Fold to raise: player folds when facing a bet/raise
+    if (actionType === "Fold" && currentBet > playerContribution) {
+      recordFoldToRaise();
+    }
+  }
+
   if (previousStreet && result.table.hand?.currentStreet && previousStreet !== result.table.hand.currentStreet) {
     const span = getTracer().startSpan("poker.hand.transition", {
       attributes: {
@@ -183,6 +224,18 @@ export async function applyTableAction(options: {
     outcomeSpan.end();
     recordHandEnded(result.table.hand.handId);
     await recordHandCompletion(result.table.hand, result.table.seats);
+
+    // Record win metrics
+    for (const winnerSeat of winners) {
+      recordHandWon();
+    }
+    // Track showdown wins vs non-showdown wins
+    const wasShowdown = previousStreet === "showdown" || result.table.hand.currentStreet === "showdown";
+    if (wasShowdown) {
+      for (const winnerSeat of winners) {
+        recordShowdownWin();
+      }
+    }
   }
 
   if (result.table.hand) {

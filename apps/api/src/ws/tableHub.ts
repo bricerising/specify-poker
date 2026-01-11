@@ -11,6 +11,8 @@ import { scheduleTurnTimeout, clearTurnTimeout } from "../services/turnTimer";
 import {
   recordActionAttempt,
   recordActionRejected,
+  recordActionTimeExceeded,
+  recordDecisionTime,
   recordRateLimit,
   recordTurnTimeout,
   recordWsError,
@@ -30,6 +32,7 @@ interface ClientConnection {
 const clients = new Map<string, ClientConnection>();
 const tableSubscriptions = new Map<string, Set<string>>();
 const lastTurnNotified = new Map<string, { handId: string; seatId: number }>();
+const turnStartTimes = new Map<string, number>(); // tableId -> timestamp when turn started
 let handEventListenerAttached = false;
 
 type TableSeatView = TableSeat & { nickname?: string };
@@ -192,6 +195,7 @@ async function scheduleTurn(tableId: string) {
   if (!state?.hand || state.hand.currentStreet === "ended") {
     clearTurnTimeout(tableId);
     lastTurnNotified.delete(tableId);
+    turnStartTimes.delete(tableId);
     return;
   }
 
@@ -201,6 +205,7 @@ async function scheduleTurn(tableId: string) {
     const seat = state.seats.find((entry) => entry.seatId === hand.currentTurnSeat);
     if (seat?.userId && seat.status !== "spectator" && seat.status !== "empty") {
       lastTurnNotified.set(tableId, { handId: hand.handId, seatId: hand.currentTurnSeat });
+      turnStartTimes.set(tableId, Date.now()); // Record when turn started for decision time tracking
       await notifyTurn(seat.userId, state.name, state.tableId, hand.currentTurnSeat);
     }
   }
@@ -306,6 +311,21 @@ async function handleAction(client: ClientConnection, payload: {
 }) {
   recordActionAttempt();
   const tableId = payload.tableId;
+
+  // Record decision time if we have turn start time
+  const turnStart = turnStartTimes.get(tableId);
+  if (turnStart) {
+    const decisionTimeSeconds = (Date.now() - turnStart) / 1000;
+    recordDecisionTime(decisionTimeSeconds);
+
+    // Track if player took action late (after 80% of timer)
+    const timerMs = Number(process.env.TURN_TIMER_MS ?? 20000);
+    if (decisionTimeSeconds > (timerMs * 0.8) / 1000) {
+      recordActionTimeExceeded();
+    }
+    turnStartTimes.delete(tableId);
+  }
+
   const tableState = await getTableState(tableId);
   if (!tableState || !tableState.hand) {
     send(client.socket, {

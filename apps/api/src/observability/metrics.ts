@@ -135,6 +135,33 @@ export function initApiMetrics() {
   registerMetric("poker_chat_messages_total", "Chat messages sent.", "counter");
   registerMetric("poker_chat_errors_total", "Chat errors by reason.", "counter");
 
+  // User journey and experience metrics
+  registerMetric("poker_sessions_total", "Total user sessions started.", "counter");
+  registerMetric("poker_session_duration_seconds_sum", "Total session duration in seconds.", "counter");
+  registerMetric("poker_session_duration_seconds_count", "Session duration samples.", "counter");
+  registerMetric("poker_session_hands_played_sum", "Total hands played per session.", "counter");
+  registerMetric("poker_session_hands_played_count", "Session hands samples.", "counter");
+  registerMetric("poker_view_transitions_total", "View transitions by from/to path.", "counter");
+
+  // Friction point metrics
+  registerMetric("poker_seat_join_failures_total", "Seat join failures by reason.", "counter");
+  registerMetric("poker_table_create_failures_total", "Table creation failures by reason.", "counter");
+  registerMetric("poker_auth_failures_total", "Authentication failures by reason.", "counter");
+  registerMetric("poker_ws_reconnects_total", "WebSocket reconnection attempts.", "counter");
+  registerMetric("poker_action_time_exceeded_total", "Actions submitted after timer warning.", "counter");
+
+  // User quality and engagement metrics
+  registerMetric("poker_vpip_actions_total", "Voluntary put money in pot actions.", "counter");
+  registerMetric("poker_pfr_actions_total", "Pre-flop raise actions.", "counter");
+  registerMetric("poker_decision_time_seconds_sum", "Total time spent making decisions.", "counter");
+  registerMetric("poker_decision_time_seconds_count", "Decision time samples.", "counter");
+  registerMetric("poker_allin_actions_total", "All-in actions.", "counter");
+  registerMetric("poker_fold_to_raise_total", "Folds in response to a raise.", "counter");
+  registerMetric("poker_hands_won_total", "Total hands won.", "counter");
+  registerMetric("poker_showdown_wins_total", "Hands won at showdown.", "counter");
+  registerMetric("poker_hands_per_table_sum", "Total hands played per table.", "counter");
+  registerMetric("poker_hands_per_table_count", "Hands per table samples.", "counter");
+
   incrementCounter("poker_actions_total", {}, 0);
   setGauge("poker_active_connections", 0);
   setGauge("poker_active_table_subscriptions", 0);
@@ -245,6 +272,94 @@ export function recordChatMessage() {
 export function recordChatError(reason: string) {
   ensureInitialized();
   incrementCounter("poker_chat_errors_total", { reason });
+}
+
+// User journey metrics
+export function recordSessionStart() {
+  ensureInitialized();
+  incrementCounter("poker_sessions_total");
+}
+
+export function recordSessionEnd(durationSeconds: number, handsPlayed: number) {
+  ensureInitialized();
+  incrementCounter("poker_session_duration_seconds_sum", {}, durationSeconds);
+  incrementCounter("poker_session_duration_seconds_count");
+  incrementCounter("poker_session_hands_played_sum", {}, handsPlayed);
+  incrementCounter("poker_session_hands_played_count");
+}
+
+export function recordViewTransition(from: string, to: string) {
+  ensureInitialized();
+  incrementCounter("poker_view_transitions_total", { from, to });
+}
+
+// Friction point metrics
+export function recordSeatJoinFailure(reason: string) {
+  ensureInitialized();
+  incrementCounter("poker_seat_join_failures_total", { reason });
+}
+
+export function recordTableCreateFailure(reason: string) {
+  ensureInitialized();
+  incrementCounter("poker_table_create_failures_total", { reason });
+}
+
+export function recordAuthFailure(reason: string) {
+  ensureInitialized();
+  incrementCounter("poker_auth_failures_total", { reason });
+}
+
+export function recordWsReconnect() {
+  ensureInitialized();
+  incrementCounter("poker_ws_reconnects_total");
+}
+
+export function recordActionTimeExceeded() {
+  ensureInitialized();
+  incrementCounter("poker_action_time_exceeded_total");
+}
+
+// User quality and engagement metrics
+export function recordVpipAction() {
+  ensureInitialized();
+  incrementCounter("poker_vpip_actions_total");
+}
+
+export function recordPfrAction() {
+  ensureInitialized();
+  incrementCounter("poker_pfr_actions_total");
+}
+
+export function recordDecisionTime(durationSeconds: number) {
+  ensureInitialized();
+  incrementCounter("poker_decision_time_seconds_sum", {}, durationSeconds);
+  incrementCounter("poker_decision_time_seconds_count");
+}
+
+export function recordAllinAction() {
+  ensureInitialized();
+  incrementCounter("poker_allin_actions_total");
+}
+
+export function recordFoldToRaise() {
+  ensureInitialized();
+  incrementCounter("poker_fold_to_raise_total");
+}
+
+export function recordHandWon() {
+  ensureInitialized();
+  incrementCounter("poker_hands_won_total");
+}
+
+export function recordShowdownWin() {
+  ensureInitialized();
+  incrementCounter("poker_showdown_wins_total");
+}
+
+export function recordHandsPerTable(count: number) {
+  ensureInitialized();
+  incrementCounter("poker_hands_per_table_sum", {}, count);
+  incrementCounter("poker_hands_per_table_count");
 }
 
 export function updateActiveConnections(delta: number) {
