@@ -1,0 +1,380 @@
+openapi: 3.1.0
+info:
+  title: Balance Service API
+  description: HTTP API for account balance management and transaction history
+  version: 1.0.0
+  contact:
+    name: Balance Service
+
+servers:
+  - url: http://localhost:3002
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      security: []
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/accounts/{accountId}/balance:
+    get:
+      summary: Get account balance
+      operationId: getBalance
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Account balance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceResponse"
+        "404":
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/accounts/{accountId}/deposit:
+    post:
+      summary: Deposit chips to account
+      operationId: deposit
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DepositRequest"
+      responses:
+        "200":
+          description: Deposit successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/accounts/{accountId}/withdraw:
+    post:
+      summary: Withdraw chips from account
+      operationId: withdraw
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawRequest"
+      responses:
+        "200":
+          description: Withdrawal successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionResponse"
+        "400":
+          description: Insufficient balance or invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/accounts/{accountId}/transactions:
+    get:
+      summary: Get transaction history
+      operationId: getTransactions
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum:
+              - DEPOSIT
+              - WITHDRAW
+              - BUY_IN
+              - CASH_OUT
+              - BLIND
+              - BET
+              - POT_WIN
+              - REFUND
+      responses:
+        "200":
+          description: Transaction history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionListResponse"
+
+  /api/accounts/{accountId}/ledger:
+    get:
+      summary: Get audit ledger entries
+      operationId: getLedger
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: from
+          in: query
+          description: ISO timestamp to start from
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: ISO timestamp to end at
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Ledger entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LedgerListResponse"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded]
+        timestamp:
+          type: string
+          format: date-time
+        redis:
+          type: boolean
+
+    BalanceResponse:
+      type: object
+      required:
+        - accountId
+        - balance
+        - currency
+        - availableBalance
+      properties:
+        accountId:
+          type: string
+        balance:
+          type: number
+          description: Total balance
+        availableBalance:
+          type: number
+          description: Balance minus pending reservations
+        currency:
+          type: string
+        version:
+          type: integer
+
+    DepositRequest:
+      type: object
+      required:
+        - amount
+        - source
+      properties:
+        amount:
+          type: number
+          minimum: 1
+        source:
+          type: string
+          enum: [FREEROLL, PURCHASE, ADMIN, BONUS]
+
+    WithdrawRequest:
+      type: object
+      required:
+        - amount
+      properties:
+        amount:
+          type: number
+          minimum: 1
+        reason:
+          type: string
+
+    TransactionResponse:
+      type: object
+      required:
+        - transactionId
+        - type
+        - amount
+        - balanceBefore
+        - balanceAfter
+        - status
+        - createdAt
+      properties:
+        transactionId:
+          type: string
+        type:
+          type: string
+        amount:
+          type: number
+        balanceBefore:
+          type: number
+        balanceAfter:
+          type: number
+        status:
+          type: string
+          enum: [PENDING, COMPLETED, FAILED]
+        metadata:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+
+    TransactionListResponse:
+      type: object
+      required:
+        - transactions
+        - total
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransactionResponse"
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    LedgerEntry:
+      type: object
+      required:
+        - entryId
+        - transactionId
+        - type
+        - amount
+        - balanceBefore
+        - balanceAfter
+        - timestamp
+        - checksum
+      properties:
+        entryId:
+          type: string
+        transactionId:
+          type: string
+        type:
+          type: string
+        amount:
+          type: number
+        balanceBefore:
+          type: number
+        balanceAfter:
+          type: number
+        metadata:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+        previousChecksum:
+          type: string
+        checksum:
+          type: string
+
+    LedgerListResponse:
+      type: object
+      required:
+        - entries
+        - total
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/LedgerEntry"
+        total:
+          type: integer
+        latestChecksum:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object

@@ -25,6 +25,13 @@ import { eventStore, HandEvent } from "./eventStore";
 import { emitHandEvent } from "./handEvents";
 import { getTable, updateTable } from "./tableRegistry";
 import { ensureTableState, getTableState, listTableStates, startHandIfReady, updateTableState } from "./tableState";
+import {
+  isBalanceServiceEnabled,
+  reserveForBuyIn,
+  commitReservation,
+  releaseReservation,
+  processCashOut,
+} from "../clients/balanceClient";
 
 async function syncSummary(tableId: string) {
   const state = await getTableState(tableId);
@@ -95,23 +102,58 @@ export async function joinSeat(options: { tableId: string; seatId: number; userI
     return { ok: false, reason: "seat_unavailable" as const };
   }
 
-  seat.userId = options.userId;
-  seat.stack = summary.config.startingStack;
-  seat.status = state.status === "in_hand" ? "spectator" : "active";
+  // Two-phase buy-in: Reserve funds before joining
+  const buyInAmount = summary.config.startingStack;
+  const idempotencyKey = `join:${options.tableId}:${options.userId}:${Date.now()}`;
+  let reservationId: string | null = null;
 
-  const updated = { ...state, version: state.version + 1 };
-  await updateTableState(state.tableId, () => updated);
-  await syncSummary(state.tableId);
-  recordTableJoin();
+  if (isBalanceServiceEnabled()) {
+    const reservation = await reserveForBuyIn(
+      options.userId,
+      options.tableId,
+      buyInAmount,
+      idempotencyKey
+    );
 
-  const handState = await startHandIfReady(state.tableId);
-  if (handState?.hand) {
-    await recordEvent(state.tableId, handState.hand.handId, "HandStarted", { snapshot: handState.hand });
-    recordHandStarted(handState.hand.handId);
-    await syncSummary(state.tableId);
+    if (!reservation.ok) {
+      recordSeatJoinFailure("insufficient_balance");
+      return { ok: false, reason: "insufficient_balance" as const };
+    }
+
+    reservationId = reservation.reservation_id;
   }
 
-  return { ok: true, tableState: await getTableState(state.tableId) };
+  try {
+    // Assign seat
+    seat.userId = options.userId;
+    seat.stack = buyInAmount;
+    seat.status = state.status === "in_hand" ? "spectator" : "active";
+
+    const updated = { ...state, version: state.version + 1 };
+    await updateTableState(state.tableId, () => updated);
+    await syncSummary(state.tableId);
+    recordTableJoin();
+
+    // Commit the reservation on successful seat assignment
+    if (reservationId) {
+      await commitReservation(reservationId);
+    }
+
+    const handState = await startHandIfReady(state.tableId);
+    if (handState?.hand) {
+      await recordEvent(state.tableId, handState.hand.handId, "HandStarted", { snapshot: handState.hand });
+      recordHandStarted(handState.hand.handId);
+      await syncSummary(state.tableId);
+    }
+
+    return { ok: true, tableState: await getTableState(state.tableId) };
+  } catch (error) {
+    // Release reservation on failure
+    if (reservationId) {
+      await releaseReservation(reservationId, "seat_join_failed");
+    }
+    throw error;
+  }
 }
 
 export async function leaveSeat(options: { tableId: string; userId: string }) {
@@ -123,6 +165,19 @@ export async function leaveSeat(options: { tableId: string; userId: string }) {
   const seat = state.seats.find((entry) => entry.userId === options.userId);
   if (!seat) {
     return { ok: false, reason: "not_seated" as const };
+  }
+
+  // Process cash-out before clearing seat
+  const cashOutAmount = seat.stack;
+  if (cashOutAmount > 0 && isBalanceServiceEnabled()) {
+    const idempotencyKey = `leave:${options.tableId}:${options.userId}:${Date.now()}`;
+    await processCashOut(
+      options.userId,
+      options.tableId,
+      seat.seatId,
+      cashOutAmount,
+      idempotencyKey
+    );
   }
 
   seat.userId = null;

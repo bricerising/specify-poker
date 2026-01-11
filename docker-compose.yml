@@ -28,9 +28,30 @@ services:
       VAPID_PUBLIC_KEY: "${VAPID_PUBLIC_KEY}"
       VAPID_PRIVATE_KEY: "${VAPID_PRIVATE_KEY}"
       VAPID_SUBJECT: "${VAPID_SUBJECT}"
+      BALANCE_SERVICE_URL: "balance:50051"
     depends_on:
       - keycloak
       - otel-collector
+      - redis
+      - balance
+    healthcheck:
+      test: ["CMD-SHELL", "true"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
+
+  balance:
+    build:
+      context: .
+      dockerfile: apps/balance/Dockerfile
+    ports:
+      - "3002:3002"
+      - "50051:50051"
+    environment:
+      HTTP_PORT: "3002"
+      GRPC_PORT: "50051"
+      REDIS_URL: "redis://redis:6379"
+    depends_on:
       - redis
     healthcheck:
       test: ["CMD-SHELL", "true"]
