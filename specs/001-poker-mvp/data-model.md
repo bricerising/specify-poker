@@ -55,7 +55,8 @@
 ### ChatMessage
 - **Fields**: id, tableId, userId, nickname, text, ts
 - **Validation**: message length <= 500, sanitized content
-- **Notes**: chat is ephemeral and broadcast over WebSocket (not persisted)
+- **Notes**: chat is broadcast over WebSocket and may be persisted with short-term
+  retention (e.g., 24h) for late-joiner synchronization.
 
 ### PushSubscription
 - **Fields**: endpoint, keys.p256dh, keys.auth
@@ -67,11 +68,13 @@
 
 ## Storage Notes
 
-- **Profiles, friends, moderation mutes, push subscriptions, tables, table states, hand events**:
-  cached in memory and persisted to Redis when available.
-- **Lobby tables**: stored as a Redis hash keyed by `poker:tables`.
-- **Table state**: stored as JSON blobs keyed by `poker:tableState:{tableId}` with a set of ids.
-- **Hand events**: stored as Redis lists per hand id (and mirrored in memory).
+- **Persistence**: Data is distributed across microservices, using PostgreSQL for 
+  durable persistence (Profiles, Hand History) and Redis for hot data and caching.
+- **Namespacing**: Redis keys are namespaced by service to avoid collisions
+  (e.g., `balance:`, `game:`, `player:`, `event:`, `gateway:`, `notify:`).
+- **Lobby tables**: stored as a Redis hash keyed by `game:tables`.
+- **Table state**: stored as JSON blobs keyed by `game:state:{tableId}`.
+- **Hand events**: stored as Redis Streams or lists within the `event:` namespace.
 
 ## Relationships
 

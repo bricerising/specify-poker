@@ -13,7 +13,7 @@
 
 ### T003: Create server entry point
 - **File**: `src/server.ts`
-- **Acceptance**: HTTP server starts on port 3000, WebSocket attached
+- **Acceptance**: HTTP server starts on port 4000, WebSocket attached
 
 ### T004: Add configuration management
 - **File**: `src/config.ts`
@@ -179,29 +179,57 @@
 
 ---
 
-## Phase 10: Testing
+## Phase 10: Observability
 
-### T033: Unit tests for JWT validation
+### T033: Implement structured logging
+- **File**: `src/observability/logger.ts`
+- **Acceptance**: JSON logs with request context and correlation IDs written to stdout for Loki
+- **Dependencies**: pino or winston
+
+### T034: Implement distributed tracing
+- **File**: `src/observability/otel.ts`
+- **Acceptance**: Trace context initialized for all requests, propagated to gRPC
+- **Dependencies**: @opentelemetry/sdk-node, @opentelemetry/instrumentation-express
+
+### T035: Implement Prometheus metrics
+- **File**: `src/observability/metrics.ts`
+- **Acceptance**: Metrics for connection count, throughput, and error rates exposed
+- **Dependencies**: prom-client
+
+---
+
+## Phase 11: Analytics
+
+### T036: Implement session event emission
+- **File**: `src/ws/server.ts`
+- **Acceptance**: Emit SESSION_STARTED and SESSION_ENDED events to Event Service
+- **Metadata**: Includes userId, duration (for end), and client type
+
+---
+
+## Phase 12: Testing
+
+### T037: Unit tests for JWT validation
 - **File**: `tests/unit/jwt.test.ts`
 - **Coverage**: Valid, invalid, expired tokens
 
-### T034: Unit tests for connection management
+### T038: Unit tests for connection management
 - **File**: `tests/unit/connections.test.ts`
 - **Coverage**: Register, unregister, lookup, broadcast
 
-### T035: Unit tests for rate limiting
+### T039: Unit tests for rate limiting
 - **File**: `tests/unit/rateLimit.test.ts`
 - **Coverage**: Increment, threshold, reset
 
-### T036: Integration tests for WebSocket
+### T040: Integration tests for WebSocket
 - **File**: `tests/integration/websocket.test.ts`
 - **Coverage**: Connect, subscribe, receive updates, disconnect
 
-### T037: Integration tests for HTTP proxy
+### T041: Integration tests for HTTP proxy
 - **File**: `tests/integration/proxy.test.ts`
 - **Coverage**: Route to backends, error handling
 
-### T038: Integration tests for chat
+### T042: Integration tests for chat
 - **File**: `tests/integration/chat.test.ts`
 - **Coverage**: Send, receive, history, mute check
 
@@ -237,7 +265,13 @@ T001 -> T002 -> T003 -> T004 -> T005 -> T006
         T031 -> T032
                   |
                   v
-T033 -> T034 -> T035 -> T036 -> T037 -> T038
+        T033 -> T034 -> T035
+                  |
+                  v
+                T036
+                  |
+                  v
+T037 -> T038 -> T039 -> T040 -> T041 -> T042
 ```
 
 ## Migration Notes

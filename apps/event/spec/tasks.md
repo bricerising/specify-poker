@@ -166,47 +166,59 @@
 
 ## Phase 8: Observability
 
-### T032: Add structured logging
+### T032: Implement structured logging
 - **File**: `src/observability/logger.ts`
-- **Acceptance**: JSON logs with correlation IDs
+- **Acceptance**: JSON logs with trace and span IDs in context written to stdout for Loki
+- **Dependencies**: pino or winston
 
-### T033: Add metrics
+### T033: Implement distributed tracing
+- **File**: `src/observability/otel.ts`
+- **Acceptance**: instrumentation for gRPC, pg, and redis, sent to Tempo
+- **Dependencies**: @opentelemetry/sdk-node, @opentelemetry/instrumentation-grpc, @opentelemetry/instrumentation-pg, @opentelemetry/instrumentation-redis
+
+### T034: Implement Prometheus metrics
 - **File**: `src/observability/metrics.ts`
-- **Acceptance**: Event throughput, latency, stream lag metrics
-
-### T034: Add tracing
-- **File**: `src/observability/tracing.ts`
-- **Acceptance**: OpenTelemetry spans for all operations
+- **Acceptance**: Metrics for ingestion rate, materialization lag, and query performance
+- **Dependencies**: prom-client
 
 ---
 
-## Phase 9: Testing
+## Phase 9: Analytics
 
-### T035: Unit tests for event ingestion
+### T035: Implement BI-ready data views
+- **File**: `migrations/002_analytics_views.sql`
+- **Acceptance**: Create materialized views for common BI queries (e.g., daily active tables, player win rates)
+- **Functions**: refreshAnalyticsViews job
+
+---
+
+## Phase 10: Testing
+
+### T036: Unit tests for event ingestion
 - **File**: `tests/unit/eventIngestionService.test.ts`
 - **Coverage**: Validation, storage, streaming
 
-### T036: Unit tests for event queries
+### T037: Unit tests for event queries
 - **File**: `tests/unit/eventQueryService.test.ts`
 - **Coverage**: Filters, pagination, cursors
 
-### T037: Unit tests for hand records
+### T038: Unit tests for hand records
 - **File**: `tests/unit/handRecordService.test.ts`
 - **Coverage**: Materialization, privacy filtering
 
-### T038: Unit tests for replay
+### T039: Unit tests for replay
 - **File**: `tests/unit/replayService.test.ts`
 - **Coverage**: State reconstruction accuracy
 
-### T039: Integration tests for database
+### T040: Integration tests for database
 - **File**: `tests/integration/database.test.ts`
 - **Coverage**: Event and hand record persistence
 
-### T040: Integration tests for streaming
+### T041: Integration tests for streaming
 - **File**: `tests/integration/streaming.test.ts`
 - **Coverage**: Pub/sub, cursor resumption
 
-### T041: Integration tests for gRPC API
+### T042: Integration tests for gRPC API
 - **File**: `tests/integration/grpc.test.ts`
 - **Coverage**: All service methods
 
@@ -239,7 +251,10 @@ T001 -> T002 -> T003 -> T004 -> T005
             T032 -> T033 -> T034
                   |
                   v
-T035 -> T036 -> T037 -> T038 -> T039 -> T040 -> T041
+                T035
+                  |
+                  v
+T036 -> T037 -> T038 -> T039 -> T040 -> T041 -> T042
 ```
 
 ## Migration Notes

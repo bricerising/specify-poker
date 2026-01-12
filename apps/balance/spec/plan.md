@@ -107,7 +107,18 @@ apps/balance/
 - Implement reservation expiry job
 - Implement ledger integrity verification job
 
-### Phase 6: Testing
+### Phase 6: Observability
+- Implement structured logging with correlation IDs (Pino/Winston)
+- Output logs to stdout/stderr in JSON format for collection by Loki
+- Integrate OpenTelemetry for distributed tracing (sent to Tempo)
+- Export Prometheus metrics (latency, throughput, error rates)
+- Define custom business metrics (ledger verification failures)
+
+### Phase 7: Analytics
+- Implement metrics for total chip supply and circulation velocity.
+- Track chip "sinks" (rake) and "sources" (deposits) for economic health analysis.
+
+### Phase 8: Testing
 - Unit tests for all services
 - Integration tests for API endpoints
 - Contract tests for gRPC

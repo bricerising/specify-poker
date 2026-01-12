@@ -91,6 +91,26 @@ the lobby and table without impacting gameplay.
 
 ---
 
+### User Story 4 - Data-Driven Insights (Priority: P2)
+
+As a product owner, I can review system and user behavior data in Grafana to 
+derive insights that inform future development and balance the game economy.
+
+**Why this priority**: Insights are necessary for the long-term health and 
+retention of the platform.
+
+**Independent Test**: Business-level metrics (DAU, retention, chip supply) are 
+visible in Grafana and updated daily.
+
+**Acceptance Scenarios**:
+
+1. **Given** active users, **When** they play hands and move chips, **Then** 
+   retention and economy metrics are updated in the business dashboard.
+2. **Given** a new feature release, **When** its impact is measured, **Then** 
+   the data is used to prioritize the next set of development tasks.
+
+---
+
 ### Edge Cases
 
 - Player disconnects while it is their turn to act.
@@ -153,6 +173,8 @@ the lobby and table without impacting gameplay.
   when out-of-order updates are detected; table patches deliver full state payloads.
 - **FR-019**: System MUST expose a Prometheus-compatible metrics endpoint and emit
   OpenTelemetry traces for core gameplay events.
+- **FR-020**: System MUST support a data-driven feedback loop by capturing business
+  metrics (retention, economy) and surfacing them in Grafana for product review.
 
 ### Key Entities *(include if feature involves data)*
 

@@ -13,7 +13,7 @@
 
 ### T003: Create server entry point
 - **File**: `src/server.ts`
-- **Acceptance**: gRPC server starts on port 50053
+- **Acceptance**: gRPC server starts on port 50052
 
 ### T004: Add configuration management
 - **File**: `src/config.ts`
@@ -160,29 +160,48 @@
 
 ---
 
-## Phase 9: Testing
+## Phase 9: Observability
 
-### T030: Unit tests for profile service
+### T030: Implement structured logging
+- **File**: `src/observability/logger.ts`
+- **Acceptance**: JSON logs with trace and span IDs in context written to stdout for Loki
+- **Dependencies**: pino or winston
+
+### T031: Implement distributed tracing
+- **File**: `src/observability/otel.ts`
+- **Acceptance**: instrumentation for gRPC and pg, sent to Tempo
+- **Dependencies**: @opentelemetry/sdk-node, @opentelemetry/instrumentation-grpc, @opentelemetry/instrumentation-pg
+
+### T032: Implement Prometheus metrics
+- **File**: `src/observability/metrics.ts`
+- **Acceptance**: Metrics for profile lookups, update frequency, and DB performance
+- **Dependencies**: prom-client
+
+---
+
+## Phase 10: Testing
+
+### T033: Unit tests for profile service
 - **File**: `tests/unit/profileService.test.ts`
 - **Coverage**: CRUD, auto-create, validation
 
-### T031: Unit tests for statistics service
+### T034: Unit tests for statistics service
 - **File**: `tests/unit/statisticsService.test.ts`
 - **Coverage**: Increment, batch update
 
-### T032: Unit tests for friends service
+### T035: Unit tests for friends service
 - **File**: `tests/unit/friendsService.test.ts`
 - **Coverage**: Add, remove, list with profiles
 
-### T033: Unit tests for deletion service
+### T036: Unit tests for deletion service
 - **File**: `tests/unit/deletionService.test.ts`
 - **Coverage**: Soft delete, anonymization, hard delete
 
-### T034: Integration tests for database
+### T037: Integration tests for database
 - **File**: `tests/integration/database.test.ts`
 - **Coverage**: Repository operations
 
-### T035: Integration tests for gRPC API
+### T038: Integration tests for gRPC API
 - **File**: `tests/integration/grpc.test.ts`
 - **Coverage**: All service methods
 
@@ -215,7 +234,10 @@ T001 -> T002 -> T003 -> T004 -> T005
                 T029
                   |
                   v
-T030 -> T031 -> T032 -> T033 -> T034 -> T035
+        T030 -> T031 -> T032
+                  |
+                  v
+T033 -> T034 -> T035 -> T036 -> T037 -> T038
 ```
 
 ## Migration Notes

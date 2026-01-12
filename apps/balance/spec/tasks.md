@@ -128,25 +128,54 @@
 
 ---
 
-## Phase 6: Testing
+## Phase 6: Observability
 
-### T025: Unit tests for account service
+### T025: Implement structured logging
+- **File**: `src/observability/logger.ts`
+- **Acceptance**: JSON logs with `traceId` and `spanId` context written to stdout
+- **Integration**: Logs collected by Docker and shipped to Loki in local environment
+- **Dependencies**: pino or winston
+
+### T026: Implement OpenTelemetry tracing
+- **File**: `src/observability/otel.ts`
+- **Acceptance**: Automatic instrumentation for Express and gRPC
+- **Dependencies**: @opentelemetry/sdk-node
+
+### T027: Implement Prometheus metrics
+- **File**: `src/observability/metrics.ts`
+- **Acceptance**: `/metrics` endpoint exposed, tracking HTTP/gRPC latency
+- **Dependencies**: prom-client
+
+---
+
+## Phase 7: Analytics
+
+### T028: Implement economy health metrics
+- **File**: `src/services/accountService.ts`
+- **Acceptance**: Metrics for total chip supply, circulation velocity, and sink/source rates
+- **Metadata**: Labeled by transaction source (e.g., DEPOSIT, RAKE)
+
+---
+
+## Phase 8: Testing
+
+### T029: Unit tests for account service
 - **File**: `tests/unit/accountService.test.ts`
 - **Coverage**: All functions, edge cases
 
-### T026: Unit tests for reservation service
+### T030: Unit tests for reservation service
 - **File**: `tests/unit/reservationService.test.ts`
 - **Coverage**: Reserve/commit/release/expiry flows
 
-### T027: Unit tests for ledger service
+### T031: Unit tests for ledger service
 - **File**: `tests/unit/ledgerService.test.ts`
 - **Coverage**: Checksum verification, corruption detection
 
-### T028: Integration tests for HTTP API
+### T032: Integration tests for HTTP API
 - **File**: `tests/integration/http.test.ts`
 - **Coverage**: All endpoints, idempotency
 
-### T029: Integration tests for gRPC API
+### T033: Integration tests for gRPC API
 - **File**: `tests/integration/grpc.test.ts`
 - **Coverage**: All methods, error cases
 
@@ -170,5 +199,11 @@ T007 -> T008 -> T009 -> T010 -> T011 -> T012 -> T013
               T023 -> T024
                   |
                   v
-T025 -> T026 -> T027 -> T028 -> T029
+        T025 -> T026 -> T027
+                  |
+                  v
+                T028
+                  |
+                  v
+T029 -> T030 -> T031 -> T032 -> T033
 ```

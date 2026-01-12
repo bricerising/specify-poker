@@ -13,7 +13,7 @@
 
 ### T003: Create server entry point
 - **File**: `src/server.ts`
-- **Acceptance**: gRPC server starts on port 50052
+- **Acceptance**: gRPC server starts on port 50053
 
 ### T004: Add configuration management
 - **File**: `src/config.ts`
@@ -181,33 +181,61 @@
 
 ---
 
-## Phase 9: Testing
+## Phase 9: Observability
 
-### T034: Unit tests for hand evaluation
+### T034: Implement structured logging
+- **File**: `src/observability/logger.ts`
+- **Acceptance**: JSON logs with trace and span IDs in context written to stdout for Loki
+- **Dependencies**: pino or winston
+
+### T035: Implement distributed tracing
+- **File**: `src/observability/otel.ts`
+- **Acceptance**: gRPC instrumentation and span propagation
+- **Dependencies**: @opentelemetry/sdk-node, @opentelemetry/instrumentation-grpc
+
+### T036: Implement Prometheus metrics
+- **File**: `src/observability/metrics.ts`
+- **Acceptance**: Metrics for turn timers, hand outcomes, and gRPC performance
+- **Dependencies**: prom-client
+
+---
+
+## Phase 10: Analytics
+
+### T037: Implement turn timing tracking
+- **File**: `src/engine/stateTransitions.ts`
+- **Acceptance**: Record duration between TURN_STARTED and ACTION_TAKEN
+- **Metadata**: Labeled by street (preflop, flop, etc.) and action type
+
+---
+
+## Phase 11: Testing
+
+### T038: Unit tests for hand evaluation
 - **File**: `tests/unit/handEval.test.ts`
 - **Coverage**: All hand types, ties, kickers
 
-### T035: Unit tests for action validation
+### T039: Unit tests for action validation
 - **File**: `tests/unit/actionRules.test.ts`
 - **Coverage**: All action types, edge cases
 
-### T036: Unit tests for pot calculation
+### T040: Unit tests for pot calculation
 - **File**: `tests/unit/potCalculator.test.ts`
 - **Coverage**: Simple pots, side pots, splits
 
-### T037: Unit tests for state transitions
+### T041: Unit tests for state transitions
 - **File**: `tests/unit/stateTransitions.test.ts`
 - **Coverage**: All streets, all action types
 
-### T038: Integration tests for table lifecycle
+### T042: Integration tests for table lifecycle
 - **File**: `tests/integration/tables.test.ts`
 - **Coverage**: Create, join, leave, delete
 
-### T039: Integration tests for hand flow
+### T043: Integration tests for hand flow
 - **File**: `tests/integration/hands.test.ts`
 - **Coverage**: Complete hands, showdowns, all-ins
 
-### T040: Integration tests for gRPC API
+### T044: Integration tests for gRPC API
 - **File**: `tests/integration/grpc.test.ts`
 - **Coverage**: All service methods
 
@@ -240,7 +268,13 @@ T001 -> T002 -> T003 -> T004 -> T005
               T032 -> T033
                   |
                   v
-T034 -> T035 -> T036 -> T037 -> T038 -> T039 -> T040
+        T034 -> T035 -> T036
+                  |
+                  v
+                T037
+                  |
+                  v
+T038 -> T039 -> T040 -> T041 -> T042 -> T043 -> T044
 ```
 
 ## Migration Notes
