@@ -96,7 +96,7 @@ export async function getTransactionsByAccount(
 
   // Fallback to in-memory
   const accountTxIds = transactionsByAccount.get(accountId) ?? [];
-  let allTxs = await Promise.all(accountTxIds.map((id) => getTransaction(id)));
+  const allTxs = await Promise.all(accountTxIds.map((id) => getTransaction(id)));
   let filtered = allTxs.filter((tx): tx is Transaction => tx !== null);
 
   if (type) {

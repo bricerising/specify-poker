@@ -1,7 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { startGrpcServer, stopGrpcServer } from '../../src/api/grpc/server';
 import * as grpc from '@grpc/grpc-js';
-import * as protoLoader from '@grpc/proto-loader';
 
 vi.mock('@grpc/grpc-js', () => {
   const Server = vi.fn().mockImplementation(() => ({
@@ -20,6 +19,15 @@ vi.mock('@grpc/grpc-js', () => {
           service: {},
         },
       },
+      grpc: {
+        health: {
+          v1: {
+            Health: {
+              service: {},
+            },
+          },
+        },
+      },
     }),
   };
 });
@@ -30,10 +38,10 @@ vi.mock('@grpc/proto-loader', () => ({
 
 describe('gRPC Server', () => {
   it('should start and stop gRPC server', async () => {
-    const storeMock = {} as any;
-    const pushMock = {} as any;
+    const subscriptionServiceMock = {} as unknown;
+    const pushMock = {} as unknown;
     
-    await startGrpcServer(50055, storeMock, pushMock);
+    await startGrpcServer(50055, subscriptionServiceMock, pushMock);
     expect(grpc.Server).toHaveBeenCalled();
     
     stopGrpcServer();

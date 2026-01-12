@@ -2,10 +2,7 @@ import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
 import * as path from "path";
 
-const PROTO_PATH = path.resolve(
-  __dirname,
-  "../../../../specs/002-balance-service/balance.proto"
-);
+const PROTO_PATH = path.resolve(__dirname, "../../../balance/proto/balance.proto");
 
 // Types for balance service responses
 export interface GetBalanceResponse {
@@ -73,7 +70,7 @@ export interface CancelPotResponse {
 }
 
 // Client configuration
-let client: any = null;
+let client: grpc.Client | null = null;
 let enabled = false;
 
 function getBalanceServiceUrl(): string | null {
@@ -105,7 +102,7 @@ export async function initBalanceClient(): Promise<void> {
       oneofs: true,
     });
 
-    const proto = grpc.loadPackageDefinition(packageDefinition) as any;
+    const proto = grpc.loadPackageDefinition(packageDefinition) as unknown as Record<string, Record<string, new (url: string, credentials: grpc.ChannelCredentials) => grpc.Client>>;
     client = new proto.balance.BalanceService(
       url,
       grpc.credentials.createInsecure()
@@ -120,8 +117,8 @@ export async function initBalanceClient(): Promise<void> {
 }
 
 function promisify<T>(
-  method: (request: any, callback: (error: Error | null, response: T) => void) => void,
-  request: any
+  method: (request: unknown, callback: (error: Error | null, response: T) => void) => void,
+  request: unknown
 ): Promise<T> {
   return new Promise((resolve, reject) => {
     method.call(client, request, (error: Error | null, response: T) => {

@@ -1,13 +1,35 @@
-import { eventStore, GameEvent } from '../storage/eventStore';
+import { eventStore } from "../storage/eventStore";
+import { GameEvent } from "../domain/types";
+import { privacyService } from "./privacyService";
+
+function extractParticipants(events: GameEvent[]): Set<string> {
+  const participants = new Set<string>();
+  const handStarted = events.find((event) => event.type === "HAND_STARTED");
+  const payload = handStarted?.payload as { seats?: { userId?: string }[] } | undefined;
+  for (const seat of payload?.seats || []) {
+    if (seat.userId) {
+      participants.add(seat.userId);
+    }
+  }
+  return participants;
+}
 
 export class ReplayService {
-  async getHandEvents(handId: string): Promise<GameEvent[]> {
-    const result = await eventStore.queryEvents({ hand_id: handId, limit: 1000 });
-    return result.events;
-  }
+  async getHandEvents(handId: string, requesterUserId?: string, isOperator = false): Promise<GameEvent[]> {
+    const result = await eventStore.queryEvents({ handId, limit: 1000 });
+    const events = result.events;
 
-  // Future: Implement state reconstruction logic here
-  // async reconstructStateAt(handId: string, eventId: string): Promise<GameState> { ... }
+    if (isOperator) {
+      return events;
+    }
+
+    const participantUserIds = extractParticipants(events);
+    const revealedSeatIds = await eventStore.getShowdownReveals(handId);
+
+    return events.map((event) =>
+      privacyService.filterEvent(event, requesterUserId, isOperator, participantUserIds, revealedSeatIds)
+    );
+  }
 }
 
 export const replayService = new ReplayService();

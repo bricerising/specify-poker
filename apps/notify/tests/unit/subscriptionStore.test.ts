@@ -21,7 +21,7 @@ import { getRedisClient } from '../../src/storage/redisClient';
 
 describe('SubscriptionStore', () => {
   let store: SubscriptionStore;
-  let redisMock: any;
+  let redisMock: unknown;
 
   beforeEach(async () => {
     store = new SubscriptionStore();

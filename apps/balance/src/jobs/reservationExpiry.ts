@@ -1,5 +1,6 @@
 import { processExpiredReservations } from "../services/reservationService";
 import { getConfig } from "../config";
+import logger from "../observability/logger";
 
 let intervalId: NodeJS.Timeout | null = null;
 
@@ -7,16 +8,16 @@ export function startReservationExpiryJob(): void {
   const config = getConfig();
   const intervalMs = config.reservationExpiryIntervalMs;
 
-  console.log(`Starting reservation expiry job (interval: ${intervalMs}ms)`);
+  logger.info({ intervalMs }, "Starting reservation expiry job");
 
   intervalId = setInterval(async () => {
     try {
       const expiredCount = await processExpiredReservations();
       if (expiredCount > 0) {
-        console.log(`Expired ${expiredCount} reservations`);
+        logger.info({ expiredCount }, "Expired reservations");
       }
     } catch (error) {
-      console.error("Reservation expiry job error:", error);
+      logger.error({ err: error }, "Reservation expiry job error");
     }
   }, intervalMs);
 }

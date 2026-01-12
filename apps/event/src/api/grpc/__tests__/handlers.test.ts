@@ -1,34 +1,49 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createHandlers } from '../handlers';
-import { eventStore } from '../../../storage/eventStore';
-import { handStore } from '../../../storage/handStore';
+import { createHandlers } from "../handlers";
+import { eventIngestionService } from "../../../services/eventIngestionService";
+import { eventQueryService } from "../../../services/eventQueryService";
+import { handRecordService } from "../../../services/handRecordService";
+import { replayService } from "../../../services/replayService";
+import { streamService } from "../../../services/streamService";
 
-vi.mock('../../../storage/eventStore', () => ({
-  eventStore: {
-    publishEvent: vi.fn(),
-    queryEvents: vi.fn(),
-    getEventById: vi.fn(),
+vi.mock("../../../services/eventIngestionService", () => ({
+  eventIngestionService: {
+    ingestEvent: vi.fn(),
+    ingestEvents: vi.fn(),
   },
 }));
 
-vi.mock('../../../storage/handStore', () => ({
-  handStore: {
+vi.mock("../../../services/eventQueryService", () => ({
+  eventQueryService: {
+    queryEvents: vi.fn(),
+    getEvent: vi.fn(),
+  },
+}));
+
+vi.mock("../../../services/handRecordService", () => ({
+  handRecordService: {
     getHandRecord: vi.fn(),
     getHandHistory: vi.fn(),
     getHandsForUser: vi.fn(),
   },
 }));
 
-vi.mock('../../../storage/redisClient', () => ({
-  default: {
-    xRead: vi.fn(),
-    get: vi.fn(),
-    set: vi.fn(),
+vi.mock("../../../services/replayService", () => ({
+  replayService: {
+    getHandEvents: vi.fn(),
+  },
+}));
+
+vi.mock("../../../services/streamService", () => ({
+  streamService: {
+    getCursor: vi.fn(),
+    updateCursor: vi.fn(),
+    readStream: vi.fn(),
   },
 }));
 
 describe('gRPC Handlers', () => {
-  let handlers: any;
+  let handlers: ReturnType<typeof createHandlers>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -42,37 +57,38 @@ describe('gRPC Handlers', () => {
         tableId: 't1',
         payload: { foo: 'bar' }
       }
-    };
+    } as unknown as Record<string, unknown>;
     const callback = vi.fn();
-    (eventStore.publishEvent as any).mockResolvedValue({ event_id: 'e1' });
+    vi.mocked(eventIngestionService.ingestEvent).mockResolvedValue({ eventId: "e1" });
 
-    await handlers.publishEvent(call, callback);
+    await handlers.publishEvent(call as unknown as Record<string, unknown>, callback);
 
-    expect(eventStore.publishEvent).toHaveBeenCalledWith({
-      type: 'TEST',
-      table_id: 't1',
-      payload: { foo: 'bar' },
-      hand_id: undefined,
-      user_id: undefined,
-      seat_id: undefined
+    expect(eventIngestionService.ingestEvent).toHaveBeenCalledWith({
+      type: "TEST",
+      tableId: "t1",
+      payload: { foo: "bar" },
+      handId: undefined,
+      userId: undefined,
+      seatId: undefined,
+      idempotencyKey: undefined,
     });
-    expect(callback).toHaveBeenCalledWith(null, { success: true, eventId: 'e1' });
+    expect(callback).toHaveBeenCalledWith(null, { success: true, eventId: "e1" });
   });
 
   it('should handle getEvent', async () => {
-    const call = { request: { eventId: 'e1' } };
+    const call = { request: { eventId: 'e1' } } as unknown as Record<string, unknown>;
     const callback = vi.fn();
     const mockEvent = {
-      event_id: 'e1',
-      type: 'TEST',
-      table_id: 't1',
+      eventId: "e1",
+      type: "TEST",
+      tableId: "t1",
       payload: {},
       timestamp: new Date(),
-      sequence: 1
+      sequence: 1,
     };
-    (eventStore.getEventById as any).mockResolvedValue(mockEvent);
+    vi.mocked(eventQueryService.getEvent).mockResolvedValue(mockEvent);
 
-    await handlers.getEvent(call, callback);
+    await handlers.getEvent(call as unknown as Record<string, unknown>, callback);
 
     expect(callback).toHaveBeenCalledWith(null, expect.objectContaining({
       eventId: 'e1',
@@ -81,11 +97,11 @@ describe('gRPC Handlers', () => {
   });
 
   it('should return NOT_FOUND if event does not exist', async () => {
-    const call = { request: { eventId: 'nonexistent' } };
+    const call = { request: { eventId: 'nonexistent' } } as unknown as Record<string, unknown>;
     const callback = vi.fn();
-    (eventStore.getEventById as any).mockResolvedValue(null);
+    vi.mocked(eventQueryService.getEvent).mockResolvedValue(null);
 
-    await handlers.getEvent(call, callback);
+    await handlers.getEvent(call as unknown as Record<string, unknown>, callback);
 
     expect(callback).toHaveBeenCalledWith(expect.objectContaining({
       code: 5 // NOT_FOUND
@@ -100,15 +116,17 @@ describe('gRPC Handlers', () => {
           { type: 'T2', tableId: 't1', payload: {} }
         ]
       }
-    };
+    } as unknown as Record<string, unknown>;
     const callback = vi.fn();
-    (eventStore.publishEvent as any).mockResolvedValueOnce({ event_id: 'e1' });
-    (eventStore.publishEvent as any).mockResolvedValueOnce({ event_id: 'e2' });
+    vi.mocked(eventIngestionService.ingestEvents).mockResolvedValue([
+      { eventId: "e1" },
+      { eventId: "e2" },
+    ]);
 
-    await handlers.publishEvents(call, callback);
+    await handlers.publishEvents(call as unknown as Record<string, unknown>, callback);
 
-    expect(eventStore.publishEvent).toHaveBeenCalledTimes(2);
-    expect(callback).toHaveBeenCalledWith(null, { success: true, eventIds: ['e1', 'e2'] });
+    expect(eventIngestionService.ingestEvents).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledWith(null, { success: true, eventIds: ["e1", "e2"] });
   });
 
   it('should handle queryEvents', async () => {
@@ -118,14 +136,17 @@ describe('gRPC Handlers', () => {
         limit: 10,
         offset: 0
       }
-    };
+    } as unknown as Record<string, unknown>;
     const callback = vi.fn();
-    (eventStore.queryEvents as any).mockResolvedValue({
-      events: [{ event_id: 'e1', type: 'T1', table_id: 't1', payload: {}, timestamp: new Date(), sequence: 1 }],
-      total: 1
+    vi.mocked(eventQueryService.queryEvents).mockResolvedValue({
+      events: [
+        { eventId: "e1", type: "T1", tableId: "t1", payload: {}, timestamp: new Date(), sequence: 1 },
+      ],
+      total: 1,
+      hasMore: false,
     });
 
-    await handlers.queryEvents(call, callback);
+    await handlers.queryEvents(call as unknown as Record<string, unknown>, callback);
 
     expect(callback).toHaveBeenCalledWith(null, expect.objectContaining({
       total: 1,
@@ -134,22 +155,24 @@ describe('gRPC Handlers', () => {
   });
 
   it('should handle getHandRecord', async () => {
-    const call = { request: { handId: 'h1' } };
+    const call = { request: { handId: 'h1' } } as unknown as Record<string, unknown>;
     const callback = vi.fn();
     const mockRecord = {
-      hand_id: 'h1',
-      table_id: 't1',
-      config: {},
+      handId: "h1",
+      tableId: "t1",
+      tableName: "Table",
+      config: { smallBlind: 10, bigBlind: 20, ante: 0 },
       participants: [],
-      community_cards: [],
+      communityCards: [],
       pots: [],
       winners: [],
-      started_at: new Date(),
-      completed_at: new Date()
+      startedAt: new Date(),
+      completedAt: new Date(),
+      duration: 1000,
     };
-    (handStore.getHandRecord as any).mockResolvedValue(mockRecord);
+    vi.mocked(handRecordService.getHandRecord).mockResolvedValue(mockRecord as unknown as Record<string, unknown>);
 
-    await handlers.getHandRecord(call, callback);
+    await handlers.getHandRecord(call as unknown as Record<string, unknown>, callback);
 
     expect(callback).toHaveBeenCalledWith(null, expect.objectContaining({
       handId: 'h1'
@@ -157,14 +180,28 @@ describe('gRPC Handlers', () => {
   });
 
   it('should handle getHandHistory', async () => {
-    const call = { request: { tableId: 't1', limit: 10, offset: 0 } };
+    const call = { request: { tableId: 't1', limit: 10, offset: 0 } } as unknown as Record<string, unknown>;
     const callback = vi.fn();
-    (handStore.getHandHistory as any).mockResolvedValue({
-      hands: [{ hand_id: 'h1', table_id: 't1', config: {}, participants: [], community_cards: [], pots: [], winners: [], started_at: new Date(), completed_at: new Date() }],
-      total: 1
-    });
+    vi.mocked(handRecordService.getHandHistory).mockResolvedValue({
+      hands: [
+        {
+          handId: "h1",
+          tableId: "t1",
+          tableName: "Table",
+          config: { smallBlind: 10, bigBlind: 20, ante: 0 },
+          participants: [],
+          communityCards: [],
+          pots: [],
+          winners: [],
+          startedAt: new Date(),
+          completedAt: new Date(),
+          duration: 1000,
+        },
+      ],
+      total: 1,
+    } as unknown as Record<string, unknown>);
 
-    await handlers.getHandHistory(call, callback);
+    await handlers.getHandHistory(call as unknown as Record<string, unknown>, callback);
 
     expect(callback).toHaveBeenCalledWith(null, expect.objectContaining({
       total: 1
@@ -172,14 +209,28 @@ describe('gRPC Handlers', () => {
   });
 
   it('should handle getHandsForUser', async () => {
-    const call = { request: { userId: 'u1', limit: 10, offset: 0 } };
+    const call = { request: { userId: 'u1', limit: 10, offset: 0 } } as unknown as Record<string, unknown>;
     const callback = vi.fn();
-    (handStore.getHandsForUser as any).mockResolvedValue({
-      hands: [{ hand_id: 'h1', table_id: 't1', config: {}, participants: [], community_cards: [], pots: [], winners: [], started_at: new Date(), completed_at: new Date() }],
-      total: 1
-    });
+    vi.mocked(handRecordService.getHandsForUser).mockResolvedValue({
+      hands: [
+        {
+          handId: "h1",
+          tableId: "t1",
+          tableName: "Table",
+          config: { smallBlind: 10, bigBlind: 20, ante: 0 },
+          participants: [],
+          communityCards: [],
+          pots: [],
+          winners: [],
+          startedAt: new Date(),
+          completedAt: new Date(),
+          duration: 1000,
+        },
+      ],
+      total: 1,
+    } as unknown as Record<string, unknown>);
 
-    await handlers.getHandsForUser(call, callback);
+    await handlers.getHandsForUser(call as unknown as Record<string, unknown>, callback);
 
     expect(callback).toHaveBeenCalledWith(null, expect.objectContaining({
       total: 1
@@ -187,14 +238,13 @@ describe('gRPC Handlers', () => {
   });
 
   it('should handle getHandReplay', async () => {
-    const call = { request: { handId: 'h1' } };
+    const call = { request: { handId: 'h1' } } as unknown as Record<string, unknown>;
     const callback = vi.fn();
-    (eventStore.queryEvents as any).mockResolvedValue({
-      events: [{ event_id: 'e1', type: 'T1', table_id: 't1', payload: {}, timestamp: new Date(), sequence: 1 }],
-      total: 1
-    });
+    vi.mocked(replayService.getHandEvents).mockResolvedValue([
+      { eventId: "e1", type: "T1", tableId: "t1", payload: {}, timestamp: new Date(), sequence: 1 },
+    ]);
 
-    await handlers.getHandReplay(call, callback);
+    await handlers.getHandReplay(call as unknown as Record<string, unknown>, callback);
 
     expect(callback).toHaveBeenCalledWith(null, expect.objectContaining({
       handId: 'h1',
@@ -203,10 +253,18 @@ describe('gRPC Handlers', () => {
   });
 
   it('should handle updateCursor', async () => {
-    const call = { request: { streamId: 's1', subscriberId: 'sub1', position: 123 } };
+    const call = { request: { streamId: 's1', subscriberId: 'sub1', position: 123 } } as unknown as Record<string, unknown>;
     const callback = vi.fn();
+    vi.mocked(streamService.updateCursor).mockResolvedValue({
+      cursorId: "s1:sub1",
+      streamId: "s1",
+      subscriberId: "sub1",
+      position: 123,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
 
-    await handlers.updateCursor(call, callback);
+    await handlers.updateCursor(call as unknown as Record<string, unknown>, callback);
 
     expect(callback).toHaveBeenCalledWith(null, expect.objectContaining({
       position: 123
@@ -214,12 +272,18 @@ describe('gRPC Handlers', () => {
   });
 
   it('should handle getCursor', async () => {
-    const call = { request: { streamId: 's1', subscriberId: 'sub1' } };
+    const call = { request: { streamId: 's1', subscriberId: 'sub1' } } as unknown as Record<string, unknown>;
     const callback = vi.fn();
-    const redisClient = (await import('../../../storage/redisClient')).default;
-    (redisClient.get as any).mockResolvedValue('123');
+    vi.mocked(streamService.getCursor).mockResolvedValue({
+      cursorId: "s1:sub1",
+      streamId: "s1",
+      subscriberId: "sub1",
+      position: 123,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
 
-    await handlers.getCursor(call, callback);
+    await handlers.getCursor(call as unknown as Record<string, unknown>, callback);
 
     expect(callback).toHaveBeenCalledWith(null, expect.objectContaining({
       position: 123
@@ -227,11 +291,11 @@ describe('gRPC Handlers', () => {
   });
 
   it('should handle publishEvent error', async () => {
-    const call = { request: { type: 'TEST', tableId: 't1' } };
+    const call = { request: { type: 'TEST', tableId: 't1' } } as unknown as Record<string, unknown>;
     const callback = vi.fn();
-    (eventStore.publishEvent as any).mockRejectedValue(new Error('Test Error'));
+    vi.mocked(eventIngestionService.ingestEvent).mockRejectedValue(new Error("Test Error"));
 
-    await handlers.publishEvent(call, callback);
+    await handlers.publishEvent(call as unknown as Record<string, unknown>, callback);
 
     expect(callback).toHaveBeenCalledWith(expect.objectContaining({
       code: 13, // INTERNAL
@@ -240,11 +304,11 @@ describe('gRPC Handlers', () => {
   });
 
   it('should handle getHandRecord NOT_FOUND', async () => {
-    const call = { request: { handId: 'nonexistent' } };
+    const call = { request: { handId: 'nonexistent' } } as unknown as Record<string, unknown>;
     const callback = vi.fn();
-    (handStore.getHandRecord as any).mockResolvedValue(null);
+    vi.mocked(handRecordService.getHandRecord).mockResolvedValue(null);
 
-    await handlers.getHandRecord(call, callback);
+    await handlers.getHandRecord(call as unknown as Record<string, unknown>, callback);
 
     expect(callback).toHaveBeenCalledWith(expect.objectContaining({
       code: 5 // NOT_FOUND

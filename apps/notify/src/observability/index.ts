@@ -1,9 +1,10 @@
-import { NodeSDK } from '@opentelemetry/sdk-node';
-import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
-import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-grpc';
-import { Resource } from '@opentelemetry/resources';
-import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
+import { NodeSDK } from "@opentelemetry/sdk-node";
+import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-grpc";
+import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-grpc";
+import { Resource } from "@opentelemetry/resources";
+import { SemanticResourceAttributes } from "@opentelemetry/semantic-conventions";
+import logger from "./logger";
 
 const sdk = new NodeSDK({
   resource: new Resource({
@@ -20,10 +21,10 @@ const sdk = new NodeSDK({
 
 export function startObservability() {
   sdk.start();
-  console.log('OpenTelemetry SDK started');
+  logger.info("OpenTelemetry SDK started");
 }
 
 export async function stopObservability() {
   await sdk.shutdown();
-  console.log('OpenTelemetry SDK shut down');
+  logger.info("OpenTelemetry SDK shut down");
 }

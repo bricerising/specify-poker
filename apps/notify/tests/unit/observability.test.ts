@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { startObservability, stopObservability } from '../../src/observability/index';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 

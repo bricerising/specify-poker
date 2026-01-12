@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { describe, expect, it, beforeEach } from "vitest";
 import {
   reserveForBuyIn,
   commitReservation,
@@ -200,7 +200,7 @@ describe("reservationService", () => {
       await ensureAccount("user-11", 1000);
 
       // Create reservation with very short timeout
-      const reserve = await reserveForBuyIn(
+      const _reserve = await reserveForBuyIn(
         "user-11",
         "table-1",
         500,
@@ -208,7 +208,7 @@ describe("reservationService", () => {
         0 // 0 second timeout = immediate expiry
       );
 
-      expect(reserve.ok).toBe(true);
+      expect(_reserve.ok).toBe(true);
 
       // Wait a bit and process expired
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -223,7 +223,7 @@ describe("reservationService", () => {
     it("does not expire active reservations", async () => {
       await ensureAccount("user-12", 1000);
 
-      const reserve = await reserveForBuyIn(
+      const _reserve = await reserveForBuyIn(
         "user-12",
         "table-1",
         500,
@@ -257,7 +257,7 @@ describe("reservationService", () => {
       await ensureAccount("user-14", 1000);
 
       const reserve1 = await reserveForBuyIn("user-14", "table-1", 300, "reserve-17");
-      const reserve2 = await reserveForBuyIn("user-14", "table-2", 200, "reserve-18");
+      const _reserve2 = await reserveForBuyIn("user-14", "table-2", 200, "reserve-18");
 
       await commitReservation(reserve1.reservationId!);
 

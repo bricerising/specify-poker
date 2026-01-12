@@ -30,16 +30,19 @@
 
 - gRPC: localhost:50055
 - Health Check: (gRPC Health Protocol)
+- Metrics: http://localhost:9105/metrics
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `GRPC_PORT` | 50055 | gRPC server port |
+| `METRICS_PORT` | 9105 | Metrics HTTP server port |
 | `REDIS_URL` | (none) | Redis connection URL |
 | `VAPID_PUBLIC_KEY` | (none) | Web Push VAPID Public Key |
 | `VAPID_PRIVATE_KEY` | (none) | Web Push VAPID Private Key |
 | `VAPID_SUBJECT` | (none) | Web Push VAPID Subject (mailto:) |
+| `EVENT_STREAM_KEY` | events:game | Redis stream key for event consumption |
 
 ## gRPC Methods
 

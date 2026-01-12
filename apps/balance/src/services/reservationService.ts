@@ -5,7 +5,6 @@ import {
   Reservation,
   ReservationResult,
 } from "../domain/types";
-import { getConfig } from "../config";
 import { getBalance, debitBalance } from "./accountService";
 import {
   getReservation,
@@ -15,6 +14,7 @@ import {
   getExpiredReservations,
 } from "../storage/reservationStore";
 import { getIdempotentResponse, setIdempotentResponse } from "../storage/idempotencyStore";
+import logger from "../observability/logger";
 
 function now(): string {
   return new Date().toISOString();
@@ -53,7 +53,6 @@ export async function reserveForBuyIn(
   }
 
   // Create reservation
-  const config = getConfig();
   const timeoutMs = (timeoutSeconds ?? 30) * 1000;
   const expiresAt = new Date(Date.now() + timeoutMs).toISOString();
 
@@ -120,7 +119,8 @@ export async function commitReservation(reservationId: string): Promise<CommitRe
     {
       tableId: reservation.tableId,
       reservationId: reservation.reservationId,
-    }
+    },
+    { useAvailableBalance: false }
   );
 
   if (!debitResult.ok) {
@@ -143,7 +143,7 @@ export async function commitReservation(reservationId: string): Promise<CommitRe
 
 export async function releaseReservation(
   reservationId: string,
-  reason?: string
+  _reason?: string
 ): Promise<ReleaseResult> {
   const reservation = await getReservation(reservationId);
   if (!reservation) {
@@ -183,11 +183,11 @@ export async function processExpiredReservations(): Promise<number> {
         releasedAt: now(),
       }));
       count++;
-      console.log("reservation.expired", {
+      logger.info({
         reservationId: reservation.reservationId,
         accountId: reservation.accountId,
         amount: reservation.amount,
-      });
+      }, "reservation.expired");
     }
   }
 

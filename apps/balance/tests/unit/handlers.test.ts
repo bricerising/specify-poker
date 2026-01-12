@@ -14,9 +14,9 @@ describe('gRPC Handlers', () => {
   });
 
   it('GetBalance should return balance', async () => {
-    const call = { request: { account_id: 'a1' } };
+    const call = { request: { account_id: 'a1' } } as unknown as Parameters<typeof handlers.GetBalance>[0];
     const callback = vi.fn();
-    (accountService.getBalance as any).mockResolvedValue({
+    vi.mocked(accountService.getBalance).mockResolvedValue({
       accountId: 'a1',
       balance: 1000,
       availableBalance: 800,
@@ -33,10 +33,10 @@ describe('gRPC Handlers', () => {
   });
 
   it('EnsureAccount should call service', async () => {
-    const call = { request: { account_id: 'a1', initial_balance: 100 } };
+    const call = { request: { account_id: 'a1', initial_balance: 100 } } as unknown as Parameters<typeof handlers.EnsureAccount>[0];
     const callback = vi.fn();
-    (accountService.ensureAccount as any).mockResolvedValue({
-      account: { accountId: 'a1', balance: 100 },
+    vi.mocked(accountService.ensureAccount).mockResolvedValue({
+      account: { accountId: 'a1', balance: 100, availableBalance: 100, currency: 'CHIPS', version: 1 },
       created: true,
     });
 
@@ -48,9 +48,9 @@ describe('gRPC Handlers', () => {
   });
 
   it('ReserveForBuyIn should call service', async () => {
-    const call = { request: { account_id: 'a1', table_id: 't1', amount: 50, idempotency_key: 'k1' } };
+    const call = { request: { account_id: 'a1', table_id: 't1', amount: 50, idempotency_key: 'k1' } } as unknown as Parameters<typeof handlers.ReserveForBuyIn>[0];
     const callback = vi.fn();
-    (reservationService.reserveForBuyIn as any).mockResolvedValue({
+    vi.mocked(reservationService.reserveForBuyIn).mockResolvedValue({
       ok: true,
       reservationId: 'r1',
     });
@@ -64,9 +64,9 @@ describe('gRPC Handlers', () => {
   });
 
   it('CommitReservation should call service', async () => {
-    const call = { request: { reservation_id: 'r1' } };
+    const call = { request: { reservation_id: 'r1' } } as unknown as Parameters<typeof handlers.CommitReservation>[0];
     const callback = vi.fn();
-    (reservationService.commitReservation as any).mockResolvedValue({
+    vi.mocked(reservationService.commitReservation).mockResolvedValue({
       ok: true,
       transactionId: 'tx1',
     });
@@ -79,9 +79,9 @@ describe('gRPC Handlers', () => {
   });
 
   it('ReleaseReservation should call service', async () => {
-    const call = { request: { reservation_id: 'r1', reason: 'cancel' } };
+    const call = { request: { reservation_id: 'r1', reason: 'cancel' } } as unknown as Parameters<typeof handlers.ReleaseReservation>[0];
     const callback = vi.fn();
-    (reservationService.releaseReservation as any).mockResolvedValue({
+    vi.mocked(reservationService.releaseReservation).mockResolvedValue({
       ok: true,
     });
 
@@ -93,9 +93,9 @@ describe('gRPC Handlers', () => {
   });
 
   it('ProcessCashOut should call service', async () => {
-    const call = { request: { account_id: 'a1', table_id: 't1', seat_id: 1, amount: 200, idempotency_key: 'k2' } };
+    const call = { request: { account_id: 'a1', table_id: 't1', seat_id: 1, amount: 200, idempotency_key: 'k2' } } as unknown as Parameters<typeof handlers.ProcessCashOut>[0];
     const callback = vi.fn();
-    (accountService.processCashOut as any).mockResolvedValue({
+    vi.mocked(accountService.processCashOut).mockResolvedValue({
       ok: true,
       transactionId: 'tx2',
     });
@@ -108,9 +108,9 @@ describe('gRPC Handlers', () => {
   });
 
   it('RecordContribution should call service', async () => {
-    const call = { request: { table_id: 't1', hand_id: 'h1', seat_id: 1, account_id: 'a1', amount: 10, contribution_type: 'BET', idempotency_key: 'k3' } };
+    const call = { request: { table_id: 't1', hand_id: 'h1', seat_id: 1, account_id: 'a1', amount: 10, contribution_type: 'BET', idempotency_key: 'k3' } } as unknown as Parameters<typeof handlers.RecordContribution>[0];
     const callback = vi.fn();
-    (tablePotService.recordContribution as any).mockResolvedValue({
+    vi.mocked(tablePotService.recordContribution).mockResolvedValue({
       ok: true,
       totalPot: 100,
     });
@@ -124,9 +124,9 @@ describe('gRPC Handlers', () => {
   });
 
   it('SettlePot should call service', async () => {
-    const call = { request: { table_id: 't1', hand_id: 'h1', winners: [{ seat_id: 1, account_id: 'a1', amount: 100 }], idempotency_key: 'k4' } };
+    const call = { request: { table_id: 't1', hand_id: 'h1', winners: [{ seat_id: 1, account_id: 'a1', amount: 100 }], idempotency_key: 'k4' } } as unknown as Parameters<typeof handlers.SettlePot>[0];
     const callback = vi.fn();
-    (tablePotService.settlePot as any).mockResolvedValue({
+    vi.mocked(tablePotService.settlePot).mockResolvedValue({
       ok: true,
       results: [{ accountId: 'a1', transactionId: 'tx3', amount: 100, newBalance: 1100 }],
     });
@@ -139,9 +139,9 @@ describe('gRPC Handlers', () => {
   });
 
   it('CancelPot should call service', async () => {
-    const call = { request: { table_id: 't1', hand_id: 'h1', reason: 'error' } };
+    const call = { request: { table_id: 't1', hand_id: 'h1', reason: 'error' } } as unknown as Parameters<typeof handlers.CancelPot>[0];
     const callback = vi.fn();
-    (tablePotService.cancelPot as any).mockResolvedValue({
+    vi.mocked(tablePotService.cancelPot).mockResolvedValue({
       ok: true,
     });
 
@@ -153,9 +153,9 @@ describe('gRPC Handlers', () => {
   });
 
   it('should handle errors in handlers', async () => {
-    const call = { request: { account_id: 'a1' } };
+    const call = { request: { account_id: 'a1' } } as unknown as Parameters<typeof handlers.GetBalance>[0];
     const callback = vi.fn();
-    (accountService.getBalance as any).mockRejectedValue(new Error('Internal'));
+    vi.mocked(accountService.getBalance).mockRejectedValue(new Error('Internal'));
 
     await handlers.GetBalance(call, callback);
 

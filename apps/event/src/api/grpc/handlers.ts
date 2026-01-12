@@ -1,284 +1,380 @@
-import * as grpc from '@grpc/grpc-js';
-import { eventIngestionService } from '../../services/eventIngestionService';
-import { eventQueryService } from '../../services/eventQueryService';
-import { handRecordService } from '../../services/handRecordService';
-import { replayService } from '../../services/replayService';
-import redisClient from '../../storage/redisClient';
+import * as grpc from "@grpc/grpc-js";
+import {
+  PublishEventRequest,
+  PublishEventsRequest,
+  QueryEventsRequest,
+  GetEventRequest,
+  GetHandRecordRequest,
+  GetHandHistoryRequest,
+  GetHandsForUserRequest,
+  GetHandReplayRequest,
+  SubscribeRequest,
+  GetCursorRequest,
+  UpdateCursorRequest,
+} from "./types";
+import { eventIngestionService } from "../../services/eventIngestionService";
+import { eventQueryService } from "../../services/eventQueryService";
+import { handRecordService } from "../../services/handRecordService";
+import { replayService } from "../../services/replayService";
+import { streamService } from "../../services/streamService";
+import logger from "../../observability/logger";
 
 export function createHandlers() {
   return {
-    publishEvent: async (call: any, callback: any) => {
+    publishEvent: async (
+      call: grpc.ServerUnaryCall<PublishEventRequest, unknown>,
+      callback: grpc.sendUnaryData<unknown>
+    ) => {
       try {
-        const { type, tableId, handId, userId, seatId, payload } = call.request;
+        const { type, tableId, handId, userId, seatId, payload, idempotencyKey } = call.request;
         const event = await eventIngestionService.ingestEvent({
           type,
-          table_id: tableId,
-          hand_id: handId,
-          user_id: userId,
-          seat_id: seatId,
-          payload
+          tableId,
+          handId,
+          userId,
+          seatId,
+          payload,
+          idempotencyKey,
         });
-        callback(null, { success: true, eventId: event.event_id });
-      } catch (err: any) {
+        callback(null, { success: true, eventId: event.eventId });
+      } catch (err: unknown) {
         callback({
           code: grpc.status.INTERNAL,
-          message: err.message
+          message: (err as Error).message,
         });
       }
     },
 
-    publishEvents: async (call: any, callback: any) => {
+    publishEvents: async (
+      call: grpc.ServerUnaryCall<PublishEventsRequest, unknown>,
+      callback: grpc.sendUnaryData<unknown>
+    ) => {
       try {
-        const events = call.request.events.map((req: any) => ({
+        const events = call.request.events.map((req: PublishEventRequest) => ({
           type: req.type,
-          table_id: req.tableId,
-          hand_id: req.handId,
-          user_id: req.userId,
-          seat_id: req.seatId,
-          payload: req.payload
+          tableId: req.tableId,
+          handId: req.handId,
+          userId: req.userId,
+          seatId: req.seatId,
+          payload: req.payload,
+          idempotencyKey: req.idempotencyKey,
         }));
         const results = await eventIngestionService.ingestEvents(events);
-        callback(null, { success: true, eventIds: results.map(r => r.event_id) });
-      } catch (err: any) {
+        callback(null, { success: true, eventIds: results.map((r) => r.eventId) });
+      } catch (err: unknown) {
         callback({
           code: grpc.status.INTERNAL,
-          message: err.message
+          message: (err as Error).message,
         });
       }
     },
 
-    queryEvents: async (call: any, callback: any) => {
+    queryEvents: async (
+      call: grpc.ServerUnaryCall<QueryEventsRequest, unknown>,
+      callback: grpc.sendUnaryData<unknown>
+    ) => {
       try {
-        const { tableId, handId, userId, types, startTime, endTime, limit, offset } = call.request;
+        const { tableId, handId, userId, types, startTime, endTime, limit, offset, cursor } = call.request;
         const result = await eventQueryService.queryEvents({
-          table_id: tableId,
-          hand_id: handId,
-          user_id: userId,
+          tableId,
+          handId,
+          userId,
           types,
-          start_time: startTime ? new Date(startTime.seconds * 1000) : undefined,
-          end_time: endTime ? new Date(endTime.seconds * 1000) : undefined,
-          limit,
-          offset
+          startTime: startTime ? new Date(startTime.seconds * 1000) : undefined,
+          endTime: endTime ? new Date(endTime.seconds * 1000) : undefined,
+          limit: limit || 100,
+          offset,
+          cursor,
         });
 
         callback(null, {
-          events: result.events.map(e => ({
-            eventId: e.event_id,
+          events: result.events.map((e) => ({
+            eventId: e.eventId,
             type: e.type,
-            tableId: e.table_id,
-            handId: e.hand_id,
-            userId: e.user_id,
-            seatId: e.seat_id,
+            tableId: e.tableId,
+            handId: e.handId ?? undefined,
+            userId: e.userId ?? undefined,
+            seatId: e.seatId ?? undefined,
             payload: e.payload,
             timestamp: { seconds: Math.floor(e.timestamp.getTime() / 1000), nanos: 0 },
-            sequence: e.sequence
+            sequence: e.sequence ?? 0,
           })),
           total: result.total,
-          hasMore: result.total > (offset || 0) + result.events.length
+          hasMore: result.hasMore,
+          nextCursor: result.nextCursor,
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         callback({
           code: grpc.status.INTERNAL,
-          message: err.message
+          message: (err as Error).message,
         });
       }
     },
 
-    getEvent: async (call: any, callback: any) => {
+    getEvent: async (call: grpc.ServerUnaryCall<GetEventRequest, unknown>, callback: grpc.sendUnaryData<unknown>) => {
       try {
-        const event = await eventQueryService.getEvent(call.request.eventId);
+        const { eventId } = call.request;
+        const event = await eventQueryService.getEvent(eventId);
         if (!event) {
-          callback({ code: grpc.status.NOT_FOUND, message: 'Event not found' });
+          callback({ code: grpc.status.NOT_FOUND, message: "Event not found" });
           return;
         }
         callback(null, {
-          eventId: event.event_id,
+          eventId: event.eventId,
           type: event.type,
-          tableId: event.table_id,
-          handId: event.hand_id,
-          userId: event.user_id,
-          seatId: event.seat_id,
+          tableId: event.tableId,
+          handId: event.handId ?? undefined,
+          userId: event.userId ?? undefined,
+          seatId: event.seatId ?? undefined,
           payload: event.payload,
           timestamp: { seconds: Math.floor(event.timestamp.getTime() / 1000), nanos: 0 },
-          sequence: event.sequence
+          sequence: event.sequence ?? 0,
         });
-      } catch (err: any) {
-        callback({ code: grpc.status.INTERNAL, message: err.message });
+      } catch (err: unknown) {
+        callback({ code: grpc.status.INTERNAL, message: (err as Error).message });
       }
     },
 
-    getHandRecord: async (call: any, callback: any) => {
+    getHandRecord: async (
+      call: grpc.ServerUnaryCall<GetHandRecordRequest, unknown>,
+      callback: grpc.sendUnaryData<unknown>
+    ) => {
       try {
         const { handId, requesterId } = call.request;
         const record = await handRecordService.getHandRecord(handId, requesterId);
         if (!record) {
-          callback({ code: grpc.status.NOT_FOUND, message: 'Hand record not found' });
+          callback({ code: grpc.status.NOT_FOUND, message: "Hand record not found" });
           return;
         }
         callback(null, mapHandRecordToProto(record));
-      } catch (err: any) {
-        callback({ code: grpc.status.INTERNAL, message: err.message });
+      } catch (err: unknown) {
+        callback({ code: grpc.status.INTERNAL, message: (err as Error).message });
       }
     },
 
-    getHandHistory: async (call: any, callback: any) => {
+    getHandHistory: async (
+      call: grpc.ServerUnaryCall<GetHandHistoryRequest, unknown>,
+      callback: grpc.sendUnaryData<unknown>
+    ) => {
       try {
         const { tableId, limit, offset, requesterId } = call.request;
-        const result = await handRecordService.getHandHistory(tableId, limit, offset);
+        const result = await handRecordService.getHandHistory(tableId, limit, offset, requesterId);
         callback(null, {
           hands: result.hands.map(mapHandRecordToProto),
-          total: result.total
+          total: result.total,
         });
-      } catch (err: any) {
-        callback({ code: grpc.status.INTERNAL, message: err.message });
+      } catch (err: unknown) {
+        callback({ code: grpc.status.INTERNAL, message: (err as Error).message });
       }
     },
 
-    getHandsForUser: async (call: any, callback: any) => {
+    getHandsForUser: async (
+      call: grpc.ServerUnaryCall<GetHandsForUserRequest, unknown>,
+      callback: grpc.sendUnaryData<unknown>
+    ) => {
       try {
         const { userId, limit, offset } = call.request;
         const result = await handRecordService.getHandsForUser(userId, limit, offset);
         callback(null, {
           hands: result.hands.map(mapHandRecordToProto),
-          total: result.total
+          total: result.total,
         });
-      } catch (err: any) {
-        callback({ code: grpc.status.INTERNAL, message: err.message });
+      } catch (err: unknown) {
+        const message = (err as Error).message;
+        if (message.toLowerCase().includes("not authorized")) {
+          callback({ code: grpc.status.PERMISSION_DENIED, message });
+          return;
+        }
+        callback({ code: grpc.status.INTERNAL, message });
       }
     },
 
-    getHandReplay: async (call: any, callback: any) => {
-       try {
-        const { handId } = call.request;
-        const events = await replayService.getHandEvents(handId);
+    getHandReplay: async (
+      call: grpc.ServerUnaryCall<GetHandReplayRequest, unknown>,
+      callback: grpc.sendUnaryData<unknown>
+    ) => {
+      try {
+        const { handId, requesterId } = call.request;
+        const events = await replayService.getHandEvents(handId, requesterId);
         callback(null, {
           handId,
-          events: events.map(e => ({
-            eventId: e.event_id,
+          events: events.map((e) => ({
+            eventId: e.eventId,
             type: e.type,
-            tableId: e.table_id,
-            handId: e.hand_id,
-            userId: e.user_id,
-            seatId: e.seat_id,
+            tableId: e.tableId,
+            handId: e.handId ?? undefined,
+            userId: e.userId ?? undefined,
+            seatId: e.seatId ?? undefined,
             payload: e.payload,
             timestamp: { seconds: Math.floor(e.timestamp.getTime() / 1000), nanos: 0 },
-            sequence: e.sequence
-          }))
+            sequence: e.sequence ?? 0,
+          })),
         });
-      } catch (err: any) {
-        callback({ code: grpc.status.INTERNAL, message: err.message });
+      } catch (err: unknown) {
+        callback({ code: grpc.status.INTERNAL, message: (err as Error).message });
       }
     },
 
-    subscribeToStream: async (call: any) => {
+    subscribeToStream: async (call: grpc.ServerWritableStream<SubscribeRequest, unknown>) => {
       const { streamId, startSequence } = call.request;
-      const redisStreamKey = streamId === 'all' ? 'events:all' : `events:table:${streamId}`;
-      let lastId = startSequence ? `${startSequence}-0` : '$';
+      let lastId = startSequence ? "0-0" : "$";
+      let lastSequence = startSequence || 0;
 
-      console.log(`Subscription started for stream ${redisStreamKey} starting at ${lastId}`);
+      logger.info({ streamId, startSequence }, "Subscription started");
 
       const poll = async () => {
         while (!call.cancelled) {
           try {
-            const streams = await redisClient.xRead(
-              [{ key: redisStreamKey, id: lastId }],
-              { COUNT: 10, BLOCK: 5000 }
-            );
+            const streams = await streamService.readStream(streamId, lastId);
 
             if (streams) {
               for (const stream of streams) {
                 for (const message of stream.messages) {
-                  const event = JSON.parse(message.message.data);
+                  const event = JSON.parse(message.message.data) as {
+                    eventId: string;
+                    type: string;
+                    tableId: string;
+                    handId?: string | null;
+                    userId?: string | null;
+                    seatId?: number | null;
+                    payload: Record<string, unknown>;
+                    timestamp: string;
+                    sequence?: number | null;
+                  };
+                  if (event.sequence && event.sequence <= lastSequence) {
+                    lastId = message.id;
+                    continue;
+                  }
                   call.write({
-                    eventId: event.event_id,
+                    eventId: event.eventId,
                     type: event.type,
-                    tableId: event.table_id,
-                    handId: event.hand_id,
-                    userId: event.user_id,
-                    seatId: event.seat_id,
+                    tableId: event.tableId,
+                    handId: event.handId ?? undefined,
+                    userId: event.userId ?? undefined,
+                    seatId: event.seatId ?? undefined,
                     payload: event.payload,
                     timestamp: { seconds: Math.floor(new Date(event.timestamp).getTime() / 1000), nanos: 0 },
-                    sequence: event.sequence
+                    sequence: event.sequence ?? 0,
                   });
                   lastId = message.id;
+                  lastSequence = event.sequence ?? lastSequence;
                 }
               }
             }
           } catch (err) {
-            console.error('Error reading from Redis stream:', err);
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            logger.error({ err, streamId }, "Error reading from Redis stream");
+            await new Promise((resolve) => setTimeout(resolve, 1000));
           }
         }
-        console.log(`Subscription ended for stream ${redisStreamKey}`);
+        logger.info({ streamId }, "Subscription ended");
       };
 
       poll();
     },
 
-    getCursor: async (call: any, callback: any) => {
+    getCursor: async (call: grpc.ServerUnaryCall<GetCursorRequest, unknown>, callback: grpc.sendUnaryData<unknown>) => {
       try {
         const { streamId, subscriberId } = call.request;
-        const key = `cursor:${streamId}:${subscriberId}`;
-        const position = await redisClient.get(key);
+        const cursor = await streamService.getCursor(streamId, subscriberId);
+        if (!cursor) {
+          callback(null, {
+            cursorId: `${streamId}:${subscriberId}`,
+            streamId,
+            subscriberId,
+            position: 0,
+            createdAt: { seconds: 0, nanos: 0 },
+            updatedAt: { seconds: 0, nanos: 0 },
+          });
+          return;
+        }
         callback(null, {
-          streamId,
-          subscriberId,
-          position: position ? parseInt(position) : 0
+          cursorId: cursor.cursorId,
+          streamId: cursor.streamId,
+          subscriberId: cursor.subscriberId,
+          position: cursor.position,
+          createdAt: { seconds: Math.floor(cursor.createdAt.getTime() / 1000), nanos: 0 },
+          updatedAt: { seconds: Math.floor(cursor.updatedAt.getTime() / 1000), nanos: 0 },
         });
-      } catch (err: any) {
-        callback({ code: grpc.status.INTERNAL, message: err.message });
+      } catch (err: unknown) {
+        callback({ code: grpc.status.INTERNAL, message: (err as Error).message });
       }
     },
 
-    updateCursor: async (call: any, callback: any) => {
+    updateCursor: async (
+      call: grpc.ServerUnaryCall<UpdateCursorRequest, unknown>,
+      callback: grpc.sendUnaryData<unknown>
+    ) => {
       try {
         const { streamId, subscriberId, position } = call.request;
-        const key = `cursor:${streamId}:${subscriberId}`;
-        await redisClient.set(key, position.toString());
+        const cursor = await streamService.updateCursor(streamId, subscriberId, position);
         callback(null, {
-          streamId,
-          subscriberId,
-          position
+          cursorId: cursor.cursorId,
+          streamId: cursor.streamId,
+          subscriberId: cursor.subscriberId,
+          position: cursor.position,
+          createdAt: { seconds: Math.floor(cursor.createdAt.getTime() / 1000), nanos: 0 },
+          updatedAt: { seconds: Math.floor(cursor.updatedAt.getTime() / 1000), nanos: 0 },
         });
-      } catch (err: any) {
-        callback({ code: grpc.status.INTERNAL, message: err.message });
+      } catch (err: unknown) {
+        callback({ code: grpc.status.INTERNAL, message: (err as Error).message });
       }
-    }
+    },
   };
 }
 
-function mapHandRecordToProto(r: any) {
+function mapHandRecordToProto(r: {
+  handId: string;
+  tableId: string;
+  tableName: string;
+  config: { smallBlind: number; bigBlind: number; ante: number };
+  participants: {
+    seatId: number;
+    userId: string;
+    nickname: string;
+    startingStack: number;
+    endingStack: number;
+    holeCards: { rank: string; suit: string }[] | null;
+    actions: { street: string; action: string; amount: number; timestamp: string }[];
+    result: string;
+  }[];
+  communityCards: { rank: string; suit: string }[];
+  pots: { amount: number; winners: string[] }[];
+  winners: { userId: string; amount: number }[];
+  startedAt: Date;
+  completedAt: Date;
+  duration: number;
+}) {
   return {
-    handId: r.hand_id,
-    tableId: r.table_id,
-    tableName: r.table_name,
+    handId: r.handId,
+    tableId: r.tableId,
+    tableName: r.tableName,
     config: r.config,
-    participants: r.participants.map((p: any) => ({
-      seatId: p.seat_id,
-      userId: p.user_id,
+    participants: r.participants.map((p) => ({
+      seatId: p.seatId,
+      userId: p.userId,
       nickname: p.nickname,
-      startingStack: p.starting_stack,
-      endingStack: p.ending_stack,
-      holeCards: p.hole_cards,
-      actions: p.actions.map((a: any) => ({
+      startingStack: p.startingStack,
+      endingStack: p.endingStack,
+      holeCards: p.holeCards ?? [],
+      actions: p.actions.map((a) => ({
         street: a.street,
         action: a.action,
         amount: a.amount,
-        timestamp: { seconds: Math.floor(new Date(a.timestamp).getTime() / 1000), nanos: 0 }
+        timestamp: { seconds: Math.floor(new Date(a.timestamp).getTime() / 1000), nanos: 0 },
       })),
-      result: p.result
+      result: p.result,
     })),
-    communityCards: r.community_cards,
-    pots: r.pots.map((p: any) => ({
+    communityCards: r.communityCards,
+    pots: r.pots.map((p) => ({
       amount: p.amount,
-      winners: p.winners
+      winners: p.winners,
     })),
-    winners: r.winners.map((w: any) => ({
-      userId: w.user_id,
-      amount: w.amount
+    winners: r.winners.map((w) => ({
+      userId: w.userId,
+      amount: w.amount,
     })),
-    startedAt: { seconds: Math.floor(new Date(r.started_at).getTime() / 1000), nanos: 0 },
-    completedAt: { seconds: Math.floor(new Date(r.completed_at).getTime() / 1000), nanos: 0 },
-    durationMs: r.duration_ms
+    startedAt: { seconds: Math.floor(new Date(r.startedAt).getTime() / 1000), nanos: 0 },
+    completedAt: { seconds: Math.floor(new Date(r.completedAt).getTime() / 1000), nanos: 0 },
+    durationMs: r.duration,
   };
 }

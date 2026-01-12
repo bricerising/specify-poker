@@ -1,13 +1,11 @@
-import { Pool } from 'pg';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import { Pool } from "pg";
+import { config } from "../config";
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://event:event@event-db:5432/event',
+  connectionString: config.databaseUrl,
 });
 
-export const query = (text: string, params?: any[]) => pool.query(text, params);
+export const query = (text: string, params?: unknown[]) => pool.query(text, params);
 
 export const getClient = () => pool.connect();
 

@@ -6,7 +6,6 @@ import { recordHandCompletion } from "../engine/statTracker";
 import {
   recordActionResult,
   recordAllinAction,
-  recordDecisionTime,
   recordFoldToRaise,
   recordHandEnded,
   recordHandShowdown,
@@ -281,15 +280,11 @@ export async function applyTableAction(options: {
     await recordHandCompletion(result.table.hand, result.table.seats);
 
     // Record win metrics
-    for (const winnerSeat of winners) {
-      recordHandWon();
-    }
+    winners.forEach(() => recordHandWon());
     // Track showdown wins vs non-showdown wins
     const wasShowdown = previousStreet === "showdown" || result.table.hand.currentStreet === "showdown";
     if (wasShowdown) {
-      for (const winnerSeat of winners) {
-        recordShowdownWin();
-      }
+      winners.forEach(() => recordShowdownWin());
     }
   }
 

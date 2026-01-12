@@ -113,6 +113,7 @@ message GetHandsForUserResponse {
 
 message GetHandReplayRequest {
   string hand_id = 1;
+  optional string requester_id = 2;
 }
 
 message GetHandReplayResponse {

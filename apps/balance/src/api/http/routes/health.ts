@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { isRedisEnabled, getRedisClient } from "../../../storage/redisClient";
+import logger from "../../../observability/logger";
 
 const router = Router();
 
@@ -14,6 +15,7 @@ router.get("/health", async (req: Request, res: Response) => {
         redisConnected = true;
       }
     } catch {
+      logger.warn("redis.health.check.failed");
       redisConnected = false;
     }
   }

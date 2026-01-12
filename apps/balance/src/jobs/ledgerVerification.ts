@@ -1,6 +1,7 @@
 import { verifyAllLedgers } from "../services/ledgerService";
 import { listAccounts } from "../storage/accountStore";
 import { getConfig } from "../config";
+import logger from "../observability/logger";
 
 let intervalId: NodeJS.Timeout | null = null;
 
@@ -8,7 +9,7 @@ export function startLedgerVerificationJob(): void {
   const config = getConfig();
   const intervalMs = config.ledgerVerificationIntervalMs;
 
-  console.log(`Starting ledger verification job (interval: ${intervalMs}ms)`);
+  logger.info({ intervalMs }, "Starting ledger verification job");
 
   intervalId = setInterval(async () => {
     try {
@@ -22,17 +23,17 @@ export function startLedgerVerificationJob(): void {
       const result = await verifyAllLedgers(accountIds);
 
       if (!result.valid) {
-        console.error("Ledger integrity check failed!", {
+        logger.error({
           failedAccounts: Object.entries(result.results)
-            .filter(([_, r]) => !r.valid)
+            .filter(([, r]) => !r.valid)
             .map(([id, r]) => ({
               accountId: id,
               firstInvalidEntry: r.firstInvalidEntry,
             })),
-        });
+        }, "Ledger integrity check failed");
       }
     } catch (error) {
-      console.error("Ledger verification job error:", error);
+      logger.error({ err: error }, "Ledger verification job error");
     }
   }, intervalMs);
 }

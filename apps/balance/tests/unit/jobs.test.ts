@@ -15,12 +15,21 @@ describe('Background Jobs', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
-    (config.getConfig as any).mockReturnValue({
+    vi.mocked(config.getConfig).mockReturnValue({
       reservationExpiryIntervalMs: 100,
       ledgerVerificationIntervalMs: 100,
-    });
-    (accountStore.listAccounts as any).mockResolvedValue([{ accountId: 'a1' }]);
-    (ledgerService.verifyAllLedgers as any).mockResolvedValue({ valid: true, results: {} });
+      grpcPort: 50051,
+      metricsPort: 9090,
+      httpPort: 3002,
+      redisUrl: 'redis://localhost:6379',
+      reservationTimeoutMs: 30000,
+      idempotencyTtlMs: 86400000,
+      logLevel: "info",
+      otelExporterEndpoint: "http://localhost:4317",
+      jwtSecret: "test-secret",
+    } as unknown as ReturnType<typeof config.getConfig>);
+    vi.mocked(accountStore.listAccounts).mockResolvedValue([{ accountId: 'a1', balance: 100, availableBalance: 100, currency: 'CHIPS', version: 1 }]);
+    vi.mocked(ledgerService.verifyAllLedgers).mockResolvedValue({ valid: true, results: {} });
   });
 
   afterEach(() => {

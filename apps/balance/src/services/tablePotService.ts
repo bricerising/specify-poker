@@ -1,4 +1,3 @@
-import { randomUUID } from "crypto";
 import {
   ContributionResult,
   Pot,
@@ -14,9 +13,47 @@ import {
 } from "../storage/tablePotStore";
 import { creditBalance } from "./accountService";
 import { getIdempotentResponse, setIdempotentResponse } from "../storage/idempotencyStore";
+import { recordPotContribution, recordPotSettlement } from "../observability/metrics";
+import logger from "../observability/logger";
 
 function now(): string {
   return new Date().toISOString();
+}
+
+function calculateRake(totalPot: number): number {
+  if (totalPot <= 20) {
+    return 0;
+  }
+  return Math.min(Math.floor(totalPot * 0.05), 5);
+}
+
+function normalizeWinners(
+  winners: SettlementWinner[],
+  targetTotal: number
+): SettlementWinner[] {
+  const totalRequested = winners.reduce((sum, w) => sum + w.amount, 0);
+  if (totalRequested <= 0 || targetTotal <= 0) {
+    return winners.map((w) => ({ ...w, amount: 0 }));
+  }
+
+  const basePayouts = winners.map((winner) => ({
+    ...winner,
+    amount: Math.floor((winner.amount / totalRequested) * targetTotal),
+  }));
+
+  let remainder = targetTotal - basePayouts.reduce((sum, w) => sum + w.amount, 0);
+  if (remainder > 0) {
+    const sorted = [...basePayouts].sort((a, b) => a.seatId - b.seatId);
+    let idx = 0;
+    while (remainder > 0) {
+      sorted[idx].amount += 1;
+      remainder -= 1;
+      idx = (idx + 1) % sorted.length;
+    }
+    return sorted;
+  }
+
+  return basePayouts;
 }
 
 export async function createPot(tableId: string, handId: string): Promise<TablePot> {
@@ -26,6 +63,7 @@ export async function createPot(tableId: string, handId: string): Promise<TableP
     handId,
     contributions: {},
     pots: [],
+    rakeAmount: 0,
     status: "ACTIVE",
     version: 0,
     createdAt: now(),
@@ -84,6 +122,7 @@ export async function recordContribution(
 
   const totalPot = Object.values(updated.contributions).reduce((sum, c) => sum + c, 0);
   const seatContribution = updated.contributions[seatId] ?? 0;
+  recordPotContribution(amount);
 
   const result: ContributionResult = {
     ok: true,
@@ -173,10 +212,15 @@ export async function settlePot(
     return result;
   }
 
+  const totalPot = Object.values(pot.contributions).reduce((sum, amount) => sum + amount, 0);
+  const rakeAmount = calculateRake(totalPot);
+  const netPot = Math.max(totalPot - rakeAmount, 0);
+  const normalizedWinners = normalizeWinners(winners, netPot);
+
   // Process each winner
   const settlementResults: SettlementResultItem[] = [];
 
-  for (const winner of winners) {
+  for (const winner of normalizedWinners) {
     if (winner.amount <= 0) {
       continue;
     }
@@ -200,6 +244,13 @@ export async function settlePot(
         amount: winner.amount,
         newBalance: creditResult.transaction.balanceAfter,
       });
+    } else {
+      const result: SettlePotResult = {
+        ok: false,
+        error: creditResult.error ?? "SETTLEMENT_FAILED",
+      };
+      await setIdempotentResponse(idempotencyKey, result);
+      return result;
     }
   }
 
@@ -207,8 +258,10 @@ export async function settlePot(
   await updateTablePot(tableId, handId, (current) => ({
     ...current,
     status: "SETTLED",
+    rakeAmount,
     settledAt: now(),
   }));
+  recordPotSettlement(totalPot, rakeAmount);
 
   const result: SettlePotResult = { ok: true, results: settlementResults };
   await setIdempotentResponse(idempotencyKey, result);
@@ -235,7 +288,7 @@ export async function cancelPot(
     settledAt: now(),
   }));
 
-  console.log("pot.cancelled", { tableId, handId, reason });
+  logger.info({ tableId, handId, reason }, "pot.cancelled");
   return { ok: true };
 }
 

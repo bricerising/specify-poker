@@ -62,23 +62,6 @@ async function waitForMessage(
   });
 }
 
-async function collectMessages(
-  ws: WebSocket,
-  durationMs: number,
-): Promise<WsMessage[]> {
-  const messages: WsMessage[] = [];
-  return new Promise((resolve) => {
-    const handleMessage = (data: WebSocket.RawData) => {
-      messages.push(JSON.parse(data.toString()));
-    };
-    ws.on("message", handleMessage);
-    setTimeout(() => {
-      ws.off("message", handleMessage);
-      resolve(messages);
-    }, durationMs);
-  });
-}
-
 describe("Specification Requirements", () => {
   let server: ReturnType<typeof createServer>;
   let port: number;

@@ -195,6 +195,7 @@ describe("accountService", () => {
       const result = await processDeposit("existing-user", 500, "BONUS", "deposit-2");
 
       expect(result.ok).toBe(true);
+      expect(result.transaction!.type).toBe("BONUS");
       expect(result.transaction!.balanceAfter).toBe(1000);
     });
   });

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { PushService } from '../../src/services/pushService';
+import { PushSenderService } from '../../src/services/pushSenderService';
 import { SubscriptionStore } from '../../src/storage/subscriptionStore';
 import webpush from 'web-push';
 
@@ -10,9 +10,9 @@ vi.mock('web-push', () => ({
   },
 }));
 
-describe('PushService', () => {
-  let pushService: PushService;
-  let storeMock: any;
+describe('PushSenderService', () => {
+  let pushService: PushSenderService;
+  let storeMock: unknown;
 
   beforeEach(() => {
     storeMock = {
@@ -20,7 +20,7 @@ describe('PushService', () => {
       deleteSubscription: vi.fn(),
       incrementStat: vi.fn(),
     };
-    pushService = new PushService(storeMock as unknown as SubscriptionStore);
+    pushService = new PushSenderService(storeMock as unknown as SubscriptionStore);
     vi.clearAllMocks();
   });
 
@@ -29,7 +29,7 @@ describe('PushService', () => {
     const sub1 = { endpoint: 'ep1', keys: { p256dh: 'dh1', auth: 'a1' } };
     const sub2 = { endpoint: 'ep2', keys: { p256dh: 'dh2', auth: 'a2' } };
     storeMock.getSubscriptions.mockResolvedValue([sub1, sub2]);
-    (webpush.sendNotification as any).mockResolvedValue({});
+    (webpush.sendNotification as unknown).mockResolvedValue({});
 
     const result = await pushService.sendToUser(userId, { title: 'T', body: 'B' });
 
@@ -42,7 +42,7 @@ describe('PushService', () => {
     const userId = 'user1';
     const sub1 = { endpoint: 'ep1', keys: { p256dh: 'dh1', auth: 'a1' } };
     storeMock.getSubscriptions.mockResolvedValue([sub1]);
-    (webpush.sendNotification as any).mockRejectedValue({ statusCode: 410 });
+    (webpush.sendNotification as unknown).mockRejectedValue({ statusCode: 410 });
 
     const result = await pushService.sendToUser(userId, { title: 'T', body: 'B' });
 

@@ -10,7 +10,7 @@ RUN npm ci
 
 COPY apps/balance/src ./apps/balance/src
 COPY packages/shared/src ./packages/shared/src
-COPY specs/002-balance-service/balance.proto ./specs/002-balance-service/
+COPY apps/balance/proto/balance.proto ./apps/balance/proto/balance.proto
 
 RUN npm run build --workspace=@specify-poker/balance
 

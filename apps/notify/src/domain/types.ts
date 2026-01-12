@@ -11,11 +11,17 @@ export interface UserPushSubscription extends PushSubscription {
   createdAt: string;
 }
 
+export type NotificationType = "turn_alert" | "game_invite" | "system";
+
 export interface NotificationPayload {
   title: string;
   body: string;
   url?: string;
   icon?: string;
   tag?: string;
-  data?: Record<string, any>;
+  data?: {
+    tableId?: string;
+    type: NotificationType;
+    [key: string]: string | undefined;
+  };
 }

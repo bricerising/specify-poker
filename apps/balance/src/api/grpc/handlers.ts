@@ -13,6 +13,12 @@ import {
   settlePot,
   cancelPot,
 } from "../../services/tablePotService";
+import { recordGrpcRequest } from "../../observability/metrics";
+import logger from "../../observability/logger";
+
+function recordDuration(method: string, startedAt: number, status: "ok" | "error") {
+  recordGrpcRequest(method, status, Date.now() - startedAt);
+}
 
 // gRPC handler implementations
 export const handlers = {
@@ -20,11 +26,13 @@ export const handlers = {
     call: { request: { account_id: string } },
     callback: (error: Error | null, response?: unknown) => void
   ) {
+    const startedAt = Date.now();
     try {
       const { account_id } = call.request;
       const balance = await getBalance(account_id);
 
       if (!balance) {
+        recordDuration("GetBalance", startedAt, "ok");
         callback(null, {
           account_id,
           balance: 0,
@@ -35,6 +43,7 @@ export const handlers = {
         return;
       }
 
+      recordDuration("GetBalance", startedAt, "ok");
       callback(null, {
         account_id: balance.accountId,
         balance: balance.balance,
@@ -43,6 +52,8 @@ export const handlers = {
         version: balance.version,
       });
     } catch (error) {
+      recordDuration("GetBalance", startedAt, "error");
+      logger.error({ err: error }, "GetBalance failed");
       callback(error as Error);
     }
   },
@@ -51,16 +62,20 @@ export const handlers = {
     call: { request: { account_id: string; initial_balance?: number } },
     callback: (error: Error | null, response?: unknown) => void
   ) {
+    const startedAt = Date.now();
     try {
       const { account_id, initial_balance = 0 } = call.request;
       const result = await ensureAccount(account_id, initial_balance);
 
+      recordDuration("EnsureAccount", startedAt, "ok");
       callback(null, {
         account_id: result.account.accountId,
         balance: result.account.balance,
         created: result.created,
       });
     } catch (error) {
+      recordDuration("EnsureAccount", startedAt, "error");
+      logger.error({ err: error }, "EnsureAccount failed");
       callback(error as Error);
     }
   },
@@ -77,6 +92,7 @@ export const handlers = {
     },
     callback: (error: Error | null, response?: unknown) => void
   ) {
+    const startedAt = Date.now();
     try {
       const { account_id, table_id, amount, idempotency_key, timeout_seconds } =
         call.request;
@@ -89,6 +105,7 @@ export const handlers = {
         timeout_seconds
       );
 
+      recordDuration("ReserveForBuyIn", startedAt, "ok");
       callback(null, {
         ok: result.ok,
         reservation_id: result.reservationId ?? "",
@@ -96,6 +113,8 @@ export const handlers = {
         available_balance: result.availableBalance ?? 0,
       });
     } catch (error) {
+      recordDuration("ReserveForBuyIn", startedAt, "error");
+      logger.error({ err: error }, "ReserveForBuyIn failed");
       callback(error as Error);
     }
   },
@@ -104,10 +123,12 @@ export const handlers = {
     call: { request: { reservation_id: string } },
     callback: (error: Error | null, response?: unknown) => void
   ) {
+    const startedAt = Date.now();
     try {
       const { reservation_id } = call.request;
       const result = await commitReservation(reservation_id);
 
+      recordDuration("CommitReservation", startedAt, "ok");
       callback(null, {
         ok: result.ok,
         transaction_id: result.transactionId ?? "",
@@ -115,6 +136,8 @@ export const handlers = {
         new_balance: result.newBalance ?? 0,
       });
     } catch (error) {
+      recordDuration("CommitReservation", startedAt, "error");
+      logger.error({ err: error }, "CommitReservation failed");
       callback(error as Error);
     }
   },
@@ -123,16 +146,20 @@ export const handlers = {
     call: { request: { reservation_id: string; reason?: string } },
     callback: (error: Error | null, response?: unknown) => void
   ) {
+    const startedAt = Date.now();
     try {
       const { reservation_id, reason } = call.request;
       const result = await releaseReservation(reservation_id, reason);
 
+      recordDuration("ReleaseReservation", startedAt, "ok");
       callback(null, {
         ok: result.ok,
         error: result.error ?? "",
         available_balance: result.availableBalance ?? 0,
       });
     } catch (error) {
+      recordDuration("ReleaseReservation", startedAt, "error");
+      logger.error({ err: error }, "ReleaseReservation failed");
       callback(error as Error);
     }
   },
@@ -150,6 +177,7 @@ export const handlers = {
     },
     callback: (error: Error | null, response?: unknown) => void
   ) {
+    const startedAt = Date.now();
     try {
       const { account_id, table_id, seat_id, amount, idempotency_key, hand_id } =
         call.request;
@@ -163,6 +191,7 @@ export const handlers = {
         hand_id
       );
 
+      recordDuration("ProcessCashOut", startedAt, "ok");
       callback(null, {
         ok: result.ok,
         transaction_id: result.transactionId ?? "",
@@ -170,6 +199,8 @@ export const handlers = {
         new_balance: result.newBalance ?? 0,
       });
     } catch (error) {
+      recordDuration("ProcessCashOut", startedAt, "error");
+      logger.error({ err: error }, "ProcessCashOut failed");
       callback(error as Error);
     }
   },
@@ -188,6 +219,7 @@ export const handlers = {
     },
     callback: (error: Error | null, response?: unknown) => void
   ) {
+    const startedAt = Date.now();
     try {
       const {
         table_id,
@@ -209,6 +241,7 @@ export const handlers = {
         idempotency_key
       );
 
+      recordDuration("RecordContribution", startedAt, "ok");
       callback(null, {
         ok: result.ok,
         error: result.error ?? "",
@@ -216,6 +249,8 @@ export const handlers = {
         seat_contribution: result.seatContribution ?? 0,
       });
     } catch (error) {
+      recordDuration("RecordContribution", startedAt, "error");
+      logger.error({ err: error }, "RecordContribution failed");
       callback(error as Error);
     }
   },
@@ -231,6 +266,7 @@ export const handlers = {
     },
     callback: (error: Error | null, response?: unknown) => void
   ) {
+    const startedAt = Date.now();
     try {
       const { table_id, hand_id, winners, idempotency_key } = call.request;
 
@@ -245,6 +281,7 @@ export const handlers = {
         idempotency_key
       );
 
+      recordDuration("SettlePot", startedAt, "ok");
       callback(null, {
         ok: result.ok,
         error: result.error ?? "",
@@ -257,6 +294,8 @@ export const handlers = {
           })) ?? [],
       });
     } catch (error) {
+      recordDuration("SettlePot", startedAt, "error");
+      logger.error({ err: error }, "SettlePot failed");
       callback(error as Error);
     }
   },
@@ -265,15 +304,19 @@ export const handlers = {
     call: { request: { table_id: string; hand_id: string; reason: string } },
     callback: (error: Error | null, response?: unknown) => void
   ) {
+    const startedAt = Date.now();
     try {
       const { table_id, hand_id, reason } = call.request;
       const result = await cancelPot(table_id, hand_id, reason);
 
+      recordDuration("CancelPot", startedAt, "ok");
       callback(null, {
         ok: result.ok,
         error: result.error ?? "",
       });
     } catch (error) {
+      recordDuration("CancelPot", startedAt, "error");
+      logger.error({ err: error }, "CancelPot failed");
       callback(error as Error);
     }
   },

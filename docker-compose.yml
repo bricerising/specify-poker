@@ -47,12 +47,16 @@ services:
     ports:
       - "3002:3002"
       - "50051:50051"
+      - "9102:9102"
     environment:
       HTTP_PORT: "3002"
       GRPC_PORT: "50051"
+      METRICS_PORT: "9102"
       REDIS_URL: "redis://redis:6379"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
     depends_on:
       - redis
+      - otel-collector
     healthcheck:
       test: ["CMD-SHELL", "true"]
       interval: 10s
@@ -197,6 +201,29 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
     depends_on:
       - event-db
+      - redis
+      - otel-collector
+    healthcheck:
+      test: ["CMD-SHELL", "true"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
+
+  game:
+    build:
+      context: .
+      dockerfile: apps/game/Dockerfile
+    ports:
+      - "50053:50053"
+    environment:
+      PORT: "50053"
+      REDIS_URL: "redis://redis:6379"
+      BALANCE_SERVICE_ADDR: "balance:50051"
+      EVENT_SERVICE_ADDR: "event:50054"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+    depends_on:
+      - balance
+      - event
       - redis
       - otel-collector
     healthcheck:

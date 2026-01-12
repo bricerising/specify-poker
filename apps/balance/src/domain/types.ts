@@ -17,6 +17,9 @@ export type TransactionType =
   | "BLIND"
   | "BET"
   | "POT_WIN"
+  | "RAKE"
+  | "BONUS"
+  | "REFERRAL"
   | "REFUND";
 
 export type TransactionStatus = "PENDING" | "COMPLETED" | "FAILED";
@@ -74,6 +77,7 @@ export interface TablePot {
   handId: string;
   contributions: Record<number, number>;
   pots: Pot[];
+  rakeAmount: number;
   status: TablePotStatus;
   version: number;
   createdAt: string;

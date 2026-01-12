@@ -4,6 +4,7 @@ import {
   verifyLedgerIntegrity,
   getLatestChecksum,
 } from "../storage/ledgerStore";
+import logger from "../observability/logger";
 
 export interface LedgerQueryOptions {
   limit?: number;
@@ -50,11 +51,11 @@ export async function verifyAllLedgers(
     results[accountId] = result;
     if (!result.valid) {
       allValid = false;
-      console.error("ledger.integrity.failed", {
+      logger.error({
         accountId,
         entriesChecked: result.entriesChecked,
         firstInvalidEntry: result.firstInvalidEntry,
-      });
+      }, "ledger.integrity.failed");
     }
   }
 

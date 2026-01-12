@@ -1,111 +1,198 @@
-import pool from './pgClient';
-import redisClient from './redisClient';
-import { v4 as uuidv4 } from 'uuid';
+import pool from "./pgClient";
+import redisClient from "./redisClient";
+import { v4 as uuidv4 } from "uuid";
+import { GameEvent, NewGameEvent } from "../domain/types";
+import { streamStore } from "./streamStore";
+import logger from "../observability/logger";
 
-export interface GameEvent {
+interface EventRow {
   event_id: string;
   type: string;
   table_id: string;
-  hand_id?: string;
-  user_id?: string;
-  seat_id?: number;
-  payload: any;
+  hand_id: string | null;
+  user_id: string | null;
+  seat_id: number | null;
+  payload: unknown;
   timestamp: Date;
-  sequence?: number;
+  sequence: number | null;
+}
+
+function mapRowToEvent(row: EventRow): GameEvent {
+  return {
+    eventId: row.event_id,
+    type: row.type as GameEvent["type"],
+    tableId: row.table_id,
+    handId: row.hand_id,
+    userId: row.user_id,
+    seatId: row.seat_id,
+    payload: row.payload as GameEvent["payload"],
+    timestamp: row.timestamp,
+    sequence: row.sequence ?? null,
+  };
+}
+
+async function nextSequenceForHand(handId: string): Promise<number> {
+  return redisClient.incr(`event:hands:sequence:${handId}`);
 }
 
 export class EventStore {
-  async publishEvent(event: Omit<GameEvent, 'event_id' | 'timestamp' | 'sequence'>): Promise<GameEvent> {
-    const event_id = uuidv4();
+  async publishEvent(event: NewGameEvent): Promise<GameEvent> {
+    const eventId = uuidv4();
     const timestamp = new Date();
+    const sequence = event.handId ? await nextSequenceForHand(event.handId) : null;
 
     const client = await pool.connect();
     try {
-      await client.query('BEGIN');
+      await client.query("BEGIN");
 
-      const res = await client.query(
-        `INSERT INTO game_events (event_id, type, table_id, hand_id, user_id, seat_id, payload, timestamp)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         RETURNING sequence`,
-        [event_id, event.type, event.table_id, event.hand_id, event.user_id, event.seat_id, event.payload, timestamp]
+      if (event.idempotencyKey) {
+        const existing = await client.query(
+          "SELECT event_id FROM event_idempotency WHERE idempotency_key = $1",
+          [event.idempotencyKey]
+        );
+        if (existing.rows.length > 0) {
+          const existingEvent = await client.query("SELECT * FROM events WHERE event_id = $1", [
+            existing.rows[0].event_id,
+          ]);
+          await client.query("COMMIT");
+          if (!existingEvent.rows[0]) {
+            throw new Error("Idempotency key exists but event is missing");
+          }
+          return mapRowToEvent(existingEvent.rows[0]);
+        }
+      }
+
+      await client.query(
+        `INSERT INTO events (event_id, type, table_id, hand_id, user_id, seat_id, payload, timestamp, sequence)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          eventId,
+          event.type,
+          event.tableId,
+          event.handId ?? null,
+          event.userId ?? null,
+          event.seatId ?? null,
+          event.payload,
+          timestamp,
+          sequence,
+        ]
       );
 
-      const sequence = res.rows[0].sequence;
-      const fullEvent: GameEvent = { ...event, event_id, timestamp, sequence };
+      if (event.idempotencyKey) {
+        await client.query(
+          `INSERT INTO event_idempotency (idempotency_key, event_id)
+           VALUES ($1, $2)`,
+          [event.idempotencyKey, eventId]
+        );
+      }
 
-      // Publish to Redis stream for hot streaming
-      // Stream key: events:table:{table_id}
-      await redisClient.xAdd(`events:table:${event.table_id}`, '*', {
-        data: JSON.stringify(fullEvent)
-      });
+      await client.query("COMMIT");
 
-      // Also publish to global stream
-      await redisClient.xAdd('events:all', '*', {
-        data: JSON.stringify(fullEvent)
-      });
+      const storedEvent = {
+        eventId,
+        type: event.type,
+        tableId: event.tableId,
+        handId: event.handId ?? null,
+        userId: event.userId ?? null,
+        seatId: event.seatId ?? null,
+        payload: event.payload,
+        timestamp,
+        sequence,
+      };
 
-      await client.query('COMMIT');
-      return fullEvent;
+      try {
+        await streamStore.publishEvent(storedEvent);
+      } catch (err) {
+        logger.error({ err }, "Failed to publish event to streams");
+      }
+
+      return storedEvent;
     } catch (err) {
-      await client.query('ROLLBACK');
+      await client.query("ROLLBACK");
       throw err;
     } finally {
       client.release();
     }
   }
 
+  async publishEvents(events: NewGameEvent[]): Promise<GameEvent[]> {
+    const results: GameEvent[] = [];
+    for (const event of events) {
+      results.push(await this.publishEvent(event));
+    }
+    return results;
+  }
+
   async queryEvents(filters: {
-    table_id?: string;
-    hand_id?: string;
-    user_id?: string;
+    tableId?: string;
+    handId?: string;
+    userId?: string;
     types?: string[];
-    start_time?: Date;
-    end_time?: Date;
+    startTime?: Date;
+    endTime?: Date;
     limit?: number;
     offset?: number;
   }): Promise<{ events: GameEvent[]; total: number }> {
-    let queryText = 'SELECT * FROM game_events WHERE 1=1';
-    const params: any[] = [];
+    let queryText = "SELECT * FROM events WHERE 1=1";
+    const params: unknown[] = [];
     let paramCount = 1;
 
-    if (filters.table_id) {
+    if (filters.tableId) {
       queryText += ` AND table_id = $${paramCount++}`;
-      params.push(filters.table_id);
+      params.push(filters.tableId);
     }
-    if (filters.hand_id) {
+    if (filters.handId) {
       queryText += ` AND hand_id = $${paramCount++}`;
-      params.push(filters.hand_id);
+      params.push(filters.handId);
     }
-    if (filters.user_id) {
+    if (filters.userId) {
       queryText += ` AND user_id = $${paramCount++}`;
-      params.push(filters.user_id);
+      params.push(filters.userId);
     }
     if (filters.types && filters.types.length > 0) {
       queryText += ` AND type = ANY($${paramCount++})`;
       params.push(filters.types);
     }
-    if (filters.start_time) {
+    if (filters.startTime) {
       queryText += ` AND timestamp >= $${paramCount++}`;
-      params.push(filters.start_time);
+      params.push(filters.startTime);
     }
-    if (filters.end_time) {
+    if (filters.endTime) {
       queryText += ` AND timestamp <= $${paramCount++}`;
-      params.push(filters.end_time);
+      params.push(filters.endTime);
     }
 
     const countRes = await pool.query(`SELECT COUNT(*) FROM (${queryText}) as filtered`, params);
-    const total = parseInt(countRes.rows[0].count);
+    const total = parseInt(countRes.rows[0].count, 10);
 
-    queryText += ` ORDER BY sequence ASC LIMIT $${paramCount++} OFFSET $${paramCount++}`;
+    queryText += ` ORDER BY timestamp ASC, sequence ASC LIMIT $${paramCount++} OFFSET $${paramCount++}`;
     params.push(filters.limit || 100, filters.offset || 0);
 
     const res = await pool.query(queryText, params);
-    return { events: res.rows, total };
+    return { events: res.rows.map(mapRowToEvent), total };
   }
 
-  async getEventById(event_id: string): Promise<GameEvent | null> {
-    const res = await pool.query('SELECT * FROM game_events WHERE event_id = $1', [event_id]);
-    return res.rows[0] || null;
+  async getEventById(eventId: string): Promise<GameEvent | null> {
+    const res = await pool.query("SELECT * FROM events WHERE event_id = $1", [eventId]);
+    return res.rows[0] ? mapRowToEvent(res.rows[0]) : null;
+  }
+
+  async getShowdownReveals(handId: string): Promise<Set<number>> {
+    const res = await pool.query(
+      "SELECT payload FROM events WHERE hand_id = $1 AND type = $2 ORDER BY timestamp DESC LIMIT 1",
+      [handId, "SHOWDOWN"]
+    );
+    if (!res.rows[0]) {
+      return new Set();
+    }
+    const payload = res.rows[0].payload as {
+      reveals?: { seatId?: number; seat_id?: number }[];
+    };
+    return new Set(
+      (payload.reveals || [])
+        .map((reveal) => reveal.seatId ?? reveal.seat_id)
+        .filter((seatId): seatId is number => typeof seatId === "number")
+    );
   }
 }
 

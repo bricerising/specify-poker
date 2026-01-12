@@ -247,14 +247,14 @@ describe("End-to-End Balance Flows", () => {
 
       expect(settleResult.ok).toBe(true);
       expect(settleResult.results).toHaveLength(1);
-      expect(settleResult.results![0].newBalance).toBe(1000 + 390);
+      expect(settleResult.results![0].newBalance).toBe(1000 + 385);
 
       // Verify final balances
       const aliceBalance = await getBalance("alice");
       const bobBalance = await getBalance("bob");
       const charlieBalance = await getBalance("charlie");
 
-      expect(aliceBalance!.balance).toBe(1390); // Won 390
+      expect(aliceBalance!.balance).toBe(1385); // Won 385 after rake
       expect(bobBalance!.balance).toBe(1000);  // Didn't spend from account (pot is tracked separately)
       expect(charlieBalance!.balance).toBe(1000); // Same
     });
@@ -286,8 +286,8 @@ describe("End-to-End Balance Flows", () => {
 
       expect(settleResult.ok).toBe(true);
 
-      expect((await getBalance("player-a"))!.balance).toBe(1000);
-      expect((await getBalance("player-b"))!.balance).toBe(1000);
+      expect((await getBalance("player-a"))!.balance).toBe(998);
+      expect((await getBalance("player-b"))!.balance).toBe(997);
     });
 
     it("handles complex side pot scenario", async () => {
@@ -337,9 +337,9 @@ describe("End-to-End Balance Flows", () => {
 
       expect(settleResult.ok).toBe(true);
 
-      expect((await getBalance("short"))!.balance).toBe(400);  // Started 100, won 300
+      expect((await getBalance("short"))!.balance).toBe(398);  // Started 100, won 298
       expect((await getBalance("medium"))!.balance).toBe(300); // Unchanged (lost all, pot tracked separately)
-      expect((await getBalance("deep"))!.balance).toBe(900);   // Started 500, won 400
+      expect((await getBalance("deep"))!.balance).toBe(897);   // Started 500, won 397
     });
   });
 
@@ -542,7 +542,7 @@ describe("End-to-End Balance Flows", () => {
       );
 
       expect(settleResult.ok).toBe(true);
-      expect(settleResult.results![0].amount).toBe(600);
+      expect(settleResult.results![0].amount).toBe(595);
     });
   });
 });

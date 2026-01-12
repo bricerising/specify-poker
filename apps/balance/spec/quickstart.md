@@ -39,6 +39,7 @@ The balance service will be available alongside the poker service.
 - HTTP API: http://localhost:3002/api
 - gRPC: localhost:50051
 - Health Check: http://localhost:3002/api/health
+- Metrics: http://localhost:9102/metrics
 
 ## Environment Variables
 
@@ -46,9 +47,13 @@ The balance service will be available alongside the poker service.
 |----------|---------|-------------|
 | `HTTP_PORT` | 3002 | HTTP server port |
 | `GRPC_PORT` | 50051 | gRPC server port |
+| `METRICS_PORT` | 9102 | Prometheus metrics port |
 | `REDIS_URL` | (none) | Redis connection URL |
 | `RESERVATION_TIMEOUT_MS` | 30000 | Reservation expiry timeout |
 | `IDEMPOTENCY_TTL_MS` | 86400000 | Idempotency key TTL (24h) |
+| `LOG_LEVEL` | info | Structured log level |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | http://localhost:4317 | OTLP gRPC exporter endpoint |
+| `JWT_SECRET` | default-secret | JWT secret for HS256 validation |
 
 ## API Quick Reference
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EventConsumer } from '../../src/services/eventConsumer';
-import { PushService } from '../../src/services/pushService';
+import { EventConsumer } from "../../src/services/eventConsumer";
+import { PushSenderService } from "../../src/services/pushSenderService";
 
 // Mock redis
 vi.mock('../../src/storage/redisClient', () => {
@@ -16,13 +16,13 @@ vi.mock('../../src/storage/redisClient', () => {
 
 describe('EventConsumer', () => {
   let consumer: EventConsumer;
-  let pushServiceMock: any;
+  let pushServiceMock: unknown;
 
   beforeEach(() => {
     pushServiceMock = {
       sendToUser: vi.fn(),
     };
-    consumer = new EventConsumer(pushServiceMock as unknown as PushService);
+    consumer = new EventConsumer(pushServiceMock as unknown as PushSenderService);
   });
 
   it('should handle TURN_STARTED event', async () => {
@@ -33,7 +33,7 @@ describe('EventConsumer', () => {
     };
 
     // Access private method for testing
-    await (consumer as any).handleEvent(message);
+    await (consumer as unknown).handleEvent(message);
 
     expect(pushServiceMock.sendToUser).toHaveBeenCalledWith('u1', expect.objectContaining({
       title: "It's your turn!",
@@ -47,7 +47,7 @@ describe('EventConsumer', () => {
       userId: 'u1',
     };
 
-    await (consumer as any).handleEvent(message);
+    await (consumer as unknown).handleEvent(message);
 
     expect(pushServiceMock.sendToUser).not.toHaveBeenCalled();
   });
@@ -58,7 +58,7 @@ describe('EventConsumer', () => {
       tableId: 't1',
     };
 
-    await (consumer as any).handleEvent(message);
+    await (consumer as unknown).handleEvent(message);
 
     expect(pushServiceMock.sendToUser).not.toHaveBeenCalled();
   });
@@ -71,7 +71,7 @@ describe('EventConsumer', () => {
     pushServiceMock.sendToUser.mockRejectedValue(new Error('Push error'));
 
     // Should not throw
-    await expect((consumer as any).handleEvent(message)).resolves.not.toThrow();
+    await expect((consumer as unknown).handleEvent(message)).resolves.not.toThrow();
   });
 
   it('should start and stop', async () => {
@@ -79,9 +79,9 @@ describe('EventConsumer', () => {
     // but we can test that it initializes correctly and sets isRunning.
     await consumer.start();
 
-    expect((consumer as any).isRunning).toBe(true);
+    expect((consumer as unknown).isRunning).toBe(true);
 
     consumer.stop();
-    expect((consumer as any).isRunning).toBe(false);
+    expect((consumer as unknown).isRunning).toBe(false);
   });
 });

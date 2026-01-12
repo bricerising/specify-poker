@@ -10,6 +10,7 @@ RUN npm ci
 
 COPY apps/api/src ./apps/api/src
 COPY packages/shared/src ./packages/shared/src
+COPY apps/balance/proto ./apps/balance/proto
 RUN npm run build --workspace=@specify-poker/api
 
 EXPOSE 4000

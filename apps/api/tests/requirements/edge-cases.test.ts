@@ -186,8 +186,7 @@ describe("Edge Cases", () => {
       const ws1 = new WebSocket(`ws://localhost:${port}/ws?token=${tokenA}`);
       await new Promise<void>((resolve) => ws1.on("open", resolve));
       ws1.send(JSON.stringify({ type: "SubscribeTable", tableId: summary.tableId }));
-      const snapshot1 = await waitForMessage(ws1, (m) => m.type === "TableSnapshot");
-      const version1 = (snapshot1.tableState as { version: number }).version;
+      await waitForMessage(ws1, (m) => m.type === "TableSnapshot");
       ws1.terminate();
 
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -236,9 +235,6 @@ describe("Edge Cases", () => {
 
       const handTable = startHand(table);
       expect(handTable.hand).toBeDefined();
-
-      // Get the initial pot (blinds)
-      const initialPot = handTable.hand!.pots.reduce((sum, p) => sum + p.amount, 0);
 
       // First player folds
       let result = applyAction(handTable, handTable.hand!.currentTurnSeat, { type: "Fold" });
@@ -528,7 +524,7 @@ describe("Edge Cases", () => {
       expect(handTable.hand).toBeDefined();
 
       // Play through the hand - both players check to showdown
-      let result = { table: handTable, accepted: true, reason: undefined as string | undefined };
+      let result = { table: handTable, accepted: true };
       let guard = 0;
 
       // Keep playing until hand ends

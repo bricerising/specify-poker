@@ -1,15 +1,38 @@
-import * as grpc from '@grpc/grpc-js';
-import { SubscriptionStore } from '../../storage/subscriptionStore';
-import { PushService } from '../../services/pushService';
-import { PushSubscription, NotificationPayload } from '../../domain/types';
+import { SubscriptionService } from "../../services/subscriptionService";
+import { PushSenderService } from "../../services/pushSenderService";
+import { NotificationPayload, NotificationType, PushSubscription } from "../../domain/types";
+import logger from "../../observability/logger";
+import { recordGrpcRequest, recordNotificationRequested } from "../../observability/metrics";
 
-export function createHandlers(subscriptionStore: SubscriptionStore, pushService: PushService) {
+function recordDuration(method: string, startedAt: number, status: "ok" | "error") {
+  recordGrpcRequest(method, status, Date.now() - startedAt);
+}
+
+function resolveNotificationData(
+  data: Record<string, string> | undefined
+): NotificationPayload["data"] | undefined {
+  if (!data || Object.keys(data).length === 0) {
+    return undefined;
+  }
+  const candidate = data.type as NotificationType | undefined;
+  const type = candidate && ["turn_alert", "game_invite", "system"].includes(candidate)
+    ? candidate
+    : "system";
   return {
-    registerSubscription: async (call: any, callback: any) => {
+    ...data,
+    type,
+  };
+}
+
+export function createHandlers(subscriptionService: SubscriptionService, pushService: PushSenderService) {
+  return {
+    registerSubscription: async (call: { request: Record<string, unknown> }, callback: (error: Error | null, response?: unknown) => void) => {
+      const startedAt = Date.now();
       try {
         const { userId, subscription } = call.request;
         if (!userId || !subscription || !subscription.endpoint || !subscription.keys) {
-          return callback(null, { ok: false, error: 'MISSING_FIELDS' });
+          recordDuration("RegisterSubscription", startedAt, "error");
+          return callback(null, { ok: false, error: "MISSING_FIELDS" });
         }
 
         const sub: PushSubscription = {
@@ -20,35 +43,46 @@ export function createHandlers(subscriptionStore: SubscriptionStore, pushService
           },
         };
 
-        await subscriptionStore.saveSubscription(userId, sub);
+        await subscriptionService.register(userId, sub);
+        recordDuration("RegisterSubscription", startedAt, "ok");
         callback(null, { ok: true });
-      } catch (error: any) {
-        callback(null, { ok: false, error: error.message });
+      } catch (error: unknown) {
+        logger.error({ err: error }, "Failed to register subscription");
+        recordDuration("RegisterSubscription", startedAt, "error");
+        callback(null, { ok: false, error: (error as Error).message });
       }
     },
 
-    unregisterSubscription: async (call: any, callback: any) => {
+    unregisterSubscription: async (call: { request: Record<string, unknown> }, callback: (error: Error | null, response?: unknown) => void) => {
+      const startedAt = Date.now();
       try {
         const { userId, endpoint } = call.request;
         if (!userId || !endpoint) {
-          return callback(null, { ok: false, error: 'MISSING_FIELDS' });
+          recordDuration("UnregisterSubscription", startedAt, "error");
+          return callback(null, { ok: false, error: "MISSING_FIELDS" });
         }
 
-        await subscriptionStore.deleteSubscription(userId, endpoint);
+        await subscriptionService.unregister(userId, endpoint);
+        recordDuration("UnregisterSubscription", startedAt, "ok");
         callback(null, { ok: true });
-      } catch (error: any) {
-        callback(null, { ok: false, error: error.message });
+      } catch (error: unknown) {
+        logger.error({ err: error }, "Failed to unregister subscription");
+        recordDuration("UnregisterSubscription", startedAt, "error");
+        callback(null, { ok: false, error: (error as Error).message });
       }
     },
 
-    listSubscriptions: async (call: any, callback: any) => {
+    listSubscriptions: async (call: { request: Record<string, unknown> }, callback: (error: Error | null, response?: unknown) => void) => {
+      const startedAt = Date.now();
       try {
         const { userId } = call.request;
         if (!userId) {
+          recordDuration("ListSubscriptions", startedAt, "ok");
           return callback(null, { subscriptions: [] });
         }
 
-        const subscriptions = await subscriptionStore.getSubscriptions(userId);
+        const subscriptions = await subscriptionService.getSubscriptions(userId);
+        recordDuration("ListSubscriptions", startedAt, "ok");
         callback(null, {
           subscriptions: subscriptions.map((s) => ({
             endpoint: s.endpoint,
@@ -58,16 +92,20 @@ export function createHandlers(subscriptionStore: SubscriptionStore, pushService
             },
           })),
         });
-      } catch (error: any) {
-        callback(error);
+      } catch (error: unknown) {
+        logger.error({ err: error }, "Failed to list subscriptions");
+        recordDuration("ListSubscriptions", startedAt, "error");
+        callback(error as Error);
       }
     },
 
-    sendNotification: async (call: any, callback: any) => {
+    sendNotification: async (call: { request: Record<string, unknown> }, callback: (error: Error | null, response?: unknown) => void) => {
+      const startedAt = Date.now();
       try {
         const { userId, title, body, url, icon, tag, data } = call.request;
         if (!userId || !title || !body) {
-          return callback(null, { ok: false, error: 'MISSING_FIELDS' });
+          recordDuration("SendNotification", startedAt, "error");
+          return callback(null, { ok: false, error: "MISSING_FIELDS" });
         }
 
         const payload: NotificationPayload = {
@@ -76,17 +114,21 @@ export function createHandlers(subscriptionStore: SubscriptionStore, pushService
           url,
           icon,
           tag,
-          data,
+          data: resolveNotificationData(data),
         };
 
+        recordNotificationRequested(payload.data?.type ?? "system");
         const result = await pushService.sendToUser(userId, payload);
+        recordDuration("SendNotification", startedAt, "ok");
         callback(null, {
           ok: true,
           successCount: result.success,
           failureCount: result.failure,
         });
-      } catch (error: any) {
-        callback(null, { ok: false, error: error.message });
+      } catch (error: unknown) {
+        logger.error({ err: error }, "Failed to send notification");
+        recordDuration("SendNotification", startedAt, "error");
+        callback(null, { ok: false, error: (error as Error).message });
       }
     },
   };

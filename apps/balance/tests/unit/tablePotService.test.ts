@@ -36,6 +36,7 @@ describe("tablePotService", () => {
       expect(pot.status).toBe("ACTIVE");
       expect(pot.contributions).toEqual({});
       expect(pot.pots).toEqual([]);
+      expect(pot.rakeAmount).toBe(0);
       expect(pot.version).toBe(0);
     });
   });
@@ -235,17 +236,19 @@ describe("tablePotService", () => {
 
       expect(result.ok).toBe(true);
       expect(result.results).toHaveLength(1);
-      expect(result.results![0].amount).toBe(200);
-      expect(result.results![0].newBalance).toBe(200);
+      expect(result.results![0].amount).toBe(195);
+      expect(result.results![0].newBalance).toBe(195);
 
       const balance = await getBalance("winner-1");
-      expect(balance!.balance).toBe(200);
+      expect(balance!.balance).toBe(195);
     });
 
     it("settles split pot", async () => {
       await ensureAccount("winner-2", 0);
       await ensureAccount("winner-3", 0);
       await createPot("table-10", "hand-10");
+      await recordContribution("table-10", "hand-10", 0, "winner-2", 150, "BET", "contrib-10a");
+      await recordContribution("table-10", "hand-10", 1, "winner-3", 150, "CALL", "contrib-10b");
 
       const result = await settlePot(
         "table-10",
@@ -260,13 +263,14 @@ describe("tablePotService", () => {
       expect(result.ok).toBe(true);
       expect(result.results).toHaveLength(2);
 
-      expect((await getBalance("winner-2"))!.balance).toBe(150);
-      expect((await getBalance("winner-3"))!.balance).toBe(150);
+      expect((await getBalance("winner-2"))!.balance).toBe(148);
+      expect((await getBalance("winner-3"))!.balance).toBe(147);
     });
 
     it("is idempotent with same key", async () => {
       await ensureAccount("winner-4", 0);
       await createPot("table-11", "hand-11");
+      await recordContribution("table-11", "hand-11", 0, "winner-4", 300, "BET", "contrib-11");
 
       const key = "idempotent-settle";
       const winners = [{ seatId: 0, accountId: "winner-4", amount: 300 }];
@@ -278,7 +282,7 @@ describe("tablePotService", () => {
       expect(result2.ok).toBe(true);
 
       const balance = await getBalance("winner-4");
-      expect(balance!.balance).toBe(300); // Only credited once
+      expect(balance!.balance).toBe(295); // Only credited once
     });
 
     it("fails for non-existent pot", async () => {
@@ -406,7 +410,7 @@ describe("tablePotService", () => {
         "settle-game1"
       );
 
-      expect((await getBalance("player-a"))!.balance).toBe(220);
+      expect((await getBalance("player-a"))!.balance).toBe(215);
     });
 
     it("three-way pot with side pot", async () => {
@@ -434,8 +438,8 @@ describe("tablePotService", () => {
         "settle-game2"
       );
 
-      expect((await getBalance("player-c"))!.balance).toBe(150);
-      expect((await getBalance("player-e"))!.balance).toBe(100);
+      expect((await getBalance("player-c"))!.balance).toBe(147);
+      expect((await getBalance("player-e"))!.balance).toBe(98);
     });
   });
 });

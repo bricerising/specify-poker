@@ -6,43 +6,71 @@ export async function runMigrations() {
     await client.query('BEGIN');
 
     await client.query(`
-      CREATE TABLE IF NOT EXISTS game_events (
+      CREATE TABLE IF NOT EXISTS events (
         event_id UUID PRIMARY KEY,
         type VARCHAR(50) NOT NULL,
-        table_id UUID NOT NULL,
-        hand_id UUID,
-        user_id UUID,
-        seat_id INTEGER,
+        table_id VARCHAR(255) NOT NULL,
+        hand_id VARCHAR(255),
+        user_id VARCHAR(255),
+        seat_id SMALLINT,
         payload JSONB NOT NULL,
-        timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        sequence SERIAL
+        timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        sequence INTEGER,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      ) PARTITION BY RANGE (timestamp);
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS events_default
+      PARTITION OF events DEFAULT;
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS event_idempotency (
+        idempotency_key VARCHAR(255) PRIMARY KEY,
+        event_id UUID NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS hand_records (
-        hand_id UUID PRIMARY KEY,
-        table_id UUID NOT NULL,
-        table_name VARCHAR(100),
+        hand_id VARCHAR(255) PRIMARY KEY,
+        table_id VARCHAR(255) NOT NULL,
+        table_name VARCHAR(100) NOT NULL,
         config JSONB NOT NULL,
         participants JSONB NOT NULL,
         community_cards JSONB NOT NULL,
         pots JSONB NOT NULL,
         winners JSONB NOT NULL,
-        started_at TIMESTAMP WITH TIME ZONE NOT NULL,
-        completed_at TIMESTAMP WITH TIME ZONE NOT NULL,
-        duration_ms INTEGER NOT NULL
+        started_at TIMESTAMPTZ NOT NULL,
+        completed_at TIMESTAMPTZ NOT NULL,
+        duration INTEGER NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
 
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_events_table_id ON game_events(table_id);`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_events_hand_id ON game_events(hand_id);`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_events_user_id ON game_events(user_id);`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_events_timestamp ON game_events(timestamp);`);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cursors (
+        cursor_id VARCHAR(255) PRIMARY KEY,
+        stream_id VARCHAR(255) NOT NULL,
+        subscriber_id VARCHAR(255) NOT NULL,
+        position INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(stream_id, subscriber_id)
+      );
+    `);
 
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_hands_table_id ON hand_records(table_id);`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_hands_completed_at ON hand_records(completed_at);`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_hands_participants_gin ON hand_records USING GIN (participants);`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_events_table ON events(table_id, timestamp);`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_events_hand ON events(hand_id, sequence) WHERE hand_id IS NOT NULL;`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_events_user ON events(user_id, timestamp) WHERE user_id IS NOT NULL;`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_events_type ON events(type, timestamp);`);
+
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_hand_records_table ON hand_records(table_id, completed_at DESC);`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_hand_records_participants ON hand_records USING GIN ((participants));`);
+
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_cursors_stream ON cursors(stream_id);`);
 
     await client.query('COMMIT');
     console.log('Migrations completed successfully');

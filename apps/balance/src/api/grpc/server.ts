@@ -2,11 +2,9 @@ import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
 import * as path from "path";
 import { handlers } from "./handlers";
+import logger from "../../observability/logger";
 
-const PROTO_PATH = path.resolve(
-  __dirname,
-  "../../../../../specs/002-balance-service/balance.proto"
-);
+const PROTO_PATH = path.resolve(__dirname, "../../../proto/balance.proto");
 
 let server: grpc.Server | null = null;
 
@@ -19,7 +17,13 @@ export async function startGrpcServer(port: number): Promise<void> {
     oneofs: true,
   });
 
-  const proto = grpc.loadPackageDefinition(packageDefinition) as any;
+  const proto = grpc.loadPackageDefinition(packageDefinition) as unknown as {
+    balance: {
+      BalanceService: {
+        service: grpc.ServiceDefinition;
+      };
+    };
+  };
 
   server = new grpc.Server();
 
@@ -44,7 +48,7 @@ export async function startGrpcServer(port: number): Promise<void> {
           reject(error);
           return;
         }
-        console.log(`gRPC server listening on port ${boundPort}`);
+        logger.info({ port: boundPort }, "Balance gRPC server listening");
         resolve();
       }
     );

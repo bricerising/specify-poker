@@ -1,12 +1,14 @@
-import { createClient, RedisClientType } from 'redis';
+import { createClient, RedisClientType } from "redis";
+import { getConfig } from "../config";
+import logger from "../observability/logger";
 
 let client: RedisClientType | null = null;
 
 export async function getRedisClient(): Promise<RedisClientType> {
   if (!client) {
-    const url = process.env.REDIS_URL || 'redis://localhost:6379';
-    client = createClient({ url });
-    client.on('error', (err) => console.error('Redis Client Error', err));
+    const config = getConfig();
+    client = createClient({ url: config.redisUrl });
+    client.on("error", (err) => logger.error({ err }, "Redis client error"));
     await client.connect();
   }
   return client;

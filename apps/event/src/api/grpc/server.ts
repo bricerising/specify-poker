@@ -16,13 +16,15 @@ export async function startGrpcServer(port: number): Promise<void> {
     oneofs: true,
   });
 
-  const proto = grpc.loadPackageDefinition(packageDefinition) as any;
+  const proto = grpc.loadPackageDefinition(packageDefinition) as unknown as {
+    event: { EventService: { service: grpc.ServiceDefinition } };
+  };
 
   server = new grpc.Server();
 
   const handlers = createHandlers();
 
-  server.addService(proto.event.EventService.service, handlers);
+  server.addService(proto.event.EventService.service, handlers as unknown as grpc.UntypedServiceImplementation);
 
   return new Promise((resolve, reject) => {
     server!.bindAsync(`0.0.0.0:${port}`, grpc.ServerCredentials.createInsecure(), (error, boundPort) => {

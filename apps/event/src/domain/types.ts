@@ -1,25 +1,135 @@
+export type EventType =
+  | "HAND_STARTED"
+  | "CARDS_DEALT"
+  | "BLIND_POSTED"
+  | "ACTION_TAKEN"
+  | "STREET_ADVANCED"
+  | "CARDS_REVEALED"
+  | "SHOWDOWN"
+  | "POT_AWARDED"
+  | "HAND_COMPLETED"
+  | "PLAYER_JOINED"
+  | "PLAYER_LEFT"
+  | "PLAYER_SAT_OUT"
+  | "PLAYER_SAT_IN"
+  | "TABLE_CREATED"
+  | "TABLE_CLOSED"
+  | "TURN_STARTED"
+  | "RAKE_DEDUCTED"
+  | "BONUS_ISSUED"
+  | "REFERRAL_ISSUED";
+
+export type Street = string;
+export type ActionType = string;
+
+export interface Card {
+  rank: string;
+  suit: string;
+}
+
+export interface HandStartedPayload {
+  button: number;
+  seats: { seatId: number; userId: string; stack: number; nickname?: string }[];
+  smallBlind: number;
+  bigBlind: number;
+}
+
+export interface CardsDealtPayload {
+  seatId: number;
+  cards: Card[];
+}
+
+export interface BlindPostedPayload {
+  seatId: number;
+  amount: number;
+  blindType: "SMALL" | "BIG" | "ANTE";
+}
+
+export interface ActionTakenPayload {
+  seatId: number;
+  action: ActionType;
+  amount: number;
+  isAllIn: boolean;
+  street?: Street;
+}
+
+export interface StreetAdvancedPayload {
+  street: Street;
+  communityCards: Card[];
+}
+
+export interface ShowdownPayload {
+  reveals: { seatId: number; cards: Card[]; handRank: string }[];
+}
+
+export interface PotAwardedPayload {
+  potIndex: number;
+  amount: number;
+  winners: { seatId: number; share: number; userId?: string }[];
+}
+
+export interface HandCompletedPayload {
+  duration: number;
+  totalPot: number;
+  rake: number;
+  playerEndStacks?: Record<string, number>;
+}
+
+export type EventPayload =
+  | HandStartedPayload
+  | CardsDealtPayload
+  | BlindPostedPayload
+  | ActionTakenPayload
+  | StreetAdvancedPayload
+  | ShowdownPayload
+  | PotAwardedPayload
+  | HandCompletedPayload
+  | Record<string, unknown>;
+
+export interface GameEvent {
+  eventId: string;
+  type: EventType;
+  tableId: string;
+  handId: string | null;
+  userId: string | null;
+  seatId: number | null;
+  payload: EventPayload;
+  timestamp: Date;
+  sequence: number | null;
+}
+
+export interface NewGameEvent {
+  type: EventType;
+  tableId: string;
+  handId?: string | null;
+  userId?: string | null;
+  seatId?: number | null;
+  payload: EventPayload;
+  idempotencyKey?: string | null;
+}
+
 export interface HandConfig {
-  small_blind: number;
-  big_blind: number;
+  smallBlind: number;
+  bigBlind: number;
   ante: number;
 }
 
 export interface ParticipantAction {
-  street: string;
-  action: string;
+  street: Street;
+  action: ActionType;
   amount: number;
-  timestamp: Date;
+  timestamp: string;
 }
 
 export interface HandParticipant {
-  seat_id: number;
-  user_id: string;
+  seatId: number;
+  userId: string;
   nickname: string;
-  starting_stack: number;
-  ending_stack: number;
-  hole_cards: string[];
+  startingStack: number;
+  endingStack: number;
+  holeCards: Card[] | null;
   actions: ParticipantAction[];
-  result: string;
+  result: "WON" | "LOST" | "FOLDED" | "SPLIT";
 }
 
 export interface Pot {
@@ -28,20 +138,56 @@ export interface Pot {
 }
 
 export interface Winner {
-  user_id: string;
+  userId: string;
   amount: number;
 }
 
 export interface HandRecord {
-  hand_id: string;
-  table_id: string;
-  table_name: string;
+  handId: string;
+  tableId: string;
+  tableName: string;
   config: HandConfig;
   participants: HandParticipant[];
-  community_cards: string[];
+  communityCards: Card[];
   pots: Pot[];
   winners: Winner[];
-  started_at: Date;
-  completed_at: Date;
-  duration_ms: number;
+  startedAt: Date;
+  completedAt: Date;
+  duration: number;
+}
+
+export interface EventStream {
+  streamId: string;
+  context: "TABLE" | "HAND" | "USER";
+  contextId: string;
+  latestSequence: number;
+  createdAt: Date;
+}
+
+export interface Cursor {
+  cursorId: string;
+  streamId: string;
+  subscriberId: string;
+  position: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface EventQuery {
+  tableId?: string;
+  handId?: string;
+  userId?: string;
+  types?: EventType[];
+  startTime?: Date;
+  endTime?: Date;
+  limit: number;
+  offset?: number;
+  cursor?: string;
+}
+
+export interface EventQueryResult {
+  events: GameEvent[];
+  total: number;
+  hasMore: boolean;
+  nextCursor?: string;
 }
