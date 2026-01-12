@@ -140,6 +140,8 @@ events in real-time as actions occur.
 - **NFR-002**: Event queries MUST complete within 200ms (first page).
 - **NFR-003**: Service MUST support 10,000 events per second write throughput.
 - **NFR-004**: Event stream latency MUST be under 100ms.
+- **NFR-005**: System MUST maintain at least 80% unit test coverage across all core logic.
+- **NFR-006**: Unit tests MUST reflect realistic consumer behavior and edge cases.
 
 ### Key Entities
 

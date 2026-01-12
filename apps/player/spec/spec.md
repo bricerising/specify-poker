@@ -138,6 +138,8 @@ removed, and other services no longer return their data.
 - **NFR-001**: Profile retrieval MUST complete within 50ms (cached).
 - **NFR-002**: Profile updates MUST complete within 200ms.
 - **NFR-003**: Service MUST support 10,000 profile lookups per second.
+- **NFR-004**: System MUST maintain at least 80% unit test coverage across all core logic.
+- **NFR-005**: Unit tests MUST reflect realistic consumer behavior and edge cases.
 
 ### Key Entities
 

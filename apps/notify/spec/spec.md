@@ -2,7 +2,7 @@
 
 **Service**: `@specify-poker/notify`
 **Created**: 2026-01-12
-**Status**: Planned
+**Status**: Implemented
 
 ## Overview
 
@@ -87,6 +87,8 @@ unregisters it; the service updates the store accordingly.
   200ms of receiving the internal trigger.
 - **NFR-002**: System MUST export OTLP traces, metrics, and logs to the observability stack.
 - **NFR-003**: System MUST handle at least 500 concurrent push delivery attempts.
+- **NFR-004**: System MUST maintain at least 80% unit test coverage across all core logic.
+- **NFR-005**: Unit tests MUST reflect realistic consumer behavior and edge cases.
 
 ### Key Entities
 

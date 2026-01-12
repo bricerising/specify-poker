@@ -25,6 +25,7 @@ type EventType =
   | "PLAYER_SAT_IN"
   | "TABLE_CREATED"
   | "TABLE_CLOSED"
+  | "TURN_STARTED"
   | "RAKE_DEDUCTED"
   | "BONUS_ISSUED"
   | "REFERRAL_ISSUED";

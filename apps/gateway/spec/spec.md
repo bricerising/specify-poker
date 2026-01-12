@@ -155,6 +155,8 @@ response is returned to client.
   instance.
 - **NFR-004**: System MUST handle 1,000 messages per second per instance.
 - **NFR-005**: System MUST export OTLP traces, metrics, and logs to the observability stack.
+- **NFR-006**: System MUST maintain at least 80% unit test coverage across all core logic.
+- **NFR-007**: Unit tests MUST reflect realistic consumer behavior and edge cases.
 
 ### Key Entities
 

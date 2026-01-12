@@ -65,6 +65,15 @@ cd apps/balance
 npm test
 ```
 
+## Quality Standards
+
+Every application in the ecosystem MUST adhere to the following quality standards:
+
+- **Unit Test Coverage**: Maintain at least 80% coverage for all core logic, services, and handlers.
+- **Realistic Behavior**: Unit tests MUST reflect realistic consumer behavior, including edge cases, error conditions, and cross-service interaction simulations.
+- **Observability Integration**: All services MUST be fully instrumented with OpenTelemetry (OTLP) for traces, metrics, and logs.
+- **Contract Verification**: Internal gRPC and external HTTP APIs MUST be verified against their respective specifications.
+
 ## Smoke Test
 
 1. Log in to the UI and enter the lobby.

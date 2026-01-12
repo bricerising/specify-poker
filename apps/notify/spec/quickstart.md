@@ -45,9 +45,10 @@
 
 The notify service exposes the following gRPC methods:
 
-- `Register` - Save a new web-push subscription
-- `Unregister` - Remove a web-push subscription
-- `NotifyUser` - Trigger a notification to all user devices
+- `RegisterSubscription` - Save a new web-push subscription
+- `UnregisterSubscription` - Remove a web-push subscription
+- `ListSubscriptions` - List all subscriptions for a user
+- `SendNotification` - Trigger a notification to all user devices
 
 ## Running Tests
 

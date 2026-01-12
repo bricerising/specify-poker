@@ -140,6 +140,8 @@ reservation is released without affecting the user's available balance permanent
 - **NFR-002**: System MUST support 500 concurrent transaction requests per second.
 - **NFR-003**: 100% ledger integrity, verified by continuous background jobs.
 - **NFR-004**: System MUST export OTLP traces, metrics, and logs to the observability stack.
+- **NFR-005**: System MUST maintain at least 80% unit test coverage across all core logic.
+- **NFR-006**: Unit tests MUST reflect realistic consumer behavior and edge cases.
 
 ### Key Entities
 

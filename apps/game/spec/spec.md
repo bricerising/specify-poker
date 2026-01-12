@@ -161,6 +161,8 @@ a player and their chat messages are blocked (via Gateway).
 - **NFR-001**: Action processing MUST complete within 50ms.
 - **NFR-002**: Hand evaluation MUST complete within 10ms.
 - **NFR-003**: System MUST support 100 concurrent tables per instance.
+- **NFR-004**: System MUST maintain at least 80% unit test coverage across all core logic.
+- **NFR-005**: Unit tests MUST reflect realistic consumer behavior and edge cases.
 
 ### Key Entities
 

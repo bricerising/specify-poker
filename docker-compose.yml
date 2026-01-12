@@ -171,3 +171,25 @@ services:
       interval: 10s
       timeout: 2s
       retries: 3
+
+  notify:
+    build:
+      context: .
+      dockerfile: apps/notify/Dockerfile
+    ports:
+      - "50055:50055"
+    environment:
+      GRPC_PORT: "50055"
+      REDIS_URL: "redis://redis:6379"
+      VAPID_PUBLIC_KEY: "${VAPID_PUBLIC_KEY}"
+      VAPID_PRIVATE_KEY: "${VAPID_PRIVATE_KEY}"
+      VAPID_SUBJECT: "${VAPID_SUBJECT}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+    depends_on:
+      - redis
+      - otel-collector
+    healthcheck:
+      test: ["CMD-SHELL", "true"]
+      interval: 10s
+      timeout: 2s
+      retries: 3

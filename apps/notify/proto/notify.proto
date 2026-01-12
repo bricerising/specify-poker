@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package notify;
+
+option go_package = "github.com/specify-poker/notify/proto";
+
+// NotifyService provides internal gRPC API for triggering notifications
+service NotifyService {
+  // Subscription management
+  rpc RegisterSubscription(RegisterSubscriptionRequest) returns (RegisterSubscriptionResponse);
+  rpc UnregisterSubscription(UnregisterSubscriptionRequest) returns (UnregisterSubscriptionResponse);
+  rpc ListSubscriptions(ListSubscriptionsRequest) returns (ListSubscriptionsResponse);
+
+  // Manual notification trigger
+  rpc SendNotification(SendNotificationRequest) returns (SendNotificationResponse);
+}
+
+message PushKeys {
+  string p256dh = 1;
+  string auth = 2;
+}
+
+message PushSubscription {
+  string endpoint = 1;
+  PushKeys keys = 2;
+}
+
+message RegisterSubscriptionRequest {
+  string user_id = 1;
+  PushSubscription subscription = 2;
+}
+
+message RegisterSubscriptionResponse {
+  bool ok = 1;
+  string error = 2;
+}
+
+message UnregisterSubscriptionRequest {
+  string user_id = 1;
+  string endpoint = 2;
+}
+
+message UnregisterSubscriptionResponse {
+  bool ok = 1;
+  string error = 2;
+}
+
+message ListSubscriptionsRequest {
+  string user_id = 1;
+}
+
+message ListSubscriptionsResponse {
+  repeated PushSubscription subscriptions = 1;
+}
+
+message SendNotificationRequest {
+  string user_id = 1;
+  string title = 2;
+  string body = 3;
+  optional string url = 4;
+  optional string icon = 5;
+  optional string tag = 6;
+  map<string, string> data = 7;
+}
+
+message SendNotificationResponse {
+  bool ok = 1;
+  int32 success_count = 2;
+  int32 failure_count = 3;
+  string error = 4;
+}
