@@ -24,7 +24,10 @@ type EventType =
   | "PLAYER_SAT_OUT"
   | "PLAYER_SAT_IN"
   | "TABLE_CREATED"
-  | "TABLE_CLOSED";
+  | "TABLE_CLOSED"
+  | "RAKE_DEDUCTED"
+  | "BONUS_ISSUED"
+  | "REFERRAL_ISSUED";
 
 interface GameEvent {
   eventId: string;          // UUID

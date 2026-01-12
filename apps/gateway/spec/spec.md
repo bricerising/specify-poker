@@ -154,6 +154,7 @@ response is returned to client.
 - **NFR-003**: System MUST support 10,000 concurrent WebSocket connections per
   instance.
 - **NFR-004**: System MUST handle 1,000 messages per second per instance.
+- **NFR-005**: System MUST export OTLP traces, metrics, and logs to the observability stack.
 
 ### Key Entities
 

@@ -131,6 +131,15 @@ reservation is released without affecting the user's available balance permanent
   updates.
 - **FR-014**: System MUST reject operations that would result in negative balance.
 - **FR-015**: System MUST support graceful degradation when Redis is unavailable.
+- **FR-016**: System MUST support rake deduction (5% of pots > 20, capped at 5 chips) from pots before distribution.
+- **FR-017**: System MUST support economic sources like daily bonuses and referral rewards via BONUS and REFERRAL transactions.
+
+### Non-Functional Requirements
+
+- **NFR-001**: P99 latency for balance updates MUST be under 50ms.
+- **NFR-002**: System MUST support 500 concurrent transaction requests per second.
+- **NFR-003**: 100% ledger integrity, verified by continuous background jobs.
+- **NFR-004**: System MUST export OTLP traces, metrics, and logs to the observability stack.
 
 ### Key Entities
 

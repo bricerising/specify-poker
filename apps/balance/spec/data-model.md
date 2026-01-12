@@ -36,6 +36,9 @@ type TransactionType =
   | "BLIND"         // Blind posting
   | "BET"           // Bet/raise contribution
   | "POT_WIN"       // Pot winnings
+  | "RAKE"          // House commission deduction
+  | "BONUS"         // Economic source (daily login, etc.)
+  | "REFERRAL"      // Referral reward
   | "REFUND";       // Reservation release or error recovery
 
 type TransactionStatus = "PENDING" | "COMPLETED" | "FAILED";
@@ -109,6 +112,7 @@ interface TablePot {
   handId: string;
   contributions: Record<number, number>;  // seatId -> total contributed
   pots: Pot[];              // Calculated pots for settlement
+  rakeAmount: number;       // Total rake deducted from this hand
   status: TablePotStatus;
   version: number;
   createdAt: string;

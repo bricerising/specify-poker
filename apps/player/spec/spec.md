@@ -130,6 +130,8 @@ removed, and other services no longer return their data.
 - **FR-010**: System MUST expose gRPC API for internal service communication.
 - **FR-011**: System MUST cache profiles for performance.
 - **FR-012**: System MUST handle profile requests for deleted/non-existent users.
+- **FR-013**: System MUST track daily logins and trigger daily bonus events.
+- **FR-014**: System MUST track referrals and trigger referral reward events.
 
 ### Non-Functional Requirements
 

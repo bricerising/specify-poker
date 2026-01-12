@@ -14,6 +14,8 @@ interface Profile {
   nickname: string;         // Display name, 1-30 chars
   avatarUrl: string | null; // URL to avatar image
   preferences: UserPreferences;
+  lastLoginAt: string | null; // ISO timestamp of last login
+  referredBy: string | null;  // userId of referrer
   createdAt: string;        // ISO timestamp
   updatedAt: string;        // ISO timestamp
 }
@@ -41,6 +43,7 @@ interface Statistics {
   pfr: number;              // Pre-flop raise % (0-100)
   allInCount: number;       // Times gone all-in
   biggestPot: number;       // Largest pot won
+  referralCount: number;    // Number of users referred
   lastUpdated: string;      // ISO timestamp
 }
 ```

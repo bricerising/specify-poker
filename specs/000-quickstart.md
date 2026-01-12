@@ -29,7 +29,12 @@
 
 - **ui**: React app (static server)
 - **api**: Legacy monolithic server (currently being deconstructed)
-- **balance**: Distributed balance service (first microservice)
+- **gateway**: API Gateway and WebSocket proxy (entry point for all traffic)
+- **balance**: Distributed balance service (manages accounts and transactions)
+- **game**: Poker game engine and table management
+- **player**: User profiles, statistics, and social features
+- **event**: Immutable event store and hand history
+- **notify**: Web push notifications and alerts
 - **keycloak**: OIDC provider with Keycloak DB (PostgreSQL)
 - **redis**: State store for tables, profiles, friends, and caching.
 - **otel-collector**: Receives OTLP traces, metrics, and logs.

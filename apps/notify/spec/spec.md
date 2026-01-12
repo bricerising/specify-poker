@@ -79,11 +79,13 @@ unregisters it; the service updates the store accordingly.
 - **FR-005**: System MUST handle 404/410 errors from push providers by removing 
   the subscription.
 - **FR-006**: System MUST allow listing all subscriptions for a specific user.
+- **FR-007**: System MUST support consuming events from Event Service (e.g., `TURN_STARTED`) to trigger automated notifications.
 
 ### Non-Functional Requirements
 
 - **NFR-001**: Notification delivery request to provider MUST be initiated within
   200ms of receiving the internal trigger.
+- **NFR-002**: System MUST export OTLP traces, metrics, and logs to the observability stack.
 - **NFR-003**: System MUST handle at least 500 concurrent push delivery attempts.
 
 ### Key Entities

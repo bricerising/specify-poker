@@ -46,8 +46,10 @@ Our approach focuses on three core pillars:
 ### 2. Economy & Balance (via Balance)
 - **Total Supply**: Sum of all user balances + active pots.
 - **Velocity of Chips**: Frequency of chip transfers/bets.
-- **Sink/Source Analysis**: Tracking how chips enter (deposits/rewards) and 
-  leave (rake/fees) the system.
+- **Sink/Source Analysis**: Tracking how chips enter (Daily Bonus, Referral Rewards, Admin Deposits) and 
+  leave (Rake, Table Fees) the system.
+- **Reservation Conversion**: Success rate of balance reservations converting to seated buy-ins.
+- **Wealth Distribution**: Gini coefficient or percentile distribution of chip balances across the user base.
 
 ### 3. Gameplay Trends (via Game & Event)
 - **Table Popularity**: Most active blind levels and table configurations.

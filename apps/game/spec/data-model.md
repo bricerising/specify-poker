@@ -97,6 +97,7 @@ interface HandState {
   turn: number;              // Seat index of current actor
   lastAggressor: number;     // Seat index of last raiser
   actions: Action[];
+  rakeAmount: number;        // Total rake deducted from pot(s)
   startedAt: string;
   deck: Card[];              // Remaining deck (server only)
 }

@@ -16,12 +16,21 @@ This document defines the core Texas Hold'em gameplay rules, the deterministic s
 ### Action Rules
 - **Minimum Players**: A hand MUST NOT start with fewer than 2 active players.
 - **Minimum Raise**: Must equal the size of the previous bet or raise in the current round.
-- **All-In**: Players can go all-in for their remaining stack. If an all-in raise is below the minimum, it does not reopen betting for players who have already acted.
-- **Side Pots**: Created when one or more players are all-in and others continue betting.
+- **Raise Capping**: If an all-in raise is below the minimum required raise, it does not re-open the betting round for players who have already acted. Subsequent players who have not yet acted may still raise.
+- **Side Pots**: Created when one or more players are all-in and others continue betting. Pots are calculated by contribution level to ensure players only win chips from opponents they have covered.
 - **Odd Chips**: In split pots, odd chips are distributed to the first player(s) in clockwise order from the dealer button.
 
-### Table Lifecycle
+### Table & Seat Lifecycle
 - **Provisioning**: If no tables exist, the system MUST automatically create a default "Main Table" for the lobby.
+- **Seat Statuses**:
+  - `EMPTY`: No player is assigned to the seat.
+  - `RESERVED`: A player has requested the seat, and a balance reservation is pending.
+  - `SEATED` / `ACTIVE`: Player is seated and ready to receive cards or is currently in a hand.
+  - `FOLDED`: Player has folded their cards in the current hand.
+  - `ALL_IN`: Player has committed their entire stack to the pot.
+  - `SITTING_OUT`: Player is at the table but not participating in hands.
+  - `DISCONNECTED`: Player has lost connection but remains in their seat until the timeout.
+- **Buy-in Reservations**: To prevent double-spending, chips are reserved in the Balance Service before a player is seated. The reservation is committed when the player successfully joins the table.
 - **Antes**: The system supports ante configuration, although it may be hidden in some client interfaces.
 
 ### Timers & Timeouts

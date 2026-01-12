@@ -154,6 +154,7 @@ a player and their chat messages are blocked (via Gateway).
   is unavailable (allow play, reconcile later).
 - **FR-019**: System MUST expose gRPC API for Gateway communication.
 - **FR-020**: System MUST version table state for client sync.
+- **FR-021**: System MUST calculate rake (5% of pot > 20, capped at 5 chips) before settling pots.
 
 ### Non-Functional Requirements
 

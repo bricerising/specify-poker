@@ -9,6 +9,13 @@ This document defines the architecture and requirements for managing player bala
 ### 1. User Accounts
 Every player has a dedicated account tracking their chip balance. Chips are "play-money" but treated with the rigor of real currency. 
 - **Initial Balance**: New accounts start with a balance of 0; chips must be acquired via deposits or rewards.
+- **Economic Sinks (Planned)**:
+  - **Rake**: 5% of pots over 20 chips, capped at 5 chips per hand. Rake is deducted before pot distribution.
+  - **Table Fees**: Entry fees for tournaments or special game modes.
+- **Economic Sources (Planned)**:
+  - **Daily Login Bonus**: 1,000 chips credited on the first login of each day.
+  - **Friend Referral**: 5,000 chips credited to both the referrer and the referee after the referee plays 100 hands.
+  - **Ad Rewards**: Small chip rewards for viewing optional partner content.
 
 ### 2. Two-Phase Buy-In
 To prevent race conditions and double-spending, joining a table uses a reservation pattern:
