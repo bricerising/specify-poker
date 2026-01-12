@@ -40,6 +40,7 @@ interface Subscription {
   channel: string;          // e.g., "table:abc123", "lobby", "chat:abc123"
   connectionId: string;
   subscribedAt: string;
+  role: "player" | "spectator";
 }
 ```
 
@@ -95,6 +96,7 @@ interface Session {
   lastSeen: string;
   deviceCount: number;
   status: "online" | "away" | "offline";
+  spectatorTableIds?: string[];
 }
 ```
 

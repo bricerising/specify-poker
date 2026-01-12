@@ -35,6 +35,27 @@ from Balance Service, plays a hand, and leaves with chips returned to balance.
 
 ---
 
+### User Story 1b - Spectator Access (Priority: P1)
+
+As a spectator, I can watch a table without taking a seat or receiving private
+player information.
+
+**Why this priority**: Spectating supports social engagement and table discovery.
+
+**Independent Test**: A user joins as a spectator, receives public table updates,
+and cannot act or see hole cards.
+
+**Acceptance Scenarios**:
+
+1. **Given** a user subscribes as a spectator, **When** the table state changes,
+   **Then** they receive public table updates.
+2. **Given** a spectator, **When** they attempt to submit an action,
+   **Then** the action is rejected with "NOT_SEATED" error.
+3. **Given** a spectator, **When** hole cards are dealt,
+   **Then** they never receive those cards.
+
+---
+
 ### User Story 2 - Hand Execution (Priority: P1)
 
 As a player, I can participate in Texas Hold'em hands with proper rule enforcement,
@@ -113,6 +134,7 @@ a player and their chat messages are blocked (via Gateway).
 - Balance Service unavailable during buy-in/cash-out.
 - Concurrent join requests for same seat.
 - Player attempts action after hand has ended.
+- Spectator disconnects and reconnects mid-hand.
 
 ## Constitution Requirements
 
@@ -125,6 +147,8 @@ a player and their chat messages are blocked (via Gateway).
 - **Atomic Settlements**: Pot settlements MUST be atomic via Balance Service;
   either all winners credited or none.
 - **Audit Trail**: All actions MUST be emitted as events to Event Service.
+- **Spectator Isolation**: Spectators MUST NOT receive private hole cards or be
+  allowed to submit actions.
 
 ## Requirements
 
@@ -155,6 +179,10 @@ a player and their chat messages are blocked (via Gateway).
 - **FR-019**: System MUST expose gRPC API for Gateway communication.
 - **FR-020**: System MUST version table state for client sync.
 - **FR-021**: System MUST calculate rake (5% of pot > 20, capped at 5 chips) before settling pots.
+- **FR-022**: System MUST allow users to join tables as spectators without
+  occupying a seat.
+- **FR-023**: System MUST ensure spectators only receive public table state
+  (no hole cards, no private actions).
 
 ### Non-Functional Requirements
 
@@ -169,6 +197,7 @@ a player and their chat messages are blocked (via Gateway).
 - **Table**: Configuration, seats, owner, current status.
 - **TableState**: Versioned state including seats, hand, and pot.
 - **Seat**: Player occupancy, stack, status, hole cards.
+- **Spectator**: Table observer with no seat and no private data access.
 - **Hand**: Hand lifecycle, community cards, pot(s), actions.
 - **Action**: Player action with type, amount, timestamp.
 - **MuteList**: Per-table list of muted user IDs.

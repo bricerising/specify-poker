@@ -55,7 +55,7 @@ interface HandStartedPayload {
 
 interface CardsDealtPayload {
   seatId: number;
-  cards: Card[];            // Encrypted or redacted for storage
+  cards: Card[];            // Stored for participants; fully redacted for non-participants
 }
 
 interface BlindPostedPayload {
@@ -135,7 +135,7 @@ interface HandParticipant {
   nickname: string;
   startingStack: number;
   endingStack: number;
-  holeCards: Card[] | null;  // Only visible to participant or at showdown
+  holeCards: Card[] | null;  // Visible to participant; opponents only if revealed at showdown; non-participants always null
   actions: ParticipantAction[];
   result: "WON" | "LOST" | "FOLDED" | "SPLIT";
 }

@@ -57,6 +57,27 @@ and the first user receives the update within 100ms.
 
 ---
 
+### User Story 2b - Spectator Experience (Priority: P1)
+
+As a spectator, I can watch a table in real time without occupying a seat or
+receiving private information.
+
+**Why this priority**: Spectating is a core social feature and expands engagement.
+
+**Independent Test**: A user subscribes as a spectator, receives table updates,
+but cannot act or see hole cards.
+
+**Acceptance Scenarios**:
+
+1. **Given** a user subscribed as a spectator, **When** a hand is in progress,
+   **Then** they receive public table state updates (community cards, pots, stacks).
+2. **Given** a spectator, **When** they attempt to submit an action,
+   **Then** the action is rejected with "NOT_SEATED" error.
+3. **Given** a spectator, **When** hole cards are delivered to seated players,
+   **Then** the spectator never receives those messages.
+
+---
+
 ### User Story 3 - Chat Messaging (Priority: P2)
 
 As a player, I can send and receive chat messages at my table with basic
@@ -110,6 +131,7 @@ response is returned to client.
 - Chat message contains prohibited content (future: content filtering).
 - Pub/sub message arrives for disconnected subscription.
 - JWT expires during active WebSocket session.
+- Spectator attempts to take a seat that fills between subscribe and join.
 
 ## Constitution Requirements
 
@@ -123,6 +145,10 @@ response is returned to client.
   to ensure all clients receive updates regardless of which instance they connect to.
 - **Observability**: All connections, messages, and errors MUST be traced and
   metered for monitoring.
+- **Spectator Isolation**: Spectators MUST NOT receive private player data
+  (hole cards) and MUST NOT be allowed to submit game actions.
+- **Spectator Signals**: Gateway MUST emit spectator join/leave events for
+  clients to render live audience counts.
 
 ## Requirements
 
@@ -146,6 +172,10 @@ response is returned to client.
 - **FR-013**: System MUST store chat messages with 24-hour retention.
 - **FR-014**: System MUST expose health and readiness endpoints.
 - **FR-015**: System MUST forward user identity to backend services via headers.
+- **FR-016**: System MUST allow users to subscribe as spectators without
+  occupying seats.
+- **FR-017**: System MUST enforce that spectators cannot submit actions or
+  receive hole card messages.
 
 ### Non-Functional Requirements
 

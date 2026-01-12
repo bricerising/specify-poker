@@ -28,13 +28,15 @@ This document defines the requirements for the Gateway Service, which acts as th
 - **Snapshots**: Upon joining a table, the client receives a full state snapshot.
 - **Patches**: Subsequent updates are delivered as patches to minimize bandwidth.
 - **Version Tracking**: Every message includes a sequence number to ensure the client remains in sync.
+- **Spectator Support**: Spectators are first-class users who may subscribe to table state without occupying a seat.
 
 ### Chat & Presence
-- **Participation**: Chat participation (sending and receiving) MUST be restricted to seated players and active spectators. 
+- **Participation**: Chat participation (sending and receiving) MUST be restricted to seated players and active spectators.
 - **Moderation**: Messages from muted players MUST be blocked at the Gateway level.
 - **Retention**: Table-specific chat history is persisted for 24 hours to support synchronization for users who join a table mid-session.
 - **Online Status**: The Gateway tracks and broadcasts user presence (online/away/offline).
 - **Rate Limiting**: Chat messages MUST be subject to specific rate limits (distinct from API limits) to prevent spam.
+- **Spectator Permissions**: Spectators MUST NOT receive hole cards or submit actions, but they MAY receive table state, community cards, and chat updates.
 
 ## Performance Requirements
 

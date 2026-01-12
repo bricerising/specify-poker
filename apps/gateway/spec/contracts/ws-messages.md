@@ -9,7 +9,7 @@ All messages are JSON objects with a `type` field.
 
 ## Client -> Server
 
-- `SubscribeTable` { tableId }
+- `SubscribeTable` { tableId }  // spectator subscription (no seat)
 - `UnsubscribeTable` { tableId }
 - `ResyncTable` { tableId }
 - `JoinSeat` { tableId, seatId }
@@ -23,7 +23,7 @@ All messages are JSON objects with a `type` field.
 
 - `Welcome` { userId, connectionId }
 - `Error` { code, message, correlationId? }
-- `LobbyTablesUpdated` { tables[] }
+- `LobbyTablesUpdated` { tables[] }  // TableSummary entries include spectatorCount
 - `TableSnapshot` { tableState }
 - `TablePatch` { tableId, handId, patch }
 - `HoleCards` { tableId, handId, seatId, cards: [string, string] }
@@ -33,13 +33,19 @@ All messages are JSON objects with a `type` field.
 - `ChatMessage` { tableId, message: { id, userId, nickname, text, ts } }
 - `TimerUpdate` { tableId, handId, currentTurnSeat, deadlineTs }
 - `HandEvent` { tableId, handId, event }
+- `SpectatorJoined` { tableId, userId, nickname?, spectatorCount }
+- `SpectatorLeft` { tableId, userId, spectatorCount }
 
 ## Shared Payloads
 
 `TableStateView`:
 - `tableId`, `name`, `ownerId`, `config`, `status`, `hand`, `version`
 - `seats[]`: `TableSeatView` entries
+- `spectators[]`: `SpectatorView` entries
 
 `TableSeatView`:
 - `seatId`, `userId`, `stack`, `status`
 - `nickname?` (present when a profile is available)
+
+`SpectatorView`:
+- `userId`, `nickname?`, `status`

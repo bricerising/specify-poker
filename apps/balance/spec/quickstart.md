@@ -52,6 +52,10 @@ The balance service will be available alongside the poker service.
 
 ## API Quick Reference
 
+**Note**: HTTP endpoints are internal-only and expected to be called via the
+Gateway with authenticated identity headers. The examples below are for local
+development only.
+
 ### HTTP Endpoints
 
 ```bash

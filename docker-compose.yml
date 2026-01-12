@@ -172,6 +172,39 @@ services:
       timeout: 2s
       retries: 3
 
+  event-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: event
+      POSTGRES_USER: event
+      POSTGRES_PASSWORD: event
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U event"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
+
+  event:
+    build:
+      context: .
+      dockerfile: apps/event/Dockerfile
+    ports:
+      - "50054:50054"
+    environment:
+      GRPC_PORT: "50054"
+      DATABASE_URL: "postgresql://event:event@event-db:5432/event"
+      REDIS_URL: "redis://redis:6379"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+    depends_on:
+      - event-db
+      - redis
+      - otel-collector
+    healthcheck:
+      test: ["CMD-SHELL", "true"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
+
   notify:
     build:
       context: .

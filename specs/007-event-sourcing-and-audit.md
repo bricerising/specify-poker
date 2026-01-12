@@ -23,7 +23,9 @@ The system MUST be able to reconstruct the exact state of any hand from its even
 
 ### Privacy & Redaction
 While the audit log is complete, access to it is filtered based on the requester:
-- **Players**: Only see their own hole cards unless the hand reached showdown.
+- **Players**: See their own hole cards; if a hand reached showdown, they see
+  all revealed hole cards for that hand.
+- **Non-Participants**: Never see hole cards, even for hands that reached showdown.
 - **Operators**: Have full access to all events for dispute resolution and bot detection.
 
 ## Downstream Processing

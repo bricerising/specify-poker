@@ -78,7 +78,7 @@ components:
           type: integer
     TableSummary:
       type: object
-      required: [tableId, name, ownerId, config, seatsTaken, occupiedSeatIds, inProgress]
+      required: [tableId, name, ownerId, config, seatsTaken, occupiedSeatIds, inProgress, spectatorCount]
       properties:
         tableId:
           type: string
@@ -96,6 +96,8 @@ components:
             type: integer
         inProgress:
           type: boolean
+        spectatorCount:
+          type: integer
     TableSeat:
       type: object
       required: [seatId, userId, stack, status]
@@ -109,10 +111,22 @@ components:
           type: integer
         status:
           type: string
-          enum: [empty, active, folded, all_in, disconnected, spectator]
+          enum: [empty, active, folded, all_in, disconnected]
+    SpectatorView:
+      type: object
+      required: [userId, status]
+      properties:
+        userId:
+          type: string
+        nickname:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, disconnected]
     TableState:
       type: object
-      required: [tableId, name, ownerId, config, seats, status, hand, version]
+      required: [tableId, name, ownerId, config, seats, spectators, status, hand, version]
       properties:
         tableId:
           type: string
@@ -126,6 +140,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TableSeat'
+        spectators:
+          type: array
+          items:
+            $ref: '#/components/schemas/SpectatorView'
         status:
           type: string
           enum: [lobby, in_hand]

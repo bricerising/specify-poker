@@ -125,7 +125,8 @@ reservation is released without affecting the user's available balance permanent
   checksums.
 - **FR-009**: System MUST support idempotent operations via client-provided keys.
 - **FR-010**: System MUST expose gRPC API for internal poker service communication.
-- **FR-011**: System MUST expose HTTP API for external account management.
+- **FR-011**: System MUST expose an HTTP API for internal account management
+  routed through the Gateway (not public internet-facing).
 - **FR-012**: System MUST provide transaction history queries by account.
 - **FR-013**: System MUST use optimistic locking to prevent concurrent balance
   updates.
@@ -133,6 +134,8 @@ reservation is released without affecting the user's available balance permanent
 - **FR-015**: System MUST support graceful degradation when Redis is unavailable.
 - **FR-016**: System MUST support rake deduction (5% of pots > 20, capped at 5 chips) from pots before distribution.
 - **FR-017**: System MUST support economic sources like daily bonuses and referral rewards via BONUS and REFERRAL transactions.
+- **FR-018**: HTTP balance endpoints MUST require Gateway-authenticated requests
+  with validated user identity.
 
 ### Non-Functional Requirements
 

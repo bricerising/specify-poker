@@ -1,0 +1,194 @@
+syntax = "proto3";
+
+package event;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+service EventService {
+  // Event ingestion
+  rpc PublishEvent(PublishEventRequest) returns (PublishEventResponse);
+  rpc PublishEvents(PublishEventsRequest) returns (PublishEventsResponse);
+  // Event queries
+  rpc QueryEvents(QueryEventsRequest) returns (QueryEventsResponse);
+  rpc GetEvent(GetEventRequest) returns (GameEvent);
+  // Hand history
+  rpc GetHandRecord(GetHandRecordRequest) returns (HandRecord);
+  rpc GetHandHistory(GetHandHistoryRequest) returns (GetHandHistoryResponse);
+  rpc GetHandsForUser(GetHandsForUserRequest) returns (GetHandsForUserResponse);
+  // Hand replay
+  rpc GetHandReplay(GetHandReplayRequest) returns (GetHandReplayResponse);
+  // Streaming
+  rpc SubscribeToStream(SubscribeRequest) returns (stream GameEvent);
+  rpc GetCursor(GetCursorRequest) returns (Cursor);
+  rpc UpdateCursor(UpdateCursorRequest) returns (Cursor);
+}
+
+message GameEvent {
+  string event_id = 1;
+  string type = 2;
+  string table_id = 3;
+  optional string hand_id = 4;
+  optional string user_id = 5;
+  optional int32 seat_id = 6;
+  google.protobuf.Struct payload = 7;
+  google.protobuf.Timestamp timestamp = 8;
+  int32 sequence = 9;
+}
+
+message PublishEventRequest {
+  string type = 1;
+  string table_id = 2;
+  optional string hand_id = 3;
+  optional string user_id = 4;
+  optional int32 seat_id = 5;
+  google.protobuf.Struct payload = 6;
+  string idempotency_key = 7;
+}
+
+message PublishEventResponse {
+  bool success = 1;
+  string event_id = 2;
+}
+
+message PublishEventsRequest {
+  repeated PublishEventRequest events = 1;
+}
+
+message PublishEventsResponse {
+  bool success = 1;
+  repeated string event_ids = 2;
+}
+
+message QueryEventsRequest {
+  optional string table_id = 1;
+  optional string hand_id = 2;
+  optional string user_id = 3;
+  repeated string types = 4;
+  optional google.protobuf.Timestamp start_time = 5;
+  optional google.protobuf.Timestamp end_time = 6;
+  int32 limit = 7;
+  int32 offset = 8;
+  optional string cursor = 9;
+}
+
+message QueryEventsResponse {
+  repeated GameEvent events = 1;
+  int32 total = 2;
+  bool has_more = 3;
+  optional string next_cursor = 4;
+}
+
+message GetEventRequest {
+  string event_id = 1;
+}
+
+message GetHandRecordRequest {
+  string hand_id = 1;
+  optional string requester_id = 2;
+}
+
+message GetHandHistoryRequest {
+  string table_id = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+  optional string requester_id = 4;
+}
+
+message GetHandHistoryResponse {
+  repeated HandRecord hands = 1;
+  int32 total = 2;
+}
+
+message GetHandsForUserRequest {
+  string user_id = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message GetHandsForUserResponse {
+  repeated HandRecord hands = 1;
+  int32 total = 2;
+}
+
+message GetHandReplayRequest {
+  string hand_id = 1;
+}
+
+message GetHandReplayResponse {
+  string hand_id = 1;
+  repeated GameEvent events = 2;
+}
+
+message SubscribeRequest {
+  string stream_id = 1;
+  optional int32 start_sequence = 2;
+}
+
+message GetCursorRequest {
+  string stream_id = 1;
+  string subscriber_id = 2;
+}
+
+message UpdateCursorRequest {
+  string stream_id = 1;
+  string subscriber_id = 2;
+  int32 position = 3;
+}
+
+message Cursor {
+  string cursor_id = 1;
+  string stream_id = 2;
+  string subscriber_id = 3;
+  int32 position = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message HandRecord {
+  string hand_id = 1;
+  string table_id = 2;
+  string table_name = 3;
+  HandConfig config = 4;
+  repeated HandParticipant participants = 5;
+  repeated string community_cards = 6;
+  repeated Pot pots = 7;
+  repeated Winner winners = 8;
+  google.protobuf.Timestamp started_at = 9;
+  google.protobuf.Timestamp completed_at = 10;
+  int32 duration_ms = 11;
+}
+
+message HandConfig {
+  int64 small_blind = 1;
+  int64 big_blind = 2;
+  int64 ante = 3;
+}
+
+message HandParticipant {
+  int32 seat_id = 1;
+  string user_id = 2;
+  string nickname = 3;
+  int64 starting_stack = 4;
+  int64 ending_stack = 5;
+  repeated string hole_cards = 6;
+  repeated ParticipantAction actions = 7;
+  string result = 8;
+}
+
+message ParticipantAction {
+  string street = 1;
+  string action = 2;
+  int64 amount = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+message Pot {
+  int64 amount = 1;
+  repeated string winners = 2;
+}
+
+message Winner {
+  string user_id = 1;
+  int64 amount = 2;
+}

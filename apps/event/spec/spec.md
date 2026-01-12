@@ -113,7 +113,7 @@ events in real-time as actions occur.
 - **Ordering**: Events MUST maintain strict chronological ordering within a hand.
 - **Durability**: Events MUST survive service restarts and be recoverable.
 - **Privacy**: Hand history MUST only be accessible to participants and authorized
-  operators.
+  operators; non-participants MUST have all hole cards redacted.
 - **Retention**: Events MUST be retained for regulatory compliance period (varies
   by jurisdiction, default 7 years).
 
@@ -133,6 +133,8 @@ events in real-time as actions occur.
 - **FR-010**: System MUST support cursor-based stream resumption.
 - **FR-011**: System MUST expose gRPC API for internal service communication.
 - **FR-012**: System MUST redact private information based on requester identity.
+- **FR-013**: Non-participants MUST never receive hole cards, even for hands that
+  reached showdown.
 
 ### Non-Functional Requirements
 

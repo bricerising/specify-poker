@@ -40,6 +40,7 @@ interface Table {
 interface TableState {
   tableId: string;
   seats: Seat[];
+  spectators: Spectator[];
   hand: HandState | null;    // Null between hands
   button: number;            // Seat index of dealer
   version: number;           // Optimistic locking
@@ -69,6 +70,12 @@ interface Seat {
   holeCards: Card[] | null; // Private, redacted in broadcasts
   reservationId?: string;   // Balance Service reservation
   lastAction?: string;      // ISO timestamp
+}
+
+interface Spectator {
+  userId: string;
+  status: "ACTIVE" | "DISCONNECTED";
+  joinedAt: string;
 }
 
 interface Card {
@@ -162,6 +169,7 @@ interface TableSummary {
   seatsTaken: number;
   occupiedSeatIds: number[];
   inProgress: boolean;
+  spectatorCount: number;
 }
 ```
 
