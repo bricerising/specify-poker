@@ -367,7 +367,7 @@ export class TableService {
         if (!cashOut.ok) {
           await this.emitGameEvent(tableId, undefined, userId, seat.seatId, "CASHOUT_FAILED", { amount: remainingStack });
         }
-      } catch (err) {
+      } catch (_err) {
         await this.emitGameEvent(tableId, undefined, userId, seat.seatId, "BALANCE_UNAVAILABLE", { action: "CASH_OUT" });
       }
     }
@@ -568,7 +568,7 @@ export class TableService {
               error: settle.error || "UNKNOWN",
             });
           }
-        } catch (err) {
+        } catch (_err) {
           await this.emitGameEvent(table.tableId, hand.handId, undefined, undefined, "BALANCE_UNAVAILABLE", {
             action: "SETTLE_POT",
           });

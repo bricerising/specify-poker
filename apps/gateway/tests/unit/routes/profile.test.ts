@@ -40,7 +40,15 @@ describe("Profile Routes", () => {
       next();
     });
     app.use("/api", profileRouter);
+    app.use("/api", profileRouter);
     vi.clearAllMocks();
+
+    // Default mock for GetStatistics to prevent timeouts
+    vi.mocked(playerClient.GetStatistics).mockImplementation(
+      (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
+        callback(null, { statistics: { handsPlayed: 0, wins: 0 } });
+      }
+    );
   });
 
   afterEach(() => {
@@ -64,7 +72,11 @@ describe("Profile Routes", () => {
       const response = await request(app).get("/api/me");
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual(mockProfile);
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        ...mockProfile,
+        stats: { handsPlayed: 0, wins: 0 },
+      });
     });
 
     it("should handle errors", async () => {
@@ -100,7 +112,11 @@ describe("Profile Routes", () => {
         .send({ nickname: "NewNickname", avatarUrl: "https://example.com/new-avatar.png" });
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual(updatedProfile);
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        ...updatedProfile,
+        stats: { handsPlayed: 0, wins: 0 },
+      });
     });
   });
 

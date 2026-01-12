@@ -33,7 +33,7 @@ export function createRouter(): Router {
     try {
       await redis.ping();
       return res.json({ status: "ready" });
-    } catch (err) {
+    } catch (_err) {
       return res.status(503).json({ status: "degraded", reason: "redis_unreachable" });
     }
   });
@@ -50,6 +50,7 @@ export function createRouter(): Router {
   router.use("/api/audit", auditRouter);
 
   // Proxy Routes (for services with HTTP endpoints like Balance)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setupProxy(router as any);
 
   return router;

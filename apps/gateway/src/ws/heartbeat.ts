@@ -1,5 +1,5 @@
 import WebSocket from "ws";
-import logger from "../observability/logger";
+
 
 export function setupHeartbeat(ws: WebSocket, onDead: () => void) {
   let isAlive = true;

@@ -7,7 +7,6 @@ import { subscribeToChannel, unsubscribeFromChannel, unsubscribeAll, getSubscrib
 import { getLocalConnectionMeta, sendToLocal } from "../localRegistry";
 import { broadcastToChannel } from "../../services/broadcastService";
 import { saveChatMessage, getChatHistory } from "../../storage/chatStore";
-import logger from "../../observability/logger";
 
 export async function handleChatPubSubEvent(message: WsPubSubMessage) {
   if (message.channel !== "chat") {
@@ -22,12 +21,12 @@ export async function handleChatPubSubEvent(message: WsPubSubMessage) {
 
 async function isSeated(tableId: string, userId: string): Promise<boolean> {
   return new Promise((resolve) => {
-    gameClient.GetTableState({ table_id: tableId, user_id: userId }, (err: any, response: any) => {
+    gameClient.GetTableState({ table_id: tableId, user_id: userId }, (err, response) => {
       if (err || !response?.state) {
         resolve(false);
         return;
       }
-      const isSeated = response.state?.seats?.some((s: any) => s.user_id === userId && s.status !== "empty") || false;
+      const isSeated = response.state?.seats?.some((s) => s.user_id === userId && s.status !== "empty") || false;
       resolve(isSeated);
     });
   });
@@ -35,12 +34,12 @@ async function isSeated(tableId: string, userId: string): Promise<boolean> {
 
 async function isSpectator(tableId: string, userId: string): Promise<boolean> {
   return new Promise((resolve) => {
-    gameClient.GetTableState({ table_id: tableId, user_id: userId }, (err: any, response: any) => {
+    gameClient.GetTableState({ table_id: tableId, user_id: userId }, (err, response) => {
       if (err || !response?.state) {
         resolve(false);
         return;
       }
-      const found = response.state?.spectators?.some((s: any) => s.user_id === userId) || false;
+      const found = response.state?.spectators?.some((s) => s.user_id === userId) || false;
       resolve(found);
     });
   });
@@ -48,7 +47,7 @@ async function isSpectator(tableId: string, userId: string): Promise<boolean> {
 
 async function isMuted(tableId: string, userId: string): Promise<boolean> {
   return new Promise((resolve) => {
-    gameClient.IsMuted({ table_id: tableId, user_id: userId }, (err: any, response: any) => {
+    gameClient.IsMuted({ table_id: tableId, user_id: userId }, (err, response) => {
       if (err || !response) {
         resolve(false);
         return;
@@ -60,7 +59,7 @@ async function isMuted(tableId: string, userId: string): Promise<boolean> {
 
 async function getNickname(userId: string): Promise<string> {
   return new Promise((resolve) => {
-    playerClient.GetProfile({ user_id: userId }, (err: any, response: any) => {
+    playerClient.GetProfile({ user_id: userId }, (err, response) => {
       const nickname = response?.profile?.nickname;
       if (err || !nickname) {
         resolve("Unknown");
@@ -130,6 +129,7 @@ async function handleChatSend(connectionId: string, userId: string, payload: { t
 
 export function attachChatHub(socket: WebSocket, userId: string, connectionId: string) {
   socket.on("message", async (data) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let message: any;
     try {
       message = JSON.parse(data.toString());

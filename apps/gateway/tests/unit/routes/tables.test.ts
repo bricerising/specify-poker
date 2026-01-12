@@ -68,7 +68,7 @@ describe("Tables Routes", () => {
       const response = await request(app).get("/api/tables");
 
       expect(response.status).toBe(200);
-      expect(response.body.tables).toEqual(mockTables);
+      expect(response.body).toEqual(mockTables);
     });
 
     it("should handle errors", async () => {

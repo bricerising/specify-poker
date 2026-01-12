@@ -22,10 +22,15 @@ router.get("/me", async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const response = await grpcCall<{ profile: unknown }>("GetProfile", {
-      user_id: userId,
-    });
-    return res.json(response.profile);
+    const [profileResponse, statsResponse] = await Promise.all([
+      grpcCall<{ profile: any }>("GetProfile", { user_id: userId }),
+      grpcCall<{ statistics: any }>("GetStatistics", { user_id: userId }),
+    ]);
+
+    const profile = profileResponse.profile || {};
+    const stats = statsResponse.statistics || { handsPlayed: 0, wins: 0 };
+
+    return res.json({ ...profile, stats });
   } catch (err) {
     logger.error({ err }, "Failed to get profile");
     return res.status(500).json({ error: "Failed to get profile" });
@@ -41,20 +46,27 @@ router.put("/me", async (req: Request, res: Response) => {
     }
 
     const { nickname, avatarUrl, preferences } = req.body;
-    const response = await grpcCall<{ profile: unknown }>("UpdateProfile", {
-      user_id: userId,
-      nickname,
-      avatar_url: avatarUrl,
-      preferences: preferences
-        ? {
+    const [updateResponse, statsResponse] = await Promise.all([
+      grpcCall<{ profile: any }>("UpdateProfile", {
+        user_id: userId,
+        nickname,
+        avatar_url: avatarUrl,
+        preferences: preferences
+          ? {
             sound_enabled: preferences.soundEnabled,
             chat_enabled: preferences.chatEnabled,
             show_hand_strength: preferences.showHandStrength,
             theme: preferences.theme,
           }
-        : undefined,
-    });
-    return res.json(response.profile);
+          : undefined,
+      }),
+      grpcCall<{ statistics: any }>("GetStatistics", { user_id: userId }),
+    ]);
+
+    const profile = updateResponse.profile || {};
+    const stats = statsResponse.statistics || { handsPlayed: 0, wins: 0 };
+
+    return res.json({ ...profile, stats });
   } catch (err) {
     logger.error({ err }, "Failed to update profile");
     return res.status(500).json({ error: "Failed to update profile" });

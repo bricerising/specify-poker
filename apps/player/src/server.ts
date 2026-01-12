@@ -12,6 +12,7 @@ import { getConfig } from "./config";
 import { startMetricsServer } from "./observability/metrics";
 import logger from "./observability/logger";
 import pool from "./storage/db";
+import { runMigrations } from "./storage/migrations";
 
 let metricsServer: ReturnType<typeof startMetricsServer> | null = null;
 let eventConsumerInstance: EventConsumer | null = null;
@@ -20,6 +21,7 @@ export async function main() {
   const config = getConfig();
 
   try {
+    await runMigrations();
     await startGrpcServer(config.grpcPort);
     metricsServer = startMetricsServer(config.metricsPort);
 

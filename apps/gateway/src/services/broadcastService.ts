@@ -3,17 +3,15 @@ import { sendToLocal } from "../ws/localRegistry";
 import * as pubsub from "../ws/pubsub";
 import logger from "../observability/logger";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function broadcastToChannel(channel: string, payload: any) {
   try {
     // 1. Get all subscribers for this channel (from Redis)
     const connectionIds = await getSubscribers(channel);
-    
+
     // 2. Deliver to local connections
-    let localCount = 0;
     for (const connId of connectionIds) {
-      if (sendToLocal(connId, payload)) {
-        localCount++;
-      }
+      sendToLocal(connId, payload);
     }
 
     // 3. Publish to Redis for other instances
@@ -29,8 +27,10 @@ export async function broadcastToChannel(channel: string, payload: any) {
       // Lobby event in pubsub expects an array of tables... 
       // maybe we should generalize pubsub a bit more.
       // For now, let's just handle it.
-      if (payload.tables) {
-          await pubsub.publishLobbyEvent(payload.tables);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((payload as any).tables) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await pubsub.publishLobbyEvent((payload as any).tables);
       }
     }
   } catch (err) {
@@ -38,10 +38,11 @@ export async function broadcastToChannel(channel: string, payload: any) {
   }
 }
 
-export async function sendToUser(userId: string, payload: any) {
-    // This would require a way to find all connectionIds for a user
-    // We have getConnectionsByUser in connectionStore
-    // But we also need to know which instances they are on.
-    // If we just want to send to local connections of that user:
-    // (Implementation omitted for now as it's not strictly in the T-tasks yet but good to have)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function sendToUser(_userId: string, _payload: unknown) {
+  // This would require a way to find all connectionIds for a user
+  // We have getConnectionsByUser in connectionStore
+  // But we also need to know which instances they are on.
+  // If we just want to send to local connections of that user:
+  // (Implementation omitted for now as it's not strictly in the T-tasks yet but good to have)
 }

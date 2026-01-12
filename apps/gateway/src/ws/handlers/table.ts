@@ -22,8 +22,8 @@ async function handleSubscribe(connectionId: string, userId: string, tableId: st
   const channel = `table:${tableId}`;
   await subscribeToChannel(connectionId, channel);
 
-  gameClient.JoinSpectator({ table_id: tableId, user_id: userId }, (_err: unknown) => undefined);
-  gameClient.GetTableState({ table_id: tableId, user_id: userId }, (err: unknown, response: any) => {
+  gameClient.JoinSpectator({ table_id: tableId, user_id: userId }, (_err) => undefined);
+  gameClient.GetTableState({ table_id: tableId, user_id: userId }, (err, response) => {
     if (err) {
       logger.error({ err, tableId }, "Failed to get table state from game service");
       return;
@@ -47,67 +47,71 @@ async function handleUnsubscribe(connectionId: string, tableId: string) {
   await unsubscribeFromChannel(connectionId, channel);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleAction(connectionId: string, userId: string, payload: any) {
-    const meta = getLocalConnectionMeta(connectionId);
-    const ip = meta?.ip ?? "unknown";
-    if (!(await checkWsRateLimit(userId, ip, "action")).ok) {
-        sendToLocal(connectionId, { type: "ActionResult", accepted: false, reason: "rate_limited" });
-        return;
-    }
+  const meta = getLocalConnectionMeta(connectionId);
+  const ip = meta?.ip ?? "unknown";
+  if (!(await checkWsRateLimit(userId, ip, "action")).ok) {
+    sendToLocal(connectionId, { type: "ActionResult", accepted: false, reason: "rate_limited" });
+    return;
+  }
 
-    const actionType = parseActionType(payload.action);
-    if (!actionType) {
-        sendToLocal(connectionId, { type: "ActionResult", accepted: false, reason: "invalid_action" });
-        return;
-    }
+  const actionType = parseActionType(payload.action);
+  if (!actionType) {
+    sendToLocal(connectionId, { type: "ActionResult", accepted: false, reason: "invalid_action" });
+    return;
+  }
 
-    gameClient.SubmitAction({
-        table_id: payload.tableId,
-        user_id: userId,
-        action_type: actionType,
-        amount: payload.amount
-    }, (err: any, response: any) => {
-        if (err) {
-            sendToLocal(connectionId, { type: "ActionResult", accepted: false, reason: "internal_error" });
-            return;
-        }
-        sendToLocal(connectionId, {
-            type: "ActionResult",
-            tableId: payload.tableId,
-            accepted: response.ok,
-            reason: response.error
-        });
+  gameClient.SubmitAction({
+    table_id: payload.tableId,
+    user_id: userId,
+    action_type: actionType,
+    amount: payload.amount
+  }, (err, response) => {
+    if (err) {
+      sendToLocal(connectionId, { type: "ActionResult", accepted: false, reason: "internal_error" });
+      return;
+    }
+    sendToLocal(connectionId, {
+      type: "ActionResult",
+      tableId: payload.tableId,
+      accepted: response.ok,
+      reason: response.error
     });
+  });
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleJoinSeat(connectionId: string, userId: string, payload: any) {
-    gameClient.JoinSeat({
-        table_id: payload.tableId,
-        user_id: userId,
-        seat_id: payload.seatId,
-        buy_in_amount: payload.buyInAmount || 200
-    }, (err: any, response: any) => {
-        if (err) {
-            sendToLocal(connectionId, { type: "Error", message: "Internal error" });
-            return;
-        }
-        if (!response.ok) {
-            sendToLocal(connectionId, { type: "Error", message: response.error });
-        }
-    });
+  gameClient.JoinSeat({
+    table_id: payload.tableId,
+    user_id: userId,
+    seat_id: payload.seatId,
+    buy_in_amount: payload.buyInAmount || 200
+  }, (err, response) => {
+    if (err) {
+      sendToLocal(connectionId, { type: "Error", message: "Internal error" });
+      return;
+    }
+    if (!response.ok) {
+      sendToLocal(connectionId, { type: "Error", message: response.error });
+    }
+  });
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleLeaveTable(userId: string, payload: any) {
-    gameClient.LeaveSeat({
-        table_id: payload.tableId,
-        user_id: userId
-    }, (err: any, _response: any) => {
-        if (err) return;
-    });
+  gameClient.LeaveSeat({
+    table_id: payload.tableId,
+    user_id: userId
+  }, (err, _response) => {
+    if (err) return;
+  });
 }
 
 export function attachTableHub(socket: WebSocket, userId: string, connectionId: string) {
   socket.on("message", async (data) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let message: any;
     try {
       message = JSON.parse(data.toString());
@@ -126,7 +130,7 @@ export function attachTableHub(socket: WebSocket, userId: string, connectionId: 
     } else if (type === "JoinSeat" && tableId) {
       const seatId = parseSeatId(message.seatId);
       if (seatId !== null) {
-          await handleJoinSeat(connectionId, userId, { tableId, seatId, buyInAmount: message.buyInAmount });
+        await handleJoinSeat(connectionId, userId, { tableId, seatId, buyInAmount: message.buyInAmount });
       }
     } else if (type === "LeaveTable" && tableId) {
       await handleLeaveTable(userId, { tableId });

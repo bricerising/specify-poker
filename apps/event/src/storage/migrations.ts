@@ -7,7 +7,7 @@ export async function runMigrations() {
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS events (
-        event_id UUID PRIMARY KEY,
+        event_id UUID,
         type VARCHAR(50) NOT NULL,
         table_id VARCHAR(255) NOT NULL,
         hand_id VARCHAR(255),
@@ -16,7 +16,8 @@ export async function runMigrations() {
         payload JSONB NOT NULL,
         timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         sequence INTEGER,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (event_id, timestamp)
       ) PARTITION BY RANGE (timestamp);
     `);
 

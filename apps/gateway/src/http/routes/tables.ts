@@ -18,7 +18,7 @@ function grpcCall<T>(method: string, request: unknown): Promise<T> {
 router.get("/", async (_req: Request, res: Response) => {
   try {
     const response = await grpcCall<{ tables: unknown[] }>("ListTables", {});
-    res.json({ tables: response.tables || [] });
+    res.json(response.tables || []);
   } catch (err) {
     logger.error({ err }, "Failed to list tables");
     res.status(500).json({ error: "Failed to list tables" });

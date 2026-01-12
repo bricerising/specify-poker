@@ -35,7 +35,7 @@ test("profile flow updates nickname", async ({ page }) => {
   });
 
   await page.addInitScript(() => {
-    window.localStorage.setItem("poker.auth.token", "test-token");
+    window.sessionStorage.setItem("poker.auth.token", "test-token");
   });
 
   await page.goto("http://localhost:3000");

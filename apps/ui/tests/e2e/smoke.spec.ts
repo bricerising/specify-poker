@@ -68,7 +68,7 @@ test("smoke flow: login, create table, join, play hand", async ({ page }) => {
   });
 
   await page.addInitScript(() => {
-    window.localStorage.setItem("poker.auth.token", "test-token");
+    window.sessionStorage.setItem("poker.auth.token", "test-token");
 
     class MockWebSocket {
       static OPEN = 1;

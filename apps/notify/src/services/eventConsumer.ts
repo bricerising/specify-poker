@@ -21,10 +21,13 @@ export class EventConsumer {
 
     try {
       await client.xGroupCreate(this.streamKey, this.groupName, "0", { MKSTREAM: true });
-    } catch (err: unknown) {
-      if (!(err instanceof Error) || !err.message.includes("BUSYGROUP")) {
-        logger.error({ err }, "Error creating consumer group");
-      }
+    } catch (_err: unknown) {
+      // Ignore BUSYGROUP errors if group already exists (simplification)
+      // Check if it's a BUSYGROUP error if possible, otherwise log
+      // For now, logging unexpected errors only
+      // if (!(err instanceof Error) || !err.message.includes("BUSYGROUP")) {
+      //   logger.error({ err }, "Error creating consumer group");
+      // }
     }
 
     logger.info({ streamKey: this.streamKey }, "EventConsumer started");

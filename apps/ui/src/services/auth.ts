@@ -4,20 +4,29 @@ const DEFAULT_KEYCLOAK_URL = "http://localhost:8080";
 const DEFAULT_REALM = "poker-local";
 const DEFAULT_CLIENT_ID = "poker-ui";
 const PKCE_STORAGE_KEY = "poker.auth.pkce_verifier";
+const TOKEN_STORAGE_KEY = "poker.auth.token";
 
-// Tokens stored in memory for security - never in localStorage
+// Tokens stored in memory + sessionStorage for refresh durability (never localStorage)
 let accessToken: string | null = null;
 
 export function setToken(token: string) {
   accessToken = token;
+  sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
 }
 
 export function getToken() {
+  if (!accessToken) {
+    const cached = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+    if (cached) {
+      accessToken = cached;
+    }
+  }
   return accessToken;
 }
 
 export function clearToken() {
   accessToken = null;
+  sessionStorage.removeItem(TOKEN_STORAGE_KEY);
 }
 
 export function isAuthenticated() {

@@ -12,6 +12,11 @@ describe("auth token management", () => {
       setToken("test-token");
       expect(getToken()).toBe("test-token");
     });
+
+    it("stores token in sessionStorage", () => {
+      setToken("test-token");
+      expect(sessionStorage.getItem("poker.auth.token")).toBe("test-token");
+    });
   });
 
   describe("getToken", () => {
@@ -23,6 +28,11 @@ describe("auth token management", () => {
       setToken("my-token");
       expect(getToken()).toBe("my-token");
     });
+
+    it("hydrates token from sessionStorage", () => {
+      sessionStorage.setItem("poker.auth.token", "cached-token");
+      expect(getToken()).toBe("cached-token");
+    });
   });
 
   describe("clearToken", () => {
@@ -30,6 +40,12 @@ describe("auth token management", () => {
       setToken("test-token");
       clearToken();
       expect(getToken()).toBeNull();
+    });
+
+    it("clears sessionStorage token", () => {
+      setToken("test-token");
+      clearToken();
+      expect(sessionStorage.getItem("poker.auth.token")).toBeNull();
     });
   });
 
@@ -57,8 +73,8 @@ describe("auth security", () => {
     expect(localStorage.getItem("poker.auth.token")).toBeNull();
   });
 
-  it("tokens are stored in memory only", () => {
-    setToken("memory-only-token");
-    expect(getToken()).toBe("memory-only-token");
+  it("tokens are not persisted to localStorage even when cached", () => {
+    sessionStorage.setItem("poker.auth.token", "session-only-token");
+    expect(localStorage.getItem("poker.auth.token")).toBeNull();
   });
 });

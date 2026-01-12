@@ -24,7 +24,8 @@ export function getLocalConnectionMeta(connectionId: string) {
   return localConnections.get(connectionId);
 }
 
-export function sendToLocal(connectionId: string, message: any) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function sendToLocal(connectionId: string, message: unknown) {
   const entry = localConnections.get(connectionId);
   const socket = entry?.socket;
   if (socket && socket.readyState === WebSocket.OPEN) {

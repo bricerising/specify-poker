@@ -78,11 +78,13 @@ export async function verifyToken(token: string): Promise<VerifiedToken> {
     ? formatPublicKey(process.env.JWT_PUBLIC_KEY)
     : null;
 
-  let key = publicKey ?? (secret ? secret : null);
+  let key = publicKey;
   if (!key) {
     const kid = header?.kid;
     if (kid) {
       key = await fetchJwksKey(kid);
+    } else if (secret) {
+      key = secret;
     } else {
       key = await fetchPublicKey();
     }

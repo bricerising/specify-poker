@@ -14,6 +14,10 @@ import { setupHeartbeat } from "./heartbeat";
 import logger from "../observability/logger";
 import { IncomingMessage } from "http";
 
+interface AuthenticatedRequest extends IncomingMessage {
+  wsAuthResult?: WsAuthResult;
+}
+
 const sessionMeta = new Map<string, { startedAt: number; clientType: string }>();
 const authTimeoutMs = 5000;
 
@@ -47,7 +51,7 @@ function emitSessionEvent(type: string, userId: string, payload: Record<string, 
       payload: toStruct(payload),
       idempotency_key: randomUUID(),
     },
-    (err: any, response: any) => {
+    (err, response) => {
       if (err || !response?.success) {
         logger.error({ err, type, userId }, "Failed to emit session event");
       }
@@ -90,7 +94,7 @@ export async function initWsServer(server: Server) {
     }
 
     const authResult = await authenticateWs(request);
-    (request as any).wsAuthResult = authResult;
+    (request as AuthenticatedRequest).wsAuthResult = authResult;
 
     wss.handleUpgrade(request, socket, head, (ws) => {
       wss.emit("connection", ws, request);
@@ -98,7 +102,7 @@ export async function initWsServer(server: Server) {
   });
 
   wss.on("connection", async (ws: WebSocket, request: IncomingMessage) => {
-    const authResult = (request as any).wsAuthResult as WsAuthResult | undefined;
+    const authResult = (request as AuthenticatedRequest).wsAuthResult;
     if (!authResult) {
       ws.close(1011, "Authentication unavailable");
       return;
@@ -174,9 +178,9 @@ export async function initWsServer(server: Server) {
       clearTimeout(authTimer);
       ws.off("message", handleAuth);
 
-      let message: any;
+      let message: { type?: string; token?: string } | undefined;
       try {
-        message = JSON.parse(data.toString());
+        message = JSON.parse(data.toString()) as { type?: string; token?: string };
       } catch {
         ws.close(1008, "Invalid authentication payload");
         return;
