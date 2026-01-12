@@ -29,7 +29,8 @@ export function createHandlers(subscriptionService: SubscriptionService, pushSer
     registerSubscription: async (call: { request: Record<string, unknown> }, callback: (error: Error | null, response?: unknown) => void) => {
       const startedAt = Date.now();
       try {
-        const { userId, subscription } = call.request;
+        const userId = call.request.userId as string | undefined;
+        const subscription = call.request.subscription as { endpoint?: string; keys?: { p256dh?: string; auth?: string } } | undefined;
         if (!userId || !subscription || !subscription.endpoint || !subscription.keys) {
           recordDuration("RegisterSubscription", startedAt, "error");
           return callback(null, { ok: false, error: "MISSING_FIELDS" });
@@ -38,8 +39,8 @@ export function createHandlers(subscriptionService: SubscriptionService, pushSer
         const sub: PushSubscription = {
           endpoint: subscription.endpoint,
           keys: {
-            p256dh: subscription.keys.p256dh,
-            auth: subscription.keys.auth,
+            p256dh: subscription.keys.p256dh!,
+            auth: subscription.keys.auth!,
           },
         };
 
@@ -56,7 +57,8 @@ export function createHandlers(subscriptionService: SubscriptionService, pushSer
     unregisterSubscription: async (call: { request: Record<string, unknown> }, callback: (error: Error | null, response?: unknown) => void) => {
       const startedAt = Date.now();
       try {
-        const { userId, endpoint } = call.request;
+        const userId = call.request.userId as string | undefined;
+        const endpoint = call.request.endpoint as string | undefined;
         if (!userId || !endpoint) {
           recordDuration("UnregisterSubscription", startedAt, "error");
           return callback(null, { ok: false, error: "MISSING_FIELDS" });
@@ -75,7 +77,7 @@ export function createHandlers(subscriptionService: SubscriptionService, pushSer
     listSubscriptions: async (call: { request: Record<string, unknown> }, callback: (error: Error | null, response?: unknown) => void) => {
       const startedAt = Date.now();
       try {
-        const { userId } = call.request;
+        const userId = call.request.userId as string | undefined;
         if (!userId) {
           recordDuration("ListSubscriptions", startedAt, "ok");
           return callback(null, { subscriptions: [] });
@@ -109,16 +111,16 @@ export function createHandlers(subscriptionService: SubscriptionService, pushSer
         }
 
         const payload: NotificationPayload = {
-          title,
-          body,
-          url,
-          icon,
-          tag,
-          data: resolveNotificationData(data),
+          title: title as string,
+          body: body as string,
+          url: url as string | undefined,
+          icon: icon as string | undefined,
+          tag: tag as string | undefined,
+          data: resolveNotificationData(data as Record<string, string> | undefined),
         };
 
         recordNotificationRequested(payload.data?.type ?? "system");
-        const result = await pushService.sendToUser(userId, payload);
+        const result = await pushService.sendToUser(userId as string, payload);
         recordDuration("SendNotification", startedAt, "ok");
         callback(null, {
           ok: true,

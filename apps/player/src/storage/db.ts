@@ -1,11 +1,11 @@
-import { Pool, PoolClient, QueryResult } from "pg";
+import { Pool, PoolClient, QueryResult, QueryResultRow } from "pg";
 import { getConfig } from "../config";
 
 const pool = new Pool({
   connectionString: getConfig().databaseUrl,
 });
 
-export async function query<T>(text: string, params?: unknown[]): Promise<QueryResult<T>> {
+export async function query<T extends QueryResultRow>(text: string, params?: unknown[]): Promise<QueryResult<T>> {
   return pool.query<T>(text, params);
 }
 

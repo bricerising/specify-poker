@@ -1,7 +1,7 @@
 import { query } from "./db";
 import { Statistics } from "../domain/types";
 
-function mapStatistics(row: {
+interface StatisticsRow {
   user_id: string;
   hands_played: number;
   wins: number;
@@ -11,7 +11,9 @@ function mapStatistics(row: {
   biggest_pot: number;
   referral_count: number;
   last_updated: Date;
-}): Statistics {
+}
+
+function mapStatistics(row: StatisticsRow): Statistics {
   return {
     userId: row.user_id,
     handsPlayed: row.hands_played,
@@ -26,17 +28,7 @@ function mapStatistics(row: {
 }
 
 export async function findById(userId: string): Promise<Statistics | null> {
-  const result = await query<{
-    user_id: string;
-    hands_played: number;
-    wins: number;
-    vpip: number;
-    pfr: number;
-    all_in_count: number;
-    biggest_pot: number;
-    referral_count: number;
-    last_updated: Date;
-  }>(
+  const result = await query<StatisticsRow>(
     `SELECT user_id, hands_played, wins, vpip, pfr, all_in_count, biggest_pot, referral_count, last_updated
      FROM statistics
      WHERE user_id = $1`,
@@ -51,7 +43,7 @@ export async function findById(userId: string): Promise<Statistics | null> {
 }
 
 export async function upsert(stats: Statistics): Promise<Statistics> {
-  const result = await query(
+  const result = await query<StatisticsRow>(
     `INSERT INTO statistics (user_id, hands_played, wins, vpip, pfr, all_in_count, biggest_pot, referral_count, last_updated)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (user_id)
@@ -81,7 +73,7 @@ export async function upsert(stats: Statistics): Promise<Statistics> {
 }
 
 export async function update(stats: Statistics): Promise<Statistics> {
-  const result = await query(
+  const result = await query<StatisticsRow>(
     `UPDATE statistics
      SET hands_played = $2,
          wins = $3,

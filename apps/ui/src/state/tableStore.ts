@@ -19,6 +19,13 @@ export interface TableSummary {
   seatsTaken: number;
   occupiedSeatIds: number[];
   inProgress: boolean;
+  spectatorCount?: number;
+}
+
+export interface SpectatorView {
+  userId: string;
+  nickname?: string;
+  status: "active" | "disconnected";
 }
 
 export interface TableSeat {
@@ -51,6 +58,7 @@ export interface TableState {
   ownerId: string;
   config: TableConfig;
   seats: TableSeat[];
+  spectators?: SpectatorView[];
   status: string;
   hand: HandState | null;
   version: number;
@@ -60,6 +68,7 @@ export interface TableStoreState {
   tables: TableSummary[];
   tableState: TableState | null;
   seatId: number | null;
+  isSpectating: boolean;
   status: "idle" | "connecting" | "connected" | "error";
   error?: string;
   chatMessages: ChatMessage[];
@@ -74,6 +83,8 @@ export interface TableStore {
   fetchTables(): Promise<void>;
   subscribeLobby(): void;
   joinSeat(tableId: string, seatId: number): Promise<void>;
+  spectateTable(tableId: string): void;
+  leaveTable(): void;
   subscribeTable(tableId: string): void;
   sendAction(action: { type: string; amount?: number }): void;
   subscribeChat(tableId: string): void;
@@ -92,6 +103,7 @@ export function createTableStore(): TableStore {
     tables: [],
     tableState: null,
     seatId: null,
+    isSpectating: false,
     status: "idle",
     chatMessages: [],
     privateHoleCards: null,
@@ -200,6 +212,33 @@ export function createTableStore(): TableStore {
             },
           },
         });
+        return;
+      }
+      if (message.type === "SpectatorJoined" || message.type === "SpectatorLeft") {
+        const spectatorCount = message.spectatorCount as number | undefined;
+        if (state.tableState && spectatorCount !== undefined) {
+          const spectators = state.tableState.spectators ?? [];
+          if (message.type === "SpectatorJoined") {
+            const newSpectator: SpectatorView = {
+              userId: message.userId as string,
+              nickname: message.nickname as string | undefined,
+              status: "active",
+            };
+            setState({
+              tableState: {
+                ...state.tableState,
+                spectators: [...spectators.filter((s) => s.userId !== newSpectator.userId), newSpectator],
+              },
+            });
+          } else {
+            setState({
+              tableState: {
+                ...state.tableState,
+                spectators: spectators.filter((s) => s.userId !== message.userId),
+              },
+            });
+          }
+        }
       }
     });
   };
@@ -225,7 +264,14 @@ export function createTableStore(): TableStore {
         body: JSON.stringify({ seatId }),
       });
       const payload = await response.json();
-      setState({ seatId, chatMessages: [], chatError: undefined, privateHoleCards: null, privateHandId: null });
+      setState({
+        seatId,
+        isSpectating: false,
+        chatMessages: [],
+        chatError: undefined,
+        privateHoleCards: null,
+        privateHandId: null,
+      });
       connect(payload.wsUrl);
       const subscribe = () => {
         socket?.send(JSON.stringify({ type: "SubscribeTable", tableId }));
@@ -240,6 +286,49 @@ export function createTableStore(): TableStore {
         };
         socket.addEventListener("open", handleOpen);
       }
+    },
+    spectateTable: (tableId) => {
+      setState({
+        seatId: null,
+        isSpectating: true,
+        chatMessages: [],
+        chatError: undefined,
+        privateHoleCards: null,
+        privateHandId: null,
+      });
+      connect();
+      const subscribe = () => {
+        socket?.send(JSON.stringify({ type: "SubscribeTable", tableId }));
+        socket?.send(JSON.stringify({ type: "SubscribeChat", tableId }));
+      };
+      if (socket?.readyState === WebSocket.OPEN) {
+        subscribe();
+      } else if (socket) {
+        const handleOpen = () => {
+          subscribe();
+          socket?.removeEventListener("open", handleOpen);
+        };
+        socket.addEventListener("open", handleOpen);
+      }
+    },
+    leaveTable: () => {
+      const tableId = state.tableState?.tableId;
+      if (tableId && socket?.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: "UnsubscribeTable", tableId }));
+        socket.send(JSON.stringify({ type: "UnsubscribeChat", tableId }));
+        if (state.seatId !== null) {
+          socket.send(JSON.stringify({ type: "LeaveTable", tableId }));
+        }
+      }
+      setState({
+        tableState: null,
+        seatId: null,
+        isSpectating: false,
+        chatMessages: [],
+        chatError: undefined,
+        privateHoleCards: null,
+        privateHandId: null,
+      });
     },
     subscribeTable: (tableId) => {
       connect();

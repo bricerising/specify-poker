@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { HandStore } from "../handStore";
 import pool from "../pgClient";
 
@@ -7,6 +7,8 @@ vi.mock('../pgClient', () => ({
     query: vi.fn(),
   },
 }));
+
+const mockQuery = pool.query as Mock;
 
 describe('HandStore', () => {
   let handStore: HandStore;
@@ -31,7 +33,7 @@ describe('HandStore', () => {
       duration: 1000,
     };
 
-    (pool.query as unknown).mockResolvedValueOnce({ rows: [] });
+    mockQuery.mockResolvedValueOnce({ rows: [] });
 
     await handStore.saveHandRecord(record);
 
@@ -52,7 +54,7 @@ describe('HandStore', () => {
       completed_at: new Date(),
       duration: 100,
     };
-    (pool.query as unknown).mockResolvedValueOnce({ rows: [record] });
+    mockQuery.mockResolvedValueOnce({ rows: [record] });
 
     const result = await handStore.getHandRecord("hand-1");
 
@@ -61,8 +63,8 @@ describe('HandStore', () => {
   });
 
   it('should get hand history', async () => {
-    (pool.query as unknown).mockResolvedValueOnce({ rows: [{ count: "1" }] });
-    (pool.query as unknown).mockResolvedValueOnce({
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: "1" }] });
+    mockQuery.mockResolvedValueOnce({
       rows: [
         {
           hand_id: "h1",
@@ -87,8 +89,8 @@ describe('HandStore', () => {
   });
 
   it('should get hands for user', async () => {
-    (pool.query as unknown).mockResolvedValueOnce({ rows: [{ count: "1" }] });
-    (pool.query as unknown).mockResolvedValueOnce({
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: "1" }] });
+    mockQuery.mockResolvedValueOnce({
       rows: [
         {
           hand_id: "h1",

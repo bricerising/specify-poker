@@ -1,12 +1,18 @@
-import { Router } from "express";
+import { Router, json } from "express";
 import { register } from "prom-client";
 import { authMiddleware } from "./middleware/auth";
 import { httpRateLimitMiddleware } from "./middleware/rateLimit";
 import { setupProxy } from "./proxy";
 import { getRedisClient } from "../storage/redisClient";
+import tablesRouter from "./routes/tables";
+import profileRouter from "./routes/profile";
+import auditRouter from "./routes/audit";
 
 export function createRouter(): Router {
   const router = Router();
+
+  // Body parsing
+  router.use(json());
 
   // Metrics (Unauthenticated)
   router.get("/metrics", async (_req, res) => {
@@ -38,7 +44,12 @@ export function createRouter(): Router {
   // Rate Limiting
   router.use(httpRateLimitMiddleware);
 
-  // Proxy Routes
+  // HTTP-to-gRPC Routes (for gRPC-only backend services)
+  router.use("/api/tables", tablesRouter);
+  router.use("/api", profileRouter); // Handles /api/me, /api/friends, /api/profile/:userId
+  router.use("/api/audit", auditRouter);
+
+  // Proxy Routes (for services with HTTP endpoints like Balance)
   setupProxy(router as any);
 
   return router;

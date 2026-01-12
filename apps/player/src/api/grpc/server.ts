@@ -19,7 +19,7 @@ export async function startGrpcServer(port: number): Promise<void> {
     oneofs: true,
   });
 
-  const proto = grpc.loadPackageDefinition(packageDefinition) as {
+  const proto = grpc.loadPackageDefinition(packageDefinition) as unknown as {
     player: {
       PlayerService: { service: grpc.ServiceDefinition };
     };

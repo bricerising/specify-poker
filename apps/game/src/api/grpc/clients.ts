@@ -18,15 +18,16 @@ function loadProto(protoPath: string) {
   return grpc.loadPackageDefinition(packageDefinition);
 }
 
-const balanceProto = loadProto(BALANCE_PROTO_PATH) as unknown as Record<string, unknown>;
-const eventProto = loadProto(EVENT_PROTO_PATH) as unknown as Record<string, unknown>;
+/* eslint-disable @typescript-eslint/no-explicit-any */
+const balanceProto = loadProto(BALANCE_PROTO_PATH) as any;
+const eventProto = loadProto(EVENT_PROTO_PATH) as any;
 
 export const balanceClient = new balanceProto.balance.BalanceService(
   config.balanceServiceAddr,
   grpc.credentials.createInsecure()
-);
+) as any;
 
 export const eventClient = new eventProto.event.EventService(
   config.eventServiceAddr,
   grpc.credentials.createInsecure()
-);
+) as any;

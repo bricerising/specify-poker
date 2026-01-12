@@ -5,6 +5,7 @@ export interface Config {
   redisUrl: string | null;
   logLevel: string;
   otelExporterEndpoint: string;
+  deletionProcessorIntervalMs: number;
 }
 
 export function loadConfig(): Config {
@@ -15,6 +16,7 @@ export function loadConfig(): Config {
     redisUrl: process.env.REDIS_URL?.trim() || null,
     logLevel: process.env.LOG_LEVEL ?? "info",
     otelExporterEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "http://localhost:4317",
+    deletionProcessorIntervalMs: parseInt(process.env.DELETION_PROCESSOR_INTERVAL_MS ?? "3600000", 10), // Default: 1 hour
   };
 }
 

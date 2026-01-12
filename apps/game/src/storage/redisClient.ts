@@ -13,4 +13,10 @@ export const connectRedis = async () => {
   }
 };
 
+export const closeRedisClient = async () => {
+  if (client.isOpen) {
+    await client.quit();
+  }
+};
+
 export default client;

@@ -5,9 +5,11 @@ import { ActionBar } from "../components/ActionBar";
 import { ChatPanel } from "../components/ChatPanel";
 import { ModerationMenu } from "../components/ModerationMenu";
 import { PokerArt } from "../components/PokerArt";
+import { Timer } from "../components/Timer";
 import { deriveLegalActions } from "../state/deriveLegalActions";
 import { TableStore, tableStore } from "../state/tableStore";
 import { fetchProfile, UserProfile } from "../services/profileApi";
+import { recordAction } from "../observability/otel";
 
 interface TablePageProps {
   store?: TableStore;
@@ -16,13 +18,8 @@ interface TablePageProps {
 export function TablePage({ store = tableStore }: TablePageProps) {
   const [state, setState] = useState(store.getState());
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [now, setNow] = useState(Date.now());
 
   useEffect(() => store.subscribe(setState), [store]);
-  useEffect(() => {
-    const interval = window.setInterval(() => setNow(Date.now()), 500);
-    return () => window.clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     fetchProfile()
@@ -68,13 +65,12 @@ export function TablePage({ store = tableStore }: TablePageProps) {
   const pot = hand?.pots.reduce((sum, entry) => sum + entry.amount, 0) ?? 0;
   const communityCards = hand?.communityCards ?? [];
   const privateCards = state.privateHoleCards ?? [];
-  const deadline = hand?.actionTimerDeadline ? Date.parse(hand.actionTimerDeadline) : null;
-  const remainingMs = deadline ? Math.max(0, deadline - now) : null;
-  const remainingSeconds = remainingMs !== null ? Math.ceil(remainingMs / 1000) : null;
-  const minutes = remainingSeconds !== null ? Math.floor(remainingSeconds / 60) : null;
-  const seconds = remainingSeconds !== null ? remainingSeconds % 60 : null;
-  const countdown =
-    minutes !== null && seconds !== null ? `${minutes}:${String(seconds).padStart(2, "0")}` : null;
+  const spectatorCount = state.tableState.spectators?.length ?? 0;
+
+  const handleLeaveTable = () => {
+    recordAction("leave_table", { "poker.table_id": state.tableState?.tableId ?? "" });
+    store.leaveTable();
+  };
 
   const renderCards = (cards: string[], fallback: string) => {
     if (cards.length === 0) {
@@ -96,7 +92,13 @@ export function TablePage({ store = tableStore }: TablePageProps) {
         <div>
           <h2>{state.tableState.name}</h2>
           <p>Track the hand flow and take your action when it is your turn.</p>
-          <div className="meta-line">Table ID: {state.tableState.tableId}</div>
+          <div className="meta-line">
+            Table ID: {state.tableState.tableId}
+            {spectatorCount > 0 ? ` | ${spectatorCount} spectator${spectatorCount !== 1 ? "s" : ""}` : ""}
+          </div>
+          <button type="button" className="btn btn-ghost" onClick={handleLeaveTable}>
+            Leave Table
+          </button>
         </div>
         <PokerArt variant="table" />
       </div>
@@ -116,12 +118,7 @@ export function TablePage({ store = tableStore }: TablePageProps) {
               {hand?.currentTurnSeat !== undefined ? `Seat ${hand.currentTurnSeat + 1}` : "-"}
             </strong>
           </div>
-          {countdown ? (
-            <div className="timer-pill">
-              <span>Action Timer</span>
-              <strong>{remainingSeconds === 0 ? "Acting now" : countdown}</strong>
-            </div>
-          ) : null}
+          <Timer deadlineTs={hand?.actionTimerDeadline ?? null} />
           <div>
             <div className="meta-line">Board</div>
             <div className="card-row">{renderCards(communityCards, "Waiting")}</div>

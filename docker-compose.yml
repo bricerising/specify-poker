@@ -13,33 +13,6 @@ services:
       timeout: 2s
       retries: 3
 
-  api:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-    ports:
-      - "4000:4000"
-    environment:
-      PORT: "4000"
-      KEYCLOAK_URL: "http://keycloak:8080"
-      KEYCLOAK_REALM: "poker-local"
-      REDIS_URL: "redis://redis:6379"
-      UI_BASE_URL: "http://localhost:3000"
-      VAPID_PUBLIC_KEY: "${VAPID_PUBLIC_KEY}"
-      VAPID_PRIVATE_KEY: "${VAPID_PRIVATE_KEY}"
-      VAPID_SUBJECT: "${VAPID_SUBJECT}"
-      BALANCE_SERVICE_URL: "balance:50051"
-    depends_on:
-      - keycloak
-      - otel-collector
-      - redis
-      - balance
-    healthcheck:
-      test: ["CMD-SHELL", "true"]
-      interval: 10s
-      timeout: 2s
-      retries: 3
-
   balance:
     build:
       context: .
@@ -247,6 +220,75 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
     depends_on:
       - redis
+      - otel-collector
+    healthcheck:
+      test: ["CMD-SHELL", "true"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
+
+  player-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: player
+      POSTGRES_USER: player
+      POSTGRES_PASSWORD: player
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U player"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
+
+  player:
+    build:
+      context: .
+      dockerfile: apps/player/Dockerfile
+    ports:
+      - "50052:50052"
+      - "9103:9103"
+    environment:
+      GRPC_PORT: "50052"
+      METRICS_PORT: "9103"
+      DATABASE_URL: "postgresql://player:player@player-db:5432/player"
+      REDIS_URL: "redis://redis:6379"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+    depends_on:
+      - player-db
+      - redis
+      - otel-collector
+    healthcheck:
+      test: ["CMD-SHELL", "true"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
+
+  gateway:
+    build:
+      context: .
+      dockerfile: apps/gateway/Dockerfile
+    ports:
+      - "4000:4000"
+      - "9104:9104"
+    environment:
+      PORT: "4000"
+      METRICS_PORT: "9104"
+      REDIS_URL: "redis://redis:6379"
+      KEYCLOAK_URL: "http://keycloak:8080"
+      KEYCLOAK_REALM: "poker-local"
+      BALANCE_SERVICE_ADDR: "balance:50051"
+      GAME_SERVICE_ADDR: "game:50053"
+      PLAYER_SERVICE_ADDR: "player:50052"
+      EVENT_SERVICE_ADDR: "event:50054"
+      NOTIFY_SERVICE_ADDR: "notify:50055"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+    depends_on:
+      - redis
+      - keycloak
+      - balance
+      - game
+      - player
+      - event
+      - notify
       - otel-collector
     healthcheck:
       test: ["CMD-SHELL", "true"]

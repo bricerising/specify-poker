@@ -17,6 +17,7 @@ import { eventQueryService } from "../../services/eventQueryService";
 import { handRecordService } from "../../services/handRecordService";
 import { replayService } from "../../services/replayService";
 import { streamService } from "../../services/streamService";
+import { EventType } from "../../domain/types";
 import logger from "../../observability/logger";
 
 export function createHandlers() {
@@ -28,7 +29,7 @@ export function createHandlers() {
       try {
         const { type, tableId, handId, userId, seatId, payload, idempotencyKey } = call.request;
         const event = await eventIngestionService.ingestEvent({
-          type,
+          type: type as EventType,
           tableId,
           handId,
           userId,
@@ -51,7 +52,7 @@ export function createHandlers() {
     ) => {
       try {
         const events = call.request.events.map((req: PublishEventRequest) => ({
-          type: req.type,
+          type: req.type as EventType,
           tableId: req.tableId,
           handId: req.handId,
           userId: req.userId,
@@ -79,7 +80,7 @@ export function createHandlers() {
           tableId,
           handId,
           userId,
-          types,
+          types: types as EventType[] | undefined,
           startTime: startTime ? new Date(startTime.seconds * 1000) : undefined,
           endTime: endTime ? new Date(endTime.seconds * 1000) : undefined,
           limit: limit || 100,

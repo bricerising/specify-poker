@@ -42,7 +42,8 @@ export class PushSenderService {
           recordPushDelivery("success");
           return { ok: true };
         } catch (error: unknown) {
-          if (error.statusCode === 404 || error.statusCode === 410) {
+          const statusCode = (error as { statusCode?: number }).statusCode;
+          if (statusCode === 404 || statusCode === 410) {
             logger.info({ userId, endpoint: sub.endpoint }, "Removing expired subscription");
             await this.subscriptionStore.deleteSubscription(userId, sub.endpoint);
             await this.subscriptionStore.incrementStat('cleanup');

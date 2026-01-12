@@ -3,7 +3,7 @@ import * as profileService from "../../services/profileService";
 import * as statisticsService from "../../services/statisticsService";
 import * as friendsService from "../../services/friendsService";
 import { recordFriendMutation, recordGrpcRequest, recordProfileLookup, recordProfileUpdate, recordStatisticsUpdate } from "../../observability/metrics";
-import { Profile, Statistics, FriendProfile } from "../../domain/types";
+import { Profile, Statistics, FriendProfile, ThemePreference } from "../../domain/types";
 import logger from "../../observability/logger";
 
 interface GetProfileRequest {
@@ -23,7 +23,7 @@ interface UpdateProfileRequest {
     soundEnabled?: boolean;
     chatEnabled?: boolean;
     showHandStrength?: boolean;
-    theme?: string;
+    theme?: ThemePreference;
   };
 }
 

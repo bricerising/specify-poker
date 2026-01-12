@@ -2,6 +2,7 @@ import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
 import * as path from "path";
 import { createHandlers } from "./handlers";
+import logger from "../../observability/logger";
 
 const PROTO_PATH = path.resolve(__dirname, "../../../proto/game.proto");
 
@@ -32,7 +33,7 @@ export async function startGrpcServer(port: number): Promise<void> {
         reject(error);
         return;
       }
-      console.log(`Game gRPC server listening on port ${boundPort}`);
+      logger.info({ port: boundPort }, "Game gRPC server listening");
       resolve();
     });
   });

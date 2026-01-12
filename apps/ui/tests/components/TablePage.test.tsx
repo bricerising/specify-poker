@@ -16,9 +16,10 @@ const mockStore = {
         bigBlind: 10,
         maxPlayers: 2,
         startingStack: 100,
-        bettingStructure: "NoLimit",
+        bettingStructure: "NoLimit" as const,
       },
       seats: [{ seatId: 0, userId: "u1", stack: 95, status: "active" }],
+      spectators: [],
       status: "in_hand",
       hand: {
         handId: "hand-1",
@@ -37,12 +38,18 @@ const mockStore = {
       version: 1,
     },
     seatId: 0,
-    status: "connected",
+    isSpectating: false,
+    status: "connected" as const,
     chatMessages: [],
+    privateHoleCards: null,
+    privateHandId: null,
   }),
   subscribe: () => () => {},
   fetchTables: async () => {},
+  subscribeLobby: () => {},
   joinSeat: async () => {},
+  spectateTable: () => {},
+  leaveTable: () => {},
   subscribeTable: () => {},
   sendAction: () => {},
   subscribeChat: () => {},
@@ -53,6 +60,8 @@ describe("TablePage", () => {
   it("renders table snapshot", () => {
     const html = renderToString(<TablePage store={mockStore} />);
     expect(html).toContain("Test Table");
-    expect(html).toContain("Board: AS KS QS");
+    expect(html).toContain("AS");
+    expect(html).toContain("KS");
+    expect(html).toContain("QS");
   });
 });

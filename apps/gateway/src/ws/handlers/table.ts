@@ -3,7 +3,7 @@ import { gameClient } from "../../grpc/clients";
 import { WsPubSubMessage } from "../pubsub";
 import { parseActionType, parseSeatId, parseTableId, checkWsRateLimit } from "../validators";
 import { subscribeToChannel, unsubscribeFromChannel, unsubscribeAll, getSubscribers } from "../subscriptions";
-import { sendToLocal } from "../localRegistry";
+import { sendToLocal, getLocalConnectionMeta } from "../localRegistry";
 import logger from "../../observability/logger";
 
 export async function handleTablePubSubEvent(message: WsPubSubMessage) {
@@ -48,7 +48,9 @@ async function handleUnsubscribe(connectionId: string, tableId: string) {
 }
 
 async function handleAction(connectionId: string, userId: string, payload: any) {
-    if (!(await checkWsRateLimit(connectionId, "action")).ok) {
+    const meta = getLocalConnectionMeta(connectionId);
+    const ip = meta?.ip ?? "unknown";
+    if (!(await checkWsRateLimit(userId, ip, "action")).ok) {
         sendToLocal(connectionId, { type: "ActionResult", accepted: false, reason: "rate_limited" });
         return;
     }

@@ -4,6 +4,18 @@ import { Profile, UserPreferences } from "../domain/types";
 
 const profileColumns = `user_id, nickname, avatar_url, preferences, last_login_at, referred_by, created_at, updated_at, deleted_at`;
 
+interface ProfileRow {
+  user_id: string;
+  nickname: string;
+  avatar_url: string | null;
+  preferences: unknown;
+  last_login_at: Date | null;
+  referred_by: string | null;
+  created_at: Date;
+  updated_at: Date;
+  deleted_at: Date | null;
+}
+
 function mapPreferences(value: unknown): UserPreferences {
   if (!value || typeof value !== "object") {
     return {
@@ -22,17 +34,7 @@ function mapPreferences(value: unknown): UserPreferences {
   };
 }
 
-function mapProfile(row: {
-  user_id: string;
-  nickname: string;
-  avatar_url: string | null;
-  preferences: unknown;
-  last_login_at: Date | null;
-  referred_by: string | null;
-  created_at: Date;
-  updated_at: Date;
-  deleted_at: Date | null;
-}): Profile {
+function mapProfile(row: ProfileRow): Profile {
   return {
     userId: row.user_id,
     nickname: row.nickname,
@@ -48,17 +50,7 @@ function mapProfile(row: {
 
 export async function findById(userId: string, includeDeleted = false): Promise<Profile | null> {
   const condition = includeDeleted ? "" : "AND deleted_at IS NULL";
-  const result = await query<{ 
-    user_id: string;
-    nickname: string;
-    avatar_url: string | null;
-    preferences: unknown;
-    last_login_at: Date | null;
-    referred_by: string | null;
-    created_at: Date;
-    updated_at: Date;
-    deleted_at: Date | null;
-  }>(
+  const result = await query<ProfileRow>(
     `SELECT ${profileColumns} FROM profiles WHERE user_id = $1 ${condition}`,
     [userId]
   );
@@ -74,17 +66,7 @@ export async function findByIds(userIds: string[], includeDeleted = false): Prom
     return [];
   }
   const condition = includeDeleted ? "" : "AND deleted_at IS NULL";
-  const result = await query<{
-    user_id: string;
-    nickname: string;
-    avatar_url: string | null;
-    preferences: unknown;
-    last_login_at: Date | null;
-    referred_by: string | null;
-    created_at: Date;
-    updated_at: Date;
-    deleted_at: Date | null;
-  }>(
+  const result = await query<ProfileRow>(
     `SELECT ${profileColumns} FROM profiles WHERE user_id = ANY($1::varchar[]) ${condition}`,
     [userIds]
   );
@@ -93,17 +75,7 @@ export async function findByIds(userIds: string[], includeDeleted = false): Prom
 }
 
 export async function findByNickname(nickname: string): Promise<Profile | null> {
-  const result = await query<{
-    user_id: string;
-    nickname: string;
-    avatar_url: string | null;
-    preferences: unknown;
-    last_login_at: Date | null;
-    referred_by: string | null;
-    created_at: Date;
-    updated_at: Date;
-    deleted_at: Date | null;
-  }>(
+  const result = await query<ProfileRow>(
     `SELECT ${profileColumns} FROM profiles WHERE nickname = $1 AND deleted_at IS NULL LIMIT 1`,
     [nickname]
   );
@@ -115,30 +87,28 @@ export async function findByNickname(nickname: string): Promise<Profile | null> 
 }
 
 export async function create(profile: Profile, client?: PoolClient): Promise<Profile> {
-  const executor = client ?? { query: (text: string, params?: unknown[]) => query(text, params) };
-  const result = await executor.query(
-    `INSERT INTO profiles (user_id, nickname, avatar_url, preferences, last_login_at, referred_by, created_at, updated_at, deleted_at)
+  const sql = `INSERT INTO profiles (user_id, nickname, avatar_url, preferences, last_login_at, referred_by, created_at, updated_at, deleted_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-     RETURNING ${profileColumns}`,
-    [
-      profile.userId,
-      profile.nickname,
-      profile.avatarUrl,
-      profile.preferences,
-      profile.lastLoginAt ? new Date(profile.lastLoginAt) : null,
-      profile.referredBy,
-      new Date(profile.createdAt),
-      new Date(profile.updatedAt),
-      profile.deletedAt ? new Date(profile.deletedAt) : null,
-    ]
-  );
-  return mapProfile(result.rows[0]);
+     RETURNING ${profileColumns}`;
+  const params = [
+    profile.userId,
+    profile.nickname,
+    profile.avatarUrl,
+    profile.preferences,
+    profile.lastLoginAt ? new Date(profile.lastLoginAt) : null,
+    profile.referredBy,
+    new Date(profile.createdAt),
+    new Date(profile.updatedAt),
+    profile.deletedAt ? new Date(profile.deletedAt) : null,
+  ];
+  const result = client
+    ? await client.query(sql, params)
+    : await query<ProfileRow>(sql, params);
+  return mapProfile(result.rows[0] as ProfileRow);
 }
 
 export async function update(profile: Profile, client?: PoolClient): Promise<Profile> {
-  const executor = client ?? { query: (text: string, params?: unknown[]) => query(text, params) };
-  const result = await executor.query(
-    `UPDATE profiles
+  const sql = `UPDATE profiles
      SET nickname = $2,
          avatar_url = $3,
          preferences = $4,
@@ -147,23 +117,25 @@ export async function update(profile: Profile, client?: PoolClient): Promise<Pro
          updated_at = $7,
          deleted_at = $8
      WHERE user_id = $1
-     RETURNING ${profileColumns}`,
-    [
-      profile.userId,
-      profile.nickname,
-      profile.avatarUrl,
-      profile.preferences,
-      profile.lastLoginAt ? new Date(profile.lastLoginAt) : null,
-      profile.referredBy,
-      new Date(profile.updatedAt),
-      profile.deletedAt ? new Date(profile.deletedAt) : null,
-    ]
-  );
-  return mapProfile(result.rows[0]);
+     RETURNING ${profileColumns}`;
+  const params = [
+    profile.userId,
+    profile.nickname,
+    profile.avatarUrl,
+    profile.preferences,
+    profile.lastLoginAt ? new Date(profile.lastLoginAt) : null,
+    profile.referredBy,
+    new Date(profile.updatedAt),
+    profile.deletedAt ? new Date(profile.deletedAt) : null,
+  ];
+  const result = client
+    ? await client.query(sql, params)
+    : await query<ProfileRow>(sql, params);
+  return mapProfile(result.rows[0] as ProfileRow);
 }
 
 export async function upsert(profile: Profile): Promise<Profile> {
-  const result = await query(
+  const result = await query<ProfileRow>(
     `INSERT INTO profiles (user_id, nickname, avatar_url, preferences, last_login_at, referred_by, created_at, updated_at, deleted_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (user_id)

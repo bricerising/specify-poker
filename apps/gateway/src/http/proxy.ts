@@ -1,5 +1,6 @@
 import { Express, Request, Response } from "express";
 import httpProxy from "http-proxy";
+import { ServerResponse } from "http";
 import { getConfig } from "../config";
 import logger from "../observability/logger";
 
@@ -7,8 +8,9 @@ const proxy = httpProxy.createProxyServer({});
 
 proxy.on("error", (err, req, res) => {
   logger.error({ err, url: req.url }, "Proxy error");
-  if (res instanceof Response) {
-    res.status(502).json({ error: "Proxy error" });
+  if (res instanceof ServerResponse && !res.headersSent) {
+    res.writeHead(502, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Proxy error" }));
   }
 });
 
@@ -37,16 +39,9 @@ export function setupProxy(app: Express) {
     });
   };
 
-  // Based on the spec:
-  // /api/tables/* -> Game Service
-  // /api/audit/* -> Event Service
-  // /api/profile, /api/me, /api/friends -> Player Service
-  // /api/accounts/* -> Balance Service
+  // Only proxy to services that expose HTTP endpoints
+  // Balance Service has HTTP API at its configured port
+  // Game, Player, Event services are gRPC-only and handled by /http/routes/*
 
-  forward("/api/tables", config.gameServiceUrl);
-  forward("/api/audit", config.eventServiceUrl);
-  forward("/api/profile", config.playerServiceUrl);
-  forward("/api/me", config.playerServiceUrl);
-  forward("/api/friends", config.playerServiceUrl);
   forward("/api/accounts", config.balanceServiceUrl);
 }

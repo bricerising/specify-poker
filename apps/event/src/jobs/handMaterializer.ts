@@ -76,7 +76,7 @@ export class HandMaterializer {
       if (events.length === 0) return;
 
       // 2. Aggregate events into a HandRecord
-      const record = this.aggregateEvents(handId, tableId, events as Record<string, unknown>[]);
+      const record = this.aggregateEvents(handId, tableId, events);
 
       // 3. Save HandRecord
       await handStore.saveHandRecord(record);

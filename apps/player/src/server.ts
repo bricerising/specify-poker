@@ -6,6 +6,7 @@ startObservability();
 
 import { startGrpcServer, stopGrpcServer } from "./api/grpc/server";
 import { EventConsumer } from "./services/eventConsumer";
+import { startDeletionProcessor, stopDeletionProcessor } from "./jobs/deletionProcessor";
 import { closeRedisClient } from "./storage/redisClient";
 import { getConfig } from "./config";
 import { startMetricsServer } from "./observability/metrics";
@@ -26,6 +27,9 @@ export async function main() {
     eventConsumerInstance = consumer;
     await consumer.start();
 
+    // Start background jobs
+    startDeletionProcessor();
+
     logger.info({ port: config.grpcPort }, "Player Service is running");
   } catch (error: unknown) {
     logger.error({ err: error }, "Failed to start Player Service");
@@ -36,6 +40,7 @@ export async function main() {
 export async function shutdown() {
   logger.info("Shutting down Player Service");
   stopGrpcServer();
+  stopDeletionProcessor();
   if (eventConsumerInstance) {
     eventConsumerInstance.stop();
     eventConsumerInstance = null;

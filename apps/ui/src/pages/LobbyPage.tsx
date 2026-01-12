@@ -77,6 +77,10 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
     }
   };
 
+  const spectateTable = (tableId: string) => {
+    store.spectateTable(tableId);
+  };
+
   const tableRows = tables.map((table, index) => {
     const occupied = new Set(table.occupiedSeatIds ?? []);
     const seatButtons = Array.from({ length: table.config.maxPlayers }, (_, index) => {
@@ -113,10 +117,20 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
         <div className="table-meta">
           <div>
             Seats: {table.seatsTaken}/{table.config.maxPlayers}
+            {table.spectatorCount ? ` | ${table.spectatorCount} watching` : ""}
           </div>
           <div>Starting Stack: {table.config.startingStack}</div>
         </div>
-        <div className="seat-actions">{seatButtons}</div>
+        <div className="seat-actions">
+          {seatButtons}
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => spectateTable(table.tableId)}
+          >
+            Watch
+          </button>
+        </div>
       </div>
     );
   });

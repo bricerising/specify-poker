@@ -1,21 +1,23 @@
 import { trace } from "@opentelemetry/api";
 
-const TOKEN_KEY = "poker.auth.token";
 const DEFAULT_KEYCLOAK_URL = "http://localhost:8080";
 const DEFAULT_REALM = "poker-local";
 const DEFAULT_CLIENT_ID = "poker-ui";
 const PKCE_STORAGE_KEY = "poker.auth.pkce_verifier";
 
+// Tokens stored in memory for security - never in localStorage
+let accessToken: string | null = null;
+
 export function setToken(token: string) {
-  localStorage.setItem(TOKEN_KEY, token);
+  accessToken = token;
 }
 
 export function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
+  return accessToken;
 }
 
 export function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
+  accessToken = null;
 }
 
 export function isAuthenticated() {

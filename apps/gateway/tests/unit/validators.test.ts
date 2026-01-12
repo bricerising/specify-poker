@@ -18,8 +18,8 @@ describe("Validators", () => {
   });
 
   it("should parse actionType", () => {
-    expect(parseActionType("Fold")).toBe("Fold");
-    expect(parseActionType("Check")).toBe("Check");
+    expect(parseActionType("Fold")).toBe("FOLD");
+    expect(parseActionType('Check')).toBe('CHECK');
     expect(parseActionType("Invalid")).toBe(null);
   });
 

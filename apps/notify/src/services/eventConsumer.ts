@@ -22,7 +22,7 @@ export class EventConsumer {
     try {
       await client.xGroupCreate(this.streamKey, this.groupName, "0", { MKSTREAM: true });
     } catch (err: unknown) {
-      if (!err.message.includes("BUSYGROUP")) {
+      if (!(err instanceof Error) || !err.message.includes("BUSYGROUP")) {
         logger.error({ err }, "Error creating consumer group");
       }
     }
