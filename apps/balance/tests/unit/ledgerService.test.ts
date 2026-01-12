@@ -3,6 +3,7 @@ import {
   queryLedger,
   verifyAccountLedger,
   getAccountChecksum,
+  verifyAllLedgers,
 } from "../../src/services/ledgerService";
 import { ensureAccount, creditBalance, debitBalance } from "../../src/services/accountService";
 import { resetAccounts } from "../../src/storage/accountStore";
@@ -205,6 +206,45 @@ describe("ledgerService", () => {
 
       expect(result.entries[0].metadata.tableId).toBe("table-123");
       expect(result.entries[0].metadata.seatId).toBe(0);
+    });
+  });
+
+  describe("verifyAllLedgers", () => {
+    it("verifies multiple accounts and returns all valid", async () => {
+      // Create multiple accounts with transactions
+      await ensureAccount("batch-1", 0);
+      await ensureAccount("batch-2", 0);
+      await ensureAccount("batch-3", 0);
+
+      await creditBalance("batch-1", 1000, "DEPOSIT", "batch-tx-1");
+      await creditBalance("batch-2", 2000, "DEPOSIT", "batch-tx-2");
+      await creditBalance("batch-3", 3000, "DEPOSIT", "batch-tx-3");
+
+      const result = await verifyAllLedgers(["batch-1", "batch-2", "batch-3"]);
+
+      expect(result.valid).toBe(true);
+      expect(Object.keys(result.results)).toHaveLength(3);
+      expect(result.results["batch-1"].valid).toBe(true);
+      expect(result.results["batch-2"].valid).toBe(true);
+      expect(result.results["batch-3"].valid).toBe(true);
+    });
+
+    it("returns valid for empty account list", async () => {
+      const result = await verifyAllLedgers([]);
+
+      expect(result.valid).toBe(true);
+      expect(Object.keys(result.results)).toHaveLength(0);
+    });
+
+    it("handles accounts with empty ledgers", async () => {
+      await ensureAccount("empty-1", 100);
+      await ensureAccount("empty-2", 200);
+
+      const result = await verifyAllLedgers(["empty-1", "empty-2"]);
+
+      expect(result.valid).toBe(true);
+      expect(result.results["empty-1"].entriesChecked).toBe(0);
+      expect(result.results["empty-2"].entriesChecked).toBe(0);
     });
   });
 });

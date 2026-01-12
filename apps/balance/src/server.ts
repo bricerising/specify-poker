@@ -77,14 +77,17 @@ async function shutdown() {
   process.exit(0);
 }
 
-// Handle shutdown signals
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+// Only start if this is the main module
+if (require.main === module) {
+  // Handle shutdown signals
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
 
-// Start the service
-start().catch((error) => {
-  console.error("Failed to start balance service:", error);
-  process.exit(1);
-});
+  // Start the service
+  start().catch((error) => {
+    console.error("Failed to start balance service:", error);
+    process.exit(1);
+  });
+}
 
-export { app };
+export { app, start, shutdown };

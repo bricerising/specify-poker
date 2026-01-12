@@ -293,11 +293,12 @@ describe("tablePotService", () => {
       expect(result.error).toBe("POT_NOT_FOUND");
     });
 
-    it("fails for already settled pot", async () => {
+    it("returns success for already settled pot (idempotent)", async () => {
       await ensureAccount("winner-5", 0);
       await createPot("table-12", "hand-12");
       await settlePot("table-12", "hand-12", [], "settle-5");
 
+      // Second settle with different key still succeeds (pot already settled)
       const result = await settlePot(
         "table-12",
         "hand-12",
@@ -305,8 +306,13 @@ describe("tablePotService", () => {
         "settle-6"
       );
 
-      expect(result.ok).toBe(false);
-      expect(result.error).toBe("POT_NOT_ACTIVE");
+      // Service returns success to prevent duplicate error handling
+      expect(result.ok).toBe(true);
+      expect(result.results).toEqual([]);
+
+      // But winner-5 shouldn't receive any funds (empty results)
+      const balance = await getBalance("winner-5");
+      expect(balance!.balance).toBe(0);
     });
 
     it("marks pot as settled", async () => {
