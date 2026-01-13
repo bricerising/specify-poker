@@ -33,7 +33,7 @@ export function createRouter(): Router {
     try {
       await redis.ping();
       return res.json({ status: "ready" });
-    } catch (_err) {
+    } catch {
       return res.status(503).json({ status: "degraded", reason: "redis_unreachable" });
     }
   });

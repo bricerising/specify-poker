@@ -1,0 +1,94 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Request, Response } from "express";
+import { IncomingMessage, ServerResponse } from "http";
+import { Socket } from "net";
+
+const proxyState = vi.hoisted(() => {
+  const handlers: Record<string, Function> = {};
+  const proxyWeb = vi.fn();
+  const proxyServer = {
+    on: vi.fn((event: string, handler: Function) => {
+      handlers[event] = handler;
+    }),
+    web: proxyWeb,
+  };
+
+  return { handlers, proxyWeb, proxyServer };
+});
+
+vi.mock("http-proxy", () => ({
+  default: {
+    createProxyServer: vi.fn(() => proxyState.proxyServer),
+  },
+}));
+
+vi.mock("../../../src/config", () => ({
+  getConfig: () => ({
+    balanceServiceUrl: "balance:3002",
+  }),
+}));
+
+vi.mock("../../../src/observability/logger", () => ({
+  default: {
+    error: vi.fn(),
+  },
+}));
+
+import { setupProxy } from "../../../src/http/proxy";
+
+describe("HTTP proxy", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("forwards balance routes to configured target", () => {
+    const routes: Array<{ path: string; handler: Function }> = [];
+    const app = {
+      all: (path: string, handler: Function) => {
+        routes.push({ path, handler });
+      },
+    } as unknown as { all: (path: string, handler: Function) => void };
+
+    setupProxy(app as unknown as { all: (path: string, handler: Function) => void });
+
+    const handler = routes.find((route) => route.path === "/api/accounts*");
+    expect(handler).toBeDefined();
+
+    const req = {} as Request;
+    const res = {} as Response;
+    handler?.handler(req, res);
+
+    expect(proxyState.proxyWeb).toHaveBeenCalledWith(
+      req,
+      res,
+      expect.objectContaining({ target: "http://balance:3002", changeOrigin: true })
+    );
+  });
+
+  it("injects auth headers on proxy requests", () => {
+    const proxyReq = { setHeader: vi.fn() };
+    const req = { auth: { userId: "user-1", claims: { role: "player" } } } as Request;
+
+    proxyState.handlers.proxyReq(proxyReq, req);
+
+    expect(proxyReq.setHeader).toHaveBeenCalledWith("x-user-id", "user-1");
+    expect(proxyReq.setHeader).toHaveBeenCalledWith("x-gateway-user-id", "user-1");
+    expect(proxyReq.setHeader).toHaveBeenCalledWith(
+      "x-user-claims",
+      JSON.stringify({ role: "player" })
+    );
+  });
+
+  it("returns 502 on proxy errors", () => {
+    const req = new IncomingMessage(new Socket()) as Request;
+    req.url = "/api/accounts";
+    const res = new ServerResponse(req);
+    vi.spyOn(res, "writeHead");
+    vi.spyOn(res, "end");
+
+    proxyState.handlers.error(new Error("proxy"), req, res);
+
+    expect(res.writeHead).toHaveBeenCalledWith(502, { "Content-Type": "application/json" });
+    expect(res.end).toHaveBeenCalledWith(JSON.stringify({ error: "Proxy error" }));
+  });
+});

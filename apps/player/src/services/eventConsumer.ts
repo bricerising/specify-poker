@@ -7,6 +7,24 @@ export class EventConsumer {
   private streamKey: string = "events:all";
   private groupName: string = "player-service";
   private consumerName: string = `consumer-${process.pid}`;
+  private handlers: Record<string, (data: Record<string, unknown>) => Promise<void>> = {
+    HAND_STARTED: async (data) => {
+      const participants = Array.isArray(data.participants) ? data.participants : [];
+      for (const userId of participants) {
+        if (typeof userId === "string" && userId) {
+          await incrementHandsPlayed(userId);
+        }
+      }
+    },
+    HAND_ENDED: async (data) => {
+      const winnerUserIds = Array.isArray(data.winnerUserIds) ? data.winnerUserIds : [];
+      for (const userId of winnerUserIds) {
+        if (typeof userId === "string" && userId) {
+          await incrementWins(userId);
+        }
+      }
+    },
+  };
 
   async start(): Promise<void> {
     const client = await getRedisClient();
@@ -63,26 +81,13 @@ export class EventConsumer {
   private async handleEvent(event: { type?: string; payload?: unknown }): Promise<void> {
     try {
       const { type, payload } = event;
-      if (!type) {
+      const handler = type ? this.handlers[type] : undefined;
+      if (!handler) {
         return;
       }
       const data = this.decodePayload(payload);
 
-      if (type === "HAND_STARTED") {
-        const participants = Array.isArray(data.participants) ? data.participants : [];
-        for (const userId of participants) {
-          if (typeof userId === "string" && userId) {
-            await incrementHandsPlayed(userId);
-          }
-        }
-      } else if (type === "HAND_ENDED") {
-        const winnerUserIds = Array.isArray(data.winnerUserIds) ? data.winnerUserIds : [];
-        for (const userId of winnerUserIds) {
-          if (typeof userId === "string" && userId) {
-            await incrementWins(userId);
-          }
-        }
-      }
+      await handler(data);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "unknown";
       logger.error({ message }, "Error handling event");

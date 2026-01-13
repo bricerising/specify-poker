@@ -108,6 +108,20 @@ export class TableService {
     };
   }
 
+  private async loadTableAndState(tableId: string) {
+    const table = await tableStore.get(tableId);
+    const state = await tableStateStore.get(tableId);
+    if (!table || !state) {
+      return null;
+    }
+    return { table, state };
+  }
+
+  private async publishTableAndLobby(table: Table, state: TableState) {
+    await this.publishTableState(table, state);
+    await this.publishLobbyUpdate(await this.listTableSummaries());
+  }
+
   async createTable(name: string, ownerId: string, configInput: TableConfig): Promise<Table> {
     const tableId = uuidv4();
     const createdAt = this.now();
@@ -207,9 +221,9 @@ export class TableService {
   }
 
   async joinSeat(tableId: string, userId: string, seatId: number, buyInAmount: number) {
-    const table = await tableStore.get(tableId);
-    const state = await tableStateStore.get(tableId);
-    if (!table || !state) return { ok: false, error: "TABLE_NOT_FOUND" };
+    const loaded = await this.loadTableAndState(tableId);
+    if (!loaded) return { ok: false, error: "TABLE_NOT_FOUND" };
+    const { table, state } = loaded;
 
     const startingStack = toNumber(table.config.startingStack, 200);
     const normalizedBuyIn = buyInAmount > 0 ? buyInAmount : startingStack;
@@ -225,8 +239,7 @@ export class TableService {
     state.version += 1;
     state.updatedAt = this.now();
     await tableStateStore.save(state);
-    await this.publishTableState(table, state);
-    await this.publishLobbyUpdate(await this.listTableSummaries());
+    await this.publishTableAndLobby(table, state);
 
     try {
       const reservation = await new Promise<BalanceReservation>((resolve, reject) => {
@@ -277,8 +290,7 @@ export class TableService {
       finalState.updatedAt = this.now();
 
       await tableStateStore.save(finalState);
-      await this.publishTableState(table, finalState);
-      await this.publishLobbyUpdate(await this.listTableSummaries());
+      await this.publishTableAndLobby(table, finalState);
 
       await this.emitGameEvent(tableId, undefined, userId, seatId, "PLAYER_JOINED", { stack: finalBuyIn });
 
@@ -311,11 +323,9 @@ export class TableService {
     await tableStateStore.save(state);
     await this.emitGameEvent(tableId, undefined, userId, seatId, "BALANCE_UNAVAILABLE", { action: "BUY_IN" });
     const table = await tableStore.get(tableId);
-    if (table) {
-      await this.publishTableState(table, state);
-      await this.publishLobbyUpdate(await this.listTableSummaries());
-      await this.checkStartHand(table, state);
-    }
+    if (!table) return;
+    await this.publishTableAndLobby(table, state);
+    await this.checkStartHand(table, state);
   }
 
   private async rollbackSeat(tableId: string, seatId: number, userId: string, reservationId?: string) {
@@ -346,9 +356,9 @@ export class TableService {
   }
 
   async leaveSeat(tableId: string, userId: string) {
-    const table = await tableStore.get(tableId);
-    const state = await tableStateStore.get(tableId);
-    if (!table || !state) return { ok: false, error: "TABLE_NOT_FOUND" };
+    const loaded = await this.loadTableAndState(tableId);
+    if (!loaded) return { ok: false, error: "TABLE_NOT_FOUND" };
+    const { table, state } = loaded;
 
     const seat = state.seats.find((entry) => entry.userId === userId);
     if (!seat) return { ok: false, error: "PLAYER_NOT_AT_TABLE" };
@@ -382,7 +392,7 @@ export class TableService {
         if (!cashOut.ok) {
           await this.emitGameEvent(tableId, undefined, userId, seat.seatId, "CASHOUT_FAILED", { amount: remainingStack });
         }
-      } catch (_err) {
+      } catch {
         await this.emitGameEvent(tableId, undefined, userId, seat.seatId, "BALANCE_UNAVAILABLE", { action: "CASH_OUT" });
       }
     }
@@ -396,52 +406,45 @@ export class TableService {
     state.updatedAt = this.now();
 
     await tableStateStore.save(state);
-    await this.publishTableState(table, state);
-    await this.publishLobbyUpdate(await this.listTableSummaries());
+    await this.publishTableAndLobby(table, state);
     await this.emitGameEvent(tableId, undefined, userId, seat.seatId, "PLAYER_LEFT", { stack: remainingStack });
     return { ok: true };
   }
 
   async joinSpectator(tableId: string, userId: string) {
-    const state = await tableStateStore.get(tableId);
-    if (!state) return { ok: false, error: "TABLE_NOT_FOUND" };
-    const table = await tableStore.get(tableId);
-    if (!table) return { ok: false, error: "TABLE_NOT_FOUND" };
-    const seated = state.seats.find((seat) => seat.userId === userId);
-    if (seated) {
+    const loaded = await this.loadTableAndState(tableId);
+    if (!loaded) return { ok: false, error: "TABLE_NOT_FOUND" };
+    const { table, state } = loaded;
+    if (state.seats.some((seat) => seat.userId === userId)) {
       return { ok: true };
     }
-    const existing = state.spectators.find((spectator) => spectator.userId === userId);
-    if (existing) {
+    if (state.spectators.some((spectator) => spectator.userId === userId)) {
       return { ok: true };
     }
     state.spectators.push({ userId, status: "ACTIVE", joinedAt: this.now() });
     state.version += 1;
     state.updatedAt = this.now();
     await tableStateStore.save(state);
-    await this.publishTableState(table, state);
-    await this.publishLobbyUpdate(await this.listTableSummaries());
+    await this.publishTableAndLobby(table, state);
     return { ok: true };
   }
 
   async leaveSpectator(tableId: string, userId: string) {
-    const state = await tableStateStore.get(tableId);
-    if (!state) return { ok: false, error: "TABLE_NOT_FOUND" };
-    const table = await tableStore.get(tableId);
-    if (!table) return { ok: false, error: "TABLE_NOT_FOUND" };
+    const loaded = await this.loadTableAndState(tableId);
+    if (!loaded) return { ok: false, error: "TABLE_NOT_FOUND" };
+    const { table, state } = loaded;
     state.spectators = state.spectators.filter((spectator) => spectator.userId !== userId);
     state.version += 1;
     state.updatedAt = this.now();
     await tableStateStore.save(state);
-    await this.publishTableState(table, state);
-    await this.publishLobbyUpdate(await this.listTableSummaries());
+    await this.publishTableAndLobby(table, state);
     return { ok: true };
   }
 
   async submitAction(tableId: string, userId: string, action: ActionInput) {
-    const table = await tableStore.get(tableId);
-    const state = await tableStateStore.get(tableId);
-    if (!table || !state) return { ok: false, error: "TABLE_NOT_FOUND" };
+    const loaded = await this.loadTableAndState(tableId);
+    if (!loaded) return { ok: false, error: "TABLE_NOT_FOUND" };
+    const { table, state } = loaded;
     if (!state.hand) return { ok: false, error: "NO_HAND_IN_PROGRESS" };
 
     const seat = state.seats.find((entry) => entry.userId === userId);
@@ -473,26 +476,25 @@ export class TableService {
     if (table.status === "PLAYING" || state.hand) return;
 
     const activePlayers = state.seats.filter((seat) => seat.userId && seat.status === "SEATED");
-    if (activePlayers.length >= 2) {
-      const updatedState = startHand(state, table.config);
-      table.status = "PLAYING";
-      await tableStore.save(table);
-      await tableStateStore.save(updatedState);
-      await this.publishTableState(table, updatedState);
-      await this.publishLobbyUpdate(await this.listTableSummaries());
+    if (activePlayers.length < 2) return;
 
-      const participants = updatedState.seats
-        .filter((seat) => seat.status === "ACTIVE" || seat.status === "ALL_IN")
-        .map((seat) => seat.userId)
-        .filter((value): value is string => Boolean(value));
+    const updatedState = startHand(state, table.config);
+    table.status = "PLAYING";
+    await tableStore.save(table);
+    await tableStateStore.save(updatedState);
+    await this.publishTableAndLobby(table, updatedState);
 
-      await this.emitGameEvent(table.tableId, updatedState.hand?.handId, undefined, undefined, "HAND_STARTED", {
-        buttonSeat: updatedState.button,
-        participants,
-      });
+    const participants = updatedState.seats
+      .filter((seat) => seat.status === "ACTIVE" || seat.status === "ALL_IN")
+      .map((seat) => seat.userId)
+      .filter((value): value is string => Boolean(value));
 
-      this.startTurnTimer(table, updatedState);
-    }
+    await this.emitGameEvent(table.tableId, updatedState.hand?.handId, undefined, undefined, "HAND_STARTED", {
+      buttonSeat: updatedState.button,
+      participants,
+    });
+
+    this.startTurnTimer(table, updatedState);
   }
 
   private startTurnTimer(table: Table, state: TableState) {
@@ -583,7 +585,7 @@ export class TableService {
               error: settle.error || "UNKNOWN",
             });
           }
-        } catch (_err) {
+        } catch {
           await this.emitGameEvent(table.tableId, hand.handId, undefined, undefined, "BALANCE_UNAVAILABLE", {
             action: "SETTLE_POT",
           });

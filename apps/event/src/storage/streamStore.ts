@@ -25,13 +25,12 @@ export class StreamStore {
   }
 
   async publishEvent(event: GameEvent): Promise<void> {
-    const streamIds = ["all", `table:${event.tableId}`];
-    if (event.handId) {
-      streamIds.push(`hand:${event.handId}`);
-    }
-    if (event.userId) {
-      streamIds.push(`user:${event.userId}`);
-    }
+    const streamIds = [
+      "all",
+      `table:${event.tableId}`,
+      event.handId ? `hand:${event.handId}` : null,
+      event.userId ? `user:${event.userId}` : null,
+    ].filter((streamId): streamId is string => Boolean(streamId));
 
     for (const streamId of streamIds) {
       await this.publish(streamId, event);
@@ -48,10 +47,7 @@ export class StreamStore {
       [{ key: streamKey(streamId), id: lastId }],
       { COUNT: count, BLOCK: blockMs }
     );
-    if (!result) {
-      return null;
-    }
-    return result as StreamResponse[];
+    return result ? (result as StreamResponse[]) : null;
   }
 }
 

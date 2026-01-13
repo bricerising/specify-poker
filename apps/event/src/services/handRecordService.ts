@@ -19,13 +19,12 @@ export class HandRecordService {
     isOperator = false
   ): Promise<{ hands: HandRecord[]; total: number }> {
     const result = await handStore.getHandHistory(tableId, limit, offset);
-    if (isOperator || !requesterUserId) {
+    const shouldRedact = !isOperator && requesterUserId;
+    if (!shouldRedact) {
       return result;
     }
 
-    const visibleHands = result.hands.filter((hand) =>
-      hand.participants.some((participant) => participant.userId === requesterUserId)
-    );
+    const visibleHands = result.hands.filter((hand) => isParticipant(hand, requesterUserId));
     const redacted = await Promise.all(
       visibleHands.map((hand) => privacyService.filterHandRecord(hand, requesterUserId, isOperator))
     );
@@ -39,11 +38,13 @@ export class HandRecordService {
     requesterUserId?: string,
     isOperator = false
   ): Promise<{ hands: HandRecord[]; total: number }> {
-    if (!isOperator && requesterUserId && requesterUserId !== userId) {
+    const isUnauthorized = !isOperator && requesterUserId && requesterUserId !== userId;
+    if (isUnauthorized) {
       throw new Error("Requester not authorized for user hand history");
     }
     const result = await handStore.getHandsForUser(userId, limit, offset);
-    if (isOperator || !requesterUserId) {
+    const shouldRedact = !isOperator && requesterUserId;
+    if (!shouldRedact) {
       return result;
     }
     const redacted = await Promise.all(
@@ -54,3 +55,10 @@ export class HandRecordService {
 }
 
 export const handRecordService = new HandRecordService();
+
+function isParticipant(hand: HandRecord, requesterUserId?: string): boolean {
+  if (!requesterUserId) {
+    return false;
+  }
+  return hand.participants.some((participant) => participant.userId === requesterUserId);
+}

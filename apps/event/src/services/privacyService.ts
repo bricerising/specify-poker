@@ -2,10 +2,7 @@ import { eventStore } from "../storage/eventStore";
 import { GameEvent, HandRecord } from "../domain/types";
 
 function isParticipant(record: HandRecord, userId?: string): boolean {
-  if (!userId) {
-    return false;
-  }
-  return record.participants.some((participant) => participant.userId === userId);
+  return Boolean(userId && record.participants.some((participant) => participant.userId === userId));
 }
 
 export class PrivacyService {
@@ -29,13 +26,8 @@ export class PrivacyService {
     return {
       ...record,
       participants: record.participants.map((participant) => {
-        if (participant.userId === requesterUserId) {
-          return participant;
-        }
-        if (revealedSeats.has(participant.seatId)) {
-          return participant;
-        }
-        return { ...participant, holeCards: null };
+        const isVisible = participant.userId === requesterUserId || revealedSeats.has(participant.seatId);
+        return isVisible ? participant : { ...participant, holeCards: null };
       }),
     };
   }
@@ -44,8 +36,7 @@ export class PrivacyService {
     event: GameEvent,
     requesterUserId?: string,
     isOperator = false,
-    participantUserIds?: Set<string>,
-    revealedSeatIds?: Set<number>
+    participantUserIds?: Set<string>
   ): GameEvent {
     if (isOperator) {
       return event;
@@ -63,25 +54,12 @@ export class PrivacyService {
       };
     }
 
-    if (event.type === "SHOWDOWN" && revealedSeatIds) {
-      return event;
-    }
-
     return event;
   }
 
   private redactEventForNonParticipant(event: GameEvent): GameEvent {
-    if (event.type === "CARDS_DEALT") {
-      return {
-        ...event,
-        payload: { ...(event.payload as Record<string, unknown>), cards: [] },
-      };
-    }
-    if (event.type === "CARDS_REVEALED") {
-      return {
-        ...event,
-        payload: { ...(event.payload as Record<string, unknown>), cards: [] },
-      };
+    if (event.type === "CARDS_DEALT" || event.type === "CARDS_REVEALED") {
+      return this.redactCardsPayload(event);
     }
     if (event.type === "SHOWDOWN") {
       const payload = event.payload as { reveals?: { seatId: number; cards?: unknown[]; handRank?: string }[] };
@@ -95,6 +73,13 @@ export class PrivacyService {
       };
     }
     return event;
+  }
+
+  private redactCardsPayload(event: GameEvent): GameEvent {
+    return {
+      ...event,
+      payload: { ...(event.payload as Record<string, unknown>), cards: [] },
+    };
   }
 }
 

@@ -21,6 +21,10 @@ import { EventType } from "../../domain/types";
 import logger from "../../observability/logger";
 
 export function createHandlers() {
+  const handleError = (callback: grpc.sendUnaryData<unknown>, err: unknown, code = grpc.status.INTERNAL) => {
+    callback({ code, message: (err as Error).message });
+  };
+
   return {
     publishEvent: async (
       call: grpc.ServerUnaryCall<PublishEventRequest, unknown>,
@@ -39,10 +43,7 @@ export function createHandlers() {
         });
         callback(null, { success: true, eventId: event.eventId });
       } catch (err: unknown) {
-        callback({
-          code: grpc.status.INTERNAL,
-          message: (err as Error).message,
-        });
+        handleError(callback, err);
       }
     },
 
@@ -63,10 +64,7 @@ export function createHandlers() {
         const results = await eventIngestionService.ingestEvents(events);
         callback(null, { success: true, eventIds: results.map((r) => r.eventId) });
       } catch (err: unknown) {
-        callback({
-          code: grpc.status.INTERNAL,
-          message: (err as Error).message,
-        });
+        handleError(callback, err);
       }
     },
 
@@ -81,34 +79,21 @@ export function createHandlers() {
           handId,
           userId,
           types: types as EventType[] | undefined,
-          startTime: startTime ? new Date(startTime.seconds * 1000) : undefined,
-          endTime: endTime ? new Date(endTime.seconds * 1000) : undefined,
+          startTime: timestampToDate(startTime),
+          endTime: timestampToDate(endTime),
           limit: limit || 100,
           offset,
           cursor,
         });
 
         callback(null, {
-          events: result.events.map((e) => ({
-            eventId: e.eventId,
-            type: e.type,
-            tableId: e.tableId,
-            handId: e.handId ?? undefined,
-            userId: e.userId ?? undefined,
-            seatId: e.seatId ?? undefined,
-            payload: e.payload,
-            timestamp: { seconds: Math.floor(e.timestamp.getTime() / 1000), nanos: 0 },
-            sequence: e.sequence ?? 0,
-          })),
+          events: result.events.map(mapEventToProto),
           total: result.total,
           hasMore: result.hasMore,
           nextCursor: result.nextCursor,
         });
       } catch (err: unknown) {
-        callback({
-          code: grpc.status.INTERNAL,
-          message: (err as Error).message,
-        });
+        handleError(callback, err);
       }
     },
 
@@ -120,19 +105,9 @@ export function createHandlers() {
           callback({ code: grpc.status.NOT_FOUND, message: "Event not found" });
           return;
         }
-        callback(null, {
-          eventId: event.eventId,
-          type: event.type,
-          tableId: event.tableId,
-          handId: event.handId ?? undefined,
-          userId: event.userId ?? undefined,
-          seatId: event.seatId ?? undefined,
-          payload: event.payload,
-          timestamp: { seconds: Math.floor(event.timestamp.getTime() / 1000), nanos: 0 },
-          sequence: event.sequence ?? 0,
-        });
+        callback(null, mapEventToProto(event));
       } catch (err: unknown) {
-        callback({ code: grpc.status.INTERNAL, message: (err as Error).message });
+        handleError(callback, err);
       }
     },
 
@@ -149,7 +124,7 @@ export function createHandlers() {
         }
         callback(null, mapHandRecordToProto(record));
       } catch (err: unknown) {
-        callback({ code: grpc.status.INTERNAL, message: (err as Error).message });
+        handleError(callback, err);
       }
     },
 
@@ -165,7 +140,7 @@ export function createHandlers() {
           total: result.total,
         });
       } catch (err: unknown) {
-        callback({ code: grpc.status.INTERNAL, message: (err as Error).message });
+        handleError(callback, err);
       }
     },
 
@@ -182,11 +157,10 @@ export function createHandlers() {
         });
       } catch (err: unknown) {
         const message = (err as Error).message;
-        if (message.toLowerCase().includes("not authorized")) {
-          callback({ code: grpc.status.PERMISSION_DENIED, message });
-          return;
-        }
-        callback({ code: grpc.status.INTERNAL, message });
+        const code = message.toLowerCase().includes("not authorized")
+          ? grpc.status.PERMISSION_DENIED
+          : grpc.status.INTERNAL;
+        handleError(callback, err, code);
       }
     },
 
@@ -199,20 +173,10 @@ export function createHandlers() {
         const events = await replayService.getHandEvents(handId, requesterId);
         callback(null, {
           handId,
-          events: events.map((e) => ({
-            eventId: e.eventId,
-            type: e.type,
-            tableId: e.tableId,
-            handId: e.handId ?? undefined,
-            userId: e.userId ?? undefined,
-            seatId: e.seatId ?? undefined,
-            payload: e.payload,
-            timestamp: { seconds: Math.floor(e.timestamp.getTime() / 1000), nanos: 0 },
-            sequence: e.sequence ?? 0,
-          })),
+          events: events.map(mapEventToProto),
         });
       } catch (err: unknown) {
-        callback({ code: grpc.status.INTERNAL, message: (err as Error).message });
+        handleError(callback, err);
       }
     },
 
@@ -246,17 +210,13 @@ export function createHandlers() {
                     lastId = message.id;
                     continue;
                   }
-                  call.write({
-                    eventId: event.eventId,
-                    type: event.type,
-                    tableId: event.tableId,
-                    handId: event.handId ?? undefined,
-                    userId: event.userId ?? undefined,
-                    seatId: event.seatId ?? undefined,
-                    payload: event.payload,
-                    timestamp: { seconds: Math.floor(new Date(event.timestamp).getTime() / 1000), nanos: 0 },
-                    sequence: event.sequence ?? 0,
-                  });
+                  call.write(
+                    mapEventToProto({
+                      ...event,
+                      timestamp: new Date(event.timestamp),
+                      sequence: event.sequence ?? null,
+                    })
+                  );
                   lastId = message.id;
                   lastSequence = event.sequence ?? lastSequence;
                 }
@@ -277,27 +237,19 @@ export function createHandlers() {
       try {
         const { streamId, subscriberId } = call.request;
         const cursor = await streamService.getCursor(streamId, subscriberId);
-        if (!cursor) {
-          callback(null, {
-            cursorId: `${streamId}:${subscriberId}`,
-            streamId,
-            subscriberId,
-            position: 0,
-            createdAt: { seconds: 0, nanos: 0 },
-            updatedAt: { seconds: 0, nanos: 0 },
-          });
-          return;
-        }
-        callback(null, {
-          cursorId: cursor.cursorId,
-          streamId: cursor.streamId,
-          subscriberId: cursor.subscriberId,
-          position: cursor.position,
-          createdAt: { seconds: Math.floor(cursor.createdAt.getTime() / 1000), nanos: 0 },
-          updatedAt: { seconds: Math.floor(cursor.updatedAt.getTime() / 1000), nanos: 0 },
-        });
+        const response = cursor
+          ? mapCursorToProto(cursor)
+          : mapCursorToProto({
+              cursorId: `${streamId}:${subscriberId}`,
+              streamId,
+              subscriberId,
+              position: 0,
+              createdAt: new Date(0),
+              updatedAt: new Date(0),
+            });
+        callback(null, response);
       } catch (err: unknown) {
-        callback({ code: grpc.status.INTERNAL, message: (err as Error).message });
+        handleError(callback, err);
       }
     },
 
@@ -308,18 +260,61 @@ export function createHandlers() {
       try {
         const { streamId, subscriberId, position } = call.request;
         const cursor = await streamService.updateCursor(streamId, subscriberId, position);
-        callback(null, {
-          cursorId: cursor.cursorId,
-          streamId: cursor.streamId,
-          subscriberId: cursor.subscriberId,
-          position: cursor.position,
-          createdAt: { seconds: Math.floor(cursor.createdAt.getTime() / 1000), nanos: 0 },
-          updatedAt: { seconds: Math.floor(cursor.updatedAt.getTime() / 1000), nanos: 0 },
-        });
+        callback(null, mapCursorToProto(cursor));
       } catch (err: unknown) {
-        callback({ code: grpc.status.INTERNAL, message: (err as Error).message });
+        handleError(callback, err);
       }
     },
+  };
+}
+
+function timestampToDate(timestamp?: { seconds: number }): Date | undefined {
+  return timestamp ? new Date(timestamp.seconds * 1000) : undefined;
+}
+
+function toTimestamp(date: Date): { seconds: number; nanos: 0 } {
+  return { seconds: Math.floor(date.getTime() / 1000), nanos: 0 };
+}
+
+function mapEventToProto(event: {
+  eventId: string;
+  type: string;
+  tableId: string;
+  handId?: string | null;
+  userId?: string | null;
+  seatId?: number | null;
+  payload: unknown;
+  timestamp: Date;
+  sequence?: number | null;
+}) {
+  return {
+    eventId: event.eventId,
+    type: event.type,
+    tableId: event.tableId,
+    handId: event.handId ?? undefined,
+    userId: event.userId ?? undefined,
+    seatId: event.seatId ?? undefined,
+    payload: event.payload,
+    timestamp: toTimestamp(event.timestamp),
+    sequence: event.sequence ?? 0,
+  };
+}
+
+function mapCursorToProto(cursor: {
+  cursorId: string;
+  streamId: string;
+  subscriberId: string;
+  position: number;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    cursorId: cursor.cursorId,
+    streamId: cursor.streamId,
+    subscriberId: cursor.subscriberId,
+    position: cursor.position,
+    createdAt: toTimestamp(cursor.createdAt),
+    updatedAt: toTimestamp(cursor.updatedAt),
   };
 }
 
@@ -361,7 +356,7 @@ function mapHandRecordToProto(r: {
         street: a.street,
         action: a.action,
         amount: a.amount,
-        timestamp: { seconds: Math.floor(new Date(a.timestamp).getTime() / 1000), nanos: 0 },
+        timestamp: toTimestamp(new Date(a.timestamp)),
       })),
       result: p.result,
     })),
@@ -374,8 +369,8 @@ function mapHandRecordToProto(r: {
       userId: w.userId,
       amount: w.amount,
     })),
-    startedAt: { seconds: Math.floor(new Date(r.startedAt).getTime() / 1000), nanos: 0 },
-    completedAt: { seconds: Math.floor(new Date(r.completedAt).getTime() / 1000), nanos: 0 },
+    startedAt: toTimestamp(new Date(r.startedAt)),
+    completedAt: toTimestamp(new Date(r.completedAt)),
     durationMs: r.duration,
   };
 }

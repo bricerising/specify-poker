@@ -12,9 +12,10 @@ import logger from "./observability/logger";
 import { startMetricsServer } from "./observability/metrics";
 
 export async function main() {
+  const isTest = process.env.NODE_ENV === "test";
   try {
     // Run DB migrations
-    if (process.env.NODE_ENV !== "test") {
+    if (!isTest) {
       await runMigrations();
     }
 
@@ -22,13 +23,13 @@ export async function main() {
     await connectRedis();
 
     // Start background jobs
-    if (process.env.NODE_ENV !== "test") {
+    if (!isTest) {
       await handMaterializer.start();
       await archiver.start();
     }
 
     // Start metrics server
-    if (process.env.NODE_ENV !== "test") {
+    if (!isTest) {
       startMetricsServer(config.metricsPort);
     }
 
@@ -38,7 +39,7 @@ export async function main() {
     logger.info({ port: config.grpcPort }, "Event Service is running");
   } catch (error) {
     logger.error({ error }, "Failed to start Event Service");
-    if (process.env.NODE_ENV !== "test") {
+    if (!isTest) {
       process.exit(1);
     }
     throw error;

@@ -267,6 +267,88 @@ function createAction(handId: string, seat: Seat, input: ActionInput, timestamp:
   };
 }
 
+function markAllInIfEmpty(seat: Seat) {
+  if (seat.stack === 0) {
+    seat.status = "ALL_IN";
+  }
+}
+
+function applyCall(hand: HandState, seat: Seat, seatId: number) {
+  const toCall = getCallAmount(hand, seat);
+  const amount = Math.min(toCall, seat.stack);
+  seat.stack -= amount;
+  hand.roundContributions[seatId] = (hand.roundContributions[seatId] ?? 0) + amount;
+  hand.totalContributions[seatId] = (hand.totalContributions[seatId] ?? 0) + amount;
+  markAllInIfEmpty(seat);
+}
+
+function applyBet(hand: HandState, seat: Seat, seatId: number, amount: number) {
+  const betAmount = Math.min(amount, seat.stack);
+  seat.stack -= betAmount;
+  hand.currentBet = betAmount;
+  hand.minRaise = betAmount;
+  hand.raiseCapped = false;
+  hand.roundContributions[seatId] = betAmount;
+  hand.totalContributions[seatId] = (hand.totalContributions[seatId] ?? 0) + betAmount;
+  hand.lastAggressor = seatId;
+  markAllInIfEmpty(seat);
+  return { resetActedSeats: true };
+}
+
+function applyRaise(
+  hand: HandState,
+  seat: Seat,
+  seatId: number,
+  amount: number,
+  previousMinRaise: number,
+) {
+  const maxTotal = seat.stack + (hand.roundContributions[seatId] ?? 0);
+  const raiseAmount = Math.min(amount, maxTotal);
+  const raiseSize = raiseAmount - hand.currentBet;
+  const additional = raiseAmount - (hand.roundContributions[seatId] ?? 0);
+  seat.stack -= Math.max(0, additional);
+  hand.currentBet = raiseAmount;
+  if (raiseSize >= previousMinRaise) {
+    hand.minRaise = raiseSize;
+    hand.raiseCapped = false;
+    hand.lastAggressor = seatId;
+  } else {
+    hand.raiseCapped = true;
+  }
+  hand.roundContributions[seatId] = raiseAmount;
+  hand.totalContributions[seatId] = (hand.totalContributions[seatId] ?? 0) + Math.max(0, additional);
+  markAllInIfEmpty(seat);
+  return { resetActedSeats: raiseSize >= previousMinRaise };
+}
+
+function applyAllIn(
+  hand: HandState,
+  seat: Seat,
+  seatId: number,
+  previousMinRaise: number,
+) {
+  const maxTotal = seat.stack + (hand.roundContributions[seatId] ?? 0);
+  if (maxTotal <= hand.currentBet) {
+    applyCall(hand, seat, seatId);
+    return { resetActedSeats: false };
+  }
+  const raiseSize = maxTotal - hand.currentBet;
+  const additional = maxTotal - (hand.roundContributions[seatId] ?? 0);
+  seat.stack -= Math.max(0, additional);
+  hand.currentBet = maxTotal;
+  if (raiseSize >= previousMinRaise) {
+    hand.minRaise = raiseSize;
+    hand.raiseCapped = false;
+    hand.lastAggressor = seatId;
+  } else {
+    hand.raiseCapped = true;
+  }
+  hand.roundContributions[seatId] = maxTotal;
+  hand.totalContributions[seatId] = (hand.totalContributions[seatId] ?? 0) + Math.max(0, additional);
+  seat.status = "ALL_IN";
+  return { resetActedSeats: raiseSize >= previousMinRaise };
+}
+
 export function startHand(
   tableState: TableState,
   config: TableConfig,
@@ -414,16 +496,15 @@ export function applyAction(
     return { state: tableState, accepted: false, reason: "SEAT_MISSING" };
   }
 
-  if (
-    seat.status !== "ACTIVE" &&
-    !(options.allowInactive && seat.status === "DISCONNECTED" && (action.type === "FOLD" || action.type === "CHECK"))
-  ) {
+  const allowInactiveAction =
+    Boolean(options.allowInactive) &&
+    seat.status === "DISCONNECTED" &&
+    (action.type === "FOLD" || action.type === "CHECK");
+  if (seat.status !== "ACTIVE" && !allowInactiveAction) {
     return { state: tableState, accepted: false, reason: "SEAT_INACTIVE" };
   }
 
-  const validationSeat = options.allowInactive && seat.status === "DISCONNECTED"
-    ? { ...seat, status: "ACTIVE" as const }
-    : seat;
+  const validationSeat = allowInactiveAction ? { ...seat, status: "ACTIVE" as const } : seat;
   const validation = validateAction(hand, validationSeat, action);
   if (!validation.ok) {
     return { state: tableState, accepted: false, reason: validation.reason };
@@ -433,81 +514,32 @@ export function applyAction(
   const previousMinRaise = hand.minRaise;
   let resetActedSeats = false;
 
-  if (action.type === "FOLD") {
-    seat.status = "FOLDED";
-  } else if (action.type === "CHECK") {
-    // no-op
-  } else if (action.type === "CALL") {
-    const toCall = getCallAmount(hand, seat);
-    const amount = Math.min(toCall, seat.stack);
-    seat.stack -= amount;
-    hand.roundContributions[seatId] = (hand.roundContributions[seatId] ?? 0) + amount;
-    hand.totalContributions[seatId] = (hand.totalContributions[seatId] ?? 0) + amount;
-    if (seat.stack === 0) {
-      seat.status = "ALL_IN";
+  switch (action.type) {
+    case "FOLD":
+      seat.status = "FOLDED";
+      break;
+    case "CHECK":
+      break;
+    case "CALL":
+      applyCall(hand, seat, seatId);
+      break;
+    case "BET": {
+      const update = applyBet(hand, seat, seatId, action.amount ?? 0);
+      resetActedSeats = update.resetActedSeats;
+      break;
     }
-  } else if (action.type === "BET") {
-    const amount = Math.min(action.amount ?? 0, seat.stack);
-    seat.stack -= amount;
-    hand.currentBet = amount;
-    hand.minRaise = amount;
-    hand.raiseCapped = false;
-    hand.roundContributions[seatId] = amount;
-    hand.totalContributions[seatId] = (hand.totalContributions[seatId] ?? 0) + amount;
-    resetActedSeats = true;
-    hand.lastAggressor = seatId;
-    if (seat.stack === 0) {
-      seat.status = "ALL_IN";
+    case "RAISE": {
+      const update = applyRaise(hand, seat, seatId, action.amount ?? hand.currentBet, previousMinRaise);
+      resetActedSeats = update.resetActedSeats;
+      break;
     }
-  } else if (action.type === "RAISE") {
-    const maxTotal = seat.stack + (hand.roundContributions[seatId] ?? 0);
-    const amount = Math.min(action.amount ?? hand.currentBet, maxTotal);
-    const raiseSize = amount - hand.currentBet;
-    const additional = amount - (hand.roundContributions[seatId] ?? 0);
-    seat.stack -= Math.max(0, additional);
-    hand.currentBet = amount;
-    if (raiseSize >= previousMinRaise) {
-      hand.minRaise = raiseSize;
-      hand.raiseCapped = false;
-      resetActedSeats = true;
-      hand.lastAggressor = seatId;
-    } else {
-      hand.raiseCapped = true;
+    case "ALL_IN": {
+      const update = applyAllIn(hand, seat, seatId, previousMinRaise);
+      resetActedSeats = update.resetActedSeats;
+      break;
     }
-    hand.roundContributions[seatId] = amount;
-    hand.totalContributions[seatId] = (hand.totalContributions[seatId] ?? 0) + Math.max(0, additional);
-    if (seat.stack === 0) {
-      seat.status = "ALL_IN";
-    }
-  } else if (action.type === "ALL_IN") {
-    const maxTotal = seat.stack + (hand.roundContributions[seatId] ?? 0);
-    if (maxTotal <= hand.currentBet) {
-      const toCall = getCallAmount(hand, seat);
-      const amount = Math.min(toCall, seat.stack);
-      seat.stack -= amount;
-      hand.roundContributions[seatId] = (hand.roundContributions[seatId] ?? 0) + amount;
-      hand.totalContributions[seatId] = (hand.totalContributions[seatId] ?? 0) + amount;
-      if (seat.stack === 0) {
-        seat.status = "ALL_IN";
-      }
-    } else {
-      const amount = maxTotal;
-      const raiseSize = amount - hand.currentBet;
-      const additional = amount - (hand.roundContributions[seatId] ?? 0);
-      seat.stack -= Math.max(0, additional);
-      hand.currentBet = amount;
-      if (raiseSize >= previousMinRaise) {
-        hand.minRaise = raiseSize;
-        hand.raiseCapped = false;
-        resetActedSeats = true;
-        hand.lastAggressor = seatId;
-      } else {
-        hand.raiseCapped = true;
-      }
-      hand.roundContributions[seatId] = amount;
-      hand.totalContributions[seatId] = (hand.totalContributions[seatId] ?? 0) + Math.max(0, additional);
-      seat.status = "ALL_IN";
-    }
+    default:
+      break;
   }
 
   const actionRecord = createAction(hand.handId, seat, action, now());

@@ -7,6 +7,9 @@ export interface Table {
     created_at: string;
 }
 
+type EmptyRequest = Record<string, never>;
+type UnaryCallback<T> = (err: Error | null, response: T) => void;
+
 export interface TableConfig {
     smallBlind: number;
     bigBlind: number;
@@ -68,24 +71,89 @@ export interface Pot {
 }
 
 export interface GameServiceClient {
-    GetTableState(request: { table_id: string; user_id: string }, callback: (err: Error | null, response: { state: TableState, hole_cards?: Card[] }) => void): void;
-    ListTables(request: Record<string, never>, callback: (err: Error | null, response: { tables: Table[] }) => void): void;
-    JoinSeat(request: { table_id: string; user_id: string; seat_id: number; buy_in_amount: number }, callback: (err: Error | null, response: { ok: boolean; error?: string }) => void): void;
-    LeaveSeat(request: { table_id: string; user_id: string }, callback: (err: Error | null, response: { ok: boolean; error?: string }) => void): void;
-    JoinSpectator(request: { table_id: string; user_id: string }, callback: (err: Error | null, response: { ok: boolean }) => void): void;
-    LeaveSpectator(request: { table_id: string; user_id: string }, callback: (err: Error | null, response: { ok: boolean }) => void): void;
-    SubmitAction(request: { table_id: string; user_id: string; action_type: string; amount?: number }, callback: (err: Error | null, response: { ok: boolean; state?: TableState; error?: string }) => void): void;
-    IsMuted(request: { table_id: string; user_id: string }, callback: (err: Error | null, response: { is_muted: boolean }) => void): void;
+    GetTableState(request: { table_id: string; user_id: string }, callback: UnaryCallback<{ state: TableState; hole_cards?: Card[] }>): void;
+    ListTables(request: EmptyRequest, callback: UnaryCallback<{ tables: Table[] }>): void;
+    CreateTable(
+        request: {
+            name: string;
+            owner_id: string;
+            config: {
+                small_blind: number;
+                big_blind: number;
+                ante: number;
+                max_players: number;
+                starting_stack: number;
+                turn_timer_seconds: number;
+            };
+        },
+        callback: UnaryCallback<Record<string, unknown>>
+    ): void;
+    GetTable(request: { table_id: string }, callback: UnaryCallback<Record<string, unknown>>): void;
+    DeleteTable(request: { table_id: string }, callback: UnaryCallback<Record<string, unknown>>): void;
+    JoinSeat(request: { table_id: string; user_id: string; seat_id: number; buy_in_amount: number }, callback: UnaryCallback<{ ok: boolean; error?: string }>): void;
+    LeaveSeat(request: { table_id: string; user_id: string }, callback: UnaryCallback<{ ok: boolean; error?: string }>): void;
+    JoinSpectator(request: { table_id: string; user_id: string }, callback: UnaryCallback<{ ok: boolean; error?: string }>): void;
+    LeaveSpectator(request: { table_id: string; user_id: string }, callback: UnaryCallback<{ ok: boolean; error?: string }>): void;
+    SubmitAction(
+        request: { table_id: string; user_id: string; action_type: string; amount?: number },
+        callback: UnaryCallback<{ ok: boolean; state?: TableState; error?: string }>
+    ): void;
+    KickPlayer(request: { table_id: string; owner_id: string; target_user_id: string }, callback: UnaryCallback<Record<string, unknown>>): void;
+    MutePlayer(request: { table_id: string; owner_id: string; target_user_id: string }, callback: UnaryCallback<Record<string, unknown>>): void;
+    UnmutePlayer(request: { table_id: string; owner_id: string; target_user_id: string }, callback: UnaryCallback<Record<string, unknown>>): void;
+    IsMuted(request: { table_id: string; user_id: string }, callback: UnaryCallback<{ is_muted: boolean }>): void;
 }
 
 export interface PlayerServiceClient {
-    GetProfile(request: { user_id: string }, callback: (err: Error | null, response: { profile: { nickname: string } }) => void): void;
+    GetProfile(request: { user_id: string }, callback: UnaryCallback<{ profile: Record<string, unknown> }>): void;
+    UpdateProfile(
+        request: {
+            user_id: string;
+            nickname?: string;
+            avatar_url?: string;
+            preferences?: {
+                sound_enabled?: boolean;
+                chat_enabled?: boolean;
+                show_hand_strength?: boolean;
+                theme?: string;
+            };
+        },
+        callback: UnaryCallback<{ profile: Record<string, unknown> }>
+    ): void;
+    DeleteProfile(request: { user_id: string }, callback: UnaryCallback<{ success: boolean }>): void;
+    GetStatistics(request: { user_id: string }, callback: UnaryCallback<{ statistics: Record<string, unknown> }>): void;
+    GetFriends(request: { user_id: string }, callback: UnaryCallback<{ friends: Array<Record<string, unknown>> }>): void;
+    AddFriend(request: { user_id: string; friend_id: string }, callback: UnaryCallback<Record<string, unknown>>): void;
+    RemoveFriend(request: { user_id: string; friend_id: string }, callback: UnaryCallback<Record<string, unknown>>): void;
+    GetNicknames(request: { user_ids: string[] }, callback: UnaryCallback<{ nicknames: Array<Record<string, unknown>> }>): void;
 }
 
 export interface EventServiceClient {
-    PublishEvent(request: any, callback: (err: Error | null, response: { success: boolean }) => void): void;
+    QueryEvents(
+        request: {
+            table_id?: string;
+            hand_id?: string;
+            user_id?: string;
+            types?: string[];
+            start_time?: { seconds: number };
+            end_time?: { seconds: number };
+            limit?: number;
+            offset?: number;
+            cursor?: string;
+        },
+        callback: UnaryCallback<{ events: unknown[]; total: number; has_more: boolean; next_cursor?: string }>
+    ): void;
+    GetEvent(request: { event_id: string }, callback: UnaryCallback<Record<string, unknown>>): void;
+    GetHandRecord(request: { hand_id: string; requester_id?: string }, callback: UnaryCallback<Record<string, unknown>>): void;
+    GetHandReplay(request: { hand_id: string }, callback: UnaryCallback<{ hand_id: string; events: unknown[] }>): void;
+    GetHandHistory(
+        request: { table_id: string; limit?: number; offset?: number; requester_id?: string },
+        callback: UnaryCallback<{ hands: unknown[]; total: number }>
+    ): void;
+    GetHandsForUser(
+        request: { user_id: string; limit?: number; offset?: number },
+        callback: UnaryCallback<{ hands: unknown[]; total: number }>
+    ): void;
 }
 
-export interface BalanceServiceClient {
-    // Add methods as needed
-}
+export type BalanceServiceClient = Record<string, never>;

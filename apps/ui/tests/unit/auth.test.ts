@@ -2,6 +2,34 @@ import { describe, expect, it, beforeEach } from "vitest";
 
 import { setToken, getToken, clearToken, isAuthenticated } from "../../src/services/auth";
 
+function ensureStorage(name: "localStorage" | "sessionStorage") {
+  const existing = (globalThis as Record<string, unknown>)[name] as { getItem?: unknown } | undefined;
+  if (existing && typeof existing.getItem === "function") {
+    return;
+  }
+  const store = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      store.set(key, value);
+    },
+    removeItem: (key: string) => {
+      store.delete(key);
+    },
+    clear: () => {
+      store.clear();
+    },
+  };
+  Object.defineProperty(globalThis, name, { value: storage, configurable: true });
+}
+
+beforeEach(() => {
+  ensureStorage("localStorage");
+  ensureStorage("sessionStorage");
+  localStorage.clear();
+  sessionStorage.clear();
+});
+
 describe("auth token management", () => {
   beforeEach(() => {
     clearToken();

@@ -140,12 +140,24 @@ export function attachChatHub(socket: WebSocket, userId: string, connectionId: s
     const type = message.type;
     const tableId = parseTableId(message.tableId);
 
-    if (type === "SubscribeChat" && tableId) {
-      await handleSubscribe(socket, connectionId, tableId);
-    } else if (type === "UnsubscribeChat" && tableId) {
-      await handleUnsubscribe(connectionId, tableId);
-    } else if (type === "ChatSend" && tableId) {
-      await handleChatSend(connectionId, userId, { tableId, message: message.message });
+    switch (type) {
+      case "SubscribeChat": {
+        if (!tableId) return;
+        await handleSubscribe(socket, connectionId, tableId);
+        return;
+      }
+      case "UnsubscribeChat": {
+        if (!tableId) return;
+        await handleUnsubscribe(connectionId, tableId);
+        return;
+      }
+      case "ChatSend": {
+        if (!tableId) return;
+        await handleChatSend(connectionId, userId, { tableId, message: message.message });
+        return;
+      }
+      default:
+        return;
     }
   });
 

@@ -4,10 +4,22 @@ import logger from "../../observability/logger";
 
 const router = Router();
 
+function requireUserId(req: Request, res: Response) {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return null;
+  }
+  return userId;
+}
+
 // Helper to convert gRPC callback to promise
-function grpcCall<T>(method: string, request: unknown): Promise<T> {
+function grpcCall<TRequest, TResponse>(
+  method: (request: TRequest, callback: (err: Error | null, response: TResponse) => void) => void,
+  request: TRequest
+): Promise<TResponse> {
   return new Promise((resolve, reject) => {
-    (playerClient as any)[method](request, (err: Error | null, response: T) => {
+    method(request, (err: Error | null, response: TResponse) => {
       if (err) reject(err);
       else resolve(response);
     });
@@ -17,13 +29,11 @@ function grpcCall<T>(method: string, request: unknown): Promise<T> {
 // GET /api/me - Get current user's profile
 router.get("/me", async (req: Request, res: Response) => {
   try {
-    const userId = req.auth?.userId;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
-    const profileResponse = await grpcCall<{ profile: any }>("GetProfile", { user_id: userId });
-    const statsResponse = await grpcCall<{ statistics: any }>("GetStatistics", { user_id: userId });
+    const profileResponse = await grpcCall(playerClient.GetProfile.bind(playerClient), { user_id: userId });
+    const statsResponse = await grpcCall(playerClient.GetStatistics.bind(playerClient), { user_id: userId });
 
     const profile = profileResponse.profile || {};
     const stats = statsResponse.statistics || { handsPlayed: 0, wins: 0 };
@@ -38,13 +48,11 @@ router.get("/me", async (req: Request, res: Response) => {
 // PUT /api/me - Update current user's profile
 router.put("/me", async (req: Request, res: Response) => {
   try {
-    const userId = req.auth?.userId;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     const { nickname, avatarUrl, preferences } = req.body;
-    const updateResponse = await grpcCall<{ profile: any }>("UpdateProfile", {
+    const updateResponse = await grpcCall(playerClient.UpdateProfile.bind(playerClient), {
       user_id: userId,
       nickname,
       avatar_url: avatarUrl,
@@ -57,7 +65,7 @@ router.put("/me", async (req: Request, res: Response) => {
         }
         : undefined,
     });
-    const statsResponse = await grpcCall<{ statistics: any }>("GetStatistics", { user_id: userId });
+    const statsResponse = await grpcCall(playerClient.GetStatistics.bind(playerClient), { user_id: userId });
 
     const profile = updateResponse.profile || {};
     const stats = statsResponse.statistics || { handsPlayed: 0, wins: 0 };
@@ -72,12 +80,10 @@ router.put("/me", async (req: Request, res: Response) => {
 // DELETE /api/me - Delete current user's profile (GDPR)
 router.delete("/me", async (req: Request, res: Response) => {
   try {
-    const userId = req.auth?.userId;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
-    const response = await grpcCall<{ success: boolean }>("DeleteProfile", {
+    const response = await grpcCall(playerClient.DeleteProfile.bind(playerClient), {
       user_id: userId,
     });
     if (!response.success) {
@@ -93,12 +99,10 @@ router.delete("/me", async (req: Request, res: Response) => {
 // GET /api/me/statistics - Get current user's statistics
 router.get("/me/statistics", async (req: Request, res: Response) => {
   try {
-    const userId = req.auth?.userId;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
-    const response = await grpcCall<{ statistics: unknown }>("GetStatistics", {
+    const response = await grpcCall(playerClient.GetStatistics.bind(playerClient), {
       user_id: userId,
     });
     return res.json(response.statistics);
@@ -112,7 +116,7 @@ router.get("/me/statistics", async (req: Request, res: Response) => {
 router.get("/profile/:userId", async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
-    const response = await grpcCall<{ profile: unknown }>("GetProfile", {
+    const response = await grpcCall(playerClient.GetProfile.bind(playerClient), {
       user_id: userId,
     });
     return res.json(response.profile);
@@ -125,12 +129,10 @@ router.get("/profile/:userId", async (req: Request, res: Response) => {
 // GET /api/friends - Get current user's friends list
 router.get("/friends", async (req: Request, res: Response) => {
   try {
-    const userId = req.auth?.userId;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
-    const response = await grpcCall<{ friends: unknown[] }>("GetFriends", {
+    const response = await grpcCall(playerClient.GetFriends.bind(playerClient), {
       user_id: userId,
     });
     return res.json({ friends: response.friends || [] });
@@ -143,17 +145,15 @@ router.get("/friends", async (req: Request, res: Response) => {
 // POST /api/friends - Add a friend
 router.post("/friends", async (req: Request, res: Response) => {
   try {
-    const userId = req.auth?.userId;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     const { friendId } = req.body;
     if (!friendId) {
       return res.status(400).json({ error: "friendId is required" });
     }
 
-    await grpcCall<void>("AddFriend", {
+    await grpcCall(playerClient.AddFriend.bind(playerClient), {
       user_id: userId,
       friend_id: friendId,
     });
@@ -167,13 +167,11 @@ router.post("/friends", async (req: Request, res: Response) => {
 // DELETE /api/friends/:friendId - Remove a friend
 router.delete("/friends/:friendId", async (req: Request, res: Response) => {
   try {
-    const userId = req.auth?.userId;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     const { friendId } = req.params;
-    await grpcCall<void>("RemoveFriend", {
+    await grpcCall(playerClient.RemoveFriend.bind(playerClient), {
       user_id: userId,
       friend_id: friendId,
     });
@@ -192,7 +190,7 @@ router.post("/nicknames", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "userIds array is required" });
     }
 
-    const response = await grpcCall<{ nicknames: unknown[] }>("GetNicknames", {
+    const response = await grpcCall(playerClient.GetNicknames.bind(playerClient), {
       user_ids: userIds,
     });
     return res.json({ nicknames: response.nicknames || [] });

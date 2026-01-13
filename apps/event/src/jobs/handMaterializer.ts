@@ -26,9 +26,10 @@ export class HandMaterializer {
     try {
       await redisClient.xGroupCreate(this.streamKey, this.groupName, '$', { MKSTREAM: true });
     } catch (err: unknown) {
-      if (!(err as Error).message.includes('BUSYGROUP')) {
-        console.error('Error creating consumer group:', err);
+      if ((err as Error).message.includes('BUSYGROUP')) {
+        return;
       }
+      console.error('Error creating consumer group:', err);
     }
 
     console.log(`HandMaterializer started, listening on ${this.streamKey}`);
@@ -45,13 +46,14 @@ export class HandMaterializer {
           { COUNT: 1, BLOCK: 5000 }
         );
 
-        if (streams) {
-          for (const stream of streams) {
-            for (const message of stream.messages) {
-              const event = JSON.parse(message.message.data);
-              await this.handleEvent(event);
-              await redisClient.xAck(this.streamKey, this.groupName, message.id);
-            }
+        if (!streams) {
+          continue;
+        }
+        for (const stream of streams) {
+          for (const message of stream.messages) {
+            const event = JSON.parse(message.message.data);
+            await this.handleEvent(event);
+            await redisClient.xAck(this.streamKey, this.groupName, message.id);
           }
         }
       } catch (err) {
@@ -62,10 +64,11 @@ export class HandMaterializer {
   }
 
   private async handleEvent(event: Record<string, unknown>) {
-    if (event.type === 'HAND_COMPLETED') {
-      console.log(`Hand completed: ${event.handId}. Materializing record...`);
-      await this.materializeHand(event.handId as string, event.tableId as string);
+    if (event.type !== 'HAND_COMPLETED') {
+      return;
     }
+    console.log(`Hand completed: ${event.handId}. Materializing record...`);
+    await this.materializeHand(event.handId as string, event.tableId as string);
   }
 
   private async materializeHand(handId: string, tableId: string) {
@@ -104,40 +107,51 @@ export class HandMaterializer {
         result: "WON" | "LOST" | "FOLDED" | "SPLIT";
       }
     >();
+    const participantsBySeat = new Map<number, string>();
     const communityCards: Card[] = [];
     const pots: { amount: number; winners: string[] }[] = [];
     const winners: { userId: string; amount: number }[] = [];
 
     events.forEach((event) => {
-      if (event.type === "HAND_STARTED") {
-        const payload = event.payload as HandStartedPayload;
-        const seats = payload.seats || (event.payload as { seats?: HandStartedPayload["seats"] }).seats || [];
-        seats.forEach((seat) => {
-          participants.set(seat.userId, {
-            seatId: seat.seatId,
-            userId: seat.userId,
-            nickname: seat.nickname || `Player ${seat.seatId}`,
-            startingStack: seat.stack,
-            endingStack: seat.stack,
-            holeCards: null,
-            actions: [],
-            result: "LOST",
+      switch (event.type) {
+        case "HAND_STARTED": {
+          const payload = event.payload as HandStartedPayload;
+          const seats = getSeats(payload, event.payload);
+          seats.forEach((seat) => {
+            participants.set(seat.userId, {
+              seatId: seat.seatId,
+              userId: seat.userId,
+              nickname: seat.nickname || `Player ${seat.seatId}`,
+              startingStack: seat.stack,
+              endingStack: seat.stack,
+              holeCards: null,
+              actions: [],
+              result: "LOST",
+            });
+            participantsBySeat.set(seat.seatId, seat.userId);
           });
-        });
-      }
-
-      if (event.type === "CARDS_DEALT" && event.userId) {
-        const payload = event.payload as { cards?: Card[] };
-        const participant = participants.get(event.userId);
-        if (participant) {
-          participant.holeCards = payload.cards || null;
+          break;
         }
-      }
-
-      if (event.type === "ACTION_TAKEN" && event.userId) {
-        const payload = event.payload as ActionTakenPayload;
-        const participant = participants.get(event.userId);
-        if (participant) {
+        case "CARDS_DEALT": {
+          if (!event.userId) {
+            break;
+          }
+          const payload = event.payload as { cards?: Card[] };
+          const participant = participants.get(event.userId);
+          if (participant) {
+            participant.holeCards = payload.cards || null;
+          }
+          break;
+        }
+        case "ACTION_TAKEN": {
+          if (!event.userId) {
+            break;
+          }
+          const payload = event.payload as ActionTakenPayload;
+          const participant = participants.get(event.userId);
+          if (!participant) {
+            break;
+          }
           participant.actions.push({
             street: payload.street || "unknown",
             action: payload.action,
@@ -147,83 +161,74 @@ export class HandMaterializer {
           if (payload.action === "FOLD") {
             participant.result = "FOLDED";
           }
+          break;
         }
-      }
-
-      if (event.type === "STREET_ADVANCED") {
-        const payload = event.payload as StreetAdvancedPayload;
-        if (payload.communityCards) {
-          communityCards.push(...payload.communityCards);
+        case "STREET_ADVANCED": {
+          const payload = event.payload as StreetAdvancedPayload;
+          if (payload.communityCards) {
+            communityCards.push(...payload.communityCards);
+          }
+          break;
         }
-      }
-
-      if (event.type === "SHOWDOWN") {
-        const payload = event.payload as ShowdownPayload;
-        payload.reveals.forEach((reveal) => {
-          const participant = Array.from(participants.values()).find((p) => p.seatId === reveal.seatId);
-          if (participant) {
-            participant.holeCards = reveal.cards;
-          }
-        });
-      }
-
-      if (event.type === "POT_AWARDED") {
-        const payload = event.payload as PotAwardedPayload;
-        pots.push({
-          amount: payload.amount,
-          winners: payload.winners
-            .map((winner) => {
-              if (winner.userId) {
-                return winner.userId;
-              }
-              const bySeat = Array.from(participants.values()).find((p) => p.seatId === winner.seatId);
-              return bySeat ? bySeat.userId : "";
-            })
-            .filter((winnerId) => winnerId.length > 0),
-        });
-        payload.winners.forEach((winner) => {
-          const userId =
-            winner.userId || Array.from(participants.values()).find((p) => p.seatId === winner.seatId)?.userId;
-          if (!userId) {
-            return;
-          }
-          winners.push({ userId, amount: winner.share });
-          const participant = participants.get(userId);
-          if (participant) {
-            participant.result = "WON";
-          }
-        });
-      }
-
-      if (event.type === "HAND_COMPLETED") {
-        const payload = event.payload as HandCompletedPayload;
-        const endStacks =
-          payload.playerEndStacks ||
-          ((event.payload as { player_end_stacks?: Record<string, number> }).player_end_stacks ?? null);
-        if (endStacks) {
-          Object.entries(endStacks).forEach(([userId, stack]) => {
-            const participant = participants.get(userId);
+        case "SHOWDOWN": {
+          const payload = event.payload as ShowdownPayload;
+          payload.reveals.forEach((reveal) => {
+            const userId = participantsBySeat.get(reveal.seatId);
+            const participant = userId ? participants.get(userId) : undefined;
             if (participant) {
-              participant.endingStack = stack;
+              participant.holeCards = reveal.cards;
             }
           });
+          break;
         }
+        case "POT_AWARDED": {
+          const payload = event.payload as PotAwardedPayload;
+          pots.push({
+            amount: payload.amount,
+            winners: payload.winners
+              .map((winner) => resolveUserId(winner.userId, winner.seatId, participantsBySeat))
+              .filter((winnerId): winnerId is string => Boolean(winnerId)),
+          });
+          payload.winners.forEach((winner) => {
+            const userId = resolveUserId(winner.userId, winner.seatId, participantsBySeat);
+            if (!userId) {
+              return;
+            }
+            winners.push({ userId, amount: winner.share });
+            const participant = participants.get(userId);
+            if (participant) {
+              participant.result = "WON";
+            }
+          });
+          break;
+        }
+        case "HAND_COMPLETED": {
+          const payload = event.payload as HandCompletedPayload;
+          const endStacks =
+            payload.playerEndStacks ||
+            ((event.payload as { player_end_stacks?: Record<string, number> }).player_end_stacks ?? null);
+          if (endStacks) {
+            Object.entries(endStacks).forEach(([userId, stack]) => {
+              const participant = participants.get(userId);
+              if (participant) {
+                participant.endingStack = stack;
+              }
+            });
+          }
+          break;
+        }
+        default:
+          break;
       }
     });
 
-    const configPayload = (startedEvent?.payload as HandStartedPayload | undefined) || {
-      smallBlind: 0,
-      bigBlind: 0,
-      seats: [],
-    };
-    const smallBlind =
-      configPayload.smallBlind || (startedEvent?.payload as { small_blind?: number } | undefined)?.small_blind || 0;
-    const bigBlind =
-      configPayload.bigBlind || (startedEvent?.payload as { big_blind?: number } | undefined)?.big_blind || 0;
-    const tableName =
-      (startedEvent?.payload as { tableName?: string } | undefined)?.tableName ||
-      (startedEvent?.payload as { table_name?: string } | undefined)?.table_name ||
-      "Unknown Table";
+    const configPayload =
+      (startedEvent?.payload as
+        | (HandStartedPayload & { small_blind?: number; big_blind?: number; tableName?: string; table_name?: string })
+        | undefined) || {};
+    const smallBlind = configPayload.smallBlind ?? configPayload.small_blind ?? 0;
+    const bigBlind = configPayload.bigBlind ?? configPayload.big_blind ?? 0;
+    const tableName = configPayload.tableName ?? configPayload.table_name ?? "Unknown Table";
 
     return {
       handId,
@@ -232,7 +237,7 @@ export class HandMaterializer {
       config: {
         smallBlind,
         bigBlind,
-        ante: (startedEvent?.payload as { ante?: number } | undefined)?.ante ?? 0,
+        ante: configPayload.ante ?? 0,
       },
       participants: Array.from(participants.values()),
       communityCards,
@@ -253,3 +258,18 @@ export class HandMaterializer {
 }
 
 export const handMaterializer = new HandMaterializer();
+
+function getSeats(
+  payload: HandStartedPayload,
+  rawPayload: unknown
+): HandStartedPayload["seats"] {
+  return payload.seats || (rawPayload as { seats?: HandStartedPayload["seats"] }).seats || [];
+}
+
+function resolveUserId(
+  userId: string | undefined,
+  seatId: number,
+  participantsBySeat: Map<number, string>
+): string | undefined {
+  return userId || participantsBySeat.get(seatId);
+}

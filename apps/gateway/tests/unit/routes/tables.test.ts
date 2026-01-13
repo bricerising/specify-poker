@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import express from "express";
-import request from "supertest";
 import tablesRouter from "../../../src/http/routes/tables";
+import { dispatchToRouter } from "../helpers/express";
 
 // Mock the gRPC client
 vi.mock("../../../src/grpc/clients", () => ({
@@ -34,17 +33,9 @@ vi.mock("../../../src/observability/logger", () => ({
 import { gameClient } from "../../../src/grpc/clients";
 
 describe("Tables Routes", () => {
-  let app: express.Application;
+  const auth = { userId: "user-123", claims: {} };
 
   beforeEach(() => {
-    app = express();
-    app.use(express.json());
-    // Add mock auth middleware
-    app.use((req, _res, next) => {
-      (req as any).auth = { userId: "user-123", claims: {} };
-      next();
-    });
-    app.use("/api/tables", tablesRouter);
     vi.clearAllMocks();
   });
 
@@ -65,9 +56,13 @@ describe("Tables Routes", () => {
         }
       );
 
-      const response = await request(app).get("/api/tables");
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "GET",
+        url: "/",
+        auth,
+      });
 
-      expect(response.status).toBe(200);
+      expect(response.statusCode).toBe(200);
       expect(response.body).toEqual(mockTables);
     });
 
@@ -78,10 +73,14 @@ describe("Tables Routes", () => {
         }
       );
 
-      const response = await request(app).get("/api/tables");
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "GET",
+        url: "/",
+        auth,
+      });
 
-      expect(response.status).toBe(500);
-      expect(response.body.error).toBe("Failed to list tables");
+      expect(response.statusCode).toBe(500);
+      expect(response.body).toEqual(expect.objectContaining({ error: "Failed to list tables" }));
     });
   });
 
@@ -95,11 +94,14 @@ describe("Tables Routes", () => {
         }
       );
 
-      const response = await request(app)
-        .post("/api/tables")
-        .send({ name: "New Table", config: { smallBlind: 1, bigBlind: 2 } });
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "POST",
+        url: "/",
+        auth,
+        body: { name: "New Table", config: { smallBlind: 1, bigBlind: 2 } },
+      });
 
-      expect(response.status).toBe(201);
+      expect(response.statusCode).toBe(201);
       expect(response.body).toEqual(mockTable);
     });
   });
@@ -114,9 +116,13 @@ describe("Tables Routes", () => {
         }
       );
 
-      const response = await request(app).get("/api/tables/t1");
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "GET",
+        url: "/t1",
+        auth,
+      });
 
-      expect(response.status).toBe(200);
+      expect(response.statusCode).toBe(200);
       expect(response.body).toEqual(mockTable);
     });
 
@@ -127,9 +133,47 @@ describe("Tables Routes", () => {
         }
       );
 
-      const response = await request(app).get("/api/tables/not-found");
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "GET",
+        url: "/not-found",
+        auth,
+      });
 
-      expect(response.status).toBe(404);
+      expect(response.statusCode).toBe(404);
+    });
+  });
+
+  describe("GET /api/tables/:tableId/state", () => {
+    it("should return table state", async () => {
+      const mockState = { table_id: "t1", status: "lobby" };
+      vi.mocked(gameClient.GetTableState).mockImplementation(
+        (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
+          callback(null, { state: mockState });
+        }
+      );
+
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "GET",
+        url: "/t1/state",
+        auth,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toEqual({ state: mockState });
+    });
+  });
+
+  describe("POST /api/tables/:tableId/join", () => {
+    it("should reject invalid seatId", async () => {
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "POST",
+        url: "/t1/join",
+        auth,
+        body: { seatId: "not-a-number" },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.body).toEqual(expect.objectContaining({ error: "seatId is required" }));
     });
   });
 
@@ -141,12 +185,17 @@ describe("Tables Routes", () => {
         }
       );
 
-      const response = await request(app)
-        .post("/api/tables/t1/seats/0/join")
-        .send({ buyInAmount: 200 });
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "POST",
+        url: "/t1/seats/0/join",
+        auth,
+        headers: { host: "localhost:4000" },
+        body: { buyInAmount: 200 },
+      });
 
-      expect(response.status).toBe(200);
-      expect(response.body.ok).toBe(true);
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toEqual(expect.objectContaining({ tableId: "t1", seatId: 0 }));
+      expect((response.body as { wsUrl?: string }).wsUrl).toBeDefined();
     });
 
     it("should return error when seat not available", async () => {
@@ -156,12 +205,34 @@ describe("Tables Routes", () => {
         }
       );
 
-      const response = await request(app)
-        .post("/api/tables/t1/seats/0/join")
-        .send({ buyInAmount: 200 });
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "POST",
+        url: "/t1/seats/0/join",
+        auth,
+        body: { buyInAmount: 200 },
+      });
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toBe("SEAT_NOT_AVAILABLE");
+      expect(response.statusCode).toBe(400);
+      expect(response.body).toEqual(expect.objectContaining({ error: "SEAT_NOT_AVAILABLE" }));
+    });
+  });
+
+  describe("POST /api/tables/:tableId/leave", () => {
+    it("should leave a table", async () => {
+      vi.mocked(gameClient.LeaveSeat).mockImplementation(
+        (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
+          callback(null, { ok: true });
+        }
+      );
+
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "POST",
+        url: "/t1/leave",
+        auth,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toEqual(expect.objectContaining({ ok: true }));
     });
   });
 
@@ -173,12 +244,15 @@ describe("Tables Routes", () => {
         }
       );
 
-      const response = await request(app)
-        .post("/api/tables/t1/action")
-        .send({ actionType: "FOLD" });
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "POST",
+        url: "/t1/action",
+        auth,
+        body: { actionType: "FOLD" },
+      });
 
-      expect(response.status).toBe(200);
-      expect(response.body.ok).toBe(true);
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toEqual(expect.objectContaining({ ok: true }));
     });
 
     it("should return error for invalid action", async () => {
@@ -188,12 +262,15 @@ describe("Tables Routes", () => {
         }
       );
 
-      const response = await request(app)
-        .post("/api/tables/t1/action")
-        .send({ actionType: "FOLD" });
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "POST",
+        url: "/t1/action",
+        auth,
+        body: { actionType: "FOLD" },
+      });
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toBe("NOT_YOUR_TURN");
+      expect(response.statusCode).toBe(400);
+      expect(response.body).toEqual(expect.objectContaining({ error: "NOT_YOUR_TURN" }));
     });
   });
 
@@ -205,10 +282,82 @@ describe("Tables Routes", () => {
         }
       );
 
-      const response = await request(app).post("/api/tables/t1/spectate");
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "POST",
+        url: "/t1/spectate",
+        auth,
+      });
 
-      expect(response.status).toBe(200);
-      expect(response.body.ok).toBe(true);
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toEqual(expect.objectContaining({ ok: true }));
+    });
+  });
+
+  describe("POST /api/tables/:tableId/spectate/leave", () => {
+    it("should leave spectating", async () => {
+      vi.mocked(gameClient.LeaveSpectator).mockImplementation(
+        (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
+          callback(null, { ok: true });
+        }
+      );
+
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "POST",
+        url: "/t1/spectate/leave",
+        auth,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toEqual(expect.objectContaining({ ok: true }));
+    });
+  });
+
+  describe("Moderation routes", () => {
+    it("kicks a player", async () => {
+      vi.mocked(gameClient.KickPlayer).mockImplementation(
+        (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
+          callback(null, {});
+        }
+      );
+
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "POST",
+        url: "/t1/kick",
+        auth,
+        body: { targetUserId: "user-2" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toEqual(expect.objectContaining({ ok: true }));
+    });
+
+    it("mutes and unmutes a player", async () => {
+      vi.mocked(gameClient.MutePlayer).mockImplementation(
+        (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
+          callback(null, {});
+        }
+      );
+      vi.mocked(gameClient.UnmutePlayer).mockImplementation(
+        (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
+          callback(null, {});
+        }
+      );
+
+      const muteResponse = await dispatchToRouter(tablesRouter, {
+        method: "POST",
+        url: "/t1/mute",
+        auth,
+        body: { targetUserId: "user-2" },
+      });
+      const unmuteResponse = await dispatchToRouter(tablesRouter, {
+        method: "POST",
+        url: "/t1/unmute",
+        auth,
+        body: { targetUserId: "user-2" },
+      });
+
+      expect(muteResponse.statusCode).toBe(200);
+      expect(unmuteResponse.statusCode).toBe(200);
     });
   });
 });

@@ -122,22 +122,42 @@ export function attachTableHub(socket: WebSocket, userId: string, connectionId: 
     const type = message.type;
     const tableId = parseTableId(message.tableId);
 
-    if (type === "SubscribeTable" && tableId) {
-      await handleSubscribe(connectionId, userId, tableId);
-    } else if (type === "UnsubscribeTable" && tableId) {
-      gameClient.LeaveSpectator({ table_id: tableId, user_id: userId }, (_err: unknown) => undefined);
-      await handleUnsubscribe(connectionId, tableId);
-    } else if (type === "JoinSeat" && tableId) {
-      const seatId = parseSeatId(message.seatId);
-      if (seatId !== null) {
-        await handleJoinSeat(connectionId, userId, { tableId, seatId, buyInAmount: message.buyInAmount });
+    switch (type) {
+      case "SubscribeTable": {
+        if (!tableId) return;
+        await handleSubscribe(connectionId, userId, tableId);
+        return;
       }
-    } else if (type === "LeaveTable" && tableId) {
-      await handleLeaveTable(userId, { tableId });
-    } else if (type === "Action" && tableId) {
-      await handleAction(connectionId, userId, message);
-    } else if (type === "ResyncTable" && tableId) {
-      await handleSubscribe(connectionId, userId, tableId);
+      case "UnsubscribeTable": {
+        if (!tableId) return;
+        gameClient.LeaveSpectator({ table_id: tableId, user_id: userId }, (_err: unknown) => undefined);
+        await handleUnsubscribe(connectionId, tableId);
+        return;
+      }
+      case "JoinSeat": {
+        if (!tableId) return;
+        const seatId = parseSeatId(message.seatId);
+        if (seatId === null) return;
+        await handleJoinSeat(connectionId, userId, { tableId, seatId, buyInAmount: message.buyInAmount });
+        return;
+      }
+      case "LeaveTable": {
+        if (!tableId) return;
+        await handleLeaveTable(userId, { tableId });
+        return;
+      }
+      case "Action": {
+        if (!tableId) return;
+        await handleAction(connectionId, userId, message);
+        return;
+      }
+      case "ResyncTable": {
+        if (!tableId) return;
+        await handleSubscribe(connectionId, userId, tableId);
+        return;
+      }
+      default:
+        return;
     }
   });
 

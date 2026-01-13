@@ -223,14 +223,20 @@ function toProtoState(state: TableState) {
   };
 }
 
+function handleUnary<Req, Res>(
+  call: ServerUnaryCall<Req, Res>,
+  callback: sendUnaryData<Res>,
+  handler: (request: Req) => Promise<Res> | Res,
+) {
+  Promise.resolve(handler(call.request))
+    .then((response) => callback(null, response))
+    .catch((err) => callback(err as Error));
+}
+
 export function createHandlers() {
   return {
-    CreateTable: async (
-      call: ServerUnaryCall<CreateTableRequest, ProtoTable>,
-      callback: sendUnaryData<ProtoTable>,
-    ) => {
-      try {
-        const { name, owner_id, config } = call.request;
+    CreateTable: (call: ServerUnaryCall<CreateTableRequest, ProtoTable>, callback: sendUnaryData<ProtoTable>) =>
+      handleUnary(call, callback, async ({ name, owner_id, config }) => {
         const table = await tableService.createTable(name, owner_id, {
           smallBlind: toNumber(config.small_blind, 1),
           bigBlind: toNumber(config.big_blind, 2),
@@ -239,36 +245,23 @@ export function createHandlers() {
           startingStack: toNumber(config.starting_stack, 200),
           turnTimerSeconds: toNumber(config.turn_timer_seconds ?? 20, 20),
         });
-        callback(null, toProtoTable(table));
-      } catch (err) {
-        callback(err as Error);
-      }
-    },
+        return toProtoTable(table);
+      }),
 
-    GetTable: async (
-      call: ServerUnaryCall<GetTableRequest, ProtoTable>,
-      callback: sendUnaryData<ProtoTable>,
-    ) => {
-      try {
-        const table = await tableService.getTable(call.request.table_id);
+    GetTable: (call: ServerUnaryCall<GetTableRequest, ProtoTable>, callback: sendUnaryData<ProtoTable>) =>
+      handleUnary(call, callback, async ({ table_id }) => {
+        const table = await tableService.getTable(table_id);
         if (!table) {
-          callback(new Error("TABLE_NOT_FOUND"));
-          return;
+          throw new Error("TABLE_NOT_FOUND");
         }
-        callback(null, toProtoTable(table));
-      } catch (err) {
-        callback(err as Error);
-      }
-    },
+        return toProtoTable(table);
+      }),
 
-    ListTables: async (
-      _call: ServerUnaryCall<ListTablesRequest, ListTablesResponse>,
-      callback: sendUnaryData<ListTablesResponse>,
-    ) => {
-      try {
+    ListTables: (call: ServerUnaryCall<ListTablesRequest, ListTablesResponse>, callback: sendUnaryData<ListTablesResponse>) =>
+      handleUnary(call, callback, async () => {
         await tableService.ensureMainTable();
         const tables = await tableService.listTableSummaries();
-        callback(null, {
+        return {
           tables: tables.map((summary) => ({
             table_id: summary.tableId,
             name: summary.name,
@@ -279,159 +272,85 @@ export function createHandlers() {
             in_progress: summary.inProgress,
             spectator_count: summary.spectatorCount,
           })),
-        });
-      } catch (err) {
-        callback(err as Error);
-      }
-    },
+        };
+      }),
 
-    DeleteTable: async (call: ServerUnaryCall<DeleteTableRequest, Empty>, callback: sendUnaryData<Empty>) => {
-      try {
-        const deleted = await tableService.deleteTable(call.request.table_id);
+    DeleteTable: (call: ServerUnaryCall<DeleteTableRequest, Empty>, callback: sendUnaryData<Empty>) =>
+      handleUnary(call, callback, async ({ table_id }) => {
+        const deleted = await tableService.deleteTable(table_id);
         if (!deleted) {
-          callback(new Error("TABLE_NOT_FOUND"));
-          return;
+          throw new Error("TABLE_NOT_FOUND");
         }
-        callback(null, {});
-      } catch (err) {
-        callback(err as Error);
-      }
-    },
+        return {};
+      }),
 
-    GetTableState: async (
-      call: ServerUnaryCall<GetTableStateRequest, GetTableStateResponse>,
-      callback: sendUnaryData<GetTableStateResponse>,
-    ) => {
-      try {
-        const { table_id, user_id } = call.request;
+    GetTableState: (call: ServerUnaryCall<GetTableStateRequest, GetTableStateResponse>, callback: sendUnaryData<GetTableStateResponse>) =>
+      handleUnary(call, callback, async ({ table_id, user_id }) => {
         const result = await tableService.getTableState(table_id, user_id);
         if (!result) {
-          callback(new Error("TABLE_NOT_FOUND"));
-          return;
+          throw new Error("TABLE_NOT_FOUND");
         }
-        callback(null, {
+        return {
           state: toProtoState(result.state),
           hole_cards: result.holeCards.map(toProtoCard),
-        });
-      } catch (err) {
-        callback(err as Error);
-      }
-    },
+        };
+      }),
 
-    JoinSeat: async (call: ServerUnaryCall<JoinSeatRequest, ActionResult>, callback: sendUnaryData<ActionResult>) => {
-      try {
-        const { table_id, user_id, seat_id, buy_in_amount } = call.request;
+    JoinSeat: (call: ServerUnaryCall<JoinSeatRequest, ActionResult>, callback: sendUnaryData<ActionResult>) =>
+      handleUnary(call, callback, ({ table_id, user_id, seat_id, buy_in_amount }) => {
         const buyInAmount = toNumber(buy_in_amount, 0);
-        const result = await tableService.joinSeat(table_id, user_id, seat_id, buyInAmount);
-        callback(null, result);
-      } catch (err) {
-        callback(err as Error);
-      }
-    },
+        return tableService.joinSeat(table_id, user_id, seat_id, buyInAmount);
+      }),
 
-    LeaveSeat: async (call: ServerUnaryCall<LeaveSeatRequest, ActionResult>, callback: sendUnaryData<ActionResult>) => {
-      try {
-        const { table_id, user_id } = call.request;
-        const result = await tableService.leaveSeat(table_id, user_id);
-        callback(null, result);
-      } catch (err) {
-        callback(err as Error);
-      }
-    },
+    LeaveSeat: (call: ServerUnaryCall<LeaveSeatRequest, ActionResult>, callback: sendUnaryData<ActionResult>) =>
+      handleUnary(call, callback, ({ table_id, user_id }) => tableService.leaveSeat(table_id, user_id)),
 
-    JoinSpectator: async (
-      call: ServerUnaryCall<JoinSpectatorRequest, ActionResult>,
-      callback: sendUnaryData<ActionResult>,
-    ) => {
-      try {
-        const { table_id, user_id } = call.request;
-        const result = await tableService.joinSpectator(table_id, user_id);
-        callback(null, result);
-      } catch (err) {
-        callback(err as Error);
-      }
-    },
+    JoinSpectator: (call: ServerUnaryCall<JoinSpectatorRequest, ActionResult>, callback: sendUnaryData<ActionResult>) =>
+      handleUnary(call, callback, ({ table_id, user_id }) => tableService.joinSpectator(table_id, user_id)),
 
-    LeaveSpectator: async (
-      call: ServerUnaryCall<LeaveSpectatorRequest, ActionResult>,
-      callback: sendUnaryData<ActionResult>,
-    ) => {
-      try {
-        const { table_id, user_id } = call.request;
-        const result = await tableService.leaveSpectator(table_id, user_id);
-        callback(null, result);
-      } catch (err) {
-        callback(err as Error);
-      }
-    },
+    LeaveSpectator: (call: ServerUnaryCall<LeaveSpectatorRequest, ActionResult>, callback: sendUnaryData<ActionResult>) =>
+      handleUnary(call, callback, ({ table_id, user_id }) => tableService.leaveSpectator(table_id, user_id)),
 
-    SubmitAction: async (
-      call: ServerUnaryCall<SubmitActionRequest, ActionResult>,
-      callback: sendUnaryData<ActionResult>,
-    ) => {
-      try {
-        const { table_id, user_id, action_type, amount } = call.request;
+    SubmitAction: (call: ServerUnaryCall<SubmitActionRequest, ActionResult>, callback: sendUnaryData<ActionResult>) =>
+      handleUnary(call, callback, ({ table_id, user_id, action_type, amount }) => {
         const normalizedAction = action_type.toUpperCase() as ActionInput["type"];
-        const result = await tableService.submitAction(table_id, user_id, {
+        return tableService.submitAction(table_id, user_id, {
           type: normalizedAction,
           amount: amount === undefined ? undefined : toNumber(amount, 0),
         });
-        callback(null, result);
-      } catch (err) {
-        callback(err as Error);
-      }
-    },
+      }),
 
-    KickPlayer: async (call: ServerUnaryCall<KickPlayerRequest, Empty>, callback: sendUnaryData<Empty>) => {
-      try {
-        const { table_id, owner_id, target_user_id } = call.request;
+    KickPlayer: (call: ServerUnaryCall<KickPlayerRequest, Empty>, callback: sendUnaryData<Empty>) =>
+      handleUnary(call, callback, async ({ table_id, owner_id, target_user_id }) => {
         const result = await moderationService.kickPlayer(table_id, owner_id, target_user_id);
         if (!result.ok) {
-          callback(new Error(result.error || "KICK_FAILED"));
-          return;
+          throw new Error(result.error || "KICK_FAILED");
         }
-        callback(null, {});
-      } catch (err) {
-        callback(err as Error);
-      }
-    },
+        return {};
+      }),
 
-    MutePlayer: async (call: ServerUnaryCall<MutePlayerRequest, Empty>, callback: sendUnaryData<Empty>) => {
-      try {
-        const { table_id, owner_id, target_user_id } = call.request;
+    MutePlayer: (call: ServerUnaryCall<MutePlayerRequest, Empty>, callback: sendUnaryData<Empty>) =>
+      handleUnary(call, callback, async ({ table_id, owner_id, target_user_id }) => {
         const result = await moderationService.mutePlayer(table_id, owner_id, target_user_id, true);
         if (!result.ok) {
-          callback(new Error(result.error || "MUTE_FAILED"));
-          return;
+          throw new Error(result.error || "MUTE_FAILED");
         }
-        callback(null, {});
-      } catch (err) {
-        callback(err as Error);
-      }
-    },
+        return {};
+      }),
 
-    UnmutePlayer: async (call: ServerUnaryCall<UnmutePlayerRequest, Empty>, callback: sendUnaryData<Empty>) => {
-      try {
-        const { table_id, owner_id, target_user_id } = call.request;
+    UnmutePlayer: (call: ServerUnaryCall<UnmutePlayerRequest, Empty>, callback: sendUnaryData<Empty>) =>
+      handleUnary(call, callback, async ({ table_id, owner_id, target_user_id }) => {
         const result = await moderationService.mutePlayer(table_id, owner_id, target_user_id, false);
         if (!result.ok) {
-          callback(new Error(result.error || "UNMUTE_FAILED"));
-          return;
+          throw new Error(result.error || "UNMUTE_FAILED");
         }
-        callback(null, {});
-      } catch (err) {
-        callback(err as Error);
-      }
-    },
+        return {};
+      }),
 
-    IsMuted: async (call: ServerUnaryCall<IsMutedRequest, { is_muted: boolean }>, callback: sendUnaryData<{ is_muted: boolean }>) => {
-      try {
-        const { table_id, user_id } = call.request;
+    IsMuted: (call: ServerUnaryCall<IsMutedRequest, { is_muted: boolean }>, callback: sendUnaryData<{ is_muted: boolean }>) =>
+      handleUnary(call, callback, async ({ table_id, user_id }) => {
         const is_muted = await moderationService.isMuted(table_id, user_id);
-        callback(null, { is_muted });
-      } catch (err) {
-        callback(err as Error);
-      }
-    },
+        return { is_muted };
+      }),
   };
 }

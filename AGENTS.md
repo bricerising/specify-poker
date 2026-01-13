@@ -43,6 +43,7 @@ specs/          # High-level system specifications
 ## Agent Workflow Notes
 
 - Prefer verifying changes against the docker compose environment (when available) so behavior matches deployed/runtime conditions.
+- The repo uses `nvm`; run `source ~/.zshrc` before `nvm use 20` so `nvm` is available in shells.
 
 ## Recent Changes
 

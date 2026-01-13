@@ -34,17 +34,18 @@ export class EventIngestionService {
   }
 
   private validateEvent(event: NewGameEvent): void {
-    if (!event.type) {
-      throw new Error("Event type is required");
-    }
-    if (!event.tableId) {
-      throw new Error("Table ID is required");
-    }
-    if (!event.payload || typeof event.payload !== "object") {
-      throw new Error("Payload must be an object");
-    }
-    if (HAND_EVENT_TYPES.has(event.type) && !event.handId) {
-      throw new Error(`handId is required for event type ${event.type}`);
+    const requiresHandId = event.type ? HAND_EVENT_TYPES.has(event.type) : false;
+    const validations: Array<[boolean, string]> = [
+      [Boolean(event.type), "Event type is required"],
+      [Boolean(event.tableId), "Table ID is required"],
+      [Boolean(event.payload && typeof event.payload === "object"), "Payload must be an object"],
+      [!requiresHandId || Boolean(event.handId), `handId is required for event type ${event.type}`],
+    ];
+
+    for (const [isValid, message] of validations) {
+      if (!isValid) {
+        throw new Error(message);
+      }
     }
   }
 }

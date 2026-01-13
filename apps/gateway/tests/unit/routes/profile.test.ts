@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import express from "express";
-import request from "supertest";
 import profileRouter from "../../../src/http/routes/profile";
+import { dispatchToRouter } from "../helpers/express";
 
 // Mock the gRPC client
 vi.mock("../../../src/grpc/clients", () => ({
@@ -29,18 +28,9 @@ vi.mock("../../../src/observability/logger", () => ({
 import { playerClient } from "../../../src/grpc/clients";
 
 describe("Profile Routes", () => {
-  let app: express.Application;
+  const auth = { userId: "user-123", claims: {} };
 
   beforeEach(() => {
-    app = express();
-    app.use(express.json());
-    // Add mock auth middleware
-    app.use((req, _res, next) => {
-      (req as any).auth = { userId: "user-123", claims: {} };
-      next();
-    });
-    app.use("/api", profileRouter);
-    app.use("/api", profileRouter);
     vi.clearAllMocks();
 
     // Default mock for GetStatistics to prevent timeouts
@@ -69,10 +59,13 @@ describe("Profile Routes", () => {
         }
       );
 
-      const response = await request(app).get("/api/me");
+      const response = await dispatchToRouter(profileRouter, {
+        method: "GET",
+        url: "/me",
+        auth,
+      });
 
-      expect(response.status).toBe(200);
-      expect(response.status).toBe(200);
+      expect(response.statusCode).toBe(200);
       expect(response.body).toEqual({
         ...mockProfile,
         stats: { handsPlayed: 0, wins: 0 },
@@ -86,10 +79,14 @@ describe("Profile Routes", () => {
         }
       );
 
-      const response = await request(app).get("/api/me");
+      const response = await dispatchToRouter(profileRouter, {
+        method: "GET",
+        url: "/me",
+        auth,
+      });
 
-      expect(response.status).toBe(500);
-      expect(response.body.error).toBe("Failed to get profile");
+      expect(response.statusCode).toBe(500);
+      expect(response.body).toEqual(expect.objectContaining({ error: "Failed to get profile" }));
     });
   });
 
@@ -107,12 +104,14 @@ describe("Profile Routes", () => {
         }
       );
 
-      const response = await request(app)
-        .put("/api/me")
-        .send({ nickname: "NewNickname", avatarUrl: "https://example.com/new-avatar.png" });
+      const response = await dispatchToRouter(profileRouter, {
+        method: "PUT",
+        url: "/me",
+        auth,
+        body: { nickname: "NewNickname", avatarUrl: "https://example.com/new-avatar.png" },
+      });
 
-      expect(response.status).toBe(200);
-      expect(response.status).toBe(200);
+      expect(response.statusCode).toBe(200);
       expect(response.body).toEqual({
         ...updatedProfile,
         stats: { handsPlayed: 0, wins: 0 },
@@ -128,9 +127,13 @@ describe("Profile Routes", () => {
         }
       );
 
-      const response = await request(app).delete("/api/me");
+      const response = await dispatchToRouter(profileRouter, {
+        method: "DELETE",
+        url: "/me",
+        auth,
+      });
 
-      expect(response.status).toBe(204);
+      expect(response.statusCode).toBe(204);
     });
 
     it("should handle deletion failure", async () => {
@@ -140,10 +143,14 @@ describe("Profile Routes", () => {
         }
       );
 
-      const response = await request(app).delete("/api/me");
+      const response = await dispatchToRouter(profileRouter, {
+        method: "DELETE",
+        url: "/me",
+        auth,
+      });
 
-      expect(response.status).toBe(500);
-      expect(response.body.error).toBe("Failed to delete profile");
+      expect(response.statusCode).toBe(500);
+      expect(response.body).toEqual(expect.objectContaining({ error: "Failed to delete profile" }));
     });
   });
 
@@ -163,9 +170,13 @@ describe("Profile Routes", () => {
         }
       );
 
-      const response = await request(app).get("/api/me/statistics");
+      const response = await dispatchToRouter(profileRouter, {
+        method: "GET",
+        url: "/me/statistics",
+        auth,
+      });
 
-      expect(response.status).toBe(200);
+      expect(response.statusCode).toBe(200);
       expect(response.body).toEqual(mockStats);
     });
   });
@@ -183,10 +194,14 @@ describe("Profile Routes", () => {
         }
       );
 
-      const response = await request(app).get("/api/friends");
+      const response = await dispatchToRouter(profileRouter, {
+        method: "GET",
+        url: "/friends",
+        auth,
+      });
 
-      expect(response.status).toBe(200);
-      expect(response.body.friends).toEqual(mockFriends);
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toEqual(expect.objectContaining({ friends: mockFriends }));
     });
   });
 
@@ -198,21 +213,27 @@ describe("Profile Routes", () => {
         }
       );
 
-      const response = await request(app)
-        .post("/api/friends")
-        .send({ friendId: "friend-123" });
+      const response = await dispatchToRouter(profileRouter, {
+        method: "POST",
+        url: "/friends",
+        auth,
+        body: { friendId: "friend-123" },
+      });
 
-      expect(response.status).toBe(201);
-      expect(response.body.ok).toBe(true);
+      expect(response.statusCode).toBe(201);
+      expect(response.body).toEqual(expect.objectContaining({ ok: true }));
     });
 
     it("should return error when friendId is missing", async () => {
-      const response = await request(app)
-        .post("/api/friends")
-        .send({});
+      const response = await dispatchToRouter(profileRouter, {
+        method: "POST",
+        url: "/friends",
+        auth,
+        body: {},
+      });
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toBe("friendId is required");
+      expect(response.statusCode).toBe(400);
+      expect(response.body).toEqual(expect.objectContaining({ error: "friendId is required" }));
     });
   });
 
@@ -224,9 +245,13 @@ describe("Profile Routes", () => {
         }
       );
 
-      const response = await request(app).delete("/api/friends/friend-123");
+      const response = await dispatchToRouter(profileRouter, {
+        method: "DELETE",
+        url: "/friends/friend-123",
+        auth,
+      });
 
-      expect(response.status).toBe(204);
+      expect(response.statusCode).toBe(204);
     });
   });
 
@@ -243,21 +268,27 @@ describe("Profile Routes", () => {
         }
       );
 
-      const response = await request(app)
-        .post("/api/nicknames")
-        .send({ userIds: ["user-1", "user-2"] });
+      const response = await dispatchToRouter(profileRouter, {
+        method: "POST",
+        url: "/nicknames",
+        auth,
+        body: { userIds: ["user-1", "user-2"] },
+      });
 
-      expect(response.status).toBe(200);
-      expect(response.body.nicknames).toEqual(mockNicknames);
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toEqual(expect.objectContaining({ nicknames: mockNicknames }));
     });
 
     it("should return error when userIds is missing", async () => {
-      const response = await request(app)
-        .post("/api/nicknames")
-        .send({});
+      const response = await dispatchToRouter(profileRouter, {
+        method: "POST",
+        url: "/nicknames",
+        auth,
+        body: {},
+      });
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toBe("userIds array is required");
+      expect(response.statusCode).toBe(400);
+      expect(response.body).toEqual(expect.objectContaining({ error: "userIds array is required" }));
     });
   });
 });

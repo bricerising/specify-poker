@@ -75,6 +75,10 @@ function getClientType(request: IncomingMessage) {
   return "web";
 }
 
+function closeWithAuthError(ws: WebSocket, reason: string) {
+  ws.close(1008, reason);
+}
+
 export async function initWsServer(server: Server) {
   const wss = new WebSocketServer({ noServer: true });
 
@@ -109,7 +113,7 @@ export async function initWsServer(server: Server) {
     }
 
     if (authResult.status === "invalid") {
-      ws.close(1008, "Unauthorized");
+      closeWithAuthError(ws, "Unauthorized");
       return;
     }
 
@@ -171,7 +175,7 @@ export async function initWsServer(server: Server) {
     }
 
     const authTimer = setTimeout(() => {
-      ws.close(1008, "Authentication required");
+      closeWithAuthError(ws, "Authentication required");
     }, authTimeoutMs);
 
     const handleAuth = async (data: WebSocket.RawData) => {
@@ -182,18 +186,18 @@ export async function initWsServer(server: Server) {
       try {
         message = JSON.parse(data.toString()) as { type?: string; token?: string };
       } catch {
-        ws.close(1008, "Invalid authentication payload");
+        closeWithAuthError(ws, "Invalid authentication payload");
         return;
       }
 
       if (message?.type !== "Authenticate" || typeof message?.token !== "string") {
-        ws.close(1008, "Authentication required");
+        closeWithAuthError(ws, "Authentication required");
         return;
       }
 
       const result = await authenticateWsToken(message.token);
       if (result.status !== "ok") {
-        ws.close(1008, "Unauthorized");
+        closeWithAuthError(ws, "Unauthorized");
         return;
       }
 

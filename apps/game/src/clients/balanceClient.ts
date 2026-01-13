@@ -14,7 +14,123 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
   oneofs: true,
 });
 
-const proto = grpc.loadPackageDefinition(packageDefinition) as any;
+type NumericString = string | number;
+
+interface ReserveForBuyInResponse {
+  ok: boolean;
+  reservation_id?: string;
+  error?: string;
+  available_balance?: NumericString;
+}
+
+interface CommitReservationResponse {
+  ok: boolean;
+  transaction_id?: string;
+  error?: string;
+  new_balance?: NumericString;
+}
+
+interface ReleaseReservationResponse {
+  ok: boolean;
+  error?: string;
+}
+
+interface ProcessCashOutResponse {
+  ok: boolean;
+  transaction_id?: string;
+  error?: string;
+  new_balance?: NumericString;
+}
+
+interface RecordContributionResponse {
+  ok: boolean;
+  error?: string;
+  total_pot?: NumericString;
+  seat_contribution?: NumericString;
+}
+
+interface SettlePotResult {
+  account_id: string;
+  transaction_id: string;
+  amount: NumericString;
+  new_balance: NumericString;
+}
+
+interface SettlePotResponse {
+  ok: boolean;
+  error?: string;
+  results?: SettlePotResult[];
+}
+
+interface CancelPotResponse {
+  ok: boolean;
+  error?: string;
+}
+
+interface BalanceServiceClient {
+  ReserveForBuyIn(
+    request: {
+      account_id: string;
+      table_id: string;
+      amount: number;
+      idempotency_key: string;
+      timeout_seconds: number;
+    },
+    callback: (err: grpc.ServiceError | null, response: ReserveForBuyInResponse) => void
+  ): void;
+  CommitReservation(
+    request: { reservation_id: string },
+    callback: (err: grpc.ServiceError | null, response: CommitReservationResponse) => void
+  ): void;
+  ReleaseReservation(
+    request: { reservation_id: string; reason?: string },
+    callback: (err: grpc.ServiceError | null, response: ReleaseReservationResponse) => void
+  ): void;
+  ProcessCashOut(
+    request: {
+      account_id: string;
+      table_id: string;
+      seat_id: number;
+      amount: number;
+      idempotency_key: string;
+      hand_id?: string;
+    },
+    callback: (err: grpc.ServiceError | null, response: ProcessCashOutResponse) => void
+  ): void;
+  RecordContribution(
+    request: {
+      table_id: string;
+      hand_id: string;
+      seat_id: number;
+      account_id: string;
+      amount: number;
+      contribution_type: string;
+      idempotency_key: string;
+    },
+    callback: (err: grpc.ServiceError | null, response: RecordContributionResponse) => void
+  ): void;
+  SettlePot(
+    request: {
+      table_id: string;
+      hand_id: string;
+      winners: Array<{ seat_id: number; account_id: string; amount: number }>;
+      idempotency_key: string;
+    },
+    callback: (err: grpc.ServiceError | null, response: SettlePotResponse) => void
+  ): void;
+  CancelPot(
+    request: { table_id: string; hand_id: string; reason: string },
+    callback: (err: grpc.ServiceError | null, response: CancelPotResponse) => void
+  ): void;
+}
+
+type BalanceProto = {
+  balance: {
+    BalanceService: new (addr: string, creds: grpc.ChannelCredentials) => BalanceServiceClient;
+  };
+};
+
+const proto = grpc.loadPackageDefinition(packageDefinition) as unknown as BalanceProto;
 
 const client = new proto.balance.BalanceService(
   config.balanceServiceAddr,
@@ -75,7 +191,7 @@ export async function reserveForBuyIn(
         idempotency_key: idempotencyKey,
         timeout_seconds: 30,
       },
-      (err: any, response: any) => {
+      (err: grpc.ServiceError | null, response: ReserveForBuyInResponse) => {
         if (err) {
           logger.error({ err, accountId, tableId }, "Balance reserve failed");
           resolve({ ok: false, error: "INTERNAL_ERROR" });
@@ -96,7 +212,7 @@ export async function commitReservation(reservationId: string): Promise<CommitRe
   return new Promise((resolve) => {
     client.CommitReservation(
       { reservation_id: reservationId },
-      (err: any, response: any) => {
+      (err: grpc.ServiceError | null, response: CommitReservationResponse) => {
         if (err) {
           logger.error({ err, reservationId }, "Balance commit failed");
           resolve({ ok: false, error: "INTERNAL_ERROR" });
@@ -120,7 +236,7 @@ export async function releaseReservation(
   return new Promise((resolve) => {
     client.ReleaseReservation(
       { reservation_id: reservationId, reason },
-      (err: any, response: any) => {
+      (err: grpc.ServiceError | null, response: ReleaseReservationResponse) => {
         if (err) {
           logger.error({ err, reservationId }, "Balance release failed");
           resolve({ ok: false, error: "INTERNAL_ERROR" });
@@ -150,7 +266,7 @@ export async function processCashOut(
         idempotency_key: idempotencyKey,
         hand_id: handId,
       },
-      (err: any, response: any) => {
+      (err: grpc.ServiceError | null, response: ProcessCashOutResponse) => {
         if (err) {
           logger.error({ err, accountId, tableId }, "Balance cash out failed");
           resolve({ ok: false, error: "INTERNAL_ERROR" });
@@ -187,7 +303,7 @@ export async function recordContribution(
         contribution_type: contributionType,
         idempotency_key: idempotencyKey,
       },
-      (err: any, response: any) => {
+      (err: grpc.ServiceError | null, response: RecordContributionResponse) => {
         if (err) {
           logger.error({ err, tableId, handId }, "Balance contribution failed");
           resolve({ ok: false, error: "INTERNAL_ERROR" });
@@ -222,7 +338,7 @@ export async function settlePot(
         })),
         idempotency_key: idempotencyKey,
       },
-      (err: any, response: any) => {
+      (err: grpc.ServiceError | null, response: SettlePotResponse) => {
         if (err) {
           logger.error({ err, tableId, handId }, "Balance settle failed");
           resolve({ ok: false, error: "INTERNAL_ERROR" });
@@ -231,7 +347,7 @@ export async function settlePot(
         resolve({
           ok: response.ok,
           error: response.error,
-          results: response.results?.map((r: any) => ({
+          results: response.results?.map((r) => ({
             accountId: r.account_id,
             transactionId: r.transaction_id,
             amount: parseInt(r.amount, 10),
@@ -251,7 +367,7 @@ export async function cancelPot(
   return new Promise((resolve) => {
     client.CancelPot(
       { table_id: tableId, hand_id: handId, reason },
-      (err: any, response: any) => {
+      (err: grpc.ServiceError | null, response: CancelPotResponse) => {
         if (err) {
           logger.error({ err, tableId, handId }, "Balance cancel pot failed");
           resolve({ ok: false, error: "INTERNAL_ERROR" });

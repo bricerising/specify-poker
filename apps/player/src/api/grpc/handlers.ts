@@ -108,25 +108,18 @@ function normalizeOptionalString(value: string | undefined): string | undefined 
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+const STATISTIC_TYPE_MAP = new Map<string, statisticsService.StatisticType>([
+  ["STATISTIC_TYPE_HANDS_PLAYED", statisticsService.StatisticType.HandsPlayed],
+  ["STATISTIC_TYPE_WINS", statisticsService.StatisticType.Wins],
+  ["STATISTIC_TYPE_VPIP", statisticsService.StatisticType.Vpip],
+  ["STATISTIC_TYPE_PFR", statisticsService.StatisticType.Pfr],
+  ["STATISTIC_TYPE_ALL_IN", statisticsService.StatisticType.AllIn],
+  ["STATISTIC_TYPE_BIGGEST_POT", statisticsService.StatisticType.BiggestPot],
+  ["STATISTIC_TYPE_REFERRAL_COUNT", statisticsService.StatisticType.ReferralCount],
+]);
+
 function toStatisticType(value: string): statisticsService.StatisticType | null {
-  switch (value) {
-    case "STATISTIC_TYPE_HANDS_PLAYED":
-      return statisticsService.StatisticType.HandsPlayed;
-    case "STATISTIC_TYPE_WINS":
-      return statisticsService.StatisticType.Wins;
-    case "STATISTIC_TYPE_VPIP":
-      return statisticsService.StatisticType.Vpip;
-    case "STATISTIC_TYPE_PFR":
-      return statisticsService.StatisticType.Pfr;
-    case "STATISTIC_TYPE_ALL_IN":
-      return statisticsService.StatisticType.AllIn;
-    case "STATISTIC_TYPE_BIGGEST_POT":
-      return statisticsService.StatisticType.BiggestPot;
-    case "STATISTIC_TYPE_REFERRAL_COUNT":
-      return statisticsService.StatisticType.ReferralCount;
-    default:
-      return null;
-  }
+  return STATISTIC_TYPE_MAP.get(value) ?? null;
 }
 
 export const handlers = {

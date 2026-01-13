@@ -9,7 +9,7 @@ Use this skill when the user asks to run tests, check linting, or validate CI-st
 
 ## Workflow
 
-1. From repo root, run `nvm use 20` to select Node.js 20 LTS.
+1. From repo root, run `source ~/.zshrc` then `nvm use 20` to select Node.js 20 LTS.
 2. Then run:
    - `npm test`
    - `npm run lint`

@@ -50,6 +50,56 @@ describe('EventStore', () => {
     expect(redisClient.xAdd).toHaveBeenCalledTimes(2);
   });
 
+  it('should return existing event for idempotency key', async () => {
+    const eventData = {
+      type: "PLAYER_JOINED",
+      tableId: "table-1",
+      payload: { userId: "user-1" },
+      idempotencyKey: "key-1",
+    };
+
+    const existingEvent = {
+      event_id: "existing-1",
+      type: "PLAYER_JOINED",
+      table_id: "table-1",
+      hand_id: null,
+      user_id: "user-1",
+      seat_id: null,
+      payload: { userId: "user-1" },
+      timestamp: new Date(),
+      sequence: null,
+    };
+
+    mockClient.query.mockResolvedValueOnce({ rows: [] }); // BEGIN
+    mockClient.query.mockResolvedValueOnce({ rows: [{ event_id: "existing-1" }] }); // idempotency lookup
+    mockClient.query.mockResolvedValueOnce({ rows: [existingEvent] }); // existing event
+    mockClient.query.mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const result = await eventStore.publishEvent(eventData);
+
+    expect(result.eventId).toBe("existing-1");
+    expect(mockClient.query).not.toHaveBeenCalledWith(expect.stringContaining("INSERT INTO events"), expect.any(Array));
+  });
+
+  it('should error if idempotency key exists but event missing', async () => {
+    const eventData = {
+      type: "PLAYER_JOINED",
+      tableId: "table-1",
+      payload: { userId: "user-1" },
+      idempotencyKey: "key-1",
+    };
+
+    mockClient.query.mockResolvedValueOnce({ rows: [] }); // BEGIN
+    mockClient.query.mockResolvedValueOnce({ rows: [{ event_id: "missing-1" }] }); // idempotency lookup
+    mockClient.query.mockResolvedValueOnce({ rows: [] }); // missing event
+
+    await expect(eventStore.publishEvent(eventData)).rejects.toThrow(
+      "Idempotency key exists but event is missing"
+    );
+
+    expect(mockClient.query).toHaveBeenCalledWith("ROLLBACK");
+  });
+
   it('should query events successfully', async () => {
     const mockEvents = [{ event_id: "e1", type: "T1", table_id: "t1", payload: {}, timestamp: new Date(), sequence: 1 }];
     (pool.query as unknown).mockResolvedValueOnce({ rows: [{ count: "1" }] }); // COUNT
@@ -71,6 +121,24 @@ describe('EventStore', () => {
 
     expect(result?.eventId).toBe("e1");
     expect(pool.query).toHaveBeenCalledWith(expect.stringContaining("SELECT * FROM events"), ["e1"]);
+  });
+
+  it('should return showdown reveals with seat ids', async () => {
+    (pool.query as unknown).mockResolvedValueOnce({
+      rows: [
+        {
+          payload: {
+            reveals: [{ seatId: 1 }, { seat_id: 2 }, { seatId: "bad" }],
+          },
+        },
+      ],
+    });
+
+    const result = await eventStore.getShowdownReveals("hand-1");
+
+    expect(result.has(1)).toBe(true);
+    expect(result.has(2)).toBe(true);
+    expect(result.size).toBe(2);
   });
 
   it('should rollback on error', async () => {

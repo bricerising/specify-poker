@@ -14,7 +14,62 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
   oneofs: true,
 });
 
-const proto = grpc.loadPackageDefinition(packageDefinition) as any;
+type StructValue =
+  | { nullValue: 0 }
+  | { boolValue: boolean }
+  | { numberValue: number }
+  | { stringValue: string }
+  | { listValue: { values: StructValue[] } }
+  | { structValue: { fields: StructFields } };
+
+type StructFields = Record<string, StructValue>;
+
+interface PublishEventResponse {
+  success: boolean;
+  event_id?: string;
+}
+
+interface PublishEventsResponse {
+  success: boolean;
+  event_ids?: string[];
+}
+
+interface EventServiceClient {
+  PublishEvent(
+    request: {
+      type: string;
+      table_id: string;
+      hand_id?: string;
+      user_id?: string;
+      seat_id?: number;
+      payload: { fields: StructFields };
+      idempotency_key: string;
+    },
+    callback: (err: grpc.ServiceError | null, response: PublishEventResponse) => void
+  ): void;
+  PublishEvents(
+    request: {
+      events: Array<{
+        type: string;
+        table_id: string;
+        hand_id?: string;
+        user_id?: string;
+        seat_id?: number;
+        payload: { fields: StructFields };
+        idempotency_key: string;
+      }>;
+    },
+    callback: (err: grpc.ServiceError | null, response: PublishEventsResponse) => void
+  ): void;
+}
+
+type EventProto = {
+  event: {
+    EventService: new (addr: string, creds: grpc.ChannelCredentials) => EventServiceClient;
+  };
+};
+
+const proto = grpc.loadPackageDefinition(packageDefinition) as unknown as EventProto;
 
 const client = new proto.event.EventService(
   config.eventServiceAddr,
@@ -27,7 +82,7 @@ export interface GameEvent {
   handId?: string;
   userId?: string;
   seatId?: number;
-  payload: Record<string, any>;
+  payload: Record<string, unknown>;
   idempotencyKey: string;
 }
 
@@ -48,7 +103,7 @@ export async function publishEvent(event: GameEvent): Promise<PublishResult> {
         payload: { fields: objectToStructFields(event.payload) },
         idempotency_key: event.idempotencyKey,
       },
-      (err: any, response: any) => {
+      (err: grpc.ServiceError | null, response: PublishEventResponse) => {
         if (err) {
           logger.error({ err, event }, "Event publish failed");
           resolve({ success: false });
@@ -74,7 +129,7 @@ export async function publishEvents(events: GameEvent[]): Promise<{ success: boo
           idempotency_key: e.idempotencyKey,
         })),
       },
-      (err: any, response: any) => {
+      (err: grpc.ServiceError | null, response: PublishEventsResponse) => {
         if (err) {
           logger.error({ err }, "Batch event publish failed");
           resolve({ success: false });
@@ -87,15 +142,15 @@ export async function publishEvents(events: GameEvent[]): Promise<{ success: boo
 }
 
 // Helper function to convert a plain object to protobuf Struct fields
-function objectToStructFields(obj: Record<string, any>): Record<string, any> {
-  const fields: Record<string, any> = {};
+function objectToStructFields(obj: Record<string, unknown>): StructFields {
+  const fields: StructFields = {};
   for (const [key, value] of Object.entries(obj)) {
     fields[key] = valueToStructValue(value);
   }
   return fields;
 }
 
-function valueToStructValue(value: any): any {
+function valueToStructValue(value: unknown): StructValue {
   if (value === null || value === undefined) {
     return { nullValue: 0 };
   }
@@ -112,7 +167,7 @@ function valueToStructValue(value: any): any {
     return { listValue: { values: value.map(valueToStructValue) } };
   }
   if (typeof value === "object") {
-    return { structValue: { fields: objectToStructFields(value) } };
+    return { structValue: { fields: objectToStructFields(value as Record<string, unknown>) } };
   }
   return { stringValue: String(value) };
 }
@@ -155,7 +210,12 @@ export const EventTypes = {
 } as const;
 
 // Convenience functions for common events
-export async function emitTableCreated(tableId: string, ownerId: string, tableName: string, config: any) {
+export async function emitTableCreated(
+  tableId: string,
+  ownerId: string,
+  tableName: string,
+  config: Record<string, unknown>
+) {
   return publishEvent({
     type: EventTypes.TABLE_CREATED,
     tableId,
@@ -187,7 +247,12 @@ export async function emitPlayerLeft(tableId: string, userId: string, seatId: nu
   });
 }
 
-export async function emitHandStarted(tableId: string, handId: string, participants: any[], button: number) {
+export async function emitHandStarted(
+  tableId: string,
+  handId: string,
+  participants: Array<Record<string, unknown>>,
+  button: number
+) {
   return publishEvent({
     type: EventTypes.HAND_STARTED,
     tableId,
@@ -220,7 +285,7 @@ export async function emitActionTaken(
 export async function emitHandCompleted(
   tableId: string,
   handId: string,
-  winners: any[],
+  winners: Array<Record<string, unknown>>,
   communityCards: string[],
   rake: number
 ) {

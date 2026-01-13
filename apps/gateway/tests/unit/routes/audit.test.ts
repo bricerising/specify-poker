@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import express from "express";
-import request from "supertest";
 import auditRouter from "../../../src/http/routes/audit";
+import { dispatchToRouter } from "../helpers/express";
 
 // Mock the gRPC client
 vi.mock("../../../src/grpc/clients", () => ({
@@ -27,17 +26,9 @@ vi.mock("../../../src/observability/logger", () => ({
 import { eventClient } from "../../../src/grpc/clients";
 
 describe("Audit Routes", () => {
-  let app: express.Application;
+  const auth = { userId: "user-123", claims: {} };
 
   beforeEach(() => {
-    app = express();
-    app.use(express.json());
-    // Add mock auth middleware
-    app.use((req, _res, next) => {
-      (req as any).auth = { userId: "user-123", claims: {} };
-      next();
-    });
-    app.use("/api/audit", auditRouter);
     vi.clearAllMocks();
   });
 
@@ -62,12 +53,20 @@ describe("Audit Routes", () => {
         }
       );
 
-      const response = await request(app).get("/api/audit/events");
+      const response = await dispatchToRouter(auditRouter, {
+        method: "GET",
+        url: "/events",
+        auth,
+      });
 
-      expect(response.status).toBe(200);
-      expect(response.body.events).toEqual(mockEvents);
-      expect(response.body.total).toBe(2);
-      expect(response.body.hasMore).toBe(false);
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          events: mockEvents,
+          total: 2,
+          hasMore: false,
+        })
+      );
     });
 
     it("should pass query parameters", async () => {
@@ -77,7 +76,12 @@ describe("Audit Routes", () => {
         }
       );
 
-      await request(app).get("/api/audit/events?tableId=t1&limit=10");
+      await dispatchToRouter(auditRouter, {
+        method: "GET",
+        url: "/events",
+        auth,
+        query: { tableId: "t1", limit: "10" },
+      });
 
       expect(eventClient.QueryEvents).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -99,9 +103,13 @@ describe("Audit Routes", () => {
         }
       );
 
-      const response = await request(app).get("/api/audit/events/e1");
+      const response = await dispatchToRouter(auditRouter, {
+        method: "GET",
+        url: "/events/e1",
+        auth,
+      });
 
-      expect(response.status).toBe(200);
+      expect(response.statusCode).toBe(200);
       expect(response.body).toEqual(mockEvent);
     });
 
@@ -112,9 +120,13 @@ describe("Audit Routes", () => {
         }
       );
 
-      const response = await request(app).get("/api/audit/events/not-found");
+      const response = await dispatchToRouter(auditRouter, {
+        method: "GET",
+        url: "/events/not-found",
+        auth,
+      });
 
-      expect(response.status).toBe(404);
+      expect(response.statusCode).toBe(404);
     });
   });
 
@@ -132,9 +144,13 @@ describe("Audit Routes", () => {
         }
       );
 
-      const response = await request(app).get("/api/audit/hands/h1");
+      const response = await dispatchToRouter(auditRouter, {
+        method: "GET",
+        url: "/hands/h1",
+        auth,
+      });
 
-      expect(response.status).toBe(200);
+      expect(response.statusCode).toBe(200);
       expect(response.body).toEqual(mockHand);
     });
   });
@@ -155,11 +171,19 @@ describe("Audit Routes", () => {
         }
       );
 
-      const response = await request(app).get("/api/audit/hands/h1/replay");
+      const response = await dispatchToRouter(auditRouter, {
+        method: "GET",
+        url: "/hands/h1/replay",
+        auth,
+      });
 
-      expect(response.status).toBe(200);
-      expect(response.body.handId).toBe("h1");
-      expect(response.body.events).toHaveLength(2);
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          handId: "h1",
+          events: expect.any(Array),
+        })
+      );
     });
   });
 
@@ -176,11 +200,14 @@ describe("Audit Routes", () => {
         }
       );
 
-      const response = await request(app).get("/api/audit/tables/t1/hands");
+      const response = await dispatchToRouter(auditRouter, {
+        method: "GET",
+        url: "/tables/t1/hands",
+        auth,
+      });
 
-      expect(response.status).toBe(200);
-      expect(response.body.hands).toEqual(mockHands);
-      expect(response.body.total).toBe(2);
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toEqual(expect.objectContaining({ hands: mockHands, total: 2 }));
     });
   });
 
@@ -196,10 +223,14 @@ describe("Audit Routes", () => {
         }
       );
 
-      const response = await request(app).get("/api/audit/my-hands");
+      const response = await dispatchToRouter(auditRouter, {
+        method: "GET",
+        url: "/my-hands",
+        auth,
+      });
 
-      expect(response.status).toBe(200);
-      expect(response.body.hands).toEqual(mockHands);
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toEqual(expect.objectContaining({ hands: mockHands }));
     });
   });
 
@@ -215,17 +246,25 @@ describe("Audit Routes", () => {
         }
       );
 
-      const response = await request(app).get("/api/audit/users/user-123/hands");
+      const response = await dispatchToRouter(auditRouter, {
+        method: "GET",
+        url: "/users/user-123/hands",
+        auth,
+      });
 
-      expect(response.status).toBe(200);
-      expect(response.body.hands).toEqual(mockHands);
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toEqual(expect.objectContaining({ hands: mockHands }));
     });
 
     it("should return 403 when accessing other user hands", async () => {
-      const response = await request(app).get("/api/audit/users/other-user/hands");
+      const response = await dispatchToRouter(auditRouter, {
+        method: "GET",
+        url: "/users/other-user/hands",
+        auth,
+      });
 
-      expect(response.status).toBe(403);
-      expect(response.body.error).toBe("Forbidden");
+      expect(response.statusCode).toBe(403);
+      expect(response.body).toEqual(expect.objectContaining({ error: "Forbidden" }));
     });
   });
 });

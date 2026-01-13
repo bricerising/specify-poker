@@ -4,10 +4,22 @@ import logger from "../../observability/logger";
 
 const router = Router();
 
+function requireUserId(req: Request, res: Response) {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return null;
+  }
+  return userId;
+}
+
 // Helper to convert gRPC callback to promise
-function grpcCall<T>(method: string, request: unknown): Promise<T> {
+function grpcCall<TRequest, TResponse>(
+  method: (request: TRequest, callback: (err: Error | null, response: TResponse) => void) => void,
+  request: TRequest
+): Promise<TResponse> {
   return new Promise((resolve, reject) => {
-    (eventClient as any)[method](request, (err: Error | null, response: T) => {
+    method(request, (err: Error | null, response: TResponse) => {
       if (err) reject(err);
       else resolve(response);
     });
@@ -25,7 +37,7 @@ router.get("/events", async (req: Request, res: Response) => {
       total: number;
       has_more: boolean;
       next_cursor?: string;
-    }>("QueryEvents", {
+    }>(eventClient.QueryEvents.bind(eventClient), {
       table_id: tableId as string | undefined,
       hand_id: handId as string | undefined,
       user_id: userId as string | undefined,
@@ -53,7 +65,7 @@ router.get("/events", async (req: Request, res: Response) => {
 router.get("/events/:eventId", async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
-    const response = await grpcCall<unknown>("GetEvent", { event_id: eventId });
+    const response = await grpcCall(eventClient.GetEvent.bind(eventClient), { event_id: eventId });
     res.json(response);
   } catch (err) {
     logger.error({ err, eventId: req.params.eventId }, "Failed to get event");
@@ -66,7 +78,7 @@ router.get("/hands/:handId", async (req: Request, res: Response) => {
   try {
     const { handId } = req.params;
     const requesterId = req.auth?.userId;
-    const response = await grpcCall<unknown>("GetHandRecord", {
+    const response = await grpcCall(eventClient.GetHandRecord.bind(eventClient), {
       hand_id: handId,
       requester_id: requesterId,
     });
@@ -81,10 +93,7 @@ router.get("/hands/:handId", async (req: Request, res: Response) => {
 router.get("/hands/:handId/replay", async (req: Request, res: Response) => {
   try {
     const { handId } = req.params;
-    const response = await grpcCall<{ hand_id: string; events: unknown[] }>(
-      "GetHandReplay",
-      { hand_id: handId }
-    );
+    const response = await grpcCall(eventClient.GetHandReplay.bind(eventClient), { hand_id: handId });
     res.json({
       handId: response.hand_id,
       events: response.events || [],
@@ -102,15 +111,12 @@ router.get("/tables/:tableId/hands", async (req: Request, res: Response) => {
     const { limit, offset } = req.query;
     const requesterId = req.auth?.userId;
 
-    const response = await grpcCall<{ hands: unknown[]; total: number }>(
-      "GetHandHistory",
-      {
-        table_id: tableId,
-        limit: limit ? parseInt(limit as string, 10) : 20,
-        offset: offset ? parseInt(offset as string, 10) : 0,
-        requester_id: requesterId,
-      }
-    );
+    const response = await grpcCall(eventClient.GetHandHistory.bind(eventClient), {
+      table_id: tableId,
+      limit: limit ? parseInt(limit as string, 10) : 20,
+      offset: offset ? parseInt(offset as string, 10) : 0,
+      requester_id: requesterId,
+    });
 
     res.json({
       hands: response.hands || [],
@@ -134,14 +140,11 @@ router.get("/users/:userId/hands", async (req: Request, res: Response) => {
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    const response = await grpcCall<{ hands: unknown[]; total: number }>(
-      "GetHandsForUser",
-      {
-        user_id: userId,
-        limit: limit ? parseInt(limit as string, 10) : 20,
-        offset: offset ? parseInt(offset as string, 10) : 0,
-      }
-    );
+    const response = await grpcCall(eventClient.GetHandsForUser.bind(eventClient), {
+      user_id: userId,
+      limit: limit ? parseInt(limit as string, 10) : 20,
+      offset: offset ? parseInt(offset as string, 10) : 0,
+    });
 
     return res.json({
       hands: response.hands || [],
@@ -156,21 +159,16 @@ router.get("/users/:userId/hands", async (req: Request, res: Response) => {
 // GET /api/audit/my-hands - Get current user's hand history
 router.get("/my-hands", async (req: Request, res: Response) => {
   try {
-    const userId = req.auth?.userId;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     const { limit, offset } = req.query;
 
-    const response = await grpcCall<{ hands: unknown[]; total: number }>(
-      "GetHandsForUser",
-      {
-        user_id: userId,
-        limit: limit ? parseInt(limit as string, 10) : 20,
-        offset: offset ? parseInt(offset as string, 10) : 0,
-      }
-    );
+    const response = await grpcCall(eventClient.GetHandsForUser.bind(eventClient), {
+      user_id: userId,
+      limit: limit ? parseInt(limit as string, 10) : 20,
+      offset: offset ? parseInt(offset as string, 10) : 0,
+    });
 
     return res.json({
       hands: response.hands || [],

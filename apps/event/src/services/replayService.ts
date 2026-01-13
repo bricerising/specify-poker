@@ -24,11 +24,8 @@ export class ReplayService {
     }
 
     const participantUserIds = extractParticipants(events);
-    const revealedSeatIds = await eventStore.getShowdownReveals(handId);
 
-    return events.map((event) =>
-      privacyService.filterEvent(event, requesterUserId, isOperator, participantUserIds, revealedSeatIds)
-    );
+    return events.map((event) => privacyService.filterEvent(event, requesterUserId, isOperator, participantUserIds));
   }
 }
 

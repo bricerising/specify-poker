@@ -45,21 +45,10 @@ export class EventStore {
     try {
       await client.query("BEGIN");
 
-      if (event.idempotencyKey) {
-        const existing = await client.query(
-          "SELECT event_id FROM event_idempotency WHERE idempotency_key = $1",
-          [event.idempotencyKey]
-        );
-        if (existing.rows.length > 0) {
-          const existingEvent = await client.query("SELECT * FROM events WHERE event_id = $1", [
-            existing.rows[0].event_id,
-          ]);
-          await client.query("COMMIT");
-          if (!existingEvent.rows[0]) {
-            throw new Error("Idempotency key exists but event is missing");
-          }
-          return mapRowToEvent(existingEvent.rows[0]);
-        }
+      const existingEvent = await this.findIdempotentEvent(client, event.idempotencyKey);
+      if (existingEvent) {
+        await client.query("COMMIT");
+        return existingEvent;
       }
 
       await client.query(
@@ -137,30 +126,23 @@ export class EventStore {
     const params: unknown[] = [];
     let paramCount = 1;
 
-    if (filters.tableId) {
-      queryText += ` AND table_id = $${paramCount++}`;
-      params.push(filters.tableId);
-    }
-    if (filters.handId) {
-      queryText += ` AND hand_id = $${paramCount++}`;
-      params.push(filters.handId);
-    }
-    if (filters.userId) {
-      queryText += ` AND user_id = $${paramCount++}`;
-      params.push(filters.userId);
-    }
+    const addFilter = (value: unknown, clause: string) => {
+      if (value === undefined || value === null) {
+        return;
+      }
+      queryText += ` ${clause} $${paramCount++}`;
+      params.push(value);
+    };
+
+    addFilter(filters.tableId, "AND table_id =");
+    addFilter(filters.handId, "AND hand_id =");
+    addFilter(filters.userId, "AND user_id =");
     if (filters.types && filters.types.length > 0) {
       queryText += ` AND type = ANY($${paramCount++})`;
       params.push(filters.types);
     }
-    if (filters.startTime) {
-      queryText += ` AND timestamp >= $${paramCount++}`;
-      params.push(filters.startTime);
-    }
-    if (filters.endTime) {
-      queryText += ` AND timestamp <= $${paramCount++}`;
-      params.push(filters.endTime);
-    }
+    addFilter(filters.startTime, "AND timestamp >=");
+    addFilter(filters.endTime, "AND timestamp <=");
 
     const countRes = await pool.query(`SELECT COUNT(*) FROM (${queryText}) as filtered`, params);
     const total = parseInt(countRes.rows[0].count, 10);
@@ -182,10 +164,11 @@ export class EventStore {
       "SELECT payload FROM events WHERE hand_id = $1 AND type = $2 ORDER BY timestamp DESC LIMIT 1",
       [handId, "SHOWDOWN"]
     );
-    if (!res.rows[0]) {
+    const row = res.rows[0];
+    if (!row) {
       return new Set();
     }
-    const payload = res.rows[0].payload as {
+    const payload = row.payload as {
       reveals?: { seatId?: number; seat_id?: number }[];
     };
     return new Set(
@@ -193,6 +176,29 @@ export class EventStore {
         .map((reveal) => reveal.seatId ?? reveal.seat_id)
         .filter((seatId): seatId is number => typeof seatId === "number")
     );
+  }
+
+  private async findIdempotentEvent(
+    client: Awaited<ReturnType<typeof pool.connect>>,
+    idempotencyKey?: string | null
+  ): Promise<GameEvent | null> {
+    if (!idempotencyKey) {
+      return null;
+    }
+    const existing = await client.query(
+      "SELECT event_id FROM event_idempotency WHERE idempotency_key = $1",
+      [idempotencyKey]
+    );
+    if (!existing.rows[0]) {
+      return null;
+    }
+    const existingEvent = await client.query("SELECT * FROM events WHERE event_id = $1", [
+      existing.rows[0].event_id,
+    ]);
+    if (!existingEvent.rows[0]) {
+      throw new Error("Idempotency key exists but event is missing");
+    }
+    return mapRowToEvent(existingEvent.rows[0]);
   }
 }
 
