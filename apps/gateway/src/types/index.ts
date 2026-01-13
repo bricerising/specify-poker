@@ -129,6 +129,32 @@ export interface PlayerServiceClient {
 }
 
 export interface EventServiceClient {
+    PublishEvent(
+        request: {
+            type: string;
+            table_id: string;
+            hand_id?: string;
+            user_id?: string;
+            seat_id?: number;
+            payload: Record<string, unknown>;
+            idempotency_key: string;
+        },
+        callback: UnaryCallback<{ success: boolean; event_id?: string }>
+    ): void;
+    PublishEvents(
+        request: {
+            events: Array<{
+                type: string;
+                table_id: string;
+                hand_id?: string;
+                user_id?: string;
+                seat_id?: number;
+                payload: Record<string, unknown>;
+                idempotency_key: string;
+            }>;
+        },
+        callback: UnaryCallback<{ success: boolean; event_ids: string[] }>
+    ): void;
     QueryEvents(
         request: {
             table_id?: string;
@@ -156,4 +182,23 @@ export interface EventServiceClient {
     ): void;
 }
 
-export type BalanceServiceClient = Record<string, never>;
+export interface NotifyServiceClient {
+    RegisterSubscription(
+        request: { user_id: string; subscription: { endpoint: string; keys?: { p256dh?: string; auth?: string } } },
+        callback: UnaryCallback<{ ok: boolean; error?: string }>
+    ): void;
+    UnregisterSubscription(
+        request: { user_id: string; endpoint: string },
+        callback: UnaryCallback<{ ok: boolean; error?: string }>
+    ): void;
+    ListSubscriptions(
+        request: { user_id: string },
+        callback: UnaryCallback<{ subscriptions: Array<{ endpoint: string; keys?: { p256dh?: string; auth?: string } }> }>
+    ): void;
+    SendNotification(
+        request: { user_id: string; title: string; body: string; url?: string; icon?: string; tag?: string; data?: Record<string, string> },
+        callback: UnaryCallback<{ ok: boolean; success_count?: number; failure_count?: number; error?: string }>
+    ): void;
+}
+
+export type BalanceServiceClient = Record<string, unknown>;

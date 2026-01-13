@@ -1,13 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Request, Response } from "express";
+import type { Request, Response, Router } from "express";
 import { IncomingMessage, ServerResponse } from "http";
 import { Socket } from "net";
 
+type ProxyEventHandler = (...args: unknown[]) => void;
+
 const proxyState = vi.hoisted(() => {
-  const handlers: Record<string, Function> = {};
+  const handlers: Record<string, ProxyEventHandler> = {};
   const proxyWeb = vi.fn();
   const proxyServer = {
-    on: vi.fn((event: string, handler: Function) => {
+    on: vi.fn((event: string, handler: ProxyEventHandler) => {
       handlers[event] = handler;
     }),
     web: proxyWeb,
@@ -42,14 +44,15 @@ describe("HTTP proxy", () => {
   });
 
   it("forwards balance routes to configured target", () => {
-    const routes: Array<{ path: string; handler: Function }> = [];
+    type RouteHandler = (req: Request, res: Response) => void;
+    const routes: Array<{ path: string; handler: RouteHandler }> = [];
     const app = {
-      all: (path: string, handler: Function) => {
+      all: (path: string, handler: RouteHandler) => {
         routes.push({ path, handler });
       },
-    } as unknown as { all: (path: string, handler: Function) => void };
+    } as unknown as Router;
 
-    setupProxy(app as unknown as { all: (path: string, handler: Function) => void });
+    setupProxy(app);
 
     const handler = routes.find((route) => route.path === "/api/accounts*");
     expect(handler).toBeDefined();

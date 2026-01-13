@@ -16,6 +16,14 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 
 type NumericString = string | number;
 
+function parseNumeric(value: NumericString | undefined): number {
+  if (value === undefined) {
+    return 0;
+  }
+  const parsed = typeof value === "number" ? value : Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 interface ReserveForBuyInResponse {
   ok: boolean;
   reservation_id?: string;
@@ -201,7 +209,7 @@ export async function reserveForBuyIn(
           ok: response.ok,
           reservationId: response.reservation_id,
           error: response.error,
-          availableBalance: parseInt(response.available_balance, 10),
+          availableBalance: parseNumeric(response.available_balance),
         });
       }
     );
@@ -222,7 +230,7 @@ export async function commitReservation(reservationId: string): Promise<CommitRe
           ok: response.ok,
           transactionId: response.transaction_id,
           error: response.error,
-          newBalance: parseInt(response.new_balance, 10),
+          newBalance: parseNumeric(response.new_balance),
         });
       }
     );
@@ -276,7 +284,7 @@ export async function processCashOut(
           ok: response.ok,
           transactionId: response.transaction_id,
           error: response.error,
-          newBalance: parseInt(response.new_balance, 10),
+          newBalance: parseNumeric(response.new_balance),
         });
       }
     );
@@ -312,8 +320,8 @@ export async function recordContribution(
         resolve({
           ok: response.ok,
           error: response.error,
-          totalPot: parseInt(response.total_pot, 10),
-          seatContribution: parseInt(response.seat_contribution, 10),
+          totalPot: parseNumeric(response.total_pot),
+          seatContribution: parseNumeric(response.seat_contribution),
         });
       }
     );
@@ -350,8 +358,8 @@ export async function settlePot(
           results: response.results?.map((r) => ({
             accountId: r.account_id,
             transactionId: r.transaction_id,
-            amount: parseInt(r.amount, 10),
-            newBalance: parseInt(r.new_balance, 10),
+            amount: parseNumeric(r.amount),
+            newBalance: parseNumeric(r.new_balance),
           })),
         });
       }

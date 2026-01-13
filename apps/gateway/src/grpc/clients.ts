@@ -2,7 +2,7 @@ import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
 import * as path from "path";
 import { getConfig } from "../config";
-import { GameServiceClient, PlayerServiceClient, BalanceServiceClient, EventServiceClient } from "../types";
+import type { BalanceServiceClient, EventServiceClient, GameServiceClient, NotifyServiceClient, PlayerServiceClient } from "../types";
 
 function loadProto(protoName: string) {
   const protoPath = path.resolve(__dirname, "../../proto", `${protoName}.proto`);
@@ -16,14 +16,19 @@ function loadProto(protoName: string) {
   return grpc.loadPackageDefinition(packageDefinition);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const gameProto = loadProto("game") as any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const playerProto = loadProto("player") as any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const balanceProto = loadProto("balance") as any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const eventProto = loadProto("event") as any;
+type GrpcClientConstructor<TClient> = new (address: string, credentials: grpc.ChannelCredentials) => TClient;
+
+type GameProto = { game: { GameService: GrpcClientConstructor<GameServiceClient> } };
+type PlayerProto = { player: { PlayerService: GrpcClientConstructor<PlayerServiceClient> } };
+type BalanceProto = { balance: { BalanceService: GrpcClientConstructor<BalanceServiceClient> } };
+type EventProto = { event: { EventService: GrpcClientConstructor<EventServiceClient> } };
+type NotifyProto = { notify: { NotifyService: GrpcClientConstructor<NotifyServiceClient> } };
+
+const gameProto = loadProto("game") as unknown as GameProto;
+const playerProto = loadProto("player") as unknown as PlayerProto;
+const balanceProto = loadProto("balance") as unknown as BalanceProto;
+const eventProto = loadProto("event") as unknown as EventProto;
+const notifyProto = loadProto("notify") as unknown as NotifyProto;
 
 const config = getConfig();
 
@@ -46,3 +51,8 @@ export const eventClient = new eventProto.event.EventService(
   config.eventServiceUrl,
   grpc.credentials.createInsecure()
 ) as EventServiceClient;
+
+export const notifyClient = new notifyProto.notify.NotifyService(
+  config.notifyServiceUrl,
+  grpc.credentials.createInsecure()
+) as NotifyServiceClient;

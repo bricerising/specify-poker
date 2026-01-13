@@ -298,6 +298,7 @@ services:
       PLAYER_SERVICE_URL: "player:50052"
       EVENT_SERVICE_URL: "event:50054"
       NOTIFY_SERVICE_URL: "notify:50055"
+      VAPID_PUBLIC_KEY: "${VAPID_PUBLIC_KEY}"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
     depends_on:
       - redis

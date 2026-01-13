@@ -6,9 +6,33 @@ const ACCOUNTS_IDS_KEY = "balance:accounts:ids";
 
 // In-memory cache
 const accounts = new Map<string, Account>();
+const accountLocks = new Map<string, Promise<void>>();
 
 function now(): string {
   return new Date().toISOString();
+}
+
+async function withAccountLock<T>(accountId: string, work: () => Promise<T>): Promise<T> {
+  const previous = accountLocks.get(accountId) ?? Promise.resolve();
+  let release: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  const chain = previous.then(() => current);
+  accountLocks.set(accountId, chain);
+
+  await previous;
+  try {
+    return await work();
+  } finally {
+    release!();
+    void chain.finally(() => {
+      if (accountLocks.get(accountId) === chain) {
+        accountLocks.delete(accountId);
+      }
+    });
+  }
 }
 
 export async function getAccount(accountId: string): Promise<Account | null> {
@@ -89,21 +113,23 @@ export async function updateAccountWithVersion(
   expectedVersion: number,
   updater: (current: Account) => Account
 ): Promise<{ ok: boolean; account?: Account; error?: string }> {
-  const current = await getAccount(accountId);
-  if (!current) {
-    return { ok: false, error: "ACCOUNT_NOT_FOUND" };
-  }
+  return withAccountLock(accountId, async () => {
+    const current = await getAccount(accountId);
+    if (!current) {
+      return { ok: false, error: "ACCOUNT_NOT_FOUND" };
+    }
 
-  if (current.version !== expectedVersion) {
-    return { ok: false, error: "VERSION_CONFLICT" };
-  }
+    if (current.version !== expectedVersion) {
+      return { ok: false, error: "VERSION_CONFLICT" };
+    }
 
-  const updated = await updateAccount(accountId, updater);
-  if (!updated) {
-    return { ok: false, error: "UPDATE_FAILED" };
-  }
+    const updated = await updateAccount(accountId, updater);
+    if (!updated) {
+      return { ok: false, error: "UPDATE_FAILED" };
+    }
 
-  return { ok: true, account: updated };
+    return { ok: true, account: updated };
+  });
 }
 
 export async function listAccounts(): Promise<Account[]> {

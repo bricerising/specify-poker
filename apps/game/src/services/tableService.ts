@@ -258,14 +258,15 @@ export class TableService {
         );
       });
 
-      if (!reservation.ok || !reservation.reservation_id) {
+      const reservationId = reservation.reservation_id;
+      if (!reservation.ok || !reservationId) {
         await this.rollbackSeat(tableId, seatId, userId);
         return { ok: false, error: reservation.error || "INSUFFICIENT_BALANCE" };
       }
 
       const commit = await new Promise<BalanceCommit>((resolve, reject) => {
         balanceClient.CommitReservation(
-          { reservation_id: reservation.reservation_id },
+          { reservation_id: reservationId },
           (err: Error | null, response: unknown) => {
             if (err) reject(err);
             else resolve(response as BalanceCommit);
@@ -285,7 +286,7 @@ export class TableService {
 
       finalSeat.stack = finalBuyIn;
       finalSeat.status = "SEATED";
-      finalSeat.reservationId = reservation.reservation_id;
+      finalSeat.reservationId = reservationId;
       finalState.version += 1;
       finalState.updatedAt = this.now();
 

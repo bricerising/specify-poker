@@ -5,6 +5,30 @@ const IDEMPOTENCY_PREFIX = "balance:transactions:idempotency:";
 
 // In-memory cache with expiry
 const idempotencyCache = new Map<string, { response: string; expiresAt: number }>();
+const idempotencyLocks = new Map<string, Promise<void>>();
+
+export async function withIdempotencyLock<T>(key: string, work: () => Promise<T>): Promise<T> {
+  const previous = idempotencyLocks.get(key) ?? Promise.resolve();
+  let release: (() => void) | undefined;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  const chain = previous.then(() => current);
+  idempotencyLocks.set(key, chain);
+
+  await previous;
+  try {
+    return await work();
+  } finally {
+    release?.();
+    void chain.finally(() => {
+      if (idempotencyLocks.get(key) === chain) {
+        idempotencyLocks.delete(key);
+      }
+    });
+  }
+}
 
 export async function getIdempotentResponse(key: string): Promise<unknown | null> {
   // Check cache first
@@ -60,5 +84,6 @@ export function cleanExpiredIdempotencyKeys(): void {
 
 export async function resetIdempotency(): Promise<void> {
   idempotencyCache.clear();
+  idempotencyLocks.clear();
   // Note: Redis keys will expire naturally via TTL
 }

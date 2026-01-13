@@ -16,7 +16,7 @@
 ## Default Local URLs
 
 - **UI**: http://localhost:3000
-- **Gateway (Legacy API)**: http://localhost:4000/api
+- **Gateway (HTTP API)**: http://localhost:4000/api
 - **WebSocket**: ws://localhost:4000/ws
 - **Balance Service (HTTP)**: http://localhost:3002/api
 - **Keycloak**: http://localhost:8080
@@ -28,7 +28,6 @@
 ## Expected Local Stack
 
 - **ui**: React app (static server)
-- **api**: Legacy monolithic server (currently being deconstructed)
 - **gateway**: API Gateway and WebSocket proxy (entry point for all traffic)
 - **balance**: Distributed balance service (manages accounts and transactions)
 - **game**: Poker game engine and table management

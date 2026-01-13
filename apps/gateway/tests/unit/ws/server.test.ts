@@ -4,6 +4,10 @@ import type { IncomingMessage } from "http";
 
 let lastWss: MockWebSocketServer | null = null;
 
+function recordWebSocketServer(server: MockWebSocketServer) {
+  lastWss = server;
+}
+
 class MockWebSocket extends EventEmitter {
   send = vi.fn();
   close = vi.fn();
@@ -15,7 +19,7 @@ class MockWebSocketServer extends EventEmitter {
   lastSocket: MockWebSocket | null = null;
   constructor() {
     super();
-    lastWss = this;
+    recordWebSocketServer(this);
   }
   handleUpgrade(_req: IncomingMessage, _socket: unknown, _head: Buffer, cb: (ws: MockWebSocket) => void) {
     this.lastSocket = new MockWebSocket();
@@ -103,7 +107,8 @@ describe("WS server", () => {
 
   it("rejects non-WS upgrade paths", async () => {
     const { initWsServer } = await import("../../../src/ws/server");
-    let upgradeHandler: (req: IncomingMessage, socket: { write: Function; destroy: Function }, head: Buffer) => void;
+    type UpgradeSocket = { write: (data: string) => void; destroy: () => void };
+    let upgradeHandler: (req: IncomingMessage, socket: UpgradeSocket, head: Buffer) => void;
     const server = {
       on: vi.fn((event: string, handler: typeof upgradeHandler) => {
         if (event === "upgrade") {

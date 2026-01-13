@@ -7,6 +7,7 @@ import { getRedisClient } from "../storage/redisClient";
 import tablesRouter from "./routes/tables";
 import profileRouter from "./routes/profile";
 import auditRouter from "./routes/audit";
+import pushRouter from "./routes/push";
 
 export function createRouter(): Router {
   const router = Router();
@@ -46,12 +47,12 @@ export function createRouter(): Router {
 
   // HTTP-to-gRPC Routes (for gRPC-only backend services)
   router.use("/api/tables", tablesRouter);
-  router.use("/api", profileRouter); // Handles /api/me, /api/friends, /api/profile/:userId
   router.use("/api/audit", auditRouter);
+  router.use("/api/push", pushRouter);
+  router.use("/api", profileRouter); // Handles /api/me, /api/friends, /api/profile/:userId
 
   // Proxy Routes (for services with HTTP endpoints like Balance)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  setupProxy(router as any);
+  setupProxy(router);
 
   return router;
 }

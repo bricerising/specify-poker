@@ -8,6 +8,25 @@ import { getLocalConnectionMeta, sendToLocal } from "../localRegistry";
 import { broadcastToChannel } from "../../services/broadcastService";
 import { saveChatMessage, getChatHistory } from "../../storage/chatStore";
 
+function rawDataToString(data: WebSocket.RawData): string {
+  if (typeof data === "string") return data;
+  if (Buffer.isBuffer(data)) return data.toString("utf8");
+  if (Array.isArray(data)) return Buffer.concat(data).toString("utf8");
+  return Buffer.from(data).toString("utf8");
+}
+
+function parseJsonObject(data: WebSocket.RawData): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(rawDataToString(data));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 export async function handleChatPubSubEvent(message: WsPubSubMessage) {
   if (message.channel !== "chat") {
     return;
@@ -61,7 +80,7 @@ async function getNickname(userId: string): Promise<string> {
   return new Promise((resolve) => {
     playerClient.GetProfile({ user_id: userId }, (err, response) => {
       const nickname = response?.profile?.nickname;
-      if (err || !nickname) {
+      if (err || typeof nickname !== "string" || nickname.trim().length === 0) {
         resolve("Unknown");
         return;
       }
@@ -70,7 +89,7 @@ async function getNickname(userId: string): Promise<string> {
   });
 }
 
-async function handleSubscribe(socket: WebSocket, connectionId: string, tableId: string) {
+async function handleSubscribe(connectionId: string, tableId: string) {
   const channel = `chat:${tableId}`;
   await subscribeToChannel(connectionId, channel);
 
@@ -83,7 +102,11 @@ async function handleUnsubscribe(connectionId: string, tableId: string) {
   await unsubscribeFromChannel(connectionId, channel);
 }
 
-async function handleChatSend(connectionId: string, userId: string, payload: { tableId: string; message?: string }) {
+async function handleChatSend(
+  connectionId: string,
+  userId: string,
+  payload: { tableId: string; message: unknown },
+) {
   const tableId = payload.tableId;
   const parsed = parseChatMessage(payload.message);
   if (!parsed.ok) {
@@ -129,21 +152,18 @@ async function handleChatSend(connectionId: string, userId: string, payload: { t
 
 export function attachChatHub(socket: WebSocket, userId: string, connectionId: string) {
   socket.on("message", async (data) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let message: any;
-    try {
-      message = JSON.parse(data.toString());
-    } catch {
+    const message = parseJsonObject(data);
+    if (!message) {
       return;
     }
 
-    const type = message.type;
+    const type = typeof message.type === "string" ? message.type : null;
     const tableId = parseTableId(message.tableId);
 
     switch (type) {
       case "SubscribeChat": {
         if (!tableId) return;
-        await handleSubscribe(socket, connectionId, tableId);
+        await handleSubscribe(connectionId, tableId);
         return;
       }
       case "UnsubscribeChat": {

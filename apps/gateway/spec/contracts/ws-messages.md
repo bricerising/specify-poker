@@ -28,7 +28,7 @@ All messages are JSON objects with a `type` field.
 - `TablePatch` { tableId, handId, patch }
 - `HoleCards` { tableId, handId, seatId, cards: [string, string] }
 - `ActionResult` { tableId, handId, accepted, reason? }
-- `ChatSubscribed` { tableId }
+- `ChatSubscribed` { tableId, history? }
 - `ChatError` { tableId, reason }
 - `ChatMessage` { tableId, message: { id, userId, nickname, text, ts } }
 - `TimerUpdate` { tableId, handId, currentTurnSeat, deadlineTs }

@@ -4,6 +4,8 @@ import logger from "../../observability/logger";
 
 const router = Router();
 
+type UnknownRecord = Record<string, unknown>;
+
 function requireUserId(req: Request, res: Response) {
   const userId = req.auth?.userId;
   if (!userId) {
@@ -26,19 +28,61 @@ function grpcCall<TRequest, TResponse>(
   });
 }
 
+function toString(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function toNumber(value: unknown, fallback = 0): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeProfile(profile: UnknownRecord, fallbackUserId: string) {
+  const userId = toString(profile.userId ?? profile.user_id) || fallbackUserId;
+  const nickname = toString(profile.nickname) || "Unknown";
+  const avatarRaw = toString(profile.avatarUrl ?? profile.avatar_url);
+  const avatarUrl = avatarRaw.length > 0 ? avatarRaw : null;
+  return { userId, nickname, avatarUrl };
+}
+
+function normalizeStats(stats: UnknownRecord | undefined) {
+  return {
+    handsPlayed: toNumber(stats?.handsPlayed ?? stats?.hands_played, 0),
+    wins: toNumber(stats?.wins, 0),
+  };
+}
+
+function normalizeFriendIds(friends: unknown): string[] {
+  if (!Array.isArray(friends)) {
+    return [];
+  }
+  return friends
+    .map((friend) => {
+      if (!friend || typeof friend !== "object") return "";
+      const record = friend as UnknownRecord;
+      return toString(record.userId ?? record.user_id);
+    })
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
+}
+
 // GET /api/me - Get current user's profile
 router.get("/me", async (req: Request, res: Response) => {
   try {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const profileResponse = await grpcCall(playerClient.GetProfile.bind(playerClient), { user_id: userId });
-    const statsResponse = await grpcCall(playerClient.GetStatistics.bind(playerClient), { user_id: userId });
+    const [profileResponse, statsResponse, friendsResponse] = await Promise.all([
+      grpcCall(playerClient.GetProfile.bind(playerClient), { user_id: userId }),
+      grpcCall(playerClient.GetStatistics.bind(playerClient), { user_id: userId }),
+      grpcCall(playerClient.GetFriends.bind(playerClient), { user_id: userId }),
+    ]);
 
-    const profile = profileResponse.profile || {};
-    const stats = statsResponse.statistics || { handsPlayed: 0, wins: 0 };
+    const profile = normalizeProfile((profileResponse.profile || {}) as UnknownRecord, userId);
+    const stats = normalizeStats(statsResponse.statistics as UnknownRecord | undefined);
+    const friends = normalizeFriendIds((friendsResponse as UnknownRecord).friends);
 
-    return res.json({ ...profile, stats });
+    return res.json({ ...profile, stats, friends });
   } catch (err) {
     logger.error({ err }, "Failed to get profile");
     return res.status(500).json({ error: "Failed to get profile" });
@@ -51,26 +95,93 @@ router.put("/me", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const { nickname, avatarUrl, preferences } = req.body;
-    const updateResponse = await grpcCall(playerClient.UpdateProfile.bind(playerClient), {
-      user_id: userId,
-      nickname,
-      avatar_url: avatarUrl,
-      preferences: preferences
-        ? {
-          sound_enabled: preferences.soundEnabled,
-          chat_enabled: preferences.chatEnabled,
-          show_hand_strength: preferences.showHandStrength,
-          theme: preferences.theme,
-        }
-        : undefined,
-    });
-    const statsResponse = await grpcCall(playerClient.GetStatistics.bind(playerClient), { user_id: userId });
+    const body = req.body as UnknownRecord;
+    const nickname = body.nickname;
+    const avatarUrl = body.avatarUrl;
+    const preferences = body.preferences;
 
-    const profile = updateResponse.profile || {};
-    const stats = statsResponse.statistics || { handsPlayed: 0, wins: 0 };
+    const updateRequest: {
+      user_id: string;
+      nickname?: string;
+      avatar_url?: string;
+      preferences?: {
+        sound_enabled?: boolean;
+        chat_enabled?: boolean;
+        show_hand_strength?: boolean;
+        theme?: string;
+      };
+    } = { user_id: userId };
 
-    return res.json({ ...profile, stats });
+    if (typeof nickname === "string") {
+      updateRequest.nickname = nickname;
+    }
+
+    if (avatarUrl === null) {
+      updateRequest.avatar_url = "";
+    } else if (typeof avatarUrl === "string") {
+      updateRequest.avatar_url = avatarUrl;
+    }
+
+    if (preferences && typeof preferences === "object") {
+      const pref = preferences as UnknownRecord;
+      updateRequest.preferences = {
+        ...(typeof pref.soundEnabled === "boolean" ? { sound_enabled: pref.soundEnabled } : {}),
+        ...(typeof pref.chatEnabled === "boolean" ? { chat_enabled: pref.chatEnabled } : {}),
+        ...(typeof pref.showHandStrength === "boolean" ? { show_hand_strength: pref.showHandStrength } : {}),
+        ...(typeof pref.theme === "string" ? { theme: pref.theme } : {}),
+      };
+    }
+
+    const updateResponse = await grpcCall(playerClient.UpdateProfile.bind(playerClient), updateRequest);
+
+    const [statsResponse, friendsResponse] = await Promise.all([
+      grpcCall(playerClient.GetStatistics.bind(playerClient), { user_id: userId }),
+      grpcCall(playerClient.GetFriends.bind(playerClient), { user_id: userId }),
+    ]);
+
+    const profile = normalizeProfile((updateResponse.profile || {}) as UnknownRecord, userId);
+    const stats = normalizeStats(statsResponse.statistics as UnknownRecord | undefined);
+    const friends = normalizeFriendIds((friendsResponse as UnknownRecord).friends);
+
+    return res.json({ ...profile, stats, friends });
+  } catch (err) {
+    logger.error({ err }, "Failed to update profile");
+    return res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+
+// POST /api/profile - Update nickname and avatar (OpenAPI alias)
+router.post("/profile", async (req: Request, res: Response) => {
+  try {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    const body = req.body as UnknownRecord;
+    const nickname = body.nickname;
+    const avatarUrl = body.avatarUrl;
+
+    const updateRequest: { user_id: string; nickname?: string; avatar_url?: string } = { user_id: userId };
+    if (typeof nickname === "string") {
+      updateRequest.nickname = nickname;
+    }
+    if (avatarUrl === null) {
+      updateRequest.avatar_url = "";
+    } else if (typeof avatarUrl === "string") {
+      updateRequest.avatar_url = avatarUrl;
+    }
+
+    const updateResponse = await grpcCall(playerClient.UpdateProfile.bind(playerClient), updateRequest);
+
+    const [statsResponse, friendsResponse] = await Promise.all([
+      grpcCall(playerClient.GetStatistics.bind(playerClient), { user_id: userId }),
+      grpcCall(playerClient.GetFriends.bind(playerClient), { user_id: userId }),
+    ]);
+
+    const profile = normalizeProfile((updateResponse.profile || {}) as UnknownRecord, userId);
+    const stats = normalizeStats(statsResponse.statistics as UnknownRecord | undefined);
+    const friends = normalizeFriendIds((friendsResponse as UnknownRecord).friends);
+
+    return res.json({ ...profile, stats, friends });
   } catch (err) {
     logger.error({ err }, "Failed to update profile");
     return res.status(500).json({ error: "Failed to update profile" });
@@ -119,7 +230,8 @@ router.get("/profile/:userId", async (req: Request, res: Response) => {
     const response = await grpcCall(playerClient.GetProfile.bind(playerClient), {
       user_id: userId,
     });
-    return res.json(response.profile);
+    const profile = normalizeProfile((response.profile || {}) as UnknownRecord, userId);
+    return res.json(profile);
   } catch (err) {
     logger.error({ err, userId: req.params.userId }, "Failed to get profile");
     return res.status(404).json({ error: "Profile not found" });
@@ -135,10 +247,52 @@ router.get("/friends", async (req: Request, res: Response) => {
     const response = await grpcCall(playerClient.GetFriends.bind(playerClient), {
       user_id: userId,
     });
-    return res.json({ friends: response.friends || [] });
+    const friends = normalizeFriendIds((response as UnknownRecord).friends);
+    return res.json({ friends });
   } catch (err) {
     logger.error({ err }, "Failed to get friends");
     return res.status(500).json({ error: "Failed to get friends" });
+  }
+});
+
+// PUT /api/friends - Replace current user's friends list
+router.put("/friends", async (req: Request, res: Response) => {
+  try {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    const body = req.body as UnknownRecord;
+    const desired = body.friends;
+    if (!Array.isArray(desired)) {
+      return res.status(400).json({ error: "friends array is required" });
+    }
+
+    const desiredIds = desired
+      .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+      .filter((entry) => entry.length > 0 && entry !== userId);
+
+    const currentResponse = await grpcCall(playerClient.GetFriends.bind(playerClient), { user_id: userId });
+    const currentIds = new Set(normalizeFriendIds((currentResponse as UnknownRecord).friends));
+    const desiredSet = new Set(desiredIds);
+
+    for (const friendId of desiredSet) {
+      if (currentIds.has(friendId)) {
+        continue;
+      }
+      await grpcCall(playerClient.AddFriend.bind(playerClient), { user_id: userId, friend_id: friendId });
+    }
+
+    for (const friendId of currentIds) {
+      if (desiredSet.has(friendId)) {
+        continue;
+      }
+      await grpcCall(playerClient.RemoveFriend.bind(playerClient), { user_id: userId, friend_id: friendId });
+    }
+
+    return res.json({ friends: Array.from(desiredSet.values()) });
+  } catch (err) {
+    logger.error({ err }, "Failed to update friends");
+    return res.status(500).json({ error: "Failed to update friends" });
   }
 });
 

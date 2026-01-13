@@ -1,11 +1,73 @@
-import request from "supertest";
 import { describe, expect, it, beforeEach } from "vitest";
+import type { Router } from "express";
 
-import { app } from "../../src/server";
+import app from "../../src/api/http/router";
 import { resetAccounts } from "../../src/storage/accountStore";
 import { resetTransactions } from "../../src/storage/transactionStore";
 import { resetIdempotency } from "../../src/storage/idempotencyStore";
 import { resetLedger } from "../../src/storage/ledgerStore";
+import { dispatchToRouter } from "../helpers/express";
+
+type ApiResponse = { status: number; body: unknown };
+
+function splitUrl(url: string): { path: string; query: Record<string, unknown> } {
+  const [path, search] = url.split("?");
+  const query: Record<string, unknown> = {};
+  if (search) {
+    const params = new URLSearchParams(search);
+    for (const [key, value] of params.entries()) {
+      query[key] = value;
+    }
+  }
+  return { path, query };
+}
+
+class RequestBuilder implements PromiseLike<ApiResponse> {
+  private headers: Record<string, string> = {};
+  private body: unknown = undefined;
+
+  constructor(
+    private router: Router,
+    private method: string,
+    private url: string,
+  ) {}
+
+  set(name: string, value: string) {
+    this.headers[name] = value;
+    return this;
+  }
+
+  send(body: unknown) {
+    this.body = body;
+    return this;
+  }
+
+  private async execute(): Promise<ApiResponse> {
+    const { path, query } = splitUrl(this.url);
+    const response = await dispatchToRouter(this.router, {
+      method: this.method,
+      url: path,
+      headers: this.headers,
+      body: this.body,
+      query,
+    });
+    return { status: response.statusCode, body: response.body };
+  }
+
+  then<TResult1 = ApiResponse, TResult2 = never>(
+    onfulfilled?: ((value: ApiResponse) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ): PromiseLike<TResult1 | TResult2> {
+    return this.execute().then(onfulfilled, onrejected);
+  }
+}
+
+function request(router: Router) {
+  return {
+    get: (url: string) => new RequestBuilder(router, "GET", url),
+    post: (url: string) => new RequestBuilder(router, "POST", url),
+  };
+}
 
 describe("Balance Service HTTP API", () => {
   beforeEach(async () => {

@@ -39,6 +39,12 @@ describe("Profile Routes", () => {
         callback(null, { statistics: { handsPlayed: 0, wins: 0 } });
       }
     );
+
+    vi.mocked(playerClient.GetFriends).mockImplementation(
+      (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
+        callback(null, { friends: [] });
+      }
+    );
   });
 
   afterEach(() => {
@@ -67,8 +73,11 @@ describe("Profile Routes", () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.body).toEqual({
-        ...mockProfile,
+        userId: "user-123",
+        nickname: "TestUser",
+        avatarUrl: "https://example.com/avatar.png",
         stats: { handsPlayed: 0, wins: 0 },
+        friends: [],
       });
     });
 
@@ -113,8 +122,11 @@ describe("Profile Routes", () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.body).toEqual({
-        ...updatedProfile,
+        userId: "user-123",
+        nickname: "NewNickname",
+        avatarUrl: "https://example.com/new-avatar.png",
         stats: { handsPlayed: 0, wins: 0 },
+        friends: [],
       });
     });
   });
@@ -201,7 +213,7 @@ describe("Profile Routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      expect(response.body).toEqual(expect.objectContaining({ friends: mockFriends }));
+      expect(response.body).toEqual(expect.objectContaining({ friends: ["friend-1", "friend-2"] }));
     });
   });
 

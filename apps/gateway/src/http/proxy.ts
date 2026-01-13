@@ -1,4 +1,4 @@
-import { Express, Request, Response } from "express";
+import type { Request, Response, Router } from "express";
 import httpProxy from "http-proxy";
 import { ServerResponse } from "http";
 import { getConfig } from "../config";
@@ -25,7 +25,7 @@ proxy.on("proxyReq", (proxyReq, req) => {
   proxyReq.setHeader("x-user-claims", JSON.stringify(auth.claims));
 });
 
-export function setupProxy(app: Express) {
+export function setupProxy(app: Router) {
   const config = getConfig();
 
   // Helper to strip prefix

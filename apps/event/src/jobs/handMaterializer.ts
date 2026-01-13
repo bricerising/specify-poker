@@ -222,13 +222,20 @@ export class HandMaterializer {
       }
     });
 
-    const configPayload =
-      (startedEvent?.payload as
-        | (HandStartedPayload & { small_blind?: number; big_blind?: number; tableName?: string; table_name?: string })
-        | undefined) || {};
-    const smallBlind = configPayload.smallBlind ?? configPayload.small_blind ?? 0;
-    const bigBlind = configPayload.bigBlind ?? configPayload.big_blind ?? 0;
-    const tableName = configPayload.tableName ?? configPayload.table_name ?? "Unknown Table";
+    const configPayload = startedEvent?.payload as
+      | (HandStartedPayload & {
+          small_blind?: number;
+          big_blind?: number;
+          ante?: number;
+          tableName?: string;
+          table_name?: string;
+        })
+      | undefined;
+
+    const smallBlind = configPayload?.smallBlind ?? configPayload?.small_blind ?? 0;
+    const bigBlind = configPayload?.bigBlind ?? configPayload?.big_blind ?? 0;
+    const ante = configPayload?.ante ?? 0;
+    const tableName = configPayload?.tableName ?? configPayload?.table_name ?? "Unknown Table";
 
     return {
       handId,
@@ -237,7 +244,7 @@ export class HandMaterializer {
       config: {
         smallBlind,
         bigBlind,
-        ante: configPayload.ante ?? 0,
+        ante,
       },
       participants: Array.from(participants.values()),
       communityCards,

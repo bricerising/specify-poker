@@ -43,6 +43,27 @@ function normalizeSeat(raw: UnknownRecord): TableSeat {
   };
 }
 
+function normalizeChatMessage(raw: unknown): ChatMessage | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const record = raw as UnknownRecord;
+  const id = typeof record.id === "string" ? record.id : "";
+  const userId =
+    typeof record.userId === "string"
+      ? record.userId
+      : typeof record.user_id === "string"
+        ? record.user_id
+        : "";
+  const text = typeof record.text === "string" ? record.text : "";
+  const ts = typeof record.ts === "string" ? record.ts : "";
+  const nickname = typeof record.nickname === "string" ? record.nickname : undefined;
+  if (!id || !userId || !text || !ts) {
+    return null;
+  }
+  return { id, userId, nickname, text, ts };
+}
+
 function cardToString(card: unknown): string | null {
   if (typeof card === "string") {
     return card;
@@ -210,6 +231,7 @@ export interface TableStore {
 export interface ChatMessage {
   id: string;
   userId: string;
+  nickname?: string;
   text: string;
   ts: string;
 }
@@ -304,6 +326,12 @@ export function createTableStore(): TableStore {
       }
       if (message.type === "ChatMessage") {
         setState({ chatMessages: [...state.chatMessages, message.message], chatError: undefined });
+        return;
+      }
+      if (message.type === "ChatSubscribed") {
+        const history = (message.history as unknown[] | undefined) ?? [];
+        const chatMessages = history.map(normalizeChatMessage).filter((entry): entry is ChatMessage => Boolean(entry));
+        setState({ chatMessages, chatError: undefined });
         return;
       }
       if (message.type === "ChatError") {

@@ -19,6 +19,7 @@ vi.mock("../../../src/config", () => ({
     playerServiceUrl: "player:1234",
     balanceServiceUrl: "balance:1234",
     eventServiceUrl: "event:1234",
+    notifyServiceUrl: "notify:1234",
   }),
 }));
 
@@ -35,19 +36,22 @@ describe("gRPC clients", () => {
       player: { PlayerService: ctor },
       balance: { BalanceService: ctor },
       event: { EventService: ctor },
+      notify: { NotifyService: ctor },
     });
 
     const module = await import("../../../src/grpc/clients");
 
-    expect(loadSync).toHaveBeenCalledTimes(4);
-    expect(createInsecure).toHaveBeenCalledTimes(4);
+    expect(loadSync).toHaveBeenCalledTimes(5);
+    expect(createInsecure).toHaveBeenCalledTimes(5);
     expect(ctor).toHaveBeenCalledWith("game:1234", "creds");
     expect(ctor).toHaveBeenCalledWith("player:1234", "creds");
     expect(ctor).toHaveBeenCalledWith("balance:1234", "creds");
     expect(ctor).toHaveBeenCalledWith("event:1234", "creds");
+    expect(ctor).toHaveBeenCalledWith("notify:1234", "creds");
     expect(module.gameClient).toBeDefined();
     expect(module.playerClient).toBeDefined();
     expect(module.balanceClient).toBeDefined();
     expect(module.eventClient).toBeDefined();
+    expect(module.notifyClient).toBeDefined();
   });
 });

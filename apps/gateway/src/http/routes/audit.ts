@@ -32,12 +32,7 @@ router.get("/events", async (req: Request, res: Response) => {
     const { tableId, handId, userId, types, startTime, endTime, limit, offset, cursor } =
       req.query;
 
-    const response = await grpcCall<{
-      events: unknown[];
-      total: number;
-      has_more: boolean;
-      next_cursor?: string;
-    }>(eventClient.QueryEvents.bind(eventClient), {
+    const response = await grpcCall(eventClient.QueryEvents.bind(eventClient), {
       table_id: tableId as string | undefined,
       hand_id: handId as string | undefined,
       user_id: userId as string | undefined,

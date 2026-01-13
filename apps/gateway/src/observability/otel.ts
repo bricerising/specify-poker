@@ -1,39 +1,54 @@
-import { NodeSDK } from '@opentelemetry/sdk-node';
-import { Resource } from '@opentelemetry/resources';
-import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
-import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
-import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
-import { ExpressInstrumentation } from '@opentelemetry/instrumentation-express';
-import logger from './logger';
+import { NodeSDK } from "@opentelemetry/sdk-node";
+import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-grpc";
+import { Resource } from "@opentelemetry/resources";
+import { SemanticResourceAttributes } from "@opentelemetry/semantic-conventions";
+import logger from "./logger";
+
+let sdk: NodeSDK | null = null;
 
 export function initOTEL() {
-  const sdk = new NodeSDK({
+  if (sdk) {
+    return;
+  }
+
+  sdk = new NodeSDK({
     resource: new Resource({
-      [SemanticResourceAttributes.SERVICE_NAME]: 'gateway',
+      [SemanticResourceAttributes.SERVICE_NAME]: "gateway-service",
     }),
-    traceExporter: new OTLPTraceExporter(),
-    metricReader: new PeriodicExportingMetricReader({
-      exporter: new OTLPMetricExporter(),
+    traceExporter: new OTLPTraceExporter({
+      url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "http://localhost:4317",
     }),
-    instrumentations: [
-      new HttpInstrumentation(),
-      new ExpressInstrumentation(),
-    ],
+    instrumentations: [getNodeAutoInstrumentations()],
   });
 
   try {
-    sdk.start();
-    logger.info('OTEL SDK started');
-  } catch (err) {
-    logger.error({ err }, 'Failed to start OTEL SDK');
+    const maybePromise = sdk.start() as unknown;
+    if (maybePromise && typeof (maybePromise as PromiseLike<void>).then === "function") {
+      void (maybePromise as PromiseLike<void>).then(
+        () => {
+          logger.info("OpenTelemetry SDK started");
+        },
+        (err: unknown) => {
+          logger.error({ err }, "Failed to start OpenTelemetry SDK");
+        },
+      );
+      return;
+    }
+    logger.info("OpenTelemetry SDK started");
+  } catch (err: unknown) {
+    logger.error({ err }, "Failed to start OpenTelemetry SDK");
   }
+}
 
-  process.on('SIGTERM', () => {
-    sdk.shutdown()
-      .then(() => logger.info('OTEL SDK shut down'))
-      .catch((err) => logger.error({ err }, 'Error shutting down OTEL SDK'))
-      .finally(() => process.exit(0));
-  });
+export async function shutdownOTEL() {
+  if (!sdk) {
+    return;
+  }
+  try {
+    await sdk.shutdown();
+    logger.info("OpenTelemetry SDK shut down");
+  } finally {
+    sdk = null;
+  }
 }

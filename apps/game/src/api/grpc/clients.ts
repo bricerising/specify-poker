@@ -18,16 +18,78 @@ function loadProto(protoPath: string) {
   return grpc.loadPackageDefinition(packageDefinition);
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-const balanceProto = loadProto(BALANCE_PROTO_PATH) as any;
-const eventProto = loadProto(EVENT_PROTO_PATH) as any;
+type UnaryCallback<TResponse> = (err: grpc.ServiceError | null, response: TResponse) => void;
+
+export interface BalanceServiceClient {
+  ReserveForBuyIn(
+    request: {
+      account_id: string;
+      table_id: string;
+      amount: number;
+      idempotency_key: string;
+      timeout_seconds: number;
+    },
+    callback: UnaryCallback<unknown>,
+  ): void;
+  CommitReservation(
+    request: { reservation_id: string },
+    callback: UnaryCallback<unknown>,
+  ): void;
+  ReleaseReservation(
+    request: { reservation_id: string; reason?: string },
+    callback: UnaryCallback<unknown>,
+  ): void;
+  ProcessCashOut(
+    request: {
+      account_id: string;
+      table_id: string;
+      seat_id: number;
+      amount: number;
+      idempotency_key: string;
+      hand_id?: string;
+    },
+    callback: UnaryCallback<unknown>,
+  ): void;
+  SettlePot(
+    request: {
+      table_id: string;
+      hand_id: string;
+      winners: Array<{ seat_id: number; account_id: string; amount: number }>;
+      idempotency_key: string;
+    },
+    callback: UnaryCallback<unknown>,
+  ): void;
+}
+
+export interface EventServiceClient {
+  PublishEvent(
+    request: {
+      type: string;
+      table_id: string;
+      hand_id?: string;
+      user_id?: string;
+      seat_id?: number;
+      payload: unknown;
+      idempotency_key: string;
+    },
+    callback: UnaryCallback<unknown>,
+  ): void;
+}
+
+type GrpcClientConstructor<TClient> = new (address: string, credentials: grpc.ChannelCredentials) => TClient;
+
+type BalanceProto = { balance: { BalanceService: GrpcClientConstructor<BalanceServiceClient> } };
+type EventProto = { event: { EventService: GrpcClientConstructor<EventServiceClient> } };
+
+const balanceProto = loadProto(BALANCE_PROTO_PATH) as unknown as BalanceProto;
+const eventProto = loadProto(EVENT_PROTO_PATH) as unknown as EventProto;
 
 export const balanceClient = new balanceProto.balance.BalanceService(
   config.balanceServiceAddr,
-  grpc.credentials.createInsecure()
-) as any;
+  grpc.credentials.createInsecure(),
+);
 
 export const eventClient = new eventProto.event.EventService(
   config.eventServiceAddr,
-  grpc.credentials.createInsecure()
-) as any;
+  grpc.credentials.createInsecure(),
+);

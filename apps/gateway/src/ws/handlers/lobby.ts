@@ -3,26 +3,20 @@ import { gameClient } from "../../grpc/clients";
 import { WsPubSubMessage } from "../pubsub";
 import { subscribeToChannel, unsubscribeFromChannel, getSubscribers } from "../subscriptions";
 import { sendToLocal } from "../localRegistry";
-import { broadcastToChannel } from "../../services/broadcastService";
 
 const LOBBY_CHANNEL = "lobby";
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function _broadcast(tables: unknown[]) {
-  await broadcastToChannel(LOBBY_CHANNEL, { type: "LobbyTablesUpdated", tables });
-}
 
 export async function handleLobbyPubSubEvent(message: WsPubSubMessage) {
   if (message.channel !== "lobby") {
     return;
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const tables = (message.payload as any).tables;
-  if (tables) {
-    const subscribers = await getSubscribers(LOBBY_CHANNEL);
-    for (const connId of subscribers) {
-      sendToLocal(connId, { type: "LobbyTablesUpdated", tables });
-    }
+  const tables = Array.isArray(message.payload.tables) ? message.payload.tables : null;
+  if (!tables) {
+    return;
+  }
+  const subscribers = await getSubscribers(LOBBY_CHANNEL);
+  for (const connId of subscribers) {
+    sendToLocal(connId, { type: "LobbyTablesUpdated", tables });
   }
 }
 

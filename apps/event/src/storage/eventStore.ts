@@ -1,6 +1,7 @@
 import pool from "./pgClient";
 import redisClient from "./redisClient";
 import { v4 as uuidv4 } from "uuid";
+import type { PoolClient } from "pg";
 import { GameEvent, NewGameEvent } from "../domain/types";
 import { streamStore } from "./streamStore";
 import logger from "../observability/logger";
@@ -179,7 +180,7 @@ export class EventStore {
   }
 
   private async findIdempotentEvent(
-    client: Awaited<ReturnType<typeof pool.connect>>,
+    client: PoolClient,
     idempotencyKey?: string | null
   ): Promise<GameEvent | null> {
     if (!idempotencyKey) {

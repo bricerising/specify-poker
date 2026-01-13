@@ -6,6 +6,36 @@ import { subscribeToChannel, unsubscribeFromChannel, unsubscribeAll, getSubscrib
 import { sendToLocal, getLocalConnectionMeta } from "../localRegistry";
 import logger from "../../observability/logger";
 
+function rawDataToString(data: WebSocket.RawData): string {
+  if (typeof data === "string") return data;
+  if (Buffer.isBuffer(data)) return data.toString("utf8");
+  if (Array.isArray(data)) return Buffer.concat(data).toString("utf8");
+  return Buffer.from(data).toString("utf8");
+}
+
+function parseJsonObject(data: WebSocket.RawData): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(rawDataToString(data));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function parseAmount(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 export async function handleTablePubSubEvent(message: WsPubSubMessage) {
   if (message.channel !== "table" && message.channel !== "timer") {
     return;
@@ -47,29 +77,40 @@ async function handleUnsubscribe(connectionId: string, tableId: string) {
   await unsubscribeFromChannel(connectionId, channel);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function handleAction(connectionId: string, userId: string, payload: any) {
+async function handleAction(
+  connectionId: string,
+  userId: string,
+  payload: { tableId: string; actionType: string; amount?: number },
+) {
   const meta = getLocalConnectionMeta(connectionId);
   const ip = meta?.ip ?? "unknown";
   if (!(await checkWsRateLimit(userId, ip, "action")).ok) {
-    sendToLocal(connectionId, { type: "ActionResult", accepted: false, reason: "rate_limited" });
+    sendToLocal(connectionId, {
+      type: "ActionResult",
+      tableId: payload.tableId,
+      accepted: false,
+      reason: "rate_limited",
+    });
     return;
   }
 
-  const actionType = parseActionType(payload.action);
-  if (!actionType) {
-    sendToLocal(connectionId, { type: "ActionResult", accepted: false, reason: "invalid_action" });
-    return;
-  }
-
-  gameClient.SubmitAction({
+  const request: { table_id: string; user_id: string; action_type: string; amount?: number } = {
     table_id: payload.tableId,
     user_id: userId,
-    action_type: actionType,
-    amount: payload.amount
-  }, (err, response) => {
+    action_type: payload.actionType,
+  };
+  if (payload.amount !== undefined) {
+    request.amount = payload.amount;
+  }
+
+  gameClient.SubmitAction(request, (err, response) => {
     if (err) {
-      sendToLocal(connectionId, { type: "ActionResult", accepted: false, reason: "internal_error" });
+      sendToLocal(connectionId, {
+        type: "ActionResult",
+        tableId: payload.tableId,
+        accepted: false,
+        reason: "internal_error",
+      });
       return;
     }
     sendToLocal(connectionId, {
@@ -81,13 +122,16 @@ async function handleAction(connectionId: string, userId: string, payload: any) 
   });
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function handleJoinSeat(connectionId: string, userId: string, payload: any) {
+async function handleJoinSeat(
+  connectionId: string,
+  userId: string,
+  payload: { tableId: string; seatId: number; buyInAmount?: number },
+) {
   gameClient.JoinSeat({
     table_id: payload.tableId,
     user_id: userId,
     seat_id: payload.seatId,
-    buy_in_amount: payload.buyInAmount || 200
+    buy_in_amount: payload.buyInAmount && payload.buyInAmount > 0 ? payload.buyInAmount : 200
   }, (err, response) => {
     if (err) {
       sendToLocal(connectionId, { type: "Error", message: "Internal error" });
@@ -99,10 +143,9 @@ async function handleJoinSeat(connectionId: string, userId: string, payload: any
   });
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function handleLeaveTable(userId: string, payload: any) {
+async function handleLeaveTable(userId: string, tableId: string) {
   gameClient.LeaveSeat({
-    table_id: payload.tableId,
+    table_id: tableId,
     user_id: userId
   }, (err, _response) => {
     if (err) return;
@@ -111,15 +154,12 @@ async function handleLeaveTable(userId: string, payload: any) {
 
 export function attachTableHub(socket: WebSocket, userId: string, connectionId: string) {
   socket.on("message", async (data) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let message: any;
-    try {
-      message = JSON.parse(data.toString());
-    } catch {
+    const message = parseJsonObject(data);
+    if (!message) {
       return;
     }
 
-    const type = message.type;
+    const type = typeof message.type === "string" ? message.type : null;
     const tableId = parseTableId(message.tableId);
 
     switch (type) {
@@ -138,17 +178,45 @@ export function attachTableHub(socket: WebSocket, userId: string, connectionId: 
         if (!tableId) return;
         const seatId = parseSeatId(message.seatId);
         if (seatId === null) return;
-        await handleJoinSeat(connectionId, userId, { tableId, seatId, buyInAmount: message.buyInAmount });
+        const buyInAmount = parseAmount(message.buyInAmount) ?? undefined;
+        await handleJoinSeat(connectionId, userId, { tableId, seatId, buyInAmount });
         return;
       }
       case "LeaveTable": {
         if (!tableId) return;
-        await handleLeaveTable(userId, { tableId });
+        await handleLeaveTable(userId, tableId);
         return;
       }
       case "Action": {
         if (!tableId) return;
-        await handleAction(connectionId, userId, message);
+        const actionType = parseActionType(message.action);
+        if (!actionType) {
+          sendToLocal(connectionId, {
+            type: "ActionResult",
+            tableId,
+            accepted: false,
+            reason: "invalid_action",
+          });
+          return;
+        }
+
+        const requiresAmount = actionType === "BET" || actionType === "RAISE" || actionType === "ALL_IN";
+        const amount = parseAmount(message.amount);
+        if (requiresAmount && amount === null) {
+          sendToLocal(connectionId, {
+            type: "ActionResult",
+            tableId,
+            accepted: false,
+            reason: "missing_amount",
+          });
+          return;
+        }
+
+        await handleAction(connectionId, userId, {
+          tableId,
+          actionType,
+          ...(amount !== null ? { amount } : {}),
+        });
         return;
       }
       case "ResyncTable": {

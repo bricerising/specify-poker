@@ -3,8 +3,7 @@ import { sendToLocal } from "../ws/localRegistry";
 import * as pubsub from "../ws/pubsub";
 import logger from "../observability/logger";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function broadcastToChannel(channel: string, payload: any) {
+export async function broadcastToChannel(channel: string, payload: Record<string, unknown>) {
   try {
     // 1. Get all subscribers for this channel (from Redis)
     const connectionIds = await getSubscribers(channel);
@@ -27,10 +26,9 @@ export async function broadcastToChannel(channel: string, payload: any) {
       // Lobby event in pubsub expects an array of tables... 
       // maybe we should generalize pubsub a bit more.
       // For now, let's just handle it.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((payload as any).tables) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await pubsub.publishLobbyEvent((payload as any).tables);
+      const tables = payload.tables;
+      if (Array.isArray(tables)) {
+        await pubsub.publishLobbyEvent(tables);
       }
     }
   } catch (err) {
@@ -38,7 +36,6 @@ export async function broadcastToChannel(channel: string, payload: any) {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function sendToUser(_userId: string, _payload: unknown) {
   // This would require a way to find all connectionIds for a user
   // We have getConnectionsByUser in connectionStore

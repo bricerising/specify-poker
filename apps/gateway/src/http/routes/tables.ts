@@ -34,6 +34,23 @@ function grpcCall<TRequest, TResponse>(
   });
 }
 
+function parseSeatId(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : parseInt(String(value), 10);
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 8) {
+    return null;
+  }
+  return parsed;
+}
+
+function seatUserId(seat: unknown): string | null {
+  if (!seat || typeof seat !== "object") {
+    return null;
+  }
+  const record = seat as Record<string, unknown>;
+  const userId = record.user_id ?? record.userId;
+  return typeof userId === "string" && userId.trim().length > 0 ? userId : null;
+}
+
 // GET /api/tables - List all tables
 router.get("/", async (_req: Request, res: Response) => {
   try {
@@ -99,8 +116,11 @@ router.delete("/:tableId", async (req: Request, res: Response) => {
 router.get("/:tableId/state", async (req: Request, res: Response) => {
   try {
     const { tableId } = req.params;
-    const userId = req.auth?.userId;
-    const response = await grpcCall(gameClient.GetTableState.bind(gameClient), { table_id: tableId, user_id: userId });
+    const userId = req.auth?.userId ?? "";
+    const response = await grpcCall(gameClient.GetTableState.bind(gameClient), {
+      table_id: tableId,
+      user_id: userId,
+    });
     res.json(response);
   } catch (err) {
     logger.error({ err, tableId: req.params.tableId }, "Failed to get table state");
@@ -251,6 +271,106 @@ router.post("/:tableId/action", async (req: Request, res: Response) => {
   } catch (err) {
     logger.error({ err }, "Failed to submit action");
     return res.status(500).json({ error: "Failed to submit action" });
+  }
+});
+
+// POST /api/tables/:tableId/moderation/kick - Kick by seatId (owner only)
+router.post("/:tableId/moderation/kick", async (req: Request, res: Response) => {
+  try {
+    const { tableId } = req.params;
+    const ownerId = requireUserId(req, res);
+    if (!ownerId) return;
+
+    const seatId = parseSeatId(req.body?.seatId);
+    if (seatId === null) {
+      return res.status(400).json({ error: "seatId is required" });
+    }
+
+    const stateResponse = await grpcCall(gameClient.GetTableState.bind(gameClient), {
+      table_id: tableId,
+      user_id: ownerId,
+    });
+    const seats = (stateResponse.state?.seats ?? []) as unknown[];
+    const targetSeat = seats.find((seat) => {
+      if (!seat || typeof seat !== "object") return false;
+      const record = seat as Record<string, unknown>;
+      const id = record.seat_id ?? record.seatId;
+      return Number(id) === seatId;
+    });
+
+    const targetUserId = seatUserId(targetSeat);
+    if (!targetUserId) {
+      return res.status(404).json({ error: "Seat not occupied" });
+    }
+
+    await grpcCall(gameClient.KickPlayer.bind(gameClient), {
+      table_id: tableId,
+      owner_id: ownerId,
+      target_user_id: targetUserId,
+    });
+
+    const updated = await grpcCall(gameClient.GetTableState.bind(gameClient), {
+      table_id: tableId,
+      user_id: ownerId,
+    });
+
+    return res.json({
+      tableId,
+      seatId,
+      userId: targetUserId,
+      action: "kick",
+      tableState: updated.state,
+    });
+  } catch (err) {
+    logger.error({ err }, "Failed to kick player");
+    return res.status(500).json({ error: "Failed to kick player" });
+  }
+});
+
+// POST /api/tables/:tableId/moderation/mute - Mute by seatId (owner only)
+router.post("/:tableId/moderation/mute", async (req: Request, res: Response) => {
+  try {
+    const { tableId } = req.params;
+    const ownerId = requireUserId(req, res);
+    if (!ownerId) return;
+
+    const seatId = parseSeatId(req.body?.seatId);
+    if (seatId === null) {
+      return res.status(400).json({ error: "seatId is required" });
+    }
+
+    const stateResponse = await grpcCall(gameClient.GetTableState.bind(gameClient), {
+      table_id: tableId,
+      user_id: ownerId,
+    });
+    const seats = (stateResponse.state?.seats ?? []) as unknown[];
+    const targetSeat = seats.find((seat) => {
+      if (!seat || typeof seat !== "object") return false;
+      const record = seat as Record<string, unknown>;
+      const id = record.seat_id ?? record.seatId;
+      return Number(id) === seatId;
+    });
+
+    const targetUserId = seatUserId(targetSeat);
+    if (!targetUserId) {
+      return res.status(404).json({ error: "Seat not occupied" });
+    }
+
+    await grpcCall(gameClient.MutePlayer.bind(gameClient), {
+      table_id: tableId,
+      owner_id: ownerId,
+      target_user_id: targetUserId,
+    });
+
+    return res.json({
+      tableId,
+      seatId,
+      userId: targetUserId,
+      action: "mute",
+    });
+  } catch (err) {
+    logger.error({ err }, "Failed to mute player");
+    return res.status(500).json({ error: "Failed to mute player" });
   }
 });
 

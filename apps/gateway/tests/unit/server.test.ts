@@ -32,6 +32,7 @@ vi.mock("../../src/ws/server", () => ({
 
 vi.mock("../../src/observability/otel", () => ({
   initOTEL: vi.fn(),
+  shutdownOTEL: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../../src/storage/instanceRegistry", () => ({

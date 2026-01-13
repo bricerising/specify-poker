@@ -1,18 +1,19 @@
+import { initOTEL, shutdownOTEL } from "./observability/otel";
+
+// Initialize OpenTelemetry before loading instrumented modules.
+initOTEL();
+
 import express from "express";
 import cors from "cors";
 import { createServer } from "http";
 import { getConfig } from "./config";
 import { createRouter } from "./http/router";
 import { initWsServer } from "./ws/server";
-import { initOTEL } from "./observability/otel";
 import { registerInstance } from "./storage/instanceRegistry";
 import logger from "./observability/logger";
 import { collectDefaultMetrics } from "prom-client";
 
 async function startServer() {
-  // Initialize OTEL before anything else
-  initOTEL();
-
   const config = getConfig();
   const app = express();
   const server = createServer(app);
@@ -42,6 +43,7 @@ async function startServer() {
   // Graceful shutdown
   const shutdown = () => {
     logger.info("Shutting down gateway...");
+    shutdownOTEL().catch((err) => logger.error({ err }, "Failed to shut down OpenTelemetry"));
     server.close(() => {
       logger.info("Gateway server closed");
       process.exit(0);

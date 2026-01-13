@@ -6,6 +6,7 @@ export interface Config {
   playerServiceUrl: string;
   balanceServiceUrl: string;
   eventServiceUrl: string;
+  notifyServiceUrl: string;
   metricsPort: number;
   corsOrigin: string;
 }
@@ -15,10 +16,11 @@ export function loadConfig(): Config {
     port: parseInt(process.env.PORT ?? "4000", 10),
     jwtSecret: process.env.JWT_SECRET ?? "default-secret",
     redisUrl: process.env.REDIS_URL ?? "redis://localhost:6379",
-    gameServiceUrl: process.env.GAME_SERVICE_URL ?? "localhost:50051",
+    gameServiceUrl: process.env.GAME_SERVICE_URL ?? "localhost:50053",
     playerServiceUrl: process.env.PLAYER_SERVICE_URL ?? "localhost:50052",
-    balanceServiceUrl: process.env.BALANCE_SERVICE_URL ?? "localhost:50053",
+    balanceServiceUrl: process.env.BALANCE_SERVICE_URL ?? "localhost:50051",
     eventServiceUrl: process.env.EVENT_SERVICE_URL ?? "localhost:50054",
+    notifyServiceUrl: process.env.NOTIFY_SERVICE_URL ?? "localhost:50055",
     metricsPort: parseInt(process.env.METRICS_PORT ?? "9100", 10),
     corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:3000",
   };
