@@ -35,16 +35,16 @@ export async function startGrpcServer(port: number): Promise<void> {
   server = new grpc.Server();
 
   server.addService(proto.player.PlayerService.service, {
-    getProfile: handlers.GetProfile,
-    getProfiles: handlers.GetProfiles,
-    updateProfile: handlers.UpdateProfile,
-    deleteProfile: handlers.DeleteProfile,
-    getStatistics: handlers.GetStatistics,
-    incrementStatistic: handlers.IncrementStatistic,
-    getFriends: handlers.GetFriends,
-    addFriend: handlers.AddFriend,
-    removeFriend: handlers.RemoveFriend,
-    getNicknames: handlers.GetNicknames,
+    GetProfile: handlers.GetProfile,
+    GetProfiles: handlers.GetProfiles,
+    UpdateProfile: handlers.UpdateProfile,
+    DeleteProfile: handlers.DeleteProfile,
+    GetStatistics: handlers.GetStatistics,
+    IncrementStatistic: handlers.IncrementStatistic,
+    GetFriends: handlers.GetFriends,
+    AddFriend: handlers.AddFriend,
+    RemoveFriend: handlers.RemoveFriend,
+    GetNicknames: handlers.GetNicknames,
   });
 
   server.addService(proto.grpc.health.v1.Health.service, createHealthHandlers());

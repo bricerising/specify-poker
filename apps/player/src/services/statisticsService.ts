@@ -1,7 +1,22 @@
-import { defaultStatistics } from "../domain/defaults";
+import { defaultProfile, defaultStatistics } from "../domain/defaults";
 import { Statistics } from "../domain/types";
 import * as statisticsRepository from "../storage/statisticsRepository";
 import * as statisticsCache from "../storage/statisticsCache";
+import * as profileRepository from "../storage/profileRepository";
+import * as profileCache from "../storage/profileCache";
+import { generateNickname } from "./nicknameService";
+
+async function ensureProfile(userId: string) {
+  const existing = await profileRepository.findById(userId, true);
+  if (existing) {
+    return;
+  }
+
+  const nickname = await generateNickname(userId);
+  const profile = defaultProfile(userId, nickname, new Date());
+  const created = await profileRepository.create(profile);
+  await profileCache.set(created);
+}
 
 export enum StatisticType {
   HandsPlayed = "hands_played",
@@ -23,6 +38,7 @@ export async function getStatistics(userId: string): Promise<Statistics> {
     await statisticsCache.set(existing);
     return existing;
   }
+  await ensureProfile(userId);
   const created = defaultStatistics(userId, new Date());
   const saved = await statisticsRepository.upsert(created);
   await statisticsCache.set(saved);

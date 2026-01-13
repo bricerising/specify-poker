@@ -124,6 +124,21 @@ services:
       timeout: 2s
       retries: 3
 
+  promtail:
+    image: grafana/promtail:2.9.4
+    command: -config.file=/etc/promtail/config.yaml
+    volumes:
+      - ./infra/promtail/promtail.yaml:/etc/promtail/config.yaml
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - loki
+    healthcheck:
+      test: ["CMD-SHELL", "true"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
+
   tempo:
     image: grafana/tempo:2.3.1
     command: ["-config.file=/etc/tempo.yaml"]

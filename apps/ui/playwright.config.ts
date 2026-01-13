@@ -1,5 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+const useExternalServer = Boolean(process.env.PLAYWRIGHT_BASE_URL)
+  || process.env.PLAYWRIGHT_EXTERNAL === "1";
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
@@ -8,7 +12,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: "html",
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL,
     trace: "on-first-retry",
   },
   projects: [
@@ -25,9 +29,11 @@ export default defineConfig({
       use: { ...devices["Desktop Safari"] },
     },
   ],
-  webServer: {
-    command: "npm run start",
-    url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: useExternalServer
+    ? undefined
+    : {
+      command: "npm run start",
+      url: baseURL,
+      reuseExistingServer: !process.env.CI,
+    },
 });

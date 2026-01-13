@@ -23,6 +23,17 @@ type EventPublish = { success: boolean };
 
 const WS_PUBSUB_CHANNEL = "gateway:ws:events";
 
+function toNumber(value: unknown, fallback = 0) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  return fallback;
+}
+
 export class TableService {
   private turnTimers = new Map<string, NodeJS.Timeout>();
 
@@ -200,6 +211,10 @@ export class TableService {
     const state = await tableStateStore.get(tableId);
     if (!table || !state) return { ok: false, error: "TABLE_NOT_FOUND" };
 
+    const startingStack = toNumber(table.config.startingStack, 200);
+    const normalizedBuyIn = buyInAmount > 0 ? buyInAmount : startingStack;
+    const finalBuyIn = normalizedBuyIn > 0 ? normalizedBuyIn : 200;
+
     const seat = state.seats.find((entry) => entry.seatId === seatId);
     if (!seat || seat.userId || seat.status !== "EMPTY") {
       return { ok: false, error: "SEAT_NOT_AVAILABLE" };
@@ -219,7 +234,7 @@ export class TableService {
           {
             account_id: userId,
             table_id: tableId,
-            amount: buyInAmount,
+            amount: finalBuyIn,
             idempotency_key: this.idempotencyKey("reserve", tableId, userId),
             timeout_seconds: 30,
           },
@@ -255,7 +270,7 @@ export class TableService {
       const finalSeat = finalState.seats.find((entry) => entry.seatId === seatId);
       if (!finalSeat || finalSeat.userId !== userId) return { ok: false, error: "SEAT_LOST" };
 
-      finalSeat.stack = buyInAmount;
+      finalSeat.stack = finalBuyIn;
       finalSeat.status = "SEATED";
       finalSeat.reservationId = reservation.reservation_id;
       finalState.version += 1;
@@ -265,13 +280,13 @@ export class TableService {
       await this.publishTableState(table, finalState);
       await this.publishLobbyUpdate(await this.listTableSummaries());
 
-      await this.emitGameEvent(tableId, undefined, userId, seatId, "PLAYER_JOINED", { stack: buyInAmount });
+      await this.emitGameEvent(tableId, undefined, userId, seatId, "PLAYER_JOINED", { stack: finalBuyIn });
 
       await this.checkStartHand(table, finalState);
 
       return { ok: true };
     } catch (err) {
-      await this.handleBalanceUnavailable(tableId, seatId, userId, buyInAmount, err);
+      await this.handleBalanceUnavailable(tableId, seatId, userId, finalBuyIn, err);
       return { ok: true };
     }
   }

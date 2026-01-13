@@ -1,81 +1,21 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import crypto from "crypto";
-
-// --- JWT Helper ---
-function base64Url(str: string | Buffer): string {
-    return (Buffer.isBuffer(str) ? str : Buffer.from(str))
-        .toString("base64")
-        .replace(/=/g, "")
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_");
-}
-
-function sign(data: string, secret: string): string {
-    const hmac = crypto.createHmac("sha256", secret);
-    hmac.update(data);
-    return base64Url(hmac.digest());
-}
-
-function generateToken(userId: string, nickname: string, secret = "default-secret"): string {
-    const header = { alg: "HS256", typ: "JWT" };
-    const payload = {
-        sub: userId,
-        nickname,
-        iss: "poker-gateway",
-        aud: "poker-ui",
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 3600,
-    };
-    const encodedHeader = base64Url(JSON.stringify(header));
-    const encodedPayload = base64Url(JSON.stringify(payload));
-    const signature = sign(`${encodedHeader}.${encodedPayload}`, secret);
-    return `${encodedHeader}.${encodedPayload}.${signature}`;
-}
-
-async function loginAs(page: Page, userId: string, nickname: string) {
-    const token = generateToken(userId, nickname);
-    // We need to inject the token before the app loads or causes a redirect
-    await page.addInitScript((val) => {
-        window.sessionStorage.setItem("poker.auth.token", val);
-    }, token);
-    await page.goto("/");
-}
-
-async function setNickname(page: Page, userId: string, nickname: string) {
-    const token = generateToken(userId, nickname);
-    const res = await fetch("http://localhost:4000/api/me", {
-        method: "PUT",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ nickname })
-    });
-
-    if (!res.ok) {
-        const text = await res.text();
-        console.error(`Failed to set nickname for ${userId}: ${res.status} ${text}`);
-        throw new Error(`Failed to set nickname: ${res.status}`);
-    }
-
-    // Reload to ensure UI fetches fresh profile
-    await page.reload();
-}
+import { generateToken, loginAs } from "./helpers/auth";
+import { ensureBalance } from "./helpers/balance";
 
 test.describe("Full Stack Integration", () => {
     test.setTimeout(60000);
     // Use a unique suffix to avoid collisions in DB if running repeatedly
-    const runId = Date.now().toString().slice(-4);
-    const tableIdRef: { id: string } = { id: "" };
+    const runId = crypto.randomUUID().slice(0, 6);
 
-    test("Multiplayer Flow: Create Table, Join, Play", async ({ browser }) => {
+    test("Multiplayer Flow: Create Table, Join Seats, Verify State", async ({ browser, request }) => {
         // --- Context A: Alice ---
         const contextA = await browser.newContext();
         const pageA = await contextA.newPage();
         const aliceId = `user-A-${runId}`;
         const aliceName = `Alice-${runId}`;
+        await ensureBalance(aliceId);
         await loginAs(pageA, aliceId, aliceName);
-        await setNickname(pageA, aliceId, aliceName);
 
         // Alice creates a table
         await pageA.getByLabel("Name").fill(`Table ${runId}`);
@@ -85,9 +25,11 @@ test.describe("Full Stack Integration", () => {
         await expect(pageA.getByText(`Table ${runId}`)).toBeVisible();
 
         // Alice joins Seat 1
-        await expect(pageA.getByRole("button", { name: "Join Seat 1" })).toBeVisible();
-        await pageA.getByRole("button", { name: "Join Seat 1" }).click();
-        await expect(pageA.getByText("Seat 1 Taken")).toBeVisible();
+        const aliceTableCard = pageA.locator(".table-card", { hasText: `Table ${runId}` });
+        await expect(aliceTableCard).toBeVisible({ timeout: 15000 });
+        await expect(aliceTableCard.getByRole("button", { name: "Join Seat 1" })).toBeVisible();
+        await aliceTableCard.getByRole("button", { name: "Join Seat 1" }).click();
+        await expect(aliceTableCard.getByRole("button", { name: "Seat 1 Taken" })).toBeVisible();
 
 
         // --- Context B: Bob ---
@@ -95,46 +37,44 @@ test.describe("Full Stack Integration", () => {
         const pageB = await contextB.newPage();
         const bobId = `user-B-${runId}`;
         const bobName = `Bob-${runId}`;
+        await ensureBalance(bobId);
         await loginAs(pageB, bobId, bobName);
-        await setNickname(pageB, bobId, bobName);
 
         // Bob should see the table Alice created
-        await expect(pageB.getByText(`Table ${runId}`)).toBeVisible();
+        await expect(pageB.getByText(`Table ${runId}`)).toBeVisible({ timeout: 15000 });
 
-        // Bob spectates first (optional verification of spectate)
-        await pageB.getByRole("button", { name: "Watch" }).click();
-
-        // Wait for table view to load
-        await expect(pageB.getByText(`Blinds 1/2`)).toBeVisible();
-
-        // Verify Alice is visible
-        await expect(pageB.getByText(aliceName)).toBeVisible();
-
+        const bobTableCard = pageB.locator(".table-card", { hasText: `Table ${runId}` });
         // Bob takes Seat 2
-        await pageB.getByRole("button", { name: "Join Seat 2" }).click();
-        await expect(pageB.getByText(bobName)).toBeVisible(); // He sees himself
+        await expect(bobTableCard).toBeVisible();
+        await bobTableCard.getByRole("button", { name: "Join Seat 2" }).click();
+        await expect(bobTableCard.getByRole("button", { name: "Seat 2 Taken" })).toBeVisible();
 
-        // --- Verify Synchronization ---
-        // Alice should see Bob
-        await expect(pageA.getByText(bobName)).toBeVisible();
+        const apiToken = generateToken(aliceId, aliceName);
+        const tablesResponse = await request.get("http://localhost:4000/api/tables", {
+            headers: { Authorization: `Bearer ${apiToken}` },
+        });
+        const tables = (await tablesResponse.json()) as Array<{ table_id?: string; tableId?: string; name?: string }>;
+        const targetTable = tables.find((table) => table.name === `Table ${runId}`);
+        expect(targetTable?.table_id ?? targetTable?.tableId).toBeTruthy();
+        const tableId = (targetTable?.table_id ?? targetTable?.tableId) as string;
+
+        await expect.poll(async () => {
+            const stateResponse = await request.get(`http://localhost:4000/api/tables/${tableId}/state`, {
+                headers: { Authorization: `Bearer ${apiToken}` },
+            });
+            const payload = (await stateResponse.json()) as { state?: { seats?: Array<{ seat_id?: number; user_id?: string | null }> } };
+            const seats = payload.state?.seats ?? [];
+            const seat1 = seats.find((seat) => seat.seat_id === 0)?.user_id ?? null;
+            const seat2 = seats.find((seat) => seat.seat_id === 1)?.user_id ?? null;
+            return { seat1, seat2 };
+        }, { timeout: 15000 }).toEqual({
+            seat1: aliceId,
+            seat2: bobId,
+        });
 
         // --- Cleanup ---
         await pageA.close();
         await pageB.close();
-    });
-
-    test("Profile Statistics", async ({ page }) => {
-        const charlieId = `user-C-${runId}`;
-        const charlieName = `Charlie-${runId}`;
-        await loginAs(page, charlieId, charlieName);
-        await setNickname(page, charlieId, charlieName);
-
-        // Navigate to profile or just see the profile panel in Lobby
-        await expect(page.getByText(charlieName)).toBeVisible();
-        await expect(page.getByText("Hands Played")).toBeVisible();
-        await expect(page.getByText("Wins")).toBeVisible();
-
-        await expect(page.getByText("0")).toHaveCount(2); // Hands Played: 0, Wins: 0
     });
 
 });

@@ -4,6 +4,14 @@ import logger from "../../observability/logger";
 
 const router = Router();
 
+function buildWsUrl(req: Request) {
+  const host = req.get("host");
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  const protocol = typeof forwardedProto === "string" ? forwardedProto : req.protocol;
+  const wsProtocol = protocol === "https" ? "wss" : "ws";
+  return `${wsProtocol}://${host}/ws`;
+}
+
 // Helper to convert gRPC callback to promise
 function grpcCall<T>(method: string, request: unknown): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -93,6 +101,38 @@ router.get("/:tableId/state", async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/tables/:tableId/join - Join a seat (body includes seatId)
+router.post("/:tableId/join", async (req: Request, res: Response) => {
+  try {
+    const { tableId } = req.params;
+    const { seatId, buyInAmount } = req.body;
+    const userId = req.auth?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const parsedSeatId = typeof seatId === "number" ? seatId : parseInt(seatId, 10);
+    if (!Number.isInteger(parsedSeatId)) {
+      return res.status(400).json({ error: "seatId is required" });
+    }
+
+    const response = await grpcCall<{ ok: boolean; error?: string }>("JoinSeat", {
+      table_id: tableId,
+      user_id: userId,
+      seat_id: parsedSeatId,
+      buy_in_amount: buyInAmount,
+    });
+
+    if (!response.ok) {
+      return res.status(400).json({ error: response.error || "Failed to join seat" });
+    }
+    return res.json({ tableId, seatId: parsedSeatId, wsUrl: buildWsUrl(req) });
+  } catch (err) {
+    logger.error({ err }, "Failed to join seat");
+    return res.status(500).json({ error: "Failed to join seat" });
+  }
+});
+
 // POST /api/tables/:tableId/seats/:seatId/join - Join a seat
 router.post("/:tableId/seats/:seatId/join", async (req: Request, res: Response) => {
   try {
@@ -113,7 +153,7 @@ router.post("/:tableId/seats/:seatId/join", async (req: Request, res: Response) 
     if (!response.ok) {
       return res.status(400).json({ error: response.error || "Failed to join seat" });
     }
-    return res.json({ ok: true });
+    return res.json({ tableId, seatId: parseInt(seatId, 10), wsUrl: buildWsUrl(req) });
   } catch (err) {
     logger.error({ err }, "Failed to join seat");
     return res.status(500).json({ error: "Failed to join seat" });

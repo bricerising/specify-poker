@@ -8,7 +8,7 @@ const PROTO_PATH = path.resolve(__dirname, "../../proto/balance.proto");
 
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
   keepCase: true,
-  longs: String,
+  longs: Number,
   enums: String,
   defaults: true,
   oneofs: true,

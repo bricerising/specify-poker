@@ -28,15 +28,15 @@ export async function startGrpcServer(port: number): Promise<void> {
   server = new grpc.Server();
 
   server.addService(proto.balance.BalanceService.service, {
-    getBalance: handlers.GetBalance,
-    ensureAccount: handlers.EnsureAccount,
-    reserveForBuyIn: handlers.ReserveForBuyIn,
-    commitReservation: handlers.CommitReservation,
-    releaseReservation: handlers.ReleaseReservation,
-    processCashOut: handlers.ProcessCashOut,
-    recordContribution: handlers.RecordContribution,
-    settlePot: handlers.SettlePot,
-    cancelPot: handlers.CancelPot,
+    GetBalance: handlers.GetBalance,
+    EnsureAccount: handlers.EnsureAccount,
+    ReserveForBuyIn: handlers.ReserveForBuyIn,
+    CommitReservation: handlers.CommitReservation,
+    ReleaseReservation: handlers.ReleaseReservation,
+    ProcessCashOut: handlers.ProcessCashOut,
+    RecordContribution: handlers.RecordContribution,
+    SettlePot: handlers.SettlePot,
+    CancelPot: handlers.CancelPot,
   });
 
   return new Promise((resolve, reject) => {

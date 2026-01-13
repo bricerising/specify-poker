@@ -24,7 +24,19 @@ export async function startGrpcServer(port: number): Promise<void> {
 
   const handlers = createHandlers();
 
-  server.addService(proto.event.EventService.service, handlers as unknown as grpc.UntypedServiceImplementation);
+  server.addService(proto.event.EventService.service, {
+    PublishEvent: handlers.publishEvent,
+    PublishEvents: handlers.publishEvents,
+    QueryEvents: handlers.queryEvents,
+    GetEvent: handlers.getEvent,
+    GetHandRecord: handlers.getHandRecord,
+    GetHandHistory: handlers.getHandHistory,
+    GetHandsForUser: handlers.getHandsForUser,
+    GetHandReplay: handlers.getHandReplay,
+    SubscribeToStream: handlers.subscribeToStream,
+    GetCursor: handlers.getCursor,
+    UpdateCursor: handlers.updateCursor,
+  } as unknown as grpc.UntypedServiceImplementation);
 
   return new Promise((resolve, reject) => {
     server!.bindAsync(`0.0.0.0:${port}`, grpc.ServerCredentials.createInsecure(), (error, boundPort) => {

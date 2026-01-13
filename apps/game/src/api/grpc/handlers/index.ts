@@ -110,6 +110,17 @@ type MutePlayerRequest = { table_id: string; owner_id: string; target_user_id: s
 type UnmutePlayerRequest = { table_id: string; owner_id: string; target_user_id: string };
 type IsMutedRequest = { table_id: string; user_id: string };
 
+function toNumber(value: unknown, fallback = 0) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  return fallback;
+}
+
 function toTimestamp(value: string) {
   const date = new Date(value);
   const seconds = Math.floor(date.getTime() / 1000);
@@ -221,12 +232,12 @@ export function createHandlers() {
       try {
         const { name, owner_id, config } = call.request;
         const table = await tableService.createTable(name, owner_id, {
-          smallBlind: config.small_blind,
-          bigBlind: config.big_blind,
-          ante: config.ante ?? 0,
-          maxPlayers: config.max_players,
-          startingStack: config.starting_stack,
-          turnTimerSeconds: config.turn_timer_seconds ?? 20,
+          smallBlind: toNumber(config.small_blind, 1),
+          bigBlind: toNumber(config.big_blind, 2),
+          ante: toNumber(config.ante ?? 0, 0),
+          maxPlayers: toNumber(config.max_players, 6),
+          startingStack: toNumber(config.starting_stack, 200),
+          turnTimerSeconds: toNumber(config.turn_timer_seconds ?? 20, 20),
         });
         callback(null, toProtoTable(table));
       } catch (err) {
@@ -310,7 +321,8 @@ export function createHandlers() {
     JoinSeat: async (call: ServerUnaryCall<JoinSeatRequest, ActionResult>, callback: sendUnaryData<ActionResult>) => {
       try {
         const { table_id, user_id, seat_id, buy_in_amount } = call.request;
-        const result = await tableService.joinSeat(table_id, user_id, seat_id, buy_in_amount);
+        const buyInAmount = toNumber(buy_in_amount, 0);
+        const result = await tableService.joinSeat(table_id, user_id, seat_id, buyInAmount);
         callback(null, result);
       } catch (err) {
         callback(err as Error);
@@ -362,7 +374,7 @@ export function createHandlers() {
         const normalizedAction = action_type.toUpperCase() as ActionInput["type"];
         const result = await tableService.submitAction(table_id, user_id, {
           type: normalizedAction,
-          amount,
+          amount: amount === undefined ? undefined : toNumber(amount, 0),
         });
         callback(null, result);
       } catch (err) {

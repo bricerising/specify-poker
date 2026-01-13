@@ -20,6 +20,32 @@ function recordDuration(method: string, startedAt: number, status: "ok" | "error
   recordGrpcRequest(method, status, Date.now() - startedAt);
 }
 
+function toNumber(value: unknown, fallback = 0) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  return fallback;
+}
+
+function toNonEmptyString(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return null;
+}
+
+function invalidArgument(callback: (error: Error | null, response?: unknown) => void, message: string) {
+  callback(new Error(message));
+}
+
 // gRPC handler implementations
 export const handlers = {
   async GetBalance(
@@ -64,8 +90,13 @@ export const handlers = {
   ) {
     const startedAt = Date.now();
     try {
-      const { account_id, initial_balance = 0 } = call.request;
-      const result = await ensureAccount(account_id, initial_balance);
+      const accountId = toNonEmptyString(call.request.account_id);
+      if (!accountId) {
+        recordDuration("EnsureAccount", startedAt, "error");
+        return invalidArgument(callback, "account_id is required");
+      }
+      const initialBalance = toNumber(call.request.initial_balance ?? 0, 0);
+      const result = await ensureAccount(accountId, initialBalance);
 
       recordDuration("EnsureAccount", startedAt, "ok");
       callback(null, {
@@ -94,15 +125,22 @@ export const handlers = {
   ) {
     const startedAt = Date.now();
     try {
-      const { account_id, table_id, amount, idempotency_key, timeout_seconds } =
-        call.request;
+      const accountId = toNonEmptyString(call.request.account_id);
+      const tableId = toNonEmptyString(call.request.table_id);
+      const idempotencyKey = toNonEmptyString(call.request.idempotency_key);
+      const amount = toNumber(call.request.amount, 0);
+      const timeoutSeconds = toNumber(call.request.timeout_seconds ?? 30, 30);
+      if (!accountId || !tableId || !idempotencyKey || amount <= 0) {
+        recordDuration("ReserveForBuyIn", startedAt, "error");
+        return invalidArgument(callback, "invalid ReserveForBuyIn request");
+      }
 
       const result = await reserveForBuyIn(
-        account_id,
-        table_id,
+        accountId,
+        tableId,
         amount,
-        idempotency_key,
-        timeout_seconds
+        idempotencyKey,
+        timeoutSeconds
       );
 
       recordDuration("ReserveForBuyIn", startedAt, "ok");
@@ -125,8 +163,12 @@ export const handlers = {
   ) {
     const startedAt = Date.now();
     try {
-      const { reservation_id } = call.request;
-      const result = await commitReservation(reservation_id);
+      const reservationId = toNonEmptyString(call.request.reservation_id);
+      if (!reservationId) {
+        recordDuration("CommitReservation", startedAt, "error");
+        return invalidArgument(callback, "reservation_id is required");
+      }
+      const result = await commitReservation(reservationId);
 
       recordDuration("CommitReservation", startedAt, "ok");
       callback(null, {
@@ -148,8 +190,12 @@ export const handlers = {
   ) {
     const startedAt = Date.now();
     try {
-      const { reservation_id, reason } = call.request;
-      const result = await releaseReservation(reservation_id, reason);
+      const reservationId = toNonEmptyString(call.request.reservation_id);
+      if (!reservationId) {
+        recordDuration("ReleaseReservation", startedAt, "error");
+        return invalidArgument(callback, "reservation_id is required");
+      }
+      const result = await releaseReservation(reservationId, call.request.reason);
 
       recordDuration("ReleaseReservation", startedAt, "ok");
       callback(null, {
@@ -179,16 +225,24 @@ export const handlers = {
   ) {
     const startedAt = Date.now();
     try {
-      const { account_id, table_id, seat_id, amount, idempotency_key, hand_id } =
-        call.request;
+      const accountId = toNonEmptyString(call.request.account_id);
+      const tableId = toNonEmptyString(call.request.table_id);
+      const idempotencyKey = toNonEmptyString(call.request.idempotency_key);
+      const seatId = toNumber(call.request.seat_id, -1);
+      const amount = toNumber(call.request.amount, 0);
+      const handId = toNonEmptyString(call.request.hand_id);
+      if (!accountId || !tableId || !idempotencyKey || seatId < 0 || amount <= 0) {
+        recordDuration("ProcessCashOut", startedAt, "error");
+        return invalidArgument(callback, "invalid ProcessCashOut request");
+      }
 
       const result = await processCashOut(
-        account_id,
-        table_id,
-        seat_id,
+        accountId,
+        tableId,
+        seatId,
         amount,
-        idempotency_key,
-        hand_id
+        idempotencyKey,
+        handId ?? undefined
       );
 
       recordDuration("ProcessCashOut", startedAt, "ok");

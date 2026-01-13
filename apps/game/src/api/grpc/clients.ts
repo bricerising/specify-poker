@@ -10,7 +10,7 @@ const EVENT_PROTO_PATH = path.resolve(__dirname, "../../../../event/proto/event.
 function loadProto(protoPath: string) {
   const packageDefinition = protoLoader.loadSync(protoPath, {
     keepCase: true,
-    longs: String,
+    longs: Number,
     enums: String,
     defaults: true,
     oneofs: true,
