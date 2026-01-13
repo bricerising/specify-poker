@@ -18,7 +18,7 @@
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "id": 100,
-      "title": "User Journey & Sessions",
+      "title": "Gameplay Snapshot",
       "type": "row"
     },
     {
@@ -46,12 +46,12 @@
       },
       "targets": [
         {
-          "expr": "poker_active_connections",
-          "legendFormat": "Active Users",
+          "expr": "game_active_tables",
+          "legendFormat": "Active Tables",
           "refId": "A"
         }
       ],
-      "title": "Active Users",
+      "title": "Active Tables",
       "type": "stat"
     },
     {
@@ -60,7 +60,7 @@
         "uid": "PROMETHEUS"
       },
       "fieldConfig": {
-        "defaults": { "unit": "s" },
+        "defaults": { "unit": "short" },
         "overrides": []
       },
       "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
@@ -79,12 +79,12 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(poker_session_duration_seconds_sum[5m])) / sum(rate(poker_session_duration_seconds_count[5m]))",
-          "legendFormat": "Avg Session Duration",
+          "expr": "sum(rate(game_turn_duration_seconds_sum[5m])) / sum(rate(game_turn_duration_seconds_count[5m]))",
+          "legendFormat": "Avg Turn Duration",
           "refId": "A"
         }
       ],
-      "title": "Avg Session Duration",
+      "title": "Avg Turn Duration",
       "type": "stat"
     },
     {
@@ -112,12 +112,12 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(poker_session_hands_played_sum[5m])) / sum(rate(poker_session_hands_played_count[5m]))",
-          "legendFormat": "Hands per Session",
+          "expr": "sum(increase(game_actions_processed_total[5m]))",
+          "legendFormat": "Actions (5m)",
           "refId": "A"
         }
       ],
-      "title": "Avg Hands per Session",
+      "title": "Actions (5m)",
       "type": "stat"
     },
     {
@@ -145,19 +145,19 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(poker_sessions_total[5m])) * 300",
-          "legendFormat": "Sessions (5m)",
+          "expr": "sum(increase(game_hands_started_total[5m]))",
+          "legendFormat": "Hands Started (5m)",
           "refId": "A"
         }
       ],
-      "title": "New Sessions (5m)",
+      "title": "Hands Started (5m)",
       "type": "stat"
     },
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
       "id": 200,
-      "title": "User Friction Points",
+      "title": "Service Latency & Errors",
       "type": "row"
     },
     {
@@ -166,7 +166,7 @@
         "uid": "PROMETHEUS"
       },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": { "unit": "s" },
         "overrides": []
       },
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
@@ -179,12 +179,27 @@
       },
       "targets": [
         {
-          "expr": "sum by (reason) (rate(poker_seat_join_failures_total[5m]))",
-          "legendFormat": "{{reason}}",
+          "expr": "sum(rate(game_grpc_request_duration_seconds_sum[5m])) / sum(rate(game_grpc_request_duration_seconds_count[5m]))",
+          "legendFormat": "game",
           "refId": "A"
+        },
+        {
+          "expr": "sum(rate(balance_grpc_request_duration_seconds_sum[5m])) / sum(rate(balance_grpc_request_duration_seconds_count[5m]))",
+          "legendFormat": "balance",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(player_grpc_request_duration_seconds_sum[5m])) / sum(rate(player_grpc_request_duration_seconds_count[5m]))",
+          "legendFormat": "player",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(rate(notify_grpc_request_duration_seconds_sum[5m])) / sum(rate(notify_grpc_request_duration_seconds_count[5m]))",
+          "legendFormat": "notify",
+          "refId": "D"
         }
       ],
-      "title": "Seat Join Failures by Reason",
+      "title": "Average gRPC Latency (seconds)",
       "type": "timeseries"
     },
     {
@@ -193,7 +208,7 @@
         "uid": "PROMETHEUS"
       },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": { "unit": "s" },
         "overrides": []
       },
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
@@ -206,12 +221,27 @@
       },
       "targets": [
         {
-          "expr": "sum by (reason) (rate(poker_action_rejections_total[5m]))",
-          "legendFormat": "{{reason}}",
+          "expr": "sum(rate(game_grpc_request_duration_seconds_count{status=\"error\"}[5m]))",
+          "legendFormat": "game",
           "refId": "A"
+        },
+        {
+          "expr": "sum(rate(balance_grpc_request_duration_seconds_count{status=\"error\"}[5m]))",
+          "legendFormat": "balance",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(player_grpc_request_duration_seconds_count{status=\"error\"}[5m]))",
+          "legendFormat": "player",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(rate(notify_grpc_request_duration_seconds_count{status=\"error\"}[5m]))",
+          "legendFormat": "notify",
+          "refId": "D"
         }
       ],
-      "title": "Action Rejections by Reason",
+      "title": "gRPC Errors (5m rate)",
       "type": "timeseries"
     },
     {
@@ -220,7 +250,7 @@
         "uid": "PROMETHEUS"
       },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": { "unit": "s" },
         "overrides": []
       },
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
@@ -233,29 +263,24 @@
       },
       "targets": [
         {
-          "expr": "rate(poker_turn_timeouts_total[5m])",
-          "legendFormat": "Turn Timeouts",
+          "expr": "sum(rate(game_turn_duration_seconds_sum[5m])) / sum(rate(game_turn_duration_seconds_count[5m]))",
+          "legendFormat": "avg",
           "refId": "A"
         },
         {
-          "expr": "rate(poker_action_time_exceeded_total[5m])",
-          "legendFormat": "Late Actions (>80% timer)",
+          "expr": "histogram_quantile(0.95, sum(rate(game_turn_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95",
           "refId": "B"
-        },
-        {
-          "expr": "rate(poker_ws_reconnects_total[5m])",
-          "legendFormat": "WS Reconnects",
-          "refId": "C"
         }
       ],
-      "title": "Time Pressure & Connection Issues",
+      "title": "Turn Duration (avg/p95)",
       "type": "timeseries"
     },
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
       "id": 300,
-      "title": "Player Quality & Engagement",
+      "title": "Player Service Activity",
       "type": "row"
     },
     {
@@ -264,7 +289,7 @@
         "uid": "PROMETHEUS"
       },
       "fieldConfig": {
-        "defaults": { "unit": "percentunit", "min": 0, "max": 1 },
+        "defaults": { "unit": "short" },
         "overrides": []
       },
       "gridPos": { "h": 6, "w": 6, "x": 0, "y": 17 },
@@ -283,12 +308,12 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(poker_vpip_actions_total[5m])) / sum(rate(poker_hands_started_total[5m]))",
-          "legendFormat": "VPIP",
+          "expr": "sum(increase(player_profile_lookups_total[5m]))",
+          "legendFormat": "Profile Lookups (5m)",
           "refId": "A"
         }
       ],
-      "title": "VPIP (Voluntarily Put $ In Pot)",
+      "title": "Profile Lookups (5m)",
       "type": "stat"
     },
     {
@@ -297,7 +322,7 @@
         "uid": "PROMETHEUS"
       },
       "fieldConfig": {
-        "defaults": { "unit": "percentunit", "min": 0, "max": 1 },
+        "defaults": { "unit": "short" },
         "overrides": []
       },
       "gridPos": { "h": 6, "w": 6, "x": 6, "y": 17 },
@@ -316,12 +341,12 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(poker_pfr_actions_total[5m])) / sum(rate(poker_hands_started_total[5m]))",
-          "legendFormat": "PFR",
+          "expr": "sum(increase(player_profile_updates_total[5m]))",
+          "legendFormat": "Profile Updates (5m)",
           "refId": "A"
         }
       ],
-      "title": "PFR (Pre-Flop Raise)",
+      "title": "Profile Updates (5m)",
       "type": "stat"
     },
     {
@@ -330,7 +355,7 @@
         "uid": "PROMETHEUS"
       },
       "fieldConfig": {
-        "defaults": { "unit": "s" },
+        "defaults": { "unit": "short" },
         "overrides": []
       },
       "gridPos": { "h": 6, "w": 6, "x": 12, "y": 17 },
@@ -349,12 +374,12 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(poker_decision_time_seconds_sum[5m])) / sum(rate(poker_decision_time_seconds_count[5m]))",
-          "legendFormat": "Avg Decision Time",
+          "expr": "sum(increase(player_friend_mutations_total[5m]))",
+          "legendFormat": "Friend Mutations (5m)",
           "refId": "A"
         }
       ],
-      "title": "Avg Decision Time",
+      "title": "Friend Mutations (5m)",
       "type": "stat"
     },
     {
@@ -363,7 +388,7 @@
         "uid": "PROMETHEUS"
       },
       "fieldConfig": {
-        "defaults": { "unit": "percentunit", "min": 0, "max": 1 },
+        "defaults": { "unit": "short" },
         "overrides": []
       },
       "gridPos": { "h": 6, "w": 6, "x": 18, "y": 17 },
@@ -382,12 +407,12 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(poker_hands_won_total[5m])) / sum(rate(poker_hands_ended_total[5m]))",
-          "legendFormat": "Win Rate",
+          "expr": "sum(increase(player_statistics_updates_total[5m]))",
+          "legendFormat": "Stats Updates (5m)",
           "refId": "A"
         }
       ],
-      "title": "Win Rate",
+      "title": "Stats Updates (5m)",
       "type": "stat"
     },
     {
@@ -396,7 +421,7 @@
         "uid": "PROMETHEUS"
       },
       "fieldConfig": {
-        "defaults": {},
+        "defaults": { "unit": "s" },
         "overrides": []
       },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
@@ -409,27 +434,17 @@
       },
       "targets": [
         {
-          "expr": "rate(poker_vpip_actions_total[5m])",
-          "legendFormat": "VPIP Actions",
+          "expr": "sum by (status) (rate(player_profile_lookups_total[5m]))",
+          "legendFormat": "lookups {{status}}",
           "refId": "A"
         },
         {
-          "expr": "rate(poker_pfr_actions_total[5m])",
-          "legendFormat": "PFR Actions",
+          "expr": "sum by (status) (rate(player_profile_updates_total[5m]))",
+          "legendFormat": "updates {{status}}",
           "refId": "B"
-        },
-        {
-          "expr": "rate(poker_allin_actions_total[5m])",
-          "legendFormat": "All-ins",
-          "refId": "C"
-        },
-        {
-          "expr": "rate(poker_fold_to_raise_total[5m])",
-          "legendFormat": "Fold to Raise",
-          "refId": "D"
         }
       ],
-      "title": "Player Action Patterns",
+      "title": "Profile Requests by Status",
       "type": "timeseries"
     },
     {
@@ -451,22 +466,12 @@
       },
       "targets": [
         {
-          "expr": "rate(poker_hands_won_total[5m])",
-          "legendFormat": "Hands Won",
+          "expr": "sum(rate(player_grpc_request_duration_seconds_sum[5m])) / sum(rate(player_grpc_request_duration_seconds_count[5m]))",
+          "legendFormat": "avg",
           "refId": "A"
-        },
-        {
-          "expr": "rate(poker_showdown_wins_total[5m])",
-          "legendFormat": "Showdown Wins",
-          "refId": "B"
-        },
-        {
-          "expr": "rate(poker_hands_won_total[5m]) - rate(poker_showdown_wins_total[5m])",
-          "legendFormat": "Non-Showdown Wins",
-          "refId": "C"
         }
       ],
-      "title": "Win Breakdown",
+      "title": "Player gRPC Latency (avg)",
       "type": "timeseries"
     },
     {
@@ -495,12 +500,12 @@
       },
       "targets": [
         {
-          "expr": "poker_actions_total",
-          "legendFormat": "actions",
+          "expr": "sum by (action_type) (rate(game_actions_processed_total[5m]))",
+          "legendFormat": "{{action_type}}",
           "refId": "A"
         }
       ],
-      "title": "Poker Actions Total",
+      "title": "Actions by Type (5m rate)",
       "type": "timeseries"
     },
     {
@@ -522,12 +527,17 @@
       },
       "targets": [
         {
-          "expr": "poker_active_connections",
-          "legendFormat": "connections",
+          "expr": "game_active_tables",
+          "legendFormat": "tables",
           "refId": "A"
+        },
+        {
+          "expr": "game_seated_players",
+          "legendFormat": "seated players",
+          "refId": "B"
         }
       ],
-      "title": "Active Connections",
+      "title": "Active Tables & Seated Players",
       "type": "timeseries"
     },
     {
@@ -549,12 +559,17 @@
       },
       "targets": [
         {
-          "expr": "sum by (type) (rate(poker_actions_by_type_total[5m]))",
-          "legendFormat": "{{type}}",
+          "expr": "sum(rate(game_hands_started_total[5m]))",
+          "legendFormat": "started",
           "refId": "A"
+        },
+        {
+          "expr": "sum(rate(game_hands_completed_total[5m]))",
+          "legendFormat": "completed",
+          "refId": "B"
         }
       ],
-      "title": "Actions by Type (5m rate)",
+      "title": "Hands Started vs Completed (5m rate)",
       "type": "timeseries"
     },
     {
@@ -576,17 +591,12 @@
       },
       "targets": [
         {
-          "expr": "rate(poker_hands_started_total[5m])",
-          "legendFormat": "started",
+          "expr": "sum by (outcome) (rate(game_hands_completed_total[5m]))",
+          "legendFormat": "{{outcome}}",
           "refId": "A"
-        },
-        {
-          "expr": "rate(poker_hands_ended_total[5m])",
-          "legendFormat": "ended",
-          "refId": "B"
         }
       ],
-      "title": "Hands Started vs Ended (5m rate)",
+      "title": "Hand Outcomes (5m rate)",
       "type": "timeseries"
     },
     {
@@ -608,17 +618,12 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(poker_hand_duration_seconds_sum[5m])) / sum(rate(poker_hand_duration_seconds_count[5m]))",
-          "legendFormat": "avg",
+          "expr": "histogram_quantile(0.95, sum(rate(game_grpc_request_duration_seconds_bucket[5m])) by (le, method))",
+          "legendFormat": "{{method}}",
           "refId": "A"
-        },
-        {
-          "expr": "poker_hand_duration_seconds_max",
-          "legendFormat": "max",
-          "refId": "B"
         }
       ],
-      "title": "Hand Duration (seconds)",
+      "title": "Game gRPC Latency p95 by Method",
       "type": "timeseries"
     },
     {
@@ -640,24 +645,24 @@
       },
       "targets": [
         {
-          "expr": "rate(poker_table_joins_total[5m])",
-          "legendFormat": "joins",
+          "expr": "game_spectators_total",
+          "legendFormat": "spectators",
           "refId": "A"
         },
         {
-          "expr": "rate(poker_table_leaves_total[5m])",
-          "legendFormat": "leaves",
+          "expr": "game_seated_players",
+          "legendFormat": "seated players",
           "refId": "B"
         }
       ],
-      "title": "Seat Joins vs Leaves (5m rate)",
+      "title": "Spectators vs Seated Players",
       "type": "timeseries"
     },
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 56 },
       "id": 500,
-      "title": "System Health",
+      "title": "Economy & Events",
       "type": "row"
     },
     {
@@ -679,12 +684,12 @@
       },
       "targets": [
         {
-          "expr": "sum by (channel) (rate(poker_rate_limit_total[5m]))",
-          "legendFormat": "{{channel}}",
+          "expr": "sum by (type) (rate(balance_transactions_total[5m]))",
+          "legendFormat": "{{type}}",
           "refId": "A"
         }
       ],
-      "title": "Rate Limit Events (5m rate)",
+      "title": "Balance Transactions by Type (5m rate)",
       "type": "timeseries"
     },
     {
@@ -706,12 +711,12 @@
       },
       "targets": [
         {
-          "expr": "sum by (type) (rate(poker_ws_messages_total[5m]))",
-          "legendFormat": "{{type}}",
+          "expr": "sum by (action) (rate(balance_velocity_chips_total[5m]))",
+          "legendFormat": "{{action}}",
           "refId": "A"
         }
       ],
-      "title": "WebSocket Messages (5m rate)",
+      "title": "Balance Velocity (chips/sec)",
       "type": "timeseries"
     },
     {
@@ -733,17 +738,17 @@
       },
       "targets": [
         {
-          "expr": "poker_active_table_subscriptions",
-          "legendFormat": "table subscriptions",
+          "expr": "balance_total_supply",
+          "legendFormat": "total supply",
           "refId": "A"
         },
         {
-          "expr": "poker_active_chat_subscriptions",
-          "legendFormat": "chat subscriptions",
+          "expr": "balance_active_pot_total",
+          "legendFormat": "active pot",
           "refId": "B"
         }
       ],
-      "title": "Active Subscriptions",
+      "title": "Economy Totals",
       "type": "timeseries"
     },
     {
@@ -765,12 +770,12 @@
       },
       "targets": [
         {
-          "expr": "sum by (reason) (rate(poker_chat_errors_total[5m]))",
-          "legendFormat": "{{reason}}",
+          "expr": "sum by (type) (rate(event_ingestion_total[5m]))",
+          "legendFormat": "{{type}}",
           "refId": "A"
         }
       ],
-      "title": "Chat Errors (5m rate)",
+      "title": "Event Ingestion by Type (5m rate)",
       "type": "timeseries"
     },
     {
@@ -792,12 +797,12 @@
       },
       "targets": [
         {
-          "expr": "sum by (code) (rate(poker_ws_errors_total[5m]))",
-          "legendFormat": "{{code}}",
+          "expr": "sum by (status) (rate(notify_push_delivery_total[5m]))",
+          "legendFormat": "{{status}}",
           "refId": "A"
         }
       ],
-      "title": "WebSocket Errors by Code",
+      "title": "Notify Push Deliveries (5m rate)",
       "type": "timeseries"
     },
     {

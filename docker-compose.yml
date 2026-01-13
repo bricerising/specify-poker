@@ -184,6 +184,7 @@ services:
       - "50054:50054"
     environment:
       GRPC_PORT: "50054"
+      METRICS_PORT: "9104"
       DATABASE_URL: "postgresql://event:event@event-db:5432/event"
       REDIS_URL: "redis://redis:6379"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
@@ -205,6 +206,7 @@ services:
       - "50053:50053"
     environment:
       PORT: "50053"
+      METRICS_PORT: "9105"
       REDIS_URL: "redis://redis:6379"
       BALANCE_SERVICE_ADDR: "balance:50051"
       EVENT_SERVICE_ADDR: "event:50054"
@@ -228,6 +230,7 @@ services:
       - "50055:50055"
     environment:
       GRPC_PORT: "50055"
+      METRICS_PORT: "9105"
       REDIS_URL: "redis://redis:6379"
       VAPID_PUBLIC_KEY: "${VAPID_PUBLIC_KEY}"
       VAPID_PRIVATE_KEY: "${VAPID_PRIVATE_KEY}"

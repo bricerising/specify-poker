@@ -40,6 +40,10 @@ infra/          # Infrastructure configurations (Grafana, Keycloak, OTel)
 specs/          # High-level system specifications
 ```
 
+## Agent Workflow Notes
+
+- Prefer verifying changes against the docker compose environment (when available) so behavior matches deployed/runtime conditions.
+
 ## Recent Changes
 
 - **Microservice Deconstruction**: Successfully split the monolithic API into focused domain services.

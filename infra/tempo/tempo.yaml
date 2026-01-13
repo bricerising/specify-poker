@@ -10,10 +10,6 @@ query_frontend:
   trace_by_id:
     duration_slo: 5s
 
-querier:
-  search:
-    enabled: true
-
 distributor:
   receivers:
     otlp:
