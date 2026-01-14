@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document defines the requirements for user profiles, identity management, aggregate statistics, and social connections (friends) within the poker platform.
+This document defines the requirements for user profiles, identity management, aggregate statistics, and social connections (friends) within a **private poker instance** (see `specs/009-private-games-and-product-scope.md`).
 
 ## Identity Management
 
@@ -35,9 +35,9 @@ The system tracks aggregate gameplay data to provide players with a sense of pro
 - **Kick**: Table owners can remove disruptive players.
 - **Mute**: Table owners can silence players in chat.
 
-## Data Privacy & Compliance
+## Data Privacy
 
-- **Data Ownership**: Users have the right to request permanent deletion of their profile and statistics (GDPR compliance).
+- **Data Ownership**: Users SHOULD be able to delete their profile and stats (privacy-minded default; exact obligations depend on deployment context).
 - **Anonymization**: When a user is deleted, their historical hand participation may be anonymized to preserve the integrity of the `Event Service` audit logs.
 
 ## Performance Requirements

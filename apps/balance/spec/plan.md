@@ -4,7 +4,7 @@
 
 This document outlines the implementation plan for the balance service microservice.
 The service handles user account balances, table pot management, and transaction
-ledger with real-money ready design.
+ledger with strong integrity and auditability for play-money chips in private games.
 
 ## Architecture
 
@@ -115,8 +115,8 @@ apps/balance/
 - Define custom business metrics (ledger verification failures)
 
 ### Phase 7: Analytics
-- Implement metrics for total chip supply and circulation velocity.
-- Track chip "sinks" (rake) and "sources" (deposits) for economic health analysis.
+- (Optional) Implement metrics for total chip supply and circulation velocity.
+- (Optional) Track chip sources/sinks primarily to detect bugs or unintended inflation in a private instance.
 
 ### Phase 8: Testing
 - Unit tests for all services
@@ -156,7 +156,7 @@ Entry N checksum = SHA-256(Entry N data + Entry N-1 checksum)
 This ensures:
 - Tampering is detectable
 - Missing entries are detectable
-- Full audit trail for compliance
+- Strong auditability for debugging and dispute resolution
 
 ### Graceful Degradation
 

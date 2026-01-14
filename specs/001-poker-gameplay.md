@@ -21,7 +21,7 @@ This document defines the core Texas Hold'em gameplay rules, the deterministic s
 - **Odd Chips**: In split pots, odd chips are distributed to the first player(s) in clockwise order from the dealer button.
 
 ### Table & Seat Lifecycle
-- **Provisioning**: If no tables exist, the system MUST automatically create a default "Main Table" for the lobby.
+- **Provisioning**: The system SHOULD start with zero tables; table owners create tables as needed. For local development, the stack MAY provision a default table for convenience.
 - **Seat Statuses**:
   - `EMPTY`: No player is assigned to the seat.
   - `RESERVED`: A player has requested the seat, and a balance reservation is pending.
@@ -57,7 +57,16 @@ The game engine is implemented as a pure, deterministic state machine. Given the
 
 ## Hand Evaluation
 
-Hands are evaluated using standard poker rankings (High Card to Royal Flush).
+Hands are evaluated using standard Texas Hold’em rankings (no wild cards; suits are equal):
+1. **Straight Flush** (includes Royal Flush)
+2. **Four of a Kind**
+3. **Full House**
+4. **Flush**
+5. **Straight**
+6. **Three of a Kind**
+7. **Two Pair**
+8. **One Pair**
+9. **High Card**
 - **Split Pots**: If two or more players have the same hand rank, the pot is divided equally (with remainders handled per house rules).
 - **Kickers**: Used to break ties between hands of the same rank (e.g., Two Pair).
 

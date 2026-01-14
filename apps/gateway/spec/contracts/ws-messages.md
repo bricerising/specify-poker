@@ -24,6 +24,7 @@ All messages are JSON objects with a `type` field.
 - `Welcome` { userId, connectionId }
 - `Error` { code, message, correlationId? }
 - `LobbyTablesUpdated` { tables[] }  // TableSummary entries include spectatorCount
+  // “Lobby” here means the instance table index (not public matchmaking).
 - `TableSnapshot` { tableState }
 - `TablePatch` { tableId, handId, patch }
 - `HoleCards` { tableId, handId, seatId, cards: [string, string] }

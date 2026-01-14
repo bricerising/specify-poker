@@ -52,7 +52,7 @@ function PokerApp() {
     <header className="app-header">
       <div className="brand">
         <div className="brand-title">Specify Poker</div>
-        <div className="brand-subtitle">Intentional tables for focused decisions.</div>
+        <div className="brand-subtitle">Private Texas Hold’em games with friends.</div>
       </div>
       <div className="header-actions">
         <div className="user-badge">
@@ -133,7 +133,7 @@ function AppRoot() {
           <header className="app-header">
             <div className="brand">
               <div className="brand-title">Specify Poker</div>
-              <div className="brand-subtitle">Secure login in progress.</div>
+              <div className="brand-subtitle">Secure login for your private game.</div>
             </div>
           </header>
           <div className="card card-subtle">Signing in...</div>
@@ -145,7 +145,7 @@ function AppRoot() {
           <header className="app-header">
             <div className="brand">
               <div className="brand-title">Specify Poker</div>
-              <div className="brand-subtitle">Plan, pace, and play with clarity.</div>
+              <div className="brand-subtitle">Private Texas Hold’em games with friends.</div>
             </div>
           </header>
           <div className="card login-card">
@@ -153,8 +153,8 @@ function AppRoot() {
               <div>
                 <h1>Specify Poker</h1>
                 <p>
-                  Create focused tables, keep the lobby in sight, and make decisions with the full
-                  table story in one view.
+                  Host private Texas Hold’em games with friends: create tables, chat in real time,
+                  spectate hands, and get a nudge when it’s your turn.
                 </p>
                 <div className="login-actions">
                   <a
@@ -167,7 +167,7 @@ function AppRoot() {
                   >
                     Login
                   </a>
-                  <p className="meta-line">Keycloak OIDC keeps seats secure.</p>
+                  <p className="meta-line">Secure login via Keycloak OIDC.</p>
                 </div>
               </div>
               <PokerArt variant="hero" />
@@ -175,16 +175,16 @@ function AppRoot() {
           </div>
           <div className="table-grid">
             <div className="card card-subtle">
-              <h3>Lobby Overview</h3>
-              <p>Live table counts, blind structure, and seat availability update as you watch.</p>
+              <h3>Private Lobby</h3>
+              <p>Tables are scoped to your instance. Share the lobby link and play with friends.</p>
             </div>
             <div className="card card-subtle">
-              <h3>Table Focus</h3>
-              <p>See the pot, board, and action controls in one glance when you sit down.</p>
+              <h3>Real-Time Play</h3>
+              <p>Seats, actions, pots, and chat stay in sync via WebSockets.</p>
             </div>
             <div className="card card-subtle">
-              <h3>Trusted Profiles</h3>
-              <p>Maintain your poker identity and stats alongside your friends list.</p>
+              <h3>Friends & Alerts</h3>
+              <p>Keep a friends list and enable push alerts so you never miss your turn.</p>
             </div>
           </div>
         </div>

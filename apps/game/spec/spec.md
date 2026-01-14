@@ -11,6 +11,8 @@ table lifecycle, hand execution, action validation, pot calculations, and
 moderation state. It enforces Texas Hold'em rules through a deterministic state
 machine and coordinates with Balance Service for buy-ins and settlements.
 
+This repository is oriented around **private games among friends** (see `specs/009-private-games-and-product-scope.md`). “Lobby” refers to the table index inside a private instance, not public matchmaking.
+
 ## User Scenarios & Testing
 
 ### User Story 1 - Table Management (Priority: P1)
@@ -27,7 +29,7 @@ from Balance Service, plays a hand, and leaves with chips returned to balance.
 **Acceptance Scenarios**:
 
 1. **Given** a user in the lobby, **When** they create a table with valid config,
-   **Then** the table appears in the lobby and they can join it.
+   **Then** the table appears in the lobby (instance table index) and they can join it.
 2. **Given** a table with open seats, **When** a user joins with sufficient balance,
    **Then** a reservation is created, committed on seat, and stack initialized.
 3. **Given** a seated player, **When** they leave the table, **Then** their
@@ -178,7 +180,7 @@ a player and their chat messages are blocked (via Gateway).
   is unavailable (allow play, reconcile later).
 - **FR-019**: System MUST expose gRPC API for Gateway communication.
 - **FR-020**: System MUST version table state for client sync.
-- **FR-021**: System MUST calculate rake (5% of pot > 20, capped at 5 chips) before settling pots.
+- **FR-021**: System SHOULD support configurable “house rules” such as optional rake (recommended default for private games: 0).
 - **FR-022**: System MUST allow users to join tables as spectators without
   occupying a seat.
 - **FR-023**: System MUST ensure spectators only receive public table state

@@ -12,9 +12,9 @@ This document defines the requirements for the Event Service, which serves as th
 
 ### Dual-Layer Storage
 1. **Hot Storage (Redis)**: Recent events are stored in Redis Streams for low-latency retrieval by real-time features like hand replay.
-2. **Cold Storage (Postgres)**: All events are asynchronously flushed to PostgreSQL for permanent, durable retention (minimum 7 years for compliance).
+2. **Cold Storage (Postgres)**: All events are asynchronously flushed to PostgreSQL for durable retention. Retention SHOULD be configurable and privacy-minded for private deployments.
 
-## Audit & Compliance
+## Audit & Hand History
 
 ### Hand History
 The system MUST be able to reconstruct the exact state of any hand from its event log.
@@ -26,7 +26,7 @@ While the audit log is complete, access to it is filtered based on the requester
 - **Players**: See their own hole cards; if a hand reached showdown, they see
   all revealed hole cards for that hand.
 - **Non-Participants**: Never see hole cards, even for hands that reached showdown.
-- **Operators**: Have full access to all events for dispute resolution and bot detection.
+- **Instance Admins**: In a private deployment, an instance admin MAY have access for debugging and dispute resolution.
 
 ## Downstream Processing
 

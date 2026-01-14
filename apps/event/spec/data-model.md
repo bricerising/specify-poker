@@ -26,9 +26,9 @@ type EventType =
   | "TABLE_CREATED"
   | "TABLE_CLOSED"
   | "TURN_STARTED"
-  | "RAKE_DEDUCTED"
-  | "BONUS_ISSUED"
-  | "REFERRAL_ISSUED";
+  | "RAKE_DEDUCTED"      // Optional house rule (not required for private games)
+  | "BONUS_ISSUED"       // Optional chip faucet (not required for private games)
+  | "REFERRAL_ISSUED";   // Optional growth mechanic (not required for private games)
 
 interface GameEvent {
   eventId: string;          // UUID
@@ -346,12 +346,12 @@ COMPLETE -> ARCHIVED (moved to cold storage)
 - **Streams**: Best-effort delivery, cursor enables catch-up.
 - **Hand records**: Eventual consistency (materialized after completion).
 
-## Privacy & Compliance
+## Privacy & Access Control
 
 ### Data Access Rules
 
 1. **Players**: Can access hand history for hands they participated in.
-2. **Operators**: Can query all events for compliance and support.
+2. **Instance Admins**: Can query events for debugging and support in a private deployment.
 3. **Analytics**: Access to anonymized/aggregated data only.
 
 ### Hole Card Visibility
@@ -359,14 +359,14 @@ COMPLETE -> ARCHIVED (moved to cold storage)
 - **During hand**: Only visible to card holder.
 - **After showdown**: Visible to all participants if shown.
 - **In history**: Visible based on above rules.
-- **For operators**: Always visible (compliance requirement).
+- **For instance admins**: Visible only when explicitly requested for debugging.
 
 ### Retention Policy
 
 | Data Type | Hot (Redis) | Warm (PostgreSQL) | Cold (Archive) |
 |-----------|-------------|-------------------|----------------|
-| Events | 24 hours | 90 days | 7 years |
-| Hand Records | 7 days | 2 years | 7 years |
+| Events | 24 hours | 90 days | Optional export |
+| Hand Records | 7 days | 90 days | Optional export |
 | Cursors | 7 days | 30 days | N/A |
 
 ## Event Flow

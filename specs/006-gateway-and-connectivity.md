@@ -4,6 +4,8 @@
 
 This document defines the requirements for the Gateway Service, which acts as the single entry point for all client traffic, handling authentication, WebSocket management, and request routing.
 
+In this repo’s intended usage, the Gateway fronts a **private instance** used by a known group (see `specs/009-private-games-and-product-scope.md`).
+
 ## Authentication & Security
 
 ### Entry Boundary
@@ -29,6 +31,10 @@ This document defines the requirements for the Gateway Service, which acts as th
 - **Patches**: Subsequent updates are delivered as patches to minimize bandwidth.
 - **Version Tracking**: Every message includes a sequence number to ensure the client remains in sync.
 - **Spectator Support**: Spectators are first-class users who may subscribe to table state without occupying a seat.
+
+### Access Control (Private Games)
+- **Instance Scope**: The “lobby” is the table index within a private instance, not public discovery.
+- **Table Scope**: The Gateway SHOULD enforce that users can only subscribe to tables they are allowed to access (at minimum: authenticated users in the instance; optionally: table-level privacy/invites).
 
 ### Chat & Presence
 - **Participation**: Chat participation (sending and receiving) MUST be restricted to seated players and active spectators.

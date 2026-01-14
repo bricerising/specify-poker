@@ -4,7 +4,7 @@
 
 ### Decision: Separate microservice for balance management
 **Rationale**: Isolates financial operations from game logic, enabling independent
-scaling, deployment, and audit compliance. Critical for future real-money support.
+scaling, deployment, and clean auditability for debugging and dispute resolution.
 **Alternatives considered**: Keeping balance in poker service (rejected for audit
 complexity and single-point-of-failure concerns).
 
@@ -21,8 +21,8 @@ table. Reservation pattern allows rollback if seat assignment fails.
 lost funds on failures).
 
 ### Decision: Append-only ledger with checksum chain
-**Rationale**: Provides immutable audit trail required for real-money compliance.
-Checksum chain enables tamper detection and integrity verification.
+**Rationale**: Provides an immutable audit trail. Checksum chain enables tamper
+detection and integrity verification.
 **Alternatives considered**: Mutable transaction log (rejected for audit concerns).
 
 ### Decision: Redis for persistence with in-memory cache
@@ -60,8 +60,7 @@ update reservation status, not just delete).
 
 ## Future Considerations
 
-- **Real-money support**: Add currency field, decimal precision, regulatory
-  compliance hooks.
+- **Optional “cash tracking” mode**: Represent real-world stakes out-of-band (no payment processing).
 - **Multi-currency**: Support for multiple chip denominations or currencies.
 - **Rate limiting**: Add rate limits to prevent abuse of deposit/withdraw
   endpoints.

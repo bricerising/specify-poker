@@ -79,8 +79,8 @@ apps/player/
 - Move profile and friends logic from `apps/api`.
 - Implement aggregate statistics calculation (hands played, wins).
 
-### Phase 4: Privacy & Compliance
-- Implement data deletion (GDPR) logic.
+### Phase 4: Privacy
+- Implement optional data deletion/anonymization workflow.
 - Ensure sensitive data is not logged.
 
 ### Phase 5: Observability
@@ -91,5 +91,5 @@ apps/player/
 ## Success Metrics
 
 - P99 profile lookup latency < 50ms (cached).
-- 100% success rate for GDPR deletion requests.
+- Deletion/anonymization workflow behaves correctly when enabled.
 - Consistent statistics across service restarts.

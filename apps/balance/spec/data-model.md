@@ -30,15 +30,15 @@ interface Account {
 ```typescript
 type TransactionType =
   | "DEPOSIT"       // External chip addition
-  | "WITHDRAW"      // External chip removal
+  | "WITHDRAW"      // Chip removal (typically admin-managed in private instances)
   | "BUY_IN"        // Table buy-in (balance -> table stack)
   | "CASH_OUT"      // Table cash-out (table stack -> balance)
   | "BLIND"         // Blind posting
   | "BET"           // Bet/raise contribution
   | "POT_WIN"       // Pot winnings
-  | "RAKE"          // House commission deduction
-  | "BONUS"         // Economic source (daily login, etc.)
-  | "REFERRAL"      // Referral reward
+  | "RAKE"          // Optional house commission deduction (recommended default for private games: 0)
+  | "BONUS"         // Optional chip faucet (not required for private games)
+  | "REFERRAL"      // Optional growth mechanic (not required for private games)
   | "REFUND";       // Reservation release or error recovery
 
 type TransactionStatus = "PENDING" | "COMPLETED" | "FAILED";

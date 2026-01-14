@@ -11,6 +11,8 @@ authentication, WebSocket termination, request routing, rate limiting, and
 real-time message delivery including chat. It coordinates with backend services
 via gRPC and synchronizes state across instances using Redis pub/sub.
 
+This repo targets private games among friends; “lobby” refers to the table index inside an instance, not public discovery (see `specs/009-private-games-and-product-scope.md`).
+
 ## User Scenarios & Testing
 
 ### User Story 1 - Authenticated Connection (Priority: P1)

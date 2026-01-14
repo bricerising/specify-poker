@@ -110,7 +110,7 @@ export function TablePage({ store = tableStore }: TablePageProps) {
           </div>
           <div className="fact">
             <span>Street</span>
-            <strong>{hand?.currentStreet ?? "Lobby"}</strong>
+            <strong>{hand?.currentStreet ?? "Waiting"}</strong>
           </div>
           <div className="fact">
             <span>Current Turn</span>

@@ -16,6 +16,9 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "loading">("idle");
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [inviteStatus, setInviteStatus] = useState<"idle" | "copied" | "failed">("idle");
+
+  const instanceUrl = typeof window === "undefined" ? null : window.location.origin;
 
   const loadTables = async () => {
     setStatus("loading");
@@ -81,6 +84,33 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
     store.spectateTable(tableId);
   };
 
+  const handleCopyInvite = async () => {
+    if (!instanceUrl) {
+      return;
+    }
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(instanceUrl);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = instanceUrl;
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        textarea.style.top = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand("copy");
+        textarea.remove();
+      }
+      setInviteStatus("copied");
+    } catch {
+      setInviteStatus("failed");
+    } finally {
+      window.setTimeout(() => setInviteStatus("idle"), 2_000);
+    }
+  };
+
   const tableRows = tables.map((table, index) => {
     const occupied = new Set(table.occupiedSeatIds ?? []);
     const seatButtons = Array.from({ length: table.config.maxPlayers }, (_, index) => {
@@ -111,7 +141,7 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
             </div>
           </div>
           <div className={`status-pill ${table.inProgress ? "live" : "waiting"}`}>
-            {table.inProgress ? "In Hand" : "Open Lobby"}
+            {table.inProgress ? "In Hand" : "Waiting"}
           </div>
         </div>
         <div className="table-meta">
@@ -142,13 +172,30 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
       <div className="page-header">
         <div>
           <h2>Lobby</h2>
-          <p>Pick a seat, or set up a new table with your preferred blinds.</p>
-          <div className="meta-line">Live updates run every 2 seconds.</div>
+          <p>Create a table for your group, or grab an open seat.</p>
+          <div className="meta-line">This lobby is scoped to your private instance.</div>
         </div>
         <PokerArt variant="hero" />
       </div>
       <div className="table-grid">
         <CreateTableForm onCreate={handleCreate} />
+        <div className="card invite-panel">
+          <h3>Invite Friends</h3>
+          <p className="meta-line">Share this lobby link with friends so they can sign in and join.</p>
+          <div className="seat-actions">
+            <a className="invite-url" href={instanceUrl ?? "#"} target="_blank" rel="noreferrer">
+              {instanceUrl ?? "Invite link available in browser"}
+            </a>
+            <button
+              type="button"
+              className="btn btn-quiet"
+              onClick={handleCopyInvite}
+              disabled={!instanceUrl || inviteStatus === "copied"}
+            >
+              {inviteStatus === "copied" ? "Copied" : inviteStatus === "failed" ? "Copy failed" : "Copy"}
+            </button>
+          </div>
+        </div>
         {profile ? (
           <div className="card profile-panel">
             <h3>Your Profile</h3>
@@ -180,7 +227,11 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
       </div>
       <div className="table-list">
         {status === "loading" ? <div className="meta-line">Loading tables...</div> : null}
-        {tableRows.length === 0 ? <div className="meta-line">No tables yet.</div> : tableRows}
+        {tableRows.length === 0 ? (
+          <div className="meta-line">No tables yet. Create one to start a private game.</div>
+        ) : (
+          tableRows
+        )}
       </div>
       {error ? (
         <div role="alert" className="alert">

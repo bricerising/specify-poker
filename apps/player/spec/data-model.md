@@ -15,7 +15,7 @@ interface Profile {
   avatarUrl: string | null; // URL to avatar image
   preferences: UserPreferences;
   lastLoginAt: string | null; // ISO timestamp of last login
-  referredBy: string | null;  // userId of referrer
+  referredBy: string | null;  // Deprecated for private games; planned removal
   createdAt: string;        // ISO timestamp
   updatedAt: string;        // ISO timestamp
 }
@@ -43,7 +43,7 @@ interface Statistics {
   pfr: number;              // Pre-flop raise % (0-100)
   allInCount: number;       // Times gone all-in
   biggestPot: number;       // Largest pot won
-  referralCount: number;    // Number of users referred
+  referralCount: number;    // Deprecated for private games; planned removal
   lastUpdated: string;      // ISO timestamp
 }
 ```
@@ -194,14 +194,14 @@ DELETED -> (purged) (30-day hard delete)
 - **Friends**: Strong consistency for mutations.
 - **Deletion**: Soft delete immediate, hard delete after 30 days.
 
-## Privacy & GDPR
+## Privacy
 
-### Data Subject Rights
+### User Data Controls
 
-1. **Right to Access**: GetProfile returns all user data.
-2. **Right to Rectification**: UpdateProfile allows corrections.
-3. **Right to Erasure**: DeleteProfile removes all personal data.
-4. **Right to Portability**: GetProfile returns exportable format.
+1. **Access**: GetProfile returns user profile and statistics.
+2. **Updates**: UpdateProfile allows corrections.
+3. **Deletion**: DeleteProfile removes/anonymizes personal profile data.
+4. **Export**: GetProfile returns an exportable format.
 
 ### Deletion Process
 
@@ -215,5 +215,5 @@ DELETED -> (purged) (30-day hard delete)
 ### Data Retention
 
 - Active profiles: Indefinite while account active.
-- Statistics: Retained for analytics after anonymization.
+- Statistics: Retained for analytics only when appropriate for the deployment context (anonymized where possible).
 - Deleted profiles: Purged after 30-day grace period.

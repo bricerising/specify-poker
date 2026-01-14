@@ -98,7 +98,7 @@
 ### T018: Implement deletion service
 - **File**: `src/services/deletionService.ts`
 - **Functions**: requestDeletion, anonymizeProfile, hardDelete
-- **Acceptance**: GDPR-compliant deletion flow
+- **Acceptance**: Deletion/anonymization flow behaves correctly
 
 ### T019: Implement nickname service
 - **File**: `src/services/nicknameService.ts`
@@ -254,4 +254,4 @@ T033 -> T034 -> T035 -> T036 -> T037 -> T038
 1. **PostgreSQL storage**: Persistent database instead of Redis-only.
 2. **gRPC-only**: No HTTP API, accessed via Gateway.
 3. **Event-driven stats**: Statistics updated from Event Service.
-4. **GDPR compliance**: Full deletion workflow implemented.
+4. **Privacy**: Optional deletion/anonymization workflow implemented.

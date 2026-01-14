@@ -293,7 +293,7 @@ export class TableService {
       await tableStateStore.save(finalState);
       await this.publishTableAndLobby(table, finalState);
 
-      await this.emitGameEvent(tableId, undefined, userId, seatId, "PLAYER_JOINED", { stack: finalBuyIn });
+      void this.emitGameEvent(tableId, undefined, userId, seatId, "PLAYER_JOINED", { stack: finalBuyIn });
 
       await this.checkStartHand(table, finalState);
 
@@ -322,7 +322,7 @@ export class TableService {
     state.version += 1;
     state.updatedAt = this.now();
     await tableStateStore.save(state);
-    await this.emitGameEvent(tableId, undefined, userId, seatId, "BALANCE_UNAVAILABLE", { action: "BUY_IN" });
+    void this.emitGameEvent(tableId, undefined, userId, seatId, "BALANCE_UNAVAILABLE", { action: "BUY_IN" });
     const table = await tableStore.get(tableId);
     if (!table) return;
     await this.publishTableAndLobby(table, state);
@@ -391,10 +391,10 @@ export class TableService {
           );
         });
         if (!cashOut.ok) {
-          await this.emitGameEvent(tableId, undefined, userId, seat.seatId, "CASHOUT_FAILED", { amount: remainingStack });
+          void this.emitGameEvent(tableId, undefined, userId, seat.seatId, "CASHOUT_FAILED", { amount: remainingStack });
         }
       } catch {
-        await this.emitGameEvent(tableId, undefined, userId, seat.seatId, "BALANCE_UNAVAILABLE", { action: "CASH_OUT" });
+        void this.emitGameEvent(tableId, undefined, userId, seat.seatId, "BALANCE_UNAVAILABLE", { action: "CASH_OUT" });
       }
     }
 
@@ -408,7 +408,7 @@ export class TableService {
 
     await tableStateStore.save(state);
     await this.publishTableAndLobby(table, state);
-    await this.emitGameEvent(tableId, undefined, userId, seat.seatId, "PLAYER_LEFT", { stack: remainingStack });
+    void this.emitGameEvent(tableId, undefined, userId, seat.seatId, "PLAYER_LEFT", { stack: remainingStack });
     return { ok: true };
   }
 
@@ -459,7 +459,7 @@ export class TableService {
     await tableStateStore.save(result.state);
     await this.publishTableState(table, result.state);
 
-    await this.emitGameEvent(tableId, result.state.hand?.handId, userId, seat.seatId, action.type, {
+    void this.emitGameEvent(tableId, result.state.hand?.handId, userId, seat.seatId, action.type, {
       amount: action.amount ?? 0,
     });
 
@@ -490,7 +490,7 @@ export class TableService {
       .map((seat) => seat.userId)
       .filter((value): value is string => Boolean(value));
 
-    await this.emitGameEvent(table.tableId, updatedState.hand?.handId, undefined, undefined, "HAND_STARTED", {
+    void this.emitGameEvent(table.tableId, updatedState.hand?.handId, undefined, undefined, "HAND_STARTED", {
       buttonSeat: updatedState.button,
       participants,
     });
@@ -540,7 +540,7 @@ export class TableService {
       .map((seatId) => state.seats.find((seat) => seat.seatId === seatId)?.userId)
       .filter((value): value is string => Boolean(value));
 
-    await this.emitGameEvent(table.tableId, hand.handId, undefined, undefined, "HAND_ENDED", {
+    void this.emitGameEvent(table.tableId, hand.handId, undefined, undefined, "HAND_ENDED", {
       winners: hand.winners ?? [],
       winnerUserIds,
       rakeAmount: hand.rakeAmount,
@@ -582,12 +582,12 @@ export class TableService {
             );
           });
           if (!settle.ok) {
-            await this.emitGameEvent(table.tableId, hand.handId, undefined, undefined, "SETTLEMENT_FAILED", {
+            void this.emitGameEvent(table.tableId, hand.handId, undefined, undefined, "SETTLEMENT_FAILED", {
               error: settle.error || "UNKNOWN",
             });
           }
         } catch {
-          await this.emitGameEvent(table.tableId, hand.handId, undefined, undefined, "BALANCE_UNAVAILABLE", {
+          void this.emitGameEvent(table.tableId, hand.handId, undefined, undefined, "BALANCE_UNAVAILABLE", {
             action: "SETTLE_POT",
           });
         }

@@ -331,6 +331,29 @@ button:hover,
   gap: 8px;
 }
 
+.invite-panel p {
+  margin: 0;
+}
+
+.invite-url {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  text-decoration: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.invite-url:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .btn-seat {
   padding: 8px 12px;
   font-size: 13px;

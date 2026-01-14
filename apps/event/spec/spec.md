@@ -8,7 +8,7 @@
 
 The Event Service provides append-only event storage, hand history persistence, and replay
 capabilities. It serves as the audit trail and historical record for all gameplay events,
-supporting regulatory compliance, player hand history access, and game analytics.
+supporting player hand history access, debugging, and game analytics for private instances.
 
 ## User Scenarios & Testing
 
@@ -17,8 +17,8 @@ supporting regulatory compliance, player hand history access, and game analytics
 As a player, I can view the history of hands I've played including all actions and
 outcomes.
 
-**Why this priority**: Hand history is essential for player trust and regulatory
-compliance; players need to verify game fairness.
+**Why this priority**: Hand history is essential for player trust; players need to
+verify game fairness.
 
 **Independent Test**: A user plays a hand, then navigates to hand history and sees
 complete action-by-action replay of the hand.
@@ -36,20 +36,20 @@ complete action-by-action replay of the hand.
 
 ### User Story 2 - Event Audit Trail (Priority: P1)
 
-As an operator, I can query all events for a table or user for compliance and
-dispute resolution.
+As an instance admin, I can query all events for a table or user for debugging and
+dispute resolution in a private deployment.
 
-**Why this priority**: Audit trail is a regulatory requirement for gaming operations
-and essential for dispute resolution.
+**Why this priority**: Audit trail is essential for dispute resolution and debugging
+unexpected behavior.
 
-**Independent Test**: An operator queries events for a specific table and receives
+**Independent Test**: An instance admin queries events for a specific table and receives
 a complete chronological log of all actions.
 
 **Acceptance Scenarios**:
 
-1. **Given** events for a table, **When** an operator queries by table ID, **Then**
+1. **Given** events for a table, **When** an instance admin queries by table ID, **Then**
    all events are returned in chronological order.
-2. **Given** events for a user, **When** an operator queries by user ID, **Then**
+2. **Given** events for a user, **When** an instance admin queries by user ID, **Then**
    all events involving that user are returned.
 3. **Given** a time range, **When** events are queried with time bounds, **Then**
    only events within that range are returned.
@@ -113,9 +113,8 @@ events in real-time as actions occur.
 - **Ordering**: Events MUST maintain strict chronological ordering within a hand.
 - **Durability**: Events MUST survive service restarts and be recoverable.
 - **Privacy**: Hand history MUST only be accessible to participants and authorized
-  operators; non-participants MUST have all hole cards redacted.
-- **Retention**: Events MUST be retained for regulatory compliance period (varies
-  by jurisdiction, default 7 years).
+  admins; non-participants MUST have all hole cards redacted.
+- **Retention**: Retention SHOULD be configurable for private deployments (privacy-minded defaults).
 
 ## Requirements
 

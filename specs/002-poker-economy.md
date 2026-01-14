@@ -2,20 +2,18 @@
 
 ## Overview
 
-This document defines the architecture and requirements for managing player balances, table buy-ins, and pot settlements. It ensures financial integrity through a distributed ledger and two-phase commit patterns.
+This document defines the architecture and requirements for managing chip balances, table buy-ins, and pot settlements in a **private, play-money** poker environment (see `specs/009-private-games-and-product-scope.md`).
+
+The goal is **integrity and correctness** (no negative balances, idempotent operations, correct settlements), not payments processing or monetization.
 
 ## Core Concepts
 
 ### 1. User Accounts
-Every player has a dedicated account tracking their chip balance. Chips are "play-money" but treated with the rigor of real currency. 
-- **Initial Balance**: New accounts start with a balance of 0; chips must be acquired via deposits or rewards.
-- **Economic Sinks (Planned)**:
-  - **Rake**: 5% of pots over 20 chips, capped at 5 chips per hand. Rake is deducted before pot distribution.
-  - **Table Fees**: Entry fees for tournaments or special game modes.
-- **Economic Sources (Planned)**:
-  - **Daily Login Bonus**: 1,000 chips credited on the first login of each day.
-  - **Friend Referral**: 5,000 chips credited to both the referrer and the referee after the referee plays 100 hands.
-  - **Ad Rewards**: Small chip rewards for viewing optional partner content.
+Every player has a dedicated account tracking their chip balance.
+- **Play-Money**: Chips are for table stakes and settlement correctness; the system does not process real-money deposits/withdrawals.
+- **Initial Balance**: New accounts SHOULD be provisioned with enough chips to join a typical table without external setup friction (amount is deployment-configurable).
+- **Admin Credits/Debits**: In a private instance, an admin MAY credit/debit chips for setup, resets, or “home game bank” workflows.
+- **Optional House Rules**: Features like rake or bonuses MAY exist as configurable knobs, but they are not core to the private-games product intent.
 
 ### 2. Two-Phase Buy-In
 To prevent race conditions and double-spending, joining a table uses a reservation pattern:
@@ -32,7 +30,7 @@ To prevent race conditions and double-spending, joining a table uses a reservati
 ## Ledger & Integrity
 
 ### 1. Transaction Ledger
-Every balance change (deposit, buy-in, win, rake) is recorded as a line item in an append-only ledger.
+Every balance change (deposit/credit, buy-in, win, cash-out, optional rake) is recorded as a line item in an append-only ledger.
 
 ### 2. Checksum Chain
 The ledger uses a checksum chain where each entry includes a SHA-256 hash of (Current Entry + Previous Entry Hash). This ensures that any tampering or missing entries are immediately detectable.
@@ -42,10 +40,10 @@ All mutating economic operations MUST accept an idempotency key (format: `{opera
 
 ## Economic Health Metrics
 
-The system monitors the overall health of the play-money economy via:
+These metrics are optional in a private instance, but can help detect bugs or unintended inflation:
 - **Total Supply**: Aggregate sum of all user balances and active pots.
 - **Velocity**: Rate at which chips are being bet and moved.
-- **Sinks & Sources**: Tracking chips entering (e.g., daily rewards) and leaving (e.g., rake) the system.
+- **Sinks & Sources**: Tracking chips entering (e.g., admin credits) and leaving (e.g., optional rake) the system.
 
 ## Performance Requirements
 

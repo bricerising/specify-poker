@@ -7,8 +7,9 @@
 ## Overview
 
 The Balance Service manages user account balances, table pot tracking, and
-transaction ledger for the poker application. It provides a real-money ready
-design with strict audit trails, idempotency, and distributed consistency.
+transaction ledger for the poker application.
+
+This repository is oriented around **private, friends-only games** (see `specs/009-private-games-and-product-scope.md`). The Balance Service treats chips as **play-money by default** and focuses on correctness (no negative balances, correct settlements) and debuggability (append-only ledger).
 
 ## User Scenarios & Testing
 
@@ -40,8 +41,8 @@ a hand, leaves the table (balance increases), and can see their transaction hist
 As a poker game, I can track pot contributions and settle winnings through the
 balance service to maintain a complete audit trail of chip movement.
 
-**Why this priority**: Pot management is integral to game integrity and audit
-requirements for real-money readiness.
+**Why this priority**: Pot management is integral to game integrity and helps players
+and hosts understand how chips moved during a hand.
 
 **Independent Test**: A complete hand is played with multiple betting rounds, pots
 are calculated correctly, and winners receive their share with all transactions
@@ -63,8 +64,8 @@ logged.
 As the poker service, I can reserve funds before confirming a seat join to prevent
 race conditions and ensure atomicity across distributed services.
 
-**Why this priority**: Two-phase commit ensures consistency between balance and
-table state, critical for real-money operations.
+**Why this priority**: Reservations prevent double-spending and keep table joins
+consistent even with retries or transient failures.
 
 **Independent Test**: A reservation is created, the seat join fails, and the
 reservation is released without affecting the user's available balance permanently.
@@ -112,7 +113,7 @@ reservation is released without affecting the user's available balance permanent
 - **FR-001**: System MUST maintain persistent account balances per user.
 - **FR-002**: System MUST support deposit operations to add chips to an account.
 - **FR-003**: System MUST support withdrawal operations to remove chips from an
-  account with balance validation.
+  account with balance validation (e.g., admin-managed chip removal in a private instance).
 - **FR-004**: System MUST support two-phase buy-in with reserve/commit/release
   operations.
 - **FR-005**: System MUST expire unreleased reservations after a configurable
@@ -132,8 +133,8 @@ reservation is released without affecting the user's available balance permanent
   updates.
 - **FR-014**: System MUST reject operations that would result in negative balance.
 - **FR-015**: System MUST support graceful degradation when Redis is unavailable.
-- **FR-016**: System MUST support rake deduction (5% of pots > 20, capped at 5 chips) from pots before distribution.
-- **FR-017**: System MUST support economic sources like daily bonuses and referral rewards via BONUS and REFERRAL transactions.
+- **FR-016**: System SHOULD support optional rake deduction as a configurable house rule (recommended default for private games: 0).
+- **FR-017**: System MAY support optional chip “faucets” (e.g., initial balance seeding or admin credits) via separate transaction types.
 - **FR-018**: HTTP balance endpoints MUST require Gateway-authenticated requests
   with validated user identity.
 
@@ -167,8 +168,8 @@ reservation is released without affecting the user's available balance permanent
 
 ## Assumptions
 
-- Currency is "CHIPS" for play-money; real-money would use ISO currency codes.
-- Initial account balance is 0; users must deposit chips to play.
+- Currency is "CHIPS" for play-money.
+- Initial account balance is deployment-configurable; it SHOULD be sufficient to join a typical table without extra setup.
 - Reservation timeout is 30 seconds by default.
 - Idempotency keys are retained for 24 hours.
 - gRPC is used for internal communication for lower latency than HTTP.

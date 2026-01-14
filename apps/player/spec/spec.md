@@ -9,7 +9,7 @@
 The Player Service manages user profiles, social connections (friends), and
 aggregate statistics. It serves as the identity layer for the poker application,
 providing nicknames, avatars, and player data to other services. It is designed
-with GDPR compliance in mind, with clear data ownership and deletion capabilities.
+to support private games among friends (see `specs/009-private-games-and-product-scope.md`), with privacy-minded defaults and optional deletion capabilities.
 
 ## User Scenarios & Testing
 
@@ -78,10 +78,10 @@ in their list, and they can remove them.
 
 ### User Story 4 - Data Deletion (Priority: P2)
 
-As a player, I can request deletion of my profile data in compliance with
-privacy regulations.
+As a player, I can request deletion of my profile data for privacy.
 
-**Why this priority**: GDPR compliance is a legal requirement for EU users.
+**Why this priority**: Privacy-friendly behavior reduces risk for a self-hosted
+deployment and builds player trust.
 
 **Independent Test**: A user requests profile deletion, their profile is
 removed, and other services no longer return their data.
@@ -108,7 +108,7 @@ removed, and other services no longer return their data.
 
 - **Data Ownership**: All profile data MUST be owned by the user and deletable
   upon request.
-- **Privacy Compliance**: Service MUST support GDPR right-to-deletion.
+- **Privacy**: Service SHOULD support right-to-deletion where appropriate for the deployment.
 - **Nickname Uniqueness**: Nicknames SHOULD be unique but MAY allow duplicates
   with disambiguation (e.g., display user ID suffix).
 - **Statistics Accuracy**: Statistics MUST be eventually consistent with
@@ -130,8 +130,6 @@ removed, and other services no longer return their data.
 - **FR-010**: System MUST expose gRPC API for internal service communication.
 - **FR-011**: System MUST cache profiles for performance.
 - **FR-012**: System MUST handle profile requests for deleted/non-existent users.
-- **FR-013**: System MUST track daily logins and trigger daily bonus events.
-- **FR-014**: System MUST track referrals and trigger referral reward events.
 
 ### Non-Functional Requirements
 

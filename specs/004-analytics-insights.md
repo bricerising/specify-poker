@@ -2,10 +2,10 @@
 
 ## Overview
 
-This document defines the strategy for capturing, analyzing, and acting upon 
-system and user data to derive business insights. It establishes the pipeline
-for transforming raw events into actionable information that informs subsequent
-development efforts.
+This document defines the strategy for capturing, analyzing, and acting upon
+system and gameplay data for a **private friends-only poker instance** (see `specs/009-private-games-and-product-scope.md`).
+
+The primary goal is **reliability and gameplay quality** (debuggability, fairness verification, and operational health), not growth marketing or monetization analytics.
 
 ## Analytics Strategy
 
@@ -38,16 +38,15 @@ Our approach focuses on three core pillars:
 ## Key Metrics & Insights
 
 ### 1. User Behavior (via Gateway & Player)
-- **DAU/MAU**: Daily/Monthly Active Users.
-- **Retention**: Percentage of users returning after 1, 7, and 30 days.
+- **Active Players**: Count of distinct players connected / in-hand.
 - **Session Duration**: Average time spent per WebSocket connection.
-- **Onboarding Funnel**: Conversion rate from registration to first hand played.
+- **Join Success Rate**: Seat-join success vs. failure reasons (insufficient chips, seat taken, auth).
+- **Timeout Rate**: Frequency of auto-actions due to turn timer expiry.
 
 ### 2. Economy & Balance (via Balance)
 - **Total Supply**: Sum of all user balances + active pots.
 - **Velocity of Chips**: Frequency of chip transfers/bets.
-- **Sink/Source Analysis**: Tracking how chips enter (Daily Bonus, Referral Rewards, Admin Deposits) and 
-  leave (Rake, Table Fees) the system.
+- **Sink/Source Analysis**: Tracking how chips enter (admin credits, deposits) and leave (optional rake) the system.
 - **Reservation Conversion**: Success rate of balance reservations converting to seated buy-ins.
 - **Wealth Distribution**: Gini coefficient or percentile distribution of chip balances across the user base.
 
@@ -62,12 +61,10 @@ Our approach focuses on three core pillars:
 
 Insights are useless unless they drive change. We implement the following loop:
 
-1. **Review**: Bi-weekly "Insight Reviews" where stakeholders examine Grafana 
-   business dashboards.
+1. **Review**: Periodic review of operational and gameplay dashboards.
 2. **Hypothesize**: Identify areas of friction (e.g., "70% of users drop off at
    the buy-in screen").
-3. **Tasking**: Convert hypotheses into actionable tasks in the relevant 
-   `spec/tasks.md` or new feature specs.
+3. **Tasking**: Convert findings into actionable tasks in the relevant `spec/tasks.md` or new feature specs.
 4. **Measure**: Use A/B testing or period-over-period analysis to verify if the 
    change improved the target metric.
 

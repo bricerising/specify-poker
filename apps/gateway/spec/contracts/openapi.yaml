@@ -539,7 +539,7 @@ paths:
 
   /api/tables:
     get:
-      summary: List lobby tables
+      summary: List tables (instance lobby)
       responses:
         '200':
           description: Tables list

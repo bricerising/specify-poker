@@ -50,7 +50,7 @@ The player service exposes the following gRPC methods:
 - `GetStatistics` - Retrieve hands played and wins
 - `AddFriend` - Add user to friends list
 - `RemoveFriend` - Remove user from friends list
-- `DeleteProfile` - Permanent data deletion (GDPR)
+- `DeleteProfile` - Permanent data deletion/anonymization
 
 ## Running Tests
 

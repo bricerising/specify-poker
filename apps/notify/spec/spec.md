@@ -41,8 +41,7 @@ registered device.
 As a player, I want to enable or disable push notifications from my profile 
 settings, so I can control how I receive updates.
 
-**Why this priority**: Required for basic user experience and compliance with 
-platform standards.
+**Why this priority**: Required for basic user experience and browser/platform standards.
 
 **Independent Test**: A user registers a new push subscription and later 
 unregisters it; the service updates the store accordingly.

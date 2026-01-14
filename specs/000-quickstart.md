@@ -1,4 +1,9 @@
-# Quickstart: Play-Money Poker
+# Quickstart: Private Play-Money Poker
+
+## Intent
+
+This repo is optimized for **friends hosting private games** in a self-hosted stack.
+It is not designed as a public matchmaking or real-money gambling platform (see `specs/009-private-games-and-product-scope.md`).
 
 ## Local Requirements
 
@@ -77,5 +82,5 @@ Every application in the ecosystem MUST adhere to the following quality standard
 
 1. Log in to the UI and enter the lobby.
 2. Create a table and join a seat.
-3. Open a second browser session to verify real-time updates and chat.
+3. Open a second browser session (or invite a friend to your instance) to verify real-time updates and chat.
 4. Open Grafana (`http://localhost:3001`) and confirm the "Poker Observability" dashboard loads.

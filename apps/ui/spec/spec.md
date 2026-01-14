@@ -7,7 +7,7 @@
 ## Overview
 
 The UI Application is a React-based single-page application that provides the
-player-facing interface for the poker platform. It connects to the Gateway
+player-facing interface for private poker games among friends (see `specs/009-private-games-and-product-scope.md`). It connects to the Gateway
 Service via WebSocket for real-time gameplay updates and HTTP for REST
 operations. The application handles authentication via Keycloak OIDC, provides
 an immersive poker table experience, and integrates with web push notifications.
@@ -44,7 +44,7 @@ As a player, I can view available tables in the lobby and see real-time updates
 as tables are created or seats fill.
 
 **Why this priority**: The lobby is the primary navigation point for finding
-and joining games.
+and joining games within a private instance (not public matchmaking).
 
 **Independent Test**: A user views the lobby, sees a list of tables with
 occupancy info, and the list updates in real-time as other users join.
@@ -52,7 +52,7 @@ occupancy info, and the list updates in real-time as other users join.
 **Acceptance Scenarios**:
 
 1. **Given** an authenticated user, **When** they view the lobby, **Then**
-   they see a list of all available tables with name, blinds, and seat count.
+   they see a list of available tables in the instance with name, blinds, and seat count.
 2. **Given** a user in the lobby, **When** another user joins a table,
    **Then** the seat count updates in real-time without page refresh.
 3. **Given** a user, **When** they want to create a table, **Then** they

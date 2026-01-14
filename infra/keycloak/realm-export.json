@@ -20,6 +20,7 @@
     {
       "username": "demo",
       "enabled": true,
+      "email": "demo@example.com",
       "emailVerified": true,
       "firstName": "Demo",
       "lastName": "User",
@@ -34,6 +35,7 @@
     {
       "username": "demo2",
       "enabled": true,
+      "email": "demo2@example.com",
       "emailVerified": true,
       "firstName": "Demo",
       "lastName": "Two",

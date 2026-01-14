@@ -13,6 +13,8 @@ The project follows a thematic specification structure located in the `specs/` r
 - `005-player-identity.md`: Profiles, statistics, and social features.
 - `006-gateway-and-connectivity.md`: Authentication, WebSockets, and routing.
 - `007-event-sourcing-and-audit.md`: Immutable event logs and hand history.
+- `008-code-quality-and-linting.md`: Linting and code quality standards.
+- `009-private-games-and-product-scope.md`: Product intent, scope, and non-goals.
 
 ## Microservice Implementation
 

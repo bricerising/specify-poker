@@ -28,6 +28,12 @@ async function isStackReady(): Promise<boolean> {
   const prometheus = await fetch(`${urls.prometheus}/-/ready`);
   if (!prometheus.ok) return false;
 
+  const loki = await fetch(`${urls.loki}/ready`);
+  if (!loki.ok) return false;
+
+  const tempo = await fetch(`${urls.tempo}/ready`);
+  if (!tempo.ok) return false;
+
   return true;
 }
 
@@ -57,4 +63,3 @@ export default async function globalSetup(_config: FullConfig) {
     `Timed out waiting for docker-compose stack after ${timeoutMs}ms (set PLAYWRIGHT_SKIP_STACK_WAIT=1 to disable).`,
   );
 }
-

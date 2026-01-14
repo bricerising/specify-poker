@@ -262,8 +262,34 @@ export function createTableStore(): TableStore {
     notify();
   };
 
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const buildPlaceholderTableState = (tableId: string): TableState => {
+    const fallback = state.tables.find((table) => table.tableId === tableId);
+    const config = fallback?.config ?? normalizeConfig(undefined);
+    const seatCount = Math.max(0, config.maxPlayers);
+    const seats: TableSeat[] = Array.from({ length: seatCount }, (_, index) => ({
+      seatId: index,
+      userId: null,
+      stack: 0,
+      status: "EMPTY",
+    }));
+
+    return {
+      tableId,
+      name: fallback?.name ?? "Table",
+      ownerId: fallback?.ownerId ?? "",
+      config,
+      seats,
+      spectators: [],
+      status: "lobby",
+      hand: null,
+      version: -1,
+    };
+  };
+
   const connect = (wsUrl?: string) => {
-    if (socket && socket.readyState === WebSocket.OPEN) {
+    if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
       return;
     }
     const apiBase = getApiBaseUrl();
@@ -422,6 +448,17 @@ export function createTableStore(): TableStore {
     }
   };
 
+  const loadTableSnapshotWithRetry = async (tableId: string, attempts = 6) => {
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const snapshot = await loadTableSnapshot(tableId);
+      if (snapshot?.tableState) {
+        return snapshot;
+      }
+      await sleep(250);
+    }
+    return null;
+  };
+
   return {
     getState: () => state,
     subscribe: (listener) => {
@@ -444,8 +481,10 @@ export function createTableStore(): TableStore {
         body: JSON.stringify({ seatId }),
       });
       const payload = await response.json();
-      const snapshotPromise = loadTableSnapshot(tableId);
+      const snapshotPromise = loadTableSnapshotWithRetry(tableId);
+      const placeholder = buildPlaceholderTableState(tableId);
       setState({
+        tableState: placeholder,
         seatId,
         isSpectating: false,
         chatMessages: [],
@@ -482,8 +521,10 @@ export function createTableStore(): TableStore {
       });
     },
     spectateTable: async (tableId) => {
-      const snapshotPromise = loadTableSnapshot(tableId);
+      const snapshotPromise = loadTableSnapshotWithRetry(tableId);
+      const placeholder = buildPlaceholderTableState(tableId);
       setState({
+        tableState: placeholder,
         seatId: null,
         isSpectating: true,
         chatMessages: [],

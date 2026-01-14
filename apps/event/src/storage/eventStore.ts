@@ -90,11 +90,9 @@ export class EventStore {
         sequence,
       };
 
-      try {
-        await streamStore.publishEvent(storedEvent);
-      } catch (err) {
+      void streamStore.publishEvent(storedEvent).catch((err) => {
         logger.error({ err }, "Failed to publish event to streams");
-      }
+      });
 
       return storedEvent;
     } catch (err) {
