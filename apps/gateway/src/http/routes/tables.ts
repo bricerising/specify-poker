@@ -1,8 +1,11 @@
 import { Router, Request, Response } from "express";
 import { gameClient } from "../../grpc/clients";
 import logger from "../../observability/logger";
+import { getConfig } from "../../config";
 
 const router = Router();
+
+const DAILY_LOGIN_BONUS_CHIPS = 1000;
 
 function requireUserId(req: Request, res: Response) {
   const userId = req.auth?.userId;
@@ -19,6 +22,53 @@ function buildWsUrl(req: Request) {
   const protocol = typeof forwardedProto === "string" ? forwardedProto : req.protocol;
   const wsProtocol = protocol === "https" ? "wss" : "ws";
   return `${wsProtocol}://${host}/ws`;
+}
+
+function isoDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function balanceBaseUrl(): string {
+  const config = getConfig();
+  return config.balanceServiceHttpUrl.startsWith("http")
+    ? config.balanceServiceHttpUrl
+    : `http://${config.balanceServiceHttpUrl}`;
+}
+
+async function ensureDailyLoginBonus(userId: string): Promise<void> {
+  const date = isoDate();
+  const idempotencyKey = `bonus:daily_login:lobby:${userId}:${date}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 2_000);
+
+  try {
+    const response = await fetch(
+      `${balanceBaseUrl()}/api/accounts/${encodeURIComponent(userId)}/deposit`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+          "x-gateway-user-id": userId,
+        },
+        body: JSON.stringify({ amount: DAILY_LOGIN_BONUS_CHIPS, source: "BONUS" }),
+        signal: controller.signal,
+      },
+    );
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      logger.warn(
+        { userId, status: response.status, body },
+        "daily_login_bonus.failed",
+      );
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown";
+    logger.warn({ userId, message }, "daily_login_bonus.error");
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // Helper to convert gRPC callback to promise
@@ -141,12 +191,18 @@ router.post("/:tableId/join", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "seatId is required" });
     }
 
-    const response = await grpcCall(gameClient.JoinSeat.bind(gameClient), {
+    const joinRequest = {
       table_id: tableId,
       user_id: userId,
       seat_id: parsedSeatId,
       buy_in_amount: buyInAmount,
-    });
+    };
+
+    let response = await grpcCall(gameClient.JoinSeat.bind(gameClient), joinRequest);
+    if (!response.ok && ["ACCOUNT_NOT_FOUND", "INSUFFICIENT_BALANCE"].includes(response.error ?? "")) {
+      await ensureDailyLoginBonus(userId);
+      response = await grpcCall(gameClient.JoinSeat.bind(gameClient), joinRequest);
+    }
 
     if (!response.ok) {
       return res.status(400).json({ error: response.error || "Failed to join seat" });
@@ -166,12 +222,18 @@ router.post("/:tableId/seats/:seatId/join", async (req: Request, res: Response) 
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const response = await grpcCall(gameClient.JoinSeat.bind(gameClient), {
+    const joinRequest = {
       table_id: tableId,
       user_id: userId,
       seat_id: parseInt(seatId, 10),
       buy_in_amount: buyInAmount,
-    });
+    };
+
+    let response = await grpcCall(gameClient.JoinSeat.bind(gameClient), joinRequest);
+    if (!response.ok && ["ACCOUNT_NOT_FOUND", "INSUFFICIENT_BALANCE"].includes(response.error ?? "")) {
+      await ensureDailyLoginBonus(userId);
+      response = await grpcCall(gameClient.JoinSeat.bind(gameClient), joinRequest);
+    }
 
     if (!response.ok) {
       return res.status(400).json({ error: response.error || "Failed to join seat" });

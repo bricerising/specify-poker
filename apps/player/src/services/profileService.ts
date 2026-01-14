@@ -98,22 +98,9 @@ export async function getProfile(userId: string, referrerId?: string): Promise<P
     profile.referredBy = referrerId;
   }
 
-  let created = profile;
-  let inserted = false;
-  try {
-    created = await profileRepository.create(profile);
-    inserted = true;
-  } catch (error: unknown) {
-    const code = typeof error === "object" && error ? (error as { code?: unknown }).code : undefined;
-    if (code !== "23505") {
-      throw error;
-    }
-    const existingAfter = await profileRepository.findById(userId, true);
-    if (!existingAfter) {
-      throw error;
-    }
-    created = existingAfter;
-  }
+  const createResult = await profileRepository.create(profile);
+  const created = createResult.profile;
+  const inserted = createResult.created;
 
   await profileCache.set(created);
 

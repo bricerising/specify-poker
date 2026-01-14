@@ -141,7 +141,8 @@ services:
 
   tempo:
     image: grafana/tempo:2.3.1
-    command: ["-config.file=/etc/tempo.yaml"]
+    # Tempo defaults to 5MB per trace; long-lived traces (e.g., WS sessions) can exceed this in local dev.
+    command: ["-config.file=/etc/tempo.yaml", "-ingester.max-bytes-per-trace=20000000"]
     volumes:
       - ./infra/tempo/tempo.yaml:/etc/tempo.yaml
     ports:

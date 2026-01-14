@@ -86,9 +86,13 @@ export async function findByNickname(nickname: string): Promise<Profile | null> 
   return mapProfile(result.rows[0]);
 }
 
-export async function create(profile: Profile, client?: PoolClient): Promise<Profile> {
+export async function create(
+  profile: Profile,
+  client?: PoolClient,
+): Promise<{ profile: Profile; created: boolean }> {
   const sql = `INSERT INTO profiles (user_id, nickname, avatar_url, preferences, last_login_at, referred_by, created_at, updated_at, deleted_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     ON CONFLICT (user_id) DO NOTHING
      RETURNING ${profileColumns}`;
   const params = [
     profile.userId,
@@ -104,7 +108,22 @@ export async function create(profile: Profile, client?: PoolClient): Promise<Pro
   const result = client
     ? await client.query(sql, params)
     : await query<ProfileRow>(sql, params);
-  return mapProfile(result.rows[0] as ProfileRow);
+  const row = result.rows[0] as ProfileRow | undefined;
+  if (row) {
+    return { profile: mapProfile(row), created: true };
+  }
+
+  const selectSql = `SELECT ${profileColumns} FROM profiles WHERE user_id = $1`;
+  const selectResult = client
+    ? await client.query(selectSql, [profile.userId])
+    : await query<ProfileRow>(selectSql, [profile.userId]);
+
+  const existingRow = selectResult.rows[0] as ProfileRow | undefined;
+  if (!existingRow) {
+    throw new Error("PROFILE_CREATE_FAILED");
+  }
+
+  return { profile: mapProfile(existingRow), created: false };
 }
 
 export async function update(profile: Profile, client?: PoolClient): Promise<Profile> {

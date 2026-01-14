@@ -46,7 +46,7 @@ function emitSessionEvent(type: string, userId: string, payload: Record<string, 
   eventClient.PublishEvent(
     {
       type,
-      table_id: "",
+      table_id: "lobby",
       user_id: userId,
       payload: toStruct(payload),
       idempotency_key: randomUUID(),
