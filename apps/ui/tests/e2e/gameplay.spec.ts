@@ -185,7 +185,7 @@ test.describe("gameplay flow", () => {
     await page.goto("/");
     await page.getByRole("button", { name: "Join Seat 2" }).click();
 
-    await expect(page.getByRole("button", { name: "Call" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Check" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Raise" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Fold" })).toBeVisible();
   });
@@ -194,7 +194,7 @@ test.describe("gameplay flow", () => {
     await page.goto("/");
     await page.getByRole("button", { name: "Join Seat 2" }).click();
 
-    await page.getByRole("button", { name: "Call" }).click();
+    await page.getByRole("button", { name: "Check" }).click();
 
     await expect(page.getByText("Street")).toBeVisible();
     await expect(page.getByText("flop")).toBeVisible();
@@ -203,7 +203,7 @@ test.describe("gameplay flow", () => {
   test("community cards appear after flop", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: "Join Seat 2" }).click();
-    await page.getByRole("button", { name: "Call" }).click();
+    await page.getByRole("button", { name: "Check" }).click();
 
     await expect(page.getByText("Qs")).toBeVisible();
     await expect(page.getByText("Jh")).toBeVisible();
@@ -214,13 +214,17 @@ test.describe("gameplay flow", () => {
     await page.goto("/");
     await page.getByRole("button", { name: "Join Seat 2" }).click();
 
-    await expect(page.getByText("Pot")).toBeVisible();
-    await expect(page.getByText("15")).toBeVisible();
+    const potFact = page.locator(".table-facts .fact").filter({ hasText: "Pot" });
+    await expect(potFact).toContainText("15");
   });
 });
 
 test.describe("timer display", () => {
   test("timer shows countdown", async ({ page }) => {
+    await page.addInitScript(() => {
+      window.sessionStorage.setItem("poker.auth.token", "test-token");
+    });
+
     await page.route("**/api/me", async (route) => {
       await route.fulfill({
         status: 200,

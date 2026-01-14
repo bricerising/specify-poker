@@ -290,6 +290,8 @@ services:
     environment:
       PORT: "4000"
       METRICS_PORT: "9104"
+      HTTP_RATE_LIMIT_MAX: "1000"
+      WS_RATE_LIMIT_MAX: "200"
       REDIS_URL: "redis://redis:6379"
       KEYCLOAK_URL: "http://keycloak:8080"
       KEYCLOAK_REALM: "poker-local"

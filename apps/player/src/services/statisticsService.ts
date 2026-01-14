@@ -14,8 +14,21 @@ async function ensureProfile(userId: string) {
 
   const nickname = await generateNickname(userId);
   const profile = defaultProfile(userId, nickname, new Date());
-  const created = await profileRepository.create(profile);
-  await profileCache.set(created);
+  try {
+    const created = await profileRepository.create(profile);
+    await profileCache.set(created);
+  } catch (error: unknown) {
+    const code = typeof error === "object" && error ? (error as { code?: unknown }).code : undefined;
+    if (code !== "23505") {
+      throw error;
+    }
+    const existingAfter = await profileRepository.findById(userId, true);
+    if (existingAfter) {
+      await profileCache.set(existingAfter);
+      return;
+    }
+    throw error;
+  }
 }
 
 export enum StatisticType {

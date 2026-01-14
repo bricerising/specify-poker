@@ -98,10 +98,26 @@ export async function getProfile(userId: string, referrerId?: string): Promise<P
     profile.referredBy = referrerId;
   }
 
-  const created = await profileRepository.create(profile);
+  let created = profile;
+  let inserted = false;
+  try {
+    created = await profileRepository.create(profile);
+    inserted = true;
+  } catch (error: unknown) {
+    const code = typeof error === "object" && error ? (error as { code?: unknown }).code : undefined;
+    if (code !== "23505") {
+      throw error;
+    }
+    const existingAfter = await profileRepository.findById(userId, true);
+    if (!existingAfter) {
+      throw error;
+    }
+    created = existingAfter;
+  }
+
   await profileCache.set(created);
 
-  if (referrerId && referrerId !== userId) {
+  if (inserted && referrerId && referrerId !== userId) {
     await incrementReferralCount(referrerId, 1);
     await publishEvent("REFERRAL_REWARD", { referrerId, referredId: userId }, referrerId);
   }

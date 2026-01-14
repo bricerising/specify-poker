@@ -1,4 +1,5 @@
-import { getRedisClient } from "../storage/redisClient";
+import { createClient } from "redis";
+import { getRedisUrl } from "../storage/redisClient";
 import { incrementHandsPlayed, incrementWins } from "./statisticsService";
 import logger from "../observability/logger";
 
@@ -7,6 +8,7 @@ export class EventConsumer {
   private streamKey: string = "events:all";
   private groupName: string = "player-service";
   private consumerName: string = `consumer-${process.pid}`;
+  private client: ReturnType<typeof createClient> | null = null;
   private handlers: Record<string, (data: Record<string, unknown>) => Promise<void>> = {
     HAND_STARTED: async (data) => {
       const participants = Array.isArray(data.participants) ? data.participants : [];
@@ -27,13 +29,19 @@ export class EventConsumer {
   };
 
   async start(): Promise<void> {
-    const client = await getRedisClient();
-    if (!client) {
+    const url = getRedisUrl();
+    if (!url) {
       logger.warn("Redis not available, EventConsumer will not start");
       return;
     }
 
     this.isRunning = true;
+    const client = createClient({ url });
+    client.on("error", (err) => {
+      logger.warn({ message: err.message }, "redis.error");
+    });
+    await client.connect();
+    this.client = client;
 
     try {
       await client.xGroupCreate(this.streamKey, this.groupName, "0", { MKSTREAM: true });
@@ -49,8 +57,10 @@ export class EventConsumer {
   }
 
   private async poll(): Promise<void> {
-    const client = await getRedisClient();
-    if (!client) return;
+    const client = this.client;
+    if (!client) {
+      return;
+    }
 
     while (this.isRunning) {
       try {
@@ -135,5 +145,9 @@ export class EventConsumer {
 
   stop(): void {
     this.isRunning = false;
+    if (this.client) {
+      void this.client.quit().catch(() => undefined);
+      this.client = null;
+    }
   }
 }

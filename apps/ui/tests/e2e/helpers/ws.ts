@@ -53,6 +53,8 @@ export async function connectWs(
     throw new Error(`Timed out waiting for WS message after ${timeoutMs}ms`);
   };
 
+  await waitForMessage((message) => message.type === "Welcome", 10_000);
+
   return {
     socket,
     messages,
@@ -72,4 +74,3 @@ export async function connectWs(
     waitForMessage,
   };
 }
-

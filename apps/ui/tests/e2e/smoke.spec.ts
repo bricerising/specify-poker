@@ -167,5 +167,6 @@ test("smoke flow: login, create table, join, play hand", async ({ page }) => {
 
   await expect(page.getByText("Table ID: table-1")).toBeVisible();
   await page.getByRole("button", { name: "Check" }).click();
-  await expect(page.getByText("Street: ended")).toBeVisible();
+  const streetFact = page.locator(".table-facts .fact").filter({ hasText: "Street" });
+  await expect(streetFact).toContainText("ended");
 });

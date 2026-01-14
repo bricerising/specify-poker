@@ -10,7 +10,7 @@ let server: grpc.Server | null = null;
 
 export async function startGrpcServer(port: number): Promise<void> {
   const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
-    keepCase: false,
+    keepCase: true,
     longs: Number,
     enums: String,
     defaults: true,

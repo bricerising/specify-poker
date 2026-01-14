@@ -35,12 +35,31 @@ test.describe("Action Bar Presets", () => {
     await tableCardBob.getByRole("button", { name: "Join Seat 2" }).click();
     await expect(pageBob.getByText("Table ID:")).toBeVisible({ timeout: 15_000 });
 
-    await expect(pageAlice.getByRole("heading", { name: "Action" })).toBeVisible({ timeout: 15_000 });
-    await expect(pageAlice.getByText("1/2 Pot")).toBeVisible();
-    await expect(pageAlice.getByText("3/4 Pot")).toBeVisible();
-    await expect(pageAlice.getByText("Pot")).toBeVisible();
-    await expect(pageAlice.getByText("All-in")).toBeVisible();
-    await expect(pageAlice.getByLabel("Bet sizing")).toBeVisible();
+    const aliceAction = pageAlice.getByRole("heading", { name: "Action" });
+    const bobAction = pageBob.getByRole("heading", { name: "Action" });
+
+    const startedAt = Date.now();
+    let actionPage: typeof pageAlice | null = null;
+    while (Date.now() - startedAt < 20_000) {
+      if (await aliceAction.isVisible().catch(() => false)) {
+        actionPage = pageAlice;
+        break;
+      }
+      if (await bobAction.isVisible().catch(() => false)) {
+        actionPage = pageBob;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    expect(actionPage, "expected one player to have legal actions").not.toBeNull();
+    actionPage = actionPage as typeof pageAlice;
+
+    await expect(actionPage.getByRole("heading", { name: "Action" })).toBeVisible();
+    await expect(actionPage.getByRole("button", { name: "1/2 Pot" })).toBeVisible();
+    await expect(actionPage.getByRole("button", { name: "3/4 Pot" })).toBeVisible();
+    await expect(actionPage.getByRole("button", { name: "Pot", exact: true })).toBeVisible();
+    await expect(actionPage.getByRole("button", { name: "All-in" })).toBeVisible();
+    await expect(actionPage.getByLabel("Bet sizing")).toBeVisible();
 
     await contextAlice.close();
     await contextBob.close();

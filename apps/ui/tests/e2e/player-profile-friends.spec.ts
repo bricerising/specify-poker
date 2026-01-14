@@ -51,7 +51,7 @@ test.describe("Player Service (via Gateway)", () => {
       await nicknameInput.fill(newNickname);
       await expect(page.getByRole("button", { name: "Save Profile" })).toBeEnabled();
       await page.getByRole("button", { name: "Save Profile" }).click();
-      await expect(page.getByText(newNickname)).toBeVisible();
+      await expect(page.locator(".profile-summary .table-name")).toHaveText(newNickname);
     });
 
     test("adds and removes friends", async ({ page }) => {
@@ -72,4 +72,3 @@ test.describe("Player Service (via Gateway)", () => {
     });
   });
 });
-

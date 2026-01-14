@@ -17,8 +17,8 @@ test("login flow completes with demo user", async ({ page }) => {
 
   await expect(page).toHaveURL(/\/realms\/poker-local\/protocol\/openid-connect\/auth/);
 
-  await page.getByLabel("Username").fill("demo");
-  await page.getByLabel("Password").fill("demo");
+  await page.getByRole("textbox", { name: "Username" }).fill("demo");
+  await page.getByRole("textbox", { name: "Password" }).fill("demo");
   await page.getByRole("button", { name: /sign in/i }).click();
 
   await expect(page.getByRole("heading", { name: "Lobby" })).toBeVisible({ timeout: 30_000 });

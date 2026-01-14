@@ -129,7 +129,8 @@ export const handlers = {
       const tableId = toNonEmptyString(call.request.table_id);
       const idempotencyKey = toNonEmptyString(call.request.idempotency_key);
       const amount = toNumber(call.request.amount, 0);
-      const timeoutSeconds = toNumber(call.request.timeout_seconds ?? 30, 30);
+      const timeoutCandidate = toNumber(call.request.timeout_seconds, 0);
+      const timeoutSeconds = timeoutCandidate > 0 ? timeoutCandidate : 30;
       if (!accountId || !tableId || !idempotencyKey || amount <= 0) {
         recordDuration("ReserveForBuyIn", startedAt, "error");
         return invalidArgument(callback, "invalid ReserveForBuyIn request");

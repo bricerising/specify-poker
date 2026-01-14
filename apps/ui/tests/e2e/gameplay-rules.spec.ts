@@ -13,11 +13,11 @@ type TableStateResponse = {
     hand?: {
       hand_id?: string;
       street?: string;
-      pots?: Array<{ amount?: number }>;
-      current_bet?: number;
-      min_raise?: number;
+      pots?: Array<{ amount?: number | string }>;
+      current_bet?: number | string;
+      min_raise?: number | string;
       turn?: number;
-      actions?: Array<{ type?: string; amount?: number }>;
+      actions?: Array<{ type?: string; amount?: number | string }>;
     } | null;
     version?: number;
   };
@@ -113,10 +113,13 @@ test.describe("Gameplay Rules (Game + Gateway)", () => {
 
     const blindActions = (hand?.actions ?? []).filter((action) => action.type === "POST_BLIND");
     expect(blindActions.length).toBe(2);
-    expect(blindActions.map((action) => action.amount ?? 0).sort((a, b) => a - b)).toEqual([5, 10]);
-    expect(hand?.current_bet).toBe(10);
-    expect(hand?.min_raise).toBe(10);
-    expect((hand?.pots ?? []).reduce((sum, pot) => sum + (pot.amount ?? 0), 0)).toBe(15);
+    const blindAmounts = blindActions
+      .map((action) => Number(action.amount ?? 0))
+      .sort((a, b) => a - b);
+    expect(blindAmounts).toEqual([5, 10]);
+    expect(Number(hand?.current_bet ?? 0)).toBe(10);
+    expect(Number(hand?.min_raise ?? 0)).toBe(10);
+    expect((hand?.pots ?? []).reduce((sum, pot) => sum + Number(pot.amount ?? 0), 0)).toBe(15);
 
     expect((payload.hole_cards ?? []).length).toBe(2);
   });

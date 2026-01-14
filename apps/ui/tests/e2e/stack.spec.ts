@@ -35,8 +35,7 @@ test.describe("Docker Compose Stack", () => {
     const tableCardA = pageA.locator(".table-card", { hasText: tableName });
     await expect(tableCardA).toBeVisible({ timeout: 15000 });
     await tableCardA.getByRole("button", { name: "Join Seat 1" }).click();
-
-    await expect(tableCardA.getByRole("button", { name: "Seat 1 Taken" })).toBeVisible();
+    await expect(pageA.getByText("Table ID:")).toBeVisible({ timeout: 15_000 });
 
     const contextB = await browser.newContext();
     const pageB = await contextB.newPage();
@@ -45,7 +44,7 @@ test.describe("Docker Compose Stack", () => {
     const tableCardB = pageB.locator(".table-card", { hasText: tableName });
     await expect(tableCardB).toBeVisible();
     await tableCardB.getByRole("button", { name: "Join Seat 2" }).click();
-    await expect(tableCardB.getByRole("button", { name: "Seat 2 Taken" })).toBeVisible();
+    await expect(pageB.getByText("Table ID:")).toBeVisible({ timeout: 15_000 });
 
     const apiToken = generateToken(aliceId, aliceName);
     const tablesResponse = await request.get("http://localhost:4000/api/tables", {

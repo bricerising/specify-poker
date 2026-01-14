@@ -96,6 +96,10 @@ export async function commitReservation(reservationId: string): Promise<CommitRe
     };
   }
 
+  if (reservation.status === "EXPIRED") {
+    return { ok: false, error: "RESERVATION_EXPIRED" };
+  }
+
   if (reservation.status !== "HELD") {
     return { ok: false, error: "RESERVATION_NOT_HELD" };
   }

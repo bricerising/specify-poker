@@ -23,6 +23,29 @@ proxy.on("proxyReq", (proxyReq, req) => {
   proxyReq.setHeader("x-user-id", auth.userId);
   proxyReq.setHeader("x-gateway-user-id", auth.userId);
   proxyReq.setHeader("x-user-claims", JSON.stringify(auth.claims));
+
+  // Express body parsing consumes the request stream, which would otherwise
+  // leave the proxied request with a Content-Length but no body. Re-send the
+  // parsed JSON body when present.
+  const method = (req.method ?? "GET").toUpperCase();
+  if (!["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+    return;
+  }
+
+  const expressReq = req as Request;
+  const body = expressReq.body as unknown;
+  if (!body) {
+    return;
+  }
+
+  const contentType = String(expressReq.headers["content-type"] ?? "");
+  if (!contentType.toLowerCase().includes("application/json")) {
+    return;
+  }
+
+  const bodyData = typeof body === "string" ? body : JSON.stringify(body);
+  proxyReq.setHeader("Content-Length", Buffer.byteLength(bodyData));
+  proxyReq.write(bodyData);
 });
 
 export function setupProxy(app: Router) {
