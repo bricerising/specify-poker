@@ -73,29 +73,50 @@ export function ActionBar({ actions, pot, onAction }: ActionBarProps) {
   }
 
   const actionClass = (action: ActionType) => {
-    if (action === "Raise" || action === "Bet") {
-      return "btn btn-primary";
-    }
     if (action === "Fold") {
-      return "btn btn-quiet";
+      return "btn btn-action btn-action-fold";
     }
-    return "btn";
+    if (action === "Check" || action === "Call") {
+      return "btn btn-action btn-action-check";
+    }
+    if (action === "Raise" || action === "Bet") {
+      return "btn btn-action btn-action-raise";
+    }
+    return "btn btn-action";
+  };
+
+  const actionLabel = (action: ActionType) => {
+    if (action === "Call") {
+      const callAmount = constraints.get("Call")?.max;
+      return callAmount ? `Call ${callAmount}` : "Call";
+    }
+    if (action === "Raise") {
+      const resolved = clampAmount(Number(amount));
+      return resolved > 0 ? `Raise ${resolved}` : "Raise";
+    }
+    if (action === "Bet") {
+      const resolved = clampAmount(Number(amount));
+      return resolved > 0 ? `Bet ${resolved}` : "Bet";
+    }
+    return action;
   };
 
   return (
     <div className="card action-bar">
-      <h3>Action</h3>
-      <label className="field">
-        <span className="field-label">Amount</span>
-        <input
-          type="number"
-          min={0}
-          value={amount}
-          onChange={(event) => setAmount(event.target.value)}
-        />
-      </label>
-      {betLimits ? (
-        <>
+      <div className="action-bar-header">
+        <h3>Action</h3>
+      </div>
+      <div className="action-bar-controls">
+        <label className="field">
+          <span className="field-label">Amount</span>
+          <input
+            type="number"
+            min={0}
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+          />
+        </label>
+        {betLimits ? (
           <label className="field">
             <span className="field-label">Bet sizing</span>
             <input
@@ -107,7 +128,11 @@ export function ActionBar({ actions, pot, onAction }: ActionBarProps) {
               onChange={(event) => setAmount(String(clampAmount(Number(event.target.value))))}
             />
           </label>
-          <div className="action-buttons">
+        ) : null}
+      </div>
+      {betLimits ? (
+        <>
+          <div className="action-buttons action-presets">
             <button type="button" className="btn btn-ghost" onClick={() => setAmount(String(clampAmount(pot / 2)))}>
               1/2 Pot
             </button>
@@ -127,7 +152,7 @@ export function ActionBar({ actions, pot, onAction }: ActionBarProps) {
           </div>
         </>
       ) : null}
-      <div className="action-buttons">
+      <div className="action-buttons action-primary">
         {actionable.map((action) => (
           <button
             key={action}
@@ -135,7 +160,7 @@ export function ActionBar({ actions, pot, onAction }: ActionBarProps) {
             className={actionClass(action)}
             onClick={() => handleAction(action)}
           >
-            {action}
+            {actionLabel(action)}
           </button>
         ))}
       </div>

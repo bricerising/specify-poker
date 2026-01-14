@@ -48,8 +48,9 @@ test.describe("Tables: spectator + chat + moderation", () => {
     await tableCardSpectator.getByRole("button", { name: "Watch" }).click();
     await expect(pageSpectator.getByText("Table ID:")).toBeVisible({ timeout: 15_000 });
 
-    // Spectator should not see hole cards (UI redaction).
-    await expect(pageSpectator.getByText("Hidden")).toBeVisible();
+    // Spectator should see card backs, not hole card faces.
+    await expect(pageSpectator.locator(".seat-cards .playing-card")).toHaveCount(0);
+    await expect(pageSpectator.locator(".seat-cards .card-back")).toHaveCount(4);
 
     await pageAlice.getByLabel("Message").fill("hello from alice");
     await pageAlice.getByRole("button", { name: "Send" }).click();

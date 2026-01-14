@@ -71,6 +71,22 @@ test.describe("Docker Compose Stack", () => {
       seat2: bobId,
     });
 
+    await expect.poll(async () => {
+      const stateResponse = await request.get(`http://localhost:4000/api/tables/${tableId}/state`, {
+        headers: { Authorization: `Bearer ${apiToken}` },
+      });
+      const payload = (await stateResponse.json()) as { state?: { hand?: unknown } };
+      return Boolean(payload.state?.hand);
+    }, { timeout: 15_000 }).toBe(true);
+
+    const aliceSeat = pageA.locator(".seat-slot.is-you .seat-cards");
+    await expect(aliceSeat.locator(".playing-card")).toHaveCount(2, { timeout: 15_000 });
+    await expect(aliceSeat.locator(".card-back")).toHaveCount(0);
+
+    const bobSeat = pageB.locator(".seat-slot.is-you .seat-cards");
+    await expect(bobSeat.locator(".playing-card")).toHaveCount(2, { timeout: 15_000 });
+    await expect(bobSeat.locator(".card-back")).toHaveCount(0);
+
     await pageA.close();
     await pageB.close();
   });

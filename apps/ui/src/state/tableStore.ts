@@ -135,6 +135,7 @@ function normalizeTableState(raw: UnknownRecord, fallback?: TableSummary): Table
     })),
     status: String(raw.status ?? (raw.hand ? "in_hand" : "lobby")),
     hand: normalizeHand(raw.hand as UnknownRecord | null | undefined, config),
+    button: toNumber(raw.button, 0),
     version: toNumber(raw.version, 0),
   };
 }
@@ -198,6 +199,7 @@ export interface TableState {
   spectators?: SpectatorView[];
   status: string;
   hand: HandState | null;
+  button: number;
   version: number;
 }
 
@@ -250,6 +252,9 @@ export function createTableStore(): TableStore {
 
   const listeners = new Set<(state: TableStoreState) => void>();
   let socket: WebSocket | null = null;
+  const requestedHoleCards = new Set<string>();
+  const nicknameCache = new Map<string, string>();
+  const requestedNicknames = new Set<string>();
 
   const notify = () => {
     for (const listener of listeners) {
@@ -263,6 +268,186 @@ export function createTableStore(): TableStore {
   };
 
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const clearRequestedHoleCards = () => {
+    requestedHoleCards.clear();
+  };
+
+  const applyCachedNicknames = (tableState: TableState): TableState => {
+    let changed = false;
+    const seats = tableState.seats.map((seat) => {
+      if (!seat.userId || seat.nickname) {
+        return seat;
+      }
+      const nickname = nicknameCache.get(seat.userId);
+      if (!nickname) {
+        return seat;
+      }
+      changed = true;
+      return { ...seat, nickname };
+    });
+
+    const spectators = tableState.spectators?.map((spectator) => {
+      if (!spectator.userId || spectator.nickname) {
+        return spectator;
+      }
+      const nickname = nicknameCache.get(spectator.userId);
+      if (!nickname) {
+        return spectator;
+      }
+      changed = true;
+      return { ...spectator, nickname };
+    });
+
+    if (!changed) {
+      return tableState;
+    }
+
+    return {
+      ...tableState,
+      seats,
+      ...(spectators ? { spectators } : {}),
+    };
+  };
+
+  async function fetchNickname(userId: string): Promise<string | null> {
+    if (!userId) {
+      return null;
+    }
+    try {
+      const response = await apiFetch(`/api/profile/${encodeURIComponent(userId)}`);
+      const payload = (await response.json()) as { nickname?: unknown };
+      const nickname = typeof payload.nickname === "string" ? payload.nickname.trim() : "";
+      return nickname.length > 0 ? nickname : null;
+    } catch {
+      return null;
+    }
+  }
+
+  const requestMissingNicknames = (tableState: TableState) => {
+    const userIds = new Set<string>();
+    for (const seat of tableState.seats) {
+      if (!seat.userId || seat.nickname || nicknameCache.has(seat.userId)) {
+        continue;
+      }
+      userIds.add(seat.userId);
+    }
+    for (const spectator of tableState.spectators ?? []) {
+      if (!spectator.userId || spectator.nickname || nicknameCache.has(spectator.userId)) {
+        continue;
+      }
+      userIds.add(spectator.userId);
+    }
+
+    for (const userId of userIds) {
+      if (requestedNicknames.has(userId)) {
+        continue;
+      }
+      requestedNicknames.add(userId);
+      void fetchNickname(userId).then((nickname) => {
+        requestedNicknames.delete(userId);
+        if (!nickname) {
+          return;
+        }
+        nicknameCache.set(userId, nickname);
+
+        const current = state.tableState;
+        if (!current || current.tableId !== tableState.tableId) {
+          return;
+        }
+
+        const updated = applyCachedNicknames(current);
+        if (updated !== current) {
+          setState({ tableState: updated });
+        }
+      });
+    }
+  };
+
+  async function fetchHoleCardsForHand(tableId: string, expectedHandId: string): Promise<string[] | null> {
+    try {
+      const response = await apiFetch(`/api/tables/${tableId}/state`);
+      const payload = (await response.json()) as {
+        state?: UnknownRecord;
+        hole_cards?: unknown[];
+        holeCards?: unknown[];
+      };
+
+      const statePayload = payload.state;
+      if (!statePayload) {
+        return null;
+      }
+
+      const handPayload = (statePayload.hand ?? null) as UnknownRecord | null;
+      const handId =
+        typeof handPayload?.handId === "string"
+          ? handPayload.handId
+          : typeof handPayload?.hand_id === "string"
+            ? handPayload.hand_id
+            : null;
+
+      if (!handId || handId !== expectedHandId) {
+        return null;
+      }
+
+      const holeCardsPayload = payload.hole_cards ?? payload.holeCards ?? [];
+      const cards = holeCardsPayload
+        .map((card) => cardToString(card))
+        .filter((card): card is string => Boolean(card));
+
+      return cards.length === 2 ? cards : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function loadHoleCardsWithRetry(tableId: string, handId: string, attempts = 12): Promise<string[] | null> {
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      if (state.tableState?.tableId !== tableId || state.isSpectating || state.seatId === null) {
+        return null;
+      }
+      if (state.privateHandId === handId && state.privateHoleCards && state.privateHoleCards.length === 2) {
+        return state.privateHoleCards;
+      }
+      const cards = await fetchHoleCardsForHand(tableId, handId);
+      if (cards) {
+        return cards;
+      }
+      await sleep(250);
+    }
+    return null;
+  }
+
+  const requestPrivateHoleCards = (tableId: string, handId: string) => {
+    if (state.seatId === null || state.isSpectating) {
+      return;
+    }
+
+    const key = `${tableId}:${handId}`;
+    if (requestedHoleCards.has(key)) {
+      return;
+    }
+    requestedHoleCards.add(key);
+
+    requestResync(socket, tableId);
+
+    void loadHoleCardsWithRetry(tableId, handId).then((cards) => {
+      requestedHoleCards.delete(key);
+      if (!cards) {
+        return;
+      }
+      if (state.tableState?.tableId !== tableId) {
+        return;
+      }
+      if (state.tableState?.hand?.handId !== handId) {
+        return;
+      }
+      if (state.seatId === null || state.isSpectating) {
+        return;
+      }
+      setState({ privateHoleCards: cards, privateHandId: handId });
+    });
+  };
 
   const buildPlaceholderTableState = (tableId: string): TableState => {
     const fallback = state.tables.find((table) => table.tableId === tableId);
@@ -284,6 +469,7 @@ export function createTableStore(): TableStore {
       spectators: [],
       status: "lobby",
       hand: null,
+      button: 0,
       version: -1,
     };
   };
@@ -330,14 +516,23 @@ export function createTableStore(): TableStore {
         }
         const tableId = String(incoming.tableId ?? incoming.table_id ?? "");
         const fallback = state.tables.find((table) => table.tableId === tableId);
-        const normalized = normalizeTableState(incoming, fallback);
+        const normalized = applyCachedNicknames(normalizeTableState(incoming, fallback));
         const incomingHandId = normalized.hand?.handId ?? null;
+        const shouldRequestHoleCards =
+          Boolean(incomingHandId)
+          && state.seatId !== null
+          && !state.isSpectating
+          && (state.privateHoleCards === null || state.privateHandId !== incomingHandId);
         const clearPrivate =
           !incomingHandId || (state.privateHandId && state.privateHandId !== incomingHandId);
         setState({
           tableState: normalized,
           ...(clearPrivate ? { privateHoleCards: null, privateHandId: null } : {}),
         });
+        requestMissingNicknames(normalized);
+        if (incomingHandId && shouldRequestHoleCards) {
+          requestPrivateHoleCards(tableId, incomingHandId);
+        }
         return;
       }
       if (message.type === "HoleCards") {
@@ -433,7 +628,7 @@ export function createTableStore(): TableStore {
         return null;
       }
       const fallback = state.tables.find((table) => table.tableId === tableId);
-      const tableState = normalizeTableState(payload.state, fallback);
+      const tableState = applyCachedNicknames(normalizeTableState(payload.state, fallback));
       const holeCardsPayload = payload.hole_cards ?? payload.holeCards ?? [];
       const privateHoleCards = holeCardsPayload
         .map((card) => cardToString(card))
@@ -475,6 +670,7 @@ export function createTableStore(): TableStore {
       connect();
     },
     joinSeat: async (tableId, seatId) => {
+      clearRequestedHoleCards();
       const response = await apiFetch(`/api/tables/${tableId}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -518,9 +714,11 @@ export function createTableStore(): TableStore {
           privateHoleCards: snapshot.privateHoleCards ?? state.privateHoleCards,
           privateHandId: snapshot.privateHandId ?? state.privateHandId,
         });
+        requestMissingNicknames(snapshot.tableState);
       });
     },
     spectateTable: async (tableId) => {
+      clearRequestedHoleCards();
       const snapshotPromise = loadTableSnapshotWithRetry(tableId);
       const placeholder = buildPlaceholderTableState(tableId);
       setState({
@@ -558,9 +756,11 @@ export function createTableStore(): TableStore {
           privateHoleCards: snapshot.privateHoleCards ?? state.privateHoleCards,
           privateHandId: snapshot.privateHandId ?? state.privateHandId,
         });
+        requestMissingNicknames(snapshot.tableState);
       });
     },
     leaveTable: () => {
+      clearRequestedHoleCards();
       const tableId = state.tableState?.tableId;
       if (tableId && socket?.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ type: "UnsubscribeTable", tableId }));

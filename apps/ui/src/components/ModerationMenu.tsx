@@ -37,7 +37,7 @@ export function ModerationMenu({ tableId, seats, onModeration }: ModerationMenuP
         seated.map((seat) => (
           <div key={seat.seatId} className="moderation-seat">
             <div>
-              <strong>Seat {seat.seatId + 1}</strong>: {seat.nickname ?? seat.userId}
+              <strong>Seat {seat.seatId + 1}</strong>: {seat.nickname ?? `Player ${seat.seatId + 1}`}
             </div>
             <div className="action-buttons">
               <button type="button" className="btn btn-quiet" onClick={() => request("kick", seat.seatId)}>

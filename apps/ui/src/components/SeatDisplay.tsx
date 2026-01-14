@@ -1,11 +1,13 @@
 import React from "react";
 
 import { TableSeat } from "../state/tableStore";
+import { formatChipsWithCommas } from "../utils/chipFormatter";
 
 interface SeatDisplayProps {
   seat: TableSeat;
   isCurrentUser: boolean;
   isCurrentTurn: boolean;
+  isDealer?: boolean;
   privateCards?: string[] | null;
 }
 
@@ -13,9 +15,11 @@ export function SeatDisplay({
   seat,
   isCurrentUser,
   isCurrentTurn,
+  isDealer = false,
   privateCards,
 }: SeatDisplayProps) {
-  const statusClass = seat.status === "folded" ? "folded" : "";
+  const normalizedStatus = seat.status.trim().toLowerCase();
+  const statusClass = normalizedStatus === "folded" ? "folded" : "";
   const turnClass = isCurrentTurn ? "is-turn" : "";
   const youClass = isCurrentUser ? "is-you" : "";
 
@@ -32,7 +36,7 @@ export function SeatDisplay({
       );
     }
 
-    if (seat.status === "active" || seat.status === "all_in") {
+    if (normalizedStatus === "active" || normalizedStatus === "all_in") {
       return (
         <div className="seat-cards">
           <span className="card-back" />
@@ -46,20 +50,34 @@ export function SeatDisplay({
 
   if (!seat.userId) {
     return (
-      <div className={`seat-card empty`}>
-        <strong>Seat {seat.seatId + 1}</strong>
-        <div className="meta-line">Open seat</div>
+      <div className="seat-badge empty">
+        <div className="seat-avatar seat-avatar-empty">+</div>
+        <div className="seat-info">
+          <div className="seat-name">Seat {seat.seatId + 1}</div>
+          <div className="seat-stack">Open</div>
+        </div>
       </div>
     );
   }
 
+  const name = seat.nickname ?? (isCurrentUser ? "You" : `Player ${seat.seatId + 1}`);
+  const initials = name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+
   return (
-    <div className={`seat-card ${statusClass} ${turnClass} ${youClass}`}>
-      <strong>Seat {seat.seatId + 1}</strong>
-      <div className="seat-player">{seat.nickname ?? seat.userId}</div>
-      <div className="seat-stack">Stack: {seat.stack}</div>
-      <div className="seat-status">{seat.status}</div>
+    <div className={`seat-badge ${statusClass} ${turnClass} ${youClass}`}>
+      <div className="seat-avatar">{initials || "P"}</div>
+      {isDealer ? <div className="dealer-button" aria-label="Dealer button">D</div> : null}
+      {normalizedStatus === "folded" ? <div className="seat-status-flag">Fold</div> : null}
       {renderCards()}
+      <div className="seat-info">
+        <div className="seat-name">{name}</div>
+        <div className="seat-stack">{formatChipsWithCommas(seat.stack)}</div>
+      </div>
     </div>
   );
 }

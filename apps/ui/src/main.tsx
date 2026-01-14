@@ -68,7 +68,7 @@ function PokerApp() {
 
   if (state.tableState) {
     return (
-      <div className="app-shell">
+      <div className="app-shell app-shell-table">
         {header}
         <div className="content">
           <TablePage store={tableStore} />
