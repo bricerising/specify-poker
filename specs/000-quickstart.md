@@ -49,7 +49,7 @@ It is not designed as a public matchmaking or real-money gambling platform (see 
 
 ## First-Time Setup Notes
 
-- **Keycloak**: Import the realm config from `infra/keycloak/`.
+- **Keycloak**: Import the realm config from `infra/keycloak/` (self-registration enabled via the **Register** link).
 - **Google Login**: To enable Google login, create a Google OAuth client and add a Keycloak Identity Provider:
   - Redirect URI: `http://localhost:8080/realms/poker-local/broker/google/endpoint`
 - **Notifications**: Generate VAPID keys and set env vars before starting the stack:

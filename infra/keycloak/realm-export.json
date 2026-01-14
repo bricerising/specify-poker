@@ -1,6 +1,7 @@
 {
   "realm": "poker-local",
   "enabled": true,
+  "registrationAllowed": true,
   "displayName": "Specify Poker Local",
   "clients": [
     {

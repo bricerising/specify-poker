@@ -14,3 +14,11 @@ build/
 *output*.txt
 *test-results*
 *playwright-report*
+
+# Codex CLI (local auth/session artifacts)
+.codex/auth.json
+.codex/config.toml
+.codex/history.jsonl
+.codex/log/
+.codex/sessions/
+.codex/version.json

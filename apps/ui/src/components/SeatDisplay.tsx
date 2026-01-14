@@ -61,16 +61,21 @@ export function SeatDisplay({
   }
 
   const name = seat.nickname ?? (isCurrentUser ? "You" : `Player ${seat.seatId + 1}`);
-  const initials = name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
 
   return (
     <div className={`seat-badge ${statusClass} ${turnClass} ${youClass}`}>
-      <div className="seat-avatar">{initials || "P"}</div>
+      <div className="seat-avatar">
+        {seat.avatarUrl ? (
+          <img src={seat.avatarUrl} alt={`${name} avatar`} loading="lazy" decoding="async" />
+        ) : (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M12 12a4.2 4.2 0 1 0-4.2-4.2A4.2 4.2 0 0 0 12 12Zm0 2c-4 0-7.2 2.2-7.2 4.9V21h14.4v-2.1C19.2 16.2 16 14 12 14Z"
+            />
+          </svg>
+        )}
+      </div>
       {isDealer ? <div className="dealer-button" aria-label="Dealer button">D</div> : null}
       {normalizedStatus === "folded" ? <div className="seat-status-flag">Fold</div> : null}
       {renderCards()}

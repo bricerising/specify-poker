@@ -38,6 +38,7 @@ function normalizeSeat(raw: UnknownRecord): TableSeat {
     seatId: toNumber(raw.seatId ?? raw.seat_id, 0),
     userId: (raw.userId ?? raw.user_id ?? null) as string | null,
     nickname: raw.nickname as string | undefined,
+    avatarUrl: (raw.avatarUrl ?? raw.avatar_url ?? null) as string | null,
     stack: toNumber(raw.stack, 0),
     status: String(raw.status ?? "EMPTY"),
   };
@@ -170,6 +171,7 @@ export interface TableSeat {
   seatId: number;
   userId: string | null;
   nickname?: string;
+  avatarUrl?: string | null;
   stack: number;
   status: string;
 }
@@ -253,8 +255,8 @@ export function createTableStore(): TableStore {
   const listeners = new Set<(state: TableStoreState) => void>();
   let socket: WebSocket | null = null;
   const requestedHoleCards = new Set<string>();
-  const nicknameCache = new Map<string, string>();
-  const requestedNicknames = new Set<string>();
+  const profileCache = new Map<string, { nickname: string; avatarUrl: string | null }>();
+  const requestedProfiles = new Set<string>();
 
   const notify = () => {
     for (const listener of listeners) {
@@ -273,30 +275,42 @@ export function createTableStore(): TableStore {
     requestedHoleCards.clear();
   };
 
-  const applyCachedNicknames = (tableState: TableState): TableState => {
+  const applyCachedProfiles = (tableState: TableState): TableState => {
     let changed = false;
     const seats = tableState.seats.map((seat) => {
-      if (!seat.userId || seat.nickname) {
+      if (!seat.userId) {
         return seat;
       }
-      const nickname = nicknameCache.get(seat.userId);
-      if (!nickname) {
+      const cached = profileCache.get(seat.userId);
+      if (!cached) {
         return seat;
       }
+      const currentNickname = typeof seat.nickname === "string" ? seat.nickname.trim() : "";
+      const shouldSetNickname = !currentNickname || currentNickname === seat.userId;
+      const shouldSetAvatar = (seat.avatarUrl === undefined || seat.avatarUrl === null) && cached.avatarUrl !== null;
+
+      if (!shouldSetNickname && !shouldSetAvatar) {
+        return seat;
+      }
+
       changed = true;
-      return { ...seat, nickname };
+      return {
+        ...seat,
+        ...(shouldSetNickname ? { nickname: cached.nickname } : {}),
+        ...(shouldSetAvatar ? { avatarUrl: cached.avatarUrl } : {}),
+      };
     });
 
     const spectators = tableState.spectators?.map((spectator) => {
       if (!spectator.userId || spectator.nickname) {
         return spectator;
       }
-      const nickname = nicknameCache.get(spectator.userId);
-      if (!nickname) {
+      const cached = profileCache.get(spectator.userId);
+      if (!cached) {
         return spectator;
       }
       changed = true;
-      return { ...spectator, nickname };
+      return { ...spectator, nickname: cached.nickname };
     });
 
     if (!changed) {
@@ -310,53 +324,60 @@ export function createTableStore(): TableStore {
     };
   };
 
-  async function fetchNickname(userId: string): Promise<string | null> {
+  async function fetchPublicProfile(userId: string): Promise<{ nickname: string; avatarUrl: string | null } | null> {
     if (!userId) {
       return null;
     }
     try {
       const response = await apiFetch(`/api/profile/${encodeURIComponent(userId)}`);
-      const payload = (await response.json()) as { nickname?: unknown };
+      const payload = (await response.json()) as { nickname?: unknown; avatarUrl?: unknown; avatar_url?: unknown };
       const nickname = typeof payload.nickname === "string" ? payload.nickname.trim() : "";
-      return nickname.length > 0 ? nickname : null;
+      const avatarRaw = payload.avatarUrl ?? payload.avatar_url;
+      const avatarUrl = typeof avatarRaw === "string" && avatarRaw.trim().length > 0 ? avatarRaw.trim() : null;
+      return nickname.length > 0 ? { nickname, avatarUrl } : null;
     } catch {
       return null;
     }
   }
 
-  const requestMissingNicknames = (tableState: TableState) => {
+  const requestMissingProfiles = (tableState: TableState) => {
     const userIds = new Set<string>();
     for (const seat of tableState.seats) {
-      if (!seat.userId || seat.nickname || nicknameCache.has(seat.userId)) {
+      const nickname = typeof seat.nickname === "string" ? seat.nickname.trim() : "";
+      const needsNickname = !nickname || nickname === seat.userId;
+      const needsAvatar = seat.avatarUrl === undefined || seat.avatarUrl === null;
+      if (!seat.userId || profileCache.has(seat.userId) || (!needsNickname && !needsAvatar)) {
         continue;
       }
       userIds.add(seat.userId);
     }
     for (const spectator of tableState.spectators ?? []) {
-      if (!spectator.userId || spectator.nickname || nicknameCache.has(spectator.userId)) {
+      const nickname = typeof spectator.nickname === "string" ? spectator.nickname.trim() : "";
+      const needsNickname = !nickname || nickname === spectator.userId;
+      if (!spectator.userId || profileCache.has(spectator.userId) || !needsNickname) {
         continue;
       }
       userIds.add(spectator.userId);
     }
 
     for (const userId of userIds) {
-      if (requestedNicknames.has(userId)) {
+      if (requestedProfiles.has(userId)) {
         continue;
       }
-      requestedNicknames.add(userId);
-      void fetchNickname(userId).then((nickname) => {
-        requestedNicknames.delete(userId);
-        if (!nickname) {
+      requestedProfiles.add(userId);
+      void fetchPublicProfile(userId).then((profile) => {
+        requestedProfiles.delete(userId);
+        if (!profile) {
           return;
         }
-        nicknameCache.set(userId, nickname);
+        profileCache.set(userId, profile);
 
         const current = state.tableState;
         if (!current || current.tableId !== tableState.tableId) {
           return;
         }
 
-        const updated = applyCachedNicknames(current);
+        const updated = applyCachedProfiles(current);
         if (updated !== current) {
           setState({ tableState: updated });
         }
@@ -456,6 +477,7 @@ export function createTableStore(): TableStore {
     const seats: TableSeat[] = Array.from({ length: seatCount }, (_, index) => ({
       seatId: index,
       userId: null,
+      avatarUrl: null,
       stack: 0,
       status: "EMPTY",
     }));
@@ -516,7 +538,7 @@ export function createTableStore(): TableStore {
         }
         const tableId = String(incoming.tableId ?? incoming.table_id ?? "");
         const fallback = state.tables.find((table) => table.tableId === tableId);
-        const normalized = applyCachedNicknames(normalizeTableState(incoming, fallback));
+        const normalized = applyCachedProfiles(normalizeTableState(incoming, fallback));
         const incomingHandId = normalized.hand?.handId ?? null;
         const shouldRequestHoleCards =
           Boolean(incomingHandId)
@@ -529,7 +551,7 @@ export function createTableStore(): TableStore {
           tableState: normalized,
           ...(clearPrivate ? { privateHoleCards: null, privateHandId: null } : {}),
         });
-        requestMissingNicknames(normalized);
+        requestMissingProfiles(normalized);
         if (incomingHandId && shouldRequestHoleCards) {
           requestPrivateHoleCards(tableId, incomingHandId);
         }
@@ -628,7 +650,7 @@ export function createTableStore(): TableStore {
         return null;
       }
       const fallback = state.tables.find((table) => table.tableId === tableId);
-      const tableState = applyCachedNicknames(normalizeTableState(payload.state, fallback));
+      const tableState = applyCachedProfiles(normalizeTableState(payload.state, fallback));
       const holeCardsPayload = payload.hole_cards ?? payload.holeCards ?? [];
       const privateHoleCards = holeCardsPayload
         .map((card) => cardToString(card))
@@ -714,7 +736,7 @@ export function createTableStore(): TableStore {
           privateHoleCards: snapshot.privateHoleCards ?? state.privateHoleCards,
           privateHandId: snapshot.privateHandId ?? state.privateHandId,
         });
-        requestMissingNicknames(snapshot.tableState);
+        requestMissingProfiles(snapshot.tableState);
       });
     },
     spectateTable: async (tableId) => {
@@ -756,7 +778,7 @@ export function createTableStore(): TableStore {
           privateHoleCards: snapshot.privateHoleCards ?? state.privateHoleCards,
           privateHandId: snapshot.privateHandId ?? state.privateHandId,
         });
-        requestMissingNicknames(snapshot.tableState);
+        requestMissingProfiles(snapshot.tableState);
       });
     },
     leaveTable: () => {
