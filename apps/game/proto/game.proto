@@ -1,0 +1,234 @@
+syntax = "proto3";
+
+package game;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+// GameService manages poker gameplay, table lifecycle, and action validation.
+service GameService {
+  // Table management
+  rpc CreateTable(CreateTableRequest) returns (Table);
+  rpc GetTable(GetTableRequest) returns (Table);
+  rpc ListTables(ListTablesRequest) returns (ListTablesResponse);
+  rpc DeleteTable(DeleteTableRequest) returns (google.protobuf.Empty);
+
+  // Seat management
+  rpc JoinSeat(JoinSeatRequest) returns (JoinSeatResponse);
+  rpc LeaveSeat(LeaveSeatRequest) returns (LeaveSeatResponse);
+  rpc GetTableState(GetTableStateRequest) returns (GetTableStateResponse);
+
+  // Spectators
+  rpc JoinSpectator(JoinSpectatorRequest) returns (JoinSpectatorResponse);
+  rpc LeaveSpectator(LeaveSpectatorRequest) returns (LeaveSpectatorResponse);
+
+  // Gameplay
+  rpc SubmitAction(SubmitActionRequest) returns (SubmitActionResponse);
+
+  // Moderation
+  rpc KickPlayer(KickPlayerRequest) returns (google.protobuf.Empty);
+  rpc MutePlayer(MutePlayerRequest) returns (google.protobuf.Empty);
+  rpc UnmutePlayer(UnmutePlayerRequest) returns (google.protobuf.Empty);
+  rpc IsMuted(IsMutedRequest) returns (IsMutedResponse);
+}
+
+// Data models
+message TableConfig {
+  int64 small_blind = 1;
+  int64 big_blind = 2;
+  int64 ante = 3;
+  int32 max_players = 4;
+  int64 starting_stack = 5;
+  int32 turn_timer_seconds = 6;
+}
+
+message Table {
+  string table_id = 1;
+  string name = 2;
+  string owner_id = 3;
+  TableConfig config = 4;
+  string status = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message Seat {
+  int32 seat_id = 1;
+  optional string user_id = 2;
+  int64 stack = 3;
+  string status = 4;
+}
+
+message Spectator {
+  string user_id = 1;
+  string status = 2;
+  google.protobuf.Timestamp joined_at = 3;
+}
+
+message Card {
+  string rank = 1;
+  string suit = 2;
+}
+
+message Action {
+  string action_id = 1;
+  string hand_id = 2;
+  int32 seat_id = 3;
+  string user_id = 4;
+  string type = 5;
+  int64 amount = 6;
+  google.protobuf.Timestamp timestamp = 7;
+}
+
+message Pot {
+  int64 amount = 1;
+  repeated int32 eligible_seat_ids = 2;
+  repeated int32 winners = 3;
+}
+
+message HandState {
+  string hand_id = 1;
+  string table_id = 2;
+  string street = 3;
+  repeated Card community_cards = 4;
+  repeated Pot pots = 5;
+  int64 current_bet = 6;
+  int64 min_raise = 7;
+  int32 turn = 8;
+  int32 last_aggressor = 9;
+  repeated Action actions = 10;
+  int64 rake_amount = 11;
+  google.protobuf.Timestamp started_at = 12;
+}
+
+message TableState {
+  string table_id = 1;
+  repeated Seat seats = 2;
+  repeated Spectator spectators = 3;
+  optional HandState hand = 4;
+  int32 button = 5;
+  int32 version = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+message TableSummary {
+  string table_id = 1;
+  string name = 2;
+  string owner_id = 3;
+  TableConfig config = 4;
+  int32 seats_taken = 5;
+  repeated int32 occupied_seat_ids = 6;
+  bool in_progress = 7;
+  int32 spectator_count = 8;
+}
+
+// Requests and Responses
+message CreateTableRequest {
+  string name = 1;
+  string owner_id = 2;
+  TableConfig config = 3;
+}
+
+message GetTableRequest {
+  string table_id = 1;
+}
+
+message ListTablesRequest {}
+
+message ListTablesResponse {
+  repeated TableSummary tables = 1;
+}
+
+message DeleteTableRequest {
+  string table_id = 1;
+}
+
+message GetTableStateRequest {
+  string table_id = 1;
+  optional string user_id = 2;
+}
+
+message GetTableStateResponse {
+  TableState state = 1;
+  repeated Card hole_cards = 2;
+}
+
+message JoinSeatRequest {
+  string table_id = 1;
+  string user_id = 2;
+  int32 seat_id = 3;
+  int64 buy_in_amount = 4;
+}
+
+message JoinSeatResponse {
+  bool ok = 1;
+  string error = 2;
+}
+
+message LeaveSeatRequest {
+  string table_id = 1;
+  string user_id = 2;
+}
+
+message LeaveSeatResponse {
+  bool ok = 1;
+  string error = 2;
+}
+
+message JoinSpectatorRequest {
+  string table_id = 1;
+  string user_id = 2;
+}
+
+message JoinSpectatorResponse {
+  bool ok = 1;
+  string error = 2;
+}
+
+message LeaveSpectatorRequest {
+  string table_id = 1;
+  string user_id = 2;
+}
+
+message LeaveSpectatorResponse {
+  bool ok = 1;
+  string error = 2;
+}
+
+message SubmitActionRequest {
+  string table_id = 1;
+  string user_id = 2;
+  string action_type = 3;
+  optional int64 amount = 4;
+}
+
+message SubmitActionResponse {
+  bool ok = 1;
+  string error = 2;
+}
+
+message KickPlayerRequest {
+  string table_id = 1;
+  string owner_id = 2;
+  string target_user_id = 3;
+}
+
+message MutePlayerRequest {
+  string table_id = 1;
+  string owner_id = 2;
+  string target_user_id = 3;
+}
+
+message UnmutePlayerRequest {
+  string table_id = 1;
+  string owner_id = 2;
+  string target_user_id = 3;
+}
+
+message IsMutedRequest {
+  string table_id = 1;
+  string user_id = 2;
+}
+
+message IsMutedResponse {
+  bool is_muted = 1;
+}

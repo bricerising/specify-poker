@@ -1,0 +1,66 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "Tempo Trace Explorer",
+      "type": "row"
+    },
+    {
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 1 },
+      "id": 2,
+      "options": {
+        "content": "Use TraceQL to search for traces by service, operation, or status. Combine this with the Loki dashboard to jump from logs to traces using the derived `traceId` field.",
+        "mode": "markdown"
+      },
+      "title": "TraceQL Tips",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "tempo",
+        "uid": "TEMPO"
+      },
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 5 },
+      "id": 3,
+      "targets": [
+        {
+          "queryType": "search",
+          "query": "{}",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent Traces",
+      "type": "traces"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["tempo", "traces"],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "title": "Tempo Traces",
+  "uid": "tempo-traces",
+  "version": 1
+}

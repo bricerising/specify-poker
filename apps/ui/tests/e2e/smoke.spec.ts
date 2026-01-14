@@ -68,7 +68,7 @@ test("smoke flow: login, create table, join, play hand", async ({ page }) => {
   });
 
   await page.addInitScript(() => {
-    window.localStorage.setItem("poker.auth.token", "test-token");
+    window.sessionStorage.setItem("poker.auth.token", "test-token");
 
     class MockWebSocket {
       static OPEN = 1;
@@ -159,7 +159,7 @@ test("smoke flow: login, create table, join, play hand", async ({ page }) => {
     window.WebSocket = MockWebSocket;
   });
 
-  await page.goto("http://localhost:3000");
+  await page.goto("/");
 
   await page.getByLabel("Name").fill("High Stakes");
   await page.getByRole("button", { name: "Create Table" }).click();
@@ -167,5 +167,6 @@ test("smoke flow: login, create table, join, play hand", async ({ page }) => {
 
   await expect(page.getByText("Table ID: table-1")).toBeVisible();
   await page.getByRole("button", { name: "Check" }).click();
-  await expect(page.getByText("Street: ended")).toBeVisible();
+  const streetFact = page.locator(".table-facts .fact").filter({ hasText: "Street" });
+  await expect(streetFact).toContainText("ended");
 });

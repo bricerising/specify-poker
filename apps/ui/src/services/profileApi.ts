@@ -17,8 +17,8 @@ export async function fetchProfile() {
 }
 
 export async function updateProfile(input: { nickname: string; avatarUrl: string | null }) {
-  const response = await apiFetch("/api/profile", {
-    method: "POST",
+  const response = await apiFetch("/api/me", {
+    method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });

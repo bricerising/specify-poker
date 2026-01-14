@@ -1,3 +1,4 @@
+/* global clients */
 self.addEventListener("push", (event) => {
   let payload = {};
   if (event.data) {

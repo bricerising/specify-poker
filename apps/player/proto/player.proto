@@ -1,0 +1,154 @@
+syntax = "proto3";
+
+package player;
+
+service PlayerService {
+  // Profile management
+  rpc GetProfile(GetProfileRequest) returns (GetProfileResponse);
+  rpc GetProfiles(GetProfilesRequest) returns (GetProfilesResponse);
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
+  rpc DeleteProfile(DeleteProfileRequest) returns (DeleteProfileResponse);
+
+  // Statistics
+  rpc GetStatistics(GetStatisticsRequest) returns (GetStatisticsResponse);
+  rpc IncrementStatistic(IncrementStatisticRequest) returns (Statistics);
+
+  // Friends
+  rpc GetFriends(GetFriendsRequest) returns (GetFriendsResponse);
+  rpc AddFriend(AddFriendRequest) returns (Empty);
+  rpc RemoveFriend(RemoveFriendRequest) returns (Empty);
+
+  // Batch
+  rpc GetNicknames(GetNicknamesRequest) returns (GetNicknamesResponse);
+}
+
+message Empty {}
+
+message UserPreferences {
+  bool sound_enabled = 1;
+  bool chat_enabled = 2;
+  bool show_hand_strength = 3;
+  string theme = 4;
+}
+
+message Profile {
+  string user_id = 1;
+  string nickname = 2;
+  string avatar_url = 3;
+  UserPreferences preferences = 4;
+  string last_login_at = 5;
+  string referred_by = 6;
+  string created_at = 7;
+  string updated_at = 8;
+}
+
+message Statistics {
+  string user_id = 1;
+  int32 hands_played = 2;
+  int32 wins = 3;
+  double vpip = 4;
+  double pfr = 5;
+  int32 all_in_count = 6;
+  int32 biggest_pot = 7;
+  int32 referral_count = 8;
+  string last_updated = 9;
+}
+
+message FriendProfile {
+  string user_id = 1;
+  string nickname = 2;
+  string avatar_url = 3;
+  string status = 4;
+}
+
+message GetProfileRequest {
+  string user_id = 1;
+  string referrer_id = 2;
+}
+
+message GetProfileResponse {
+  Profile profile = 1;
+}
+
+message GetProfilesRequest {
+  repeated string user_ids = 1;
+}
+
+message GetProfilesResponse {
+  repeated Profile profiles = 1;
+}
+
+message UpdateProfileRequest {
+  string user_id = 1;
+  string nickname = 2;
+  string avatar_url = 3;
+  UserPreferences preferences = 4;
+}
+
+message UpdateProfileResponse {
+  Profile profile = 1;
+}
+
+message DeleteProfileRequest {
+  string user_id = 1;
+}
+
+message DeleteProfileResponse {
+  bool success = 1;
+}
+
+message GetStatisticsRequest {
+  string user_id = 1;
+}
+
+message GetStatisticsResponse {
+  Statistics statistics = 1;
+}
+
+enum StatisticType {
+  STATISTIC_TYPE_UNSPECIFIED = 0;
+  STATISTIC_TYPE_HANDS_PLAYED = 1;
+  STATISTIC_TYPE_WINS = 2;
+  STATISTIC_TYPE_VPIP = 3;
+  STATISTIC_TYPE_PFR = 4;
+  STATISTIC_TYPE_ALL_IN = 5;
+  STATISTIC_TYPE_BIGGEST_POT = 6;
+  STATISTIC_TYPE_REFERRAL_COUNT = 7;
+}
+
+message IncrementStatisticRequest {
+  string user_id = 1;
+  StatisticType type = 2;
+  double amount = 3;
+}
+
+message GetFriendsRequest {
+  string user_id = 1;
+}
+
+message GetFriendsResponse {
+  repeated FriendProfile friends = 1;
+}
+
+message AddFriendRequest {
+  string user_id = 1;
+  string friend_id = 2;
+}
+
+message RemoveFriendRequest {
+  string user_id = 1;
+  string friend_id = 2;
+}
+
+message GetNicknamesRequest {
+  repeated string user_ids = 1;
+}
+
+message NicknameLookup {
+  string user_id = 1;
+  string nickname = 2;
+}
+
+message GetNicknamesResponse {
+  repeated NicknameLookup nicknames = 1;
+}

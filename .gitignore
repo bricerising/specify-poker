@@ -8,6 +8,17 @@ Thumbs.db
 node_modules/
 dist/
 build/
-coverage/
+**/coverage/
 *.log
 .env*
+*output*.txt
+*test-results*
+*playwright-report*
+
+# Codex CLI (local auth/session artifacts)
+.codex/auth.json
+.codex/config.toml
+.codex/history.jsonl
+.codex/log/
+.codex/sessions/
+.codex/version.json

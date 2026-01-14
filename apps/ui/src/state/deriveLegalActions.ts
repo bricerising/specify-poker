@@ -34,7 +34,8 @@ export function deriveLegalActions(table: TableState, seatId: number): LegalActi
     return [];
   }
   const seat = table.seats.find((entry) => entry.seatId === seatId);
-  if (!seat || seat.status !== "active") {
+  const normalizedStatus = seat?.status.trim().toLowerCase();
+  if (!seat || normalizedStatus !== "active") {
     return [];
   }
   if (hand.currentTurnSeat !== seatId) {

@@ -4,10 +4,13 @@ import { trace } from "@opentelemetry/api";
 import { ActionBar } from "../components/ActionBar";
 import { ChatPanel } from "../components/ChatPanel";
 import { ModerationMenu } from "../components/ModerationMenu";
-import { PokerArt } from "../components/PokerArt";
+import { TableLayout } from "../components/TableLayout";
+import { Timer } from "../components/Timer";
 import { deriveLegalActions } from "../state/deriveLegalActions";
 import { TableStore, tableStore } from "../state/tableStore";
 import { fetchProfile, UserProfile } from "../services/profileApi";
+import { recordAction } from "../observability/otel";
+import { formatBlinds } from "../utils/chipFormatter";
 
 interface TablePageProps {
   store?: TableStore;
@@ -16,13 +19,8 @@ interface TablePageProps {
 export function TablePage({ store = tableStore }: TablePageProps) {
   const [state, setState] = useState(store.getState());
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [now, setNow] = useState(Date.now());
 
   useEffect(() => store.subscribe(setState), [store]);
-  useEffect(() => {
-    const interval = window.setInterval(() => setNow(Date.now()), 500);
-    return () => window.clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     fetchProfile()
@@ -67,126 +65,91 @@ export function TablePage({ store = tableStore }: TablePageProps) {
   const hand = state.tableState.hand;
   const pot = hand?.pots.reduce((sum, entry) => sum + entry.amount, 0) ?? 0;
   const communityCards = hand?.communityCards ?? [];
-  const privateCards = state.privateHoleCards ?? [];
-  const deadline = hand?.actionTimerDeadline ? Date.parse(hand.actionTimerDeadline) : null;
-  const remainingMs = deadline ? Math.max(0, deadline - now) : null;
-  const remainingSeconds = remainingMs !== null ? Math.ceil(remainingMs / 1000) : null;
-  const minutes = remainingSeconds !== null ? Math.floor(remainingSeconds / 60) : null;
-  const seconds = remainingSeconds !== null ? remainingSeconds % 60 : null;
-  const countdown =
-    minutes !== null && seconds !== null ? `${minutes}:${String(seconds).padStart(2, "0")}` : null;
+  const spectatorCount = state.tableState.spectators?.length ?? 0;
+  const blinds = formatBlinds(state.tableState.config.smallBlind, state.tableState.config.bigBlind);
 
-  const renderCards = (cards: string[], fallback: string) => {
-    if (cards.length === 0) {
-      return <span className="card-ghost">{fallback}</span>;
-    }
-    return cards.map((card, index) => (
-      <span key={`${card}-${index}`} className="playing-card">
-        {card}
-      </span>
-    ));
+  const handleLeaveTable = () => {
+    recordAction("leave_table", { "poker.table_id": state.tableState?.tableId ?? "" });
+    store.leaveTable();
   };
 
-  const profileInitials = profile ? profile.nickname.slice(0, 2).toUpperCase() : "";
   const userId = profile?.userId ?? null;
 
   return (
-    <section className="page">
-      <div className="page-header">
+    <section className="table-page">
+      <header className="table-topbar">
         <div>
           <h2>{state.tableState.name}</h2>
-          <p>Track the hand flow and take your action when it is your turn.</p>
-          <div className="meta-line">Table ID: {state.tableState.tableId}</div>
+          <div className="meta-line">
+            Table ID: {state.tableState.tableId} | Blinds {blinds}
+            {spectatorCount > 0 ? ` | ${spectatorCount} spectator${spectatorCount !== 1 ? "s" : ""}` : ""}
+          </div>
         </div>
-        <PokerArt variant="table" />
-      </div>
-      <div className="table-grid">
-        <div className="card table-facts">
-          <div className="fact">
-            <span>Pot</span>
-            <strong>{pot}</strong>
-          </div>
-          <div className="fact">
-            <span>Street</span>
-            <strong>{hand?.currentStreet ?? "Lobby"}</strong>
-          </div>
-          <div className="fact">
-            <span>Current Turn</span>
-            <strong>
-              {hand?.currentTurnSeat !== undefined ? `Seat ${hand.currentTurnSeat + 1}` : "-"}
-            </strong>
-          </div>
-          {countdown ? (
-            <div className="timer-pill">
-              <span>Action Timer</span>
-              <strong>{remainingSeconds === 0 ? "Acting now" : countdown}</strong>
+        <div className="table-topbar-actions">
+          <button type="button" className="btn btn-ghost" onClick={handleLeaveTable}>
+            Leave Table
+          </button>
+        </div>
+      </header>
+
+      <div className="table-stage">
+        <TableLayout
+          seats={state.tableState.seats}
+          currentUserSeatId={state.seatId}
+          currentTurnSeatId={hand?.currentTurnSeat ?? null}
+          buttonSeatId={state.tableState.button}
+          privateCards={state.privateHoleCards}
+        >
+          <div className="table-center-stack">
+            <div className="table-facts table-facts-top">
+              <div className="fact pot-pill">
+                <span>Pot</span>
+                <strong>{pot}</strong>
+              </div>
             </div>
+            <div className="board-row">
+              {communityCards.length > 0 ? (
+                communityCards.map((card, index) => (
+                  <span key={`${card}-${index}`} className="playing-card playing-card-lg">
+                    {card}
+                  </span>
+                ))
+              ) : (
+                <span className="card-ghost">Waiting</span>
+              )}
+            </div>
+            <div className="table-facts">
+              <div className="fact">
+                <span>Street</span>
+                <strong>{hand?.currentStreet ?? "Waiting"}</strong>
+              </div>
+              <div className="fact">
+                <span>Current Turn</span>
+                <strong>
+                  {hand?.currentTurnSeat !== undefined ? `Seat ${hand.currentTurnSeat + 1}` : "-"}
+                </strong>
+              </div>
+            </div>
+            <Timer deadlineTs={hand?.actionTimerDeadline ?? null} />
+          </div>
+        </TableLayout>
+      </div>
+
+      <div className="table-dock">
+        <div className="table-dock-main">
+          <ActionBar actions={actions} pot={pot} onAction={(action) => store.sendAction(action)} />
+        </div>
+        <div className="table-dock-side">
+          <ChatPanel
+            messages={state.chatMessages}
+            onSend={(message) => store.sendChat(message)}
+            error={state.chatError}
+          />
+          {userId && state.tableState.ownerId === userId ? (
+            <ModerationMenu tableId={state.tableState.tableId} seats={state.tableState.seats} />
           ) : null}
-          <div>
-            <div className="meta-line">Board</div>
-            <div className="card-row">{renderCards(communityCards, "Waiting")}</div>
-          </div>
-          <div>
-            <div className="meta-line">Your Cards</div>
-            <div className="card-row">{renderCards(privateCards, "Hidden")}</div>
-          </div>
         </div>
-        <div className="card">
-          <h3>Seats</h3>
-          <div className="seat-grid">
-            {state.tableState.seats.map((seat) => (
-              <div
-                key={seat.seatId}
-                className={`seat-card${seat.seatId === state.seatId ? " is-you" : ""}`}
-              >
-                <strong>Seat {seat.seatId + 1}</strong>
-                <div>{seat.nickname ?? seat.userId ?? "Open seat"}</div>
-                <div>Stack: {seat.stack}</div>
-                <div>Status: {seat.status}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-        {profile ? (
-          <div className="card profile-panel">
-            <h3>Your Profile</h3>
-            <div className="profile-summary">
-              <div className="avatar">
-                {profile.avatarUrl ? (
-                  <img src={profile.avatarUrl} alt={`${profile.nickname} avatar`} />
-                ) : (
-                  <span>{profileInitials}</span>
-                )}
-              </div>
-              <div>
-                <div className="meta-line">Nickname</div>
-                <div className="table-name">{profile.nickname}</div>
-              </div>
-            </div>
-            <div className="stat-grid">
-              <div className="stat">
-                <strong>{profile.stats.handsPlayed}</strong>
-                Hands Played
-              </div>
-              <div className="stat">
-                <strong>{profile.stats.wins}</strong>
-                Wins
-              </div>
-            </div>
-          </div>
-        ) : null}
       </div>
-      <div className="table-actions">
-        <ActionBar actions={actions} pot={pot} onAction={(action) => store.sendAction(action)} />
-        <ChatPanel
-          messages={state.chatMessages}
-          onSend={(message) => store.sendChat(message)}
-          error={state.chatError}
-        />
-      </div>
-      {userId && state.tableState.ownerId === userId ? (
-        <ModerationMenu tableId={state.tableState.tableId} seats={state.tableState.seats} />
-      ) : null}
     </section>
   );
 }

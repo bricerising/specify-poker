@@ -45,10 +45,10 @@ test("lobby flow creates a table and updates the list", async ({ page }) => {
   });
 
   await page.addInitScript(() => {
-    window.localStorage.setItem("poker.auth.token", "test-token");
+    window.sessionStorage.setItem("poker.auth.token", "test-token");
   });
 
-  await page.goto("http://localhost:3000");
+  await page.goto("/");
 
   await page.getByLabel("Name").fill("High Stakes");
   await page.getByRole("button", { name: "Create Table" }).click();

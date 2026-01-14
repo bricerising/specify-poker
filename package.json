@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "tsc -p packages/shared/tsconfig.json && tsc -p apps/api/tsconfig.json && tsc -p apps/ui/tsconfig.json",
+    "build": "npm run -ws --if-present build",
     "lint": "eslint .",
     "test": "vitest run"
   },

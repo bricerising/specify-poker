@@ -1,11 +1,17 @@
 import { trace } from "@opentelemetry/api";
 
 export function isStaleVersion(currentVersion: number | null, incomingVersion: number) {
-  return currentVersion !== null && incomingVersion <= currentVersion;
+  if (currentVersion === null || currentVersion < 0) {
+    return false;
+  }
+  return incomingVersion <= currentVersion;
 }
 
 export function shouldResync(currentVersion: number | null, incomingVersion: number) {
-  return currentVersion !== null && incomingVersion > currentVersion + 1;
+  if (currentVersion === null || currentVersion < 0) {
+    return false;
+  }
+  return incomingVersion > currentVersion + 1;
 }
 
 export function requestResync(socket: WebSocket | null, tableId: string) {
