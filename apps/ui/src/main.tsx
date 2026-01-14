@@ -162,7 +162,7 @@ function PokerApp() {
       <div className="app-shell app-shell-table">
         {header}
         <div className="content">
-          <TablePage store={tableStore} />
+          <TablePage store={tableStore} onLeave={() => navigate("/")} />
         </div>
       </div>
     );

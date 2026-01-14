@@ -24,4 +24,4 @@ datasources:
     uid: TEMPO
     type: tempo
     access: proxy
-    url: http://tempo:3200
+    url: http://tempo-grafana-proxy:3200

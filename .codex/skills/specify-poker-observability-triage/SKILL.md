@@ -52,6 +52,7 @@ description: Triage and debug specify-poker issues using the LGTM stack (Grafana
 
 - Gateway logs include `traceId`/`spanId` via Pino + OTel context.
 - If a trace is missing spans, confirm the failing request actually hit the compose stack (not a locally-started service) and that `OTEL_EXPORTER_OTLP_ENDPOINT` is set for the service.
+- If Grafana trace search fails with `invalid start ... value out of range`, confirm `tempo-grafana-proxy` is running and Grafana’s Tempo datasource URL points to `http://tempo-grafana-proxy:3200` (Grafana uses ms, Tempo `api/search` expects seconds).
 
 ## Prometheus / Metrics (When It’s Intermittent)
 

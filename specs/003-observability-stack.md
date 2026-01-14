@@ -73,6 +73,8 @@ The following services are included in the local environment:
 - **Grafana**: `http://localhost:3001` (Default login: admin/admin)
 - **OTEL Collector**: `localhost:4317` (gRPC) / `localhost:4318` (HTTP)
 
+Note: Grafana queries Tempo via an internal `tempo-grafana-proxy` that normalizes `start`/`end` query parameters (Grafana uses milliseconds, Tempo `api/search` expects seconds).
+
 ## Success Criteria
 
 - **Correlation**: 100% of error logs contain a `traceId`.

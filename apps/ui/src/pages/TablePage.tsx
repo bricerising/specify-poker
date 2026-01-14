@@ -15,9 +15,10 @@ import { formatBlinds } from "../utils/chipFormatter";
 
 interface TablePageProps {
   store?: TableStore;
+  onLeave?: () => void;
 }
 
-export function TablePage({ store = tableStore }: TablePageProps) {
+export function TablePage({ store = tableStore, onLeave }: TablePageProps) {
   const [state, setState] = useState(store.getState());
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isChatCollapsed, setIsChatCollapsed] = useState(false);
@@ -73,6 +74,7 @@ export function TablePage({ store = tableStore }: TablePageProps) {
   const handleLeaveTable = () => {
     recordAction("leave_table", { "poker.table_id": state.tableState?.tableId ?? "" });
     store.leaveTable();
+    onLeave?.();
   };
 
   const userId = profile?.userId ?? null;
