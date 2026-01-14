@@ -13,7 +13,10 @@ describe("grafana dashboard", () => {
       .flatMap((panel) => panel.targets ?? [])
       .map((target) => target.expr ?? "");
 
-    expect(expressions).toContain("poker_actions_total");
-    expect(expressions).toContain("poker_active_connections");
+    const allExpressions = expressions.join("\n");
+
+    expect(allExpressions).toContain("game_actions_processed_total");
+    expect(allExpressions).toContain("gateway_ws_active_connections");
+    expect(allExpressions).toContain("process_resident_memory_bytes");
   });
 });

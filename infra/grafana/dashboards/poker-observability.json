@@ -57,10 +57,10 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PROMETHEUS"
+      "uid": "PROMETHEUS"
       },
       "fieldConfig": {
-        "defaults": { "unit": "short" },
+        "defaults": { "unit": "s" },
         "overrides": []
       },
       "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
@@ -79,7 +79,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(game_turn_duration_seconds_sum[5m])) / sum(rate(game_turn_duration_seconds_count[5m]))",
+          "expr": "(sum(rate(game_turn_duration_seconds_sum[5m])) / clamp_min(sum(rate(game_turn_duration_seconds_count[5m])), 1)) or vector(0)",
           "legendFormat": "Avg Turn Duration",
           "refId": "A"
         }
@@ -112,7 +112,7 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(game_actions_processed_total[5m]))",
+          "expr": "sum(increase(game_actions_processed_total[5m])) or vector(0)",
           "legendFormat": "Actions (5m)",
           "refId": "A"
         }
@@ -145,7 +145,7 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(game_hands_started_total[5m]))",
+          "expr": "sum(increase(game_hands_started_total[5m])) or vector(0)",
           "legendFormat": "Hands Started (5m)",
           "refId": "A"
         }
@@ -179,22 +179,22 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(game_grpc_request_duration_seconds_sum[5m])) / sum(rate(game_grpc_request_duration_seconds_count[5m]))",
+          "expr": "sum(rate(game_grpc_request_duration_seconds_sum[5m])) / clamp_min(sum(rate(game_grpc_request_duration_seconds_count[5m])), 1)",
           "legendFormat": "game",
           "refId": "A"
         },
         {
-          "expr": "sum(rate(balance_grpc_request_duration_seconds_sum[5m])) / sum(rate(balance_grpc_request_duration_seconds_count[5m]))",
+          "expr": "sum(rate(balance_grpc_request_duration_seconds_sum[5m])) / clamp_min(sum(rate(balance_grpc_request_duration_seconds_count[5m])), 1)",
           "legendFormat": "balance",
           "refId": "B"
         },
         {
-          "expr": "sum(rate(player_grpc_request_duration_seconds_sum[5m])) / sum(rate(player_grpc_request_duration_seconds_count[5m]))",
+          "expr": "sum(rate(player_grpc_request_duration_seconds_sum[5m])) / clamp_min(sum(rate(player_grpc_request_duration_seconds_count[5m])), 1)",
           "legendFormat": "player",
           "refId": "C"
         },
         {
-          "expr": "sum(rate(notify_grpc_request_duration_seconds_sum[5m])) / sum(rate(notify_grpc_request_duration_seconds_count[5m]))",
+          "expr": "sum(rate(notify_grpc_request_duration_seconds_sum[5m])) / clamp_min(sum(rate(notify_grpc_request_duration_seconds_count[5m])), 1)",
           "legendFormat": "notify",
           "refId": "D"
         }
@@ -221,22 +221,22 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(game_grpc_request_duration_seconds_count{status=\"error\"}[5m]))",
+          "expr": "sum(rate(game_grpc_request_duration_seconds_count{status=\"error\"}[5m])) or vector(0)",
           "legendFormat": "game",
           "refId": "A"
         },
         {
-          "expr": "sum(rate(balance_grpc_request_duration_seconds_count{status=\"error\"}[5m]))",
+          "expr": "sum(rate(balance_grpc_request_duration_seconds_count{status=\"error\"}[5m])) or vector(0)",
           "legendFormat": "balance",
           "refId": "B"
         },
         {
-          "expr": "sum(rate(player_grpc_request_duration_seconds_count{status=\"error\"}[5m]))",
+          "expr": "sum(rate(player_grpc_request_duration_seconds_count{status=\"error\"}[5m])) or vector(0)",
           "legendFormat": "player",
           "refId": "C"
         },
         {
-          "expr": "sum(rate(notify_grpc_request_duration_seconds_count{status=\"error\"}[5m]))",
+          "expr": "sum(rate(notify_grpc_request_duration_seconds_count{status=\"error\"}[5m])) or vector(0)",
           "legendFormat": "notify",
           "refId": "D"
         }
@@ -263,7 +263,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(game_turn_duration_seconds_sum[5m])) / sum(rate(game_turn_duration_seconds_count[5m]))",
+          "expr": "sum(rate(game_turn_duration_seconds_sum[5m])) / clamp_min(sum(rate(game_turn_duration_seconds_count[5m])), 1)",
           "legendFormat": "avg",
           "refId": "A"
         },
@@ -808,6 +808,269 @@
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 73 },
+      "id": 550,
+      "title": "User Experience",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 74 },
+      "id": 551,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (client_type) (gateway_ws_active_connections)",
+          "legendFormat": "{{client_type}}",
+          "refId": "A"
+        }
+      ],
+      "title": "WS Active Connections",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "s" },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 74 },
+      "id": 552,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(gateway_ws_session_duration_seconds_bucket[5m])) by (le, client_type))",
+          "legendFormat": "{{client_type}}",
+          "refId": "A"
+        }
+      ],
+      "title": "WS Session Duration p95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "s" },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 74 },
+      "id": 553,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(gateway_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "A"
+        }
+      ],
+      "title": "Gateway HTTP Latency p95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "percent" },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 82 },
+      "id": 554,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "(100 * sum(rate(game_seat_joins_total{status=\"ok\"}[5m])) / clamp_min(sum(rate(game_seat_joins_total[5m])), 1)) or vector(0)",
+          "legendFormat": "Join Success",
+          "refId": "A"
+        }
+      ],
+      "title": "Seat Join Success (%)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 82 },
+      "id": 555,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (reason) (rate(game_seat_joins_total{status=\"error\"}[5m]))",
+          "legendFormat": "{{reason}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Seat Join Failures (5m rate)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 82 },
+      "id": 556,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (street, action_type) (rate(game_turn_timeouts_total[5m]))",
+          "legendFormat": "{{street}} {{action_type}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Turn Timeouts (5m rate)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 90 },
+      "id": 560,
+      "title": "Compute Utilization",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 91 },
+      "id": 561,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (job) (rate(process_cpu_user_seconds_total[5m]) + rate(process_cpu_system_seconds_total[5m]))",
+          "legendFormat": "{{job}}",
+          "refId": "A"
+        }
+      ],
+      "title": "CPU (cores)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes" },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 91 },
+      "id": 562,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (job) (process_resident_memory_bytes)",
+          "legendFormat": "{{job}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Memory RSS",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROMETHEUS"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "s" },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 91 },
+      "id": 563,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "max by (job) (nodejs_eventloop_lag_p99_seconds)",
+          "legendFormat": "{{job}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Event Loop Lag p99",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 99 },
       "id": 600,
       "title": "Logs & Traces",
       "type": "row"
@@ -821,7 +1084,7 @@
         "defaults": { "unit": "short" },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 74 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 100 },
       "id": 601,
       "options": {
         "legend": {
@@ -847,7 +1110,7 @@
         "defaults": { "unit": "short" },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 74 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 100 },
       "id": 602,
       "options": {
         "colorMode": "value",
@@ -875,7 +1138,7 @@
         "type": "loki",
         "uid": "LOKI"
       },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 82 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 108 },
       "id": 603,
       "options": {
         "dedupStrategy": "none",
@@ -898,7 +1161,7 @@
         "type": "tempo",
         "uid": "TEMPO"
       },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 92 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 118 },
       "id": 604,
       "targets": [
         {
@@ -924,5 +1187,5 @@
   },
   "title": "Poker Observability",
   "uid": "poker-observability",
-  "version": 3
+  "version": 4
 }

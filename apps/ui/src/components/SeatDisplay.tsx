@@ -2,6 +2,7 @@ import React from "react";
 
 import { TableSeat } from "../state/tableStore";
 import { formatChipsWithCommas } from "../utils/chipFormatter";
+import { PlayingCard } from "./PlayingCard";
 
 interface SeatDisplayProps {
   seat: TableSeat;
@@ -28,9 +29,7 @@ export function SeatDisplay({
       return (
         <div className="seat-cards">
           {privateCards.map((card, index) => (
-            <span key={`${card}-${index}`} className="playing-card">
-              {card}
-            </span>
+            <PlayingCard key={`${card}-${index}`} card={card} />
           ))}
         </div>
       );

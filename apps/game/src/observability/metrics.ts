@@ -35,6 +35,20 @@ const actionsProcessed = new Counter({
   registers: [registry],
 });
 
+const seatJoins = new Counter({
+  name: "game_seat_joins_total",
+  help: "Total seat join attempts.",
+  labelNames: ["status", "reason"],
+  registers: [registry],
+});
+
+const turnTimeouts = new Counter({
+  name: "game_turn_timeouts_total",
+  help: "Total number of turn timeouts that trigger an auto action.",
+  labelNames: ["street", "action_type"],
+  registers: [registry],
+});
+
 const turnTimeDuration = new Histogram({
   name: "game_turn_duration_seconds",
   help: "Time taken for player to act on their turn.",
@@ -75,6 +89,14 @@ export function recordHandCompleted(tableId: string, outcome: "showdown" | "fold
 
 export function recordAction(actionType: string) {
   actionsProcessed.inc({ action_type: actionType });
+}
+
+export function recordSeatJoin(status: "ok" | "error", reason: string) {
+  seatJoins.inc({ status, reason });
+}
+
+export function recordTurnTimeout(street: string, actionType: string) {
+  turnTimeouts.inc({ street, action_type: actionType });
 }
 
 export function recordTurnTime(street: string, actionType: string, durationMs: number) {

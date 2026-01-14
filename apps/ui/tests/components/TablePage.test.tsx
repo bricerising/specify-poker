@@ -60,8 +60,8 @@ describe("TablePage", () => {
   it("renders table snapshot", () => {
     const html = renderToString(<TablePage store={mockStore} />);
     expect(html).toContain("Test Table");
-    expect(html).toContain("AS");
-    expect(html).toContain("KS");
-    expect(html).toContain("QS");
+    expect(html).toContain('aria-label="A of spades"');
+    expect(html).toContain('aria-label="K of spades"');
+    expect(html).toContain('aria-label="Q of spades"');
   });
 });

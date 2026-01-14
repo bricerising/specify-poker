@@ -13,6 +13,7 @@ import { updatePresence } from "../storage/sessionStore";
 import { getConnectionsByUser } from "../storage/connectionStore";
 import { setupHeartbeat } from "./heartbeat";
 import logger from "../observability/logger";
+import { recordWsConnected, recordWsDisconnected } from "../observability/metrics";
 import { IncomingMessage } from "http";
 
 interface AuthenticatedRequest extends IncomingMessage {
@@ -132,6 +133,7 @@ export async function initWsServer(server: Server) {
       await updatePresence(userId, "online");
 
       sessionMeta.set(connectionId, { startedAt: Date.now(), clientType });
+      recordWsConnected(clientType);
       emitSessionEvent("SESSION_STARTED", userId, {
         connectionId,
         clientType,
@@ -159,6 +161,7 @@ export async function initWsServer(server: Server) {
         const meta = sessionMeta.get(connectionId);
         sessionMeta.delete(connectionId);
         const durationMs = meta ? Date.now() - meta.startedAt : undefined;
+        recordWsDisconnected(meta?.clientType ?? getClientType(request), durationMs);
         emitSessionEvent("SESSION_ENDED", userId, {
           connectionId,
           durationMs,

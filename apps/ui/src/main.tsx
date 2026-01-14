@@ -23,12 +23,103 @@ recordNavigation(window.location.pathname);
 
 const root = createRoot(rootElement);
 
+type AppRoute =
+  | { kind: "lobby" }
+  | { kind: "profile" }
+  | { kind: "friends" }
+  | { kind: "table"; tableId: string };
+
+function normalizePathname(pathname: string) {
+  const trimmed = pathname.trim().replace(/\/+$/, "");
+  return trimmed.length > 0 ? trimmed : "/";
+}
+
+function parseRoute(pathname: string): AppRoute {
+  const normalized = normalizePathname(pathname);
+  const tableMatch = normalized.match(/^\/table\/([^/]+)$/);
+  if (tableMatch) {
+    return { kind: "table", tableId: decodeURIComponent(tableMatch[1]) };
+  }
+  if (normalized === "/profile") {
+    return { kind: "profile" };
+  }
+  if (normalized === "/friends") {
+    return { kind: "friends" };
+  }
+  return { kind: "lobby" };
+}
+
+function buildTablePath(tableId: string) {
+  return `/table/${encodeURIComponent(tableId)}`;
+}
+
 function PokerApp() {
   const [state, setState] = React.useState(tableStore.getState());
-  const [view, setView] = React.useState<"lobby" | "profile" | "friends">("lobby");
   const [profile, setProfile] = React.useState<UserProfile | null>(null);
+  const [pathname, setPathname] = React.useState(() => normalizePathname(window.location.pathname));
+  const route = React.useMemo(() => parseRoute(pathname), [pathname]);
+  const tableRouteId = route.kind === "table" ? route.tableId : null;
+  const previousTableIdRef = React.useRef<string | null>(null);
 
   React.useEffect(() => tableStore.subscribe(setState), []);
+  React.useEffect(() => {
+    const handler = () => {
+      const nextPath = normalizePathname(window.location.pathname);
+      setPathname(nextPath);
+      recordNavigation(nextPath);
+    };
+    window.addEventListener("popstate", handler);
+    return () => window.removeEventListener("popstate", handler);
+  }, []);
+
+  const navigate = React.useCallback((nextPath: string) => {
+    const normalized = normalizePathname(nextPath);
+    if (normalized === window.location.pathname) {
+      return;
+    }
+    window.history.pushState(null, "", normalized);
+    setPathname(normalized);
+    recordNavigation(normalized);
+  }, []);
+
+  React.useEffect(() => {
+    if (!tableRouteId) {
+      return;
+    }
+    const currentTableId = tableStore.getState().tableState?.tableId ?? null;
+    if (currentTableId === tableRouteId) {
+      return;
+    }
+    if (currentTableId) {
+      tableStore.leaveTable();
+    }
+    tableStore.spectateTable(tableRouteId);
+  }, [tableRouteId]);
+
+  React.useEffect(() => {
+    if (route.kind === "table") {
+      return;
+    }
+    if (state.tableState) {
+      tableStore.leaveTable();
+    }
+  }, [route.kind]);
+
+  React.useEffect(() => {
+    const currentTableId = state.tableState?.tableId ?? null;
+    const previousTableId = previousTableIdRef.current;
+    previousTableIdRef.current = currentTableId;
+
+    if (route.kind === "table" && previousTableId && !currentTableId) {
+      navigate("/");
+      return;
+    }
+
+    if (route.kind !== "table" && currentTableId && !previousTableId) {
+      navigate(buildTablePath(currentTableId));
+    }
+  }, [navigate, route.kind, state.tableState?.tableId]);
+
   React.useEffect(() => {
     fetchProfile()
       .then((data) => setProfile(data))
@@ -66,7 +157,7 @@ function PokerApp() {
     </header>
   );
 
-  if (state.tableState) {
+  if (route.kind === "table" || state.tableState) {
     return (
       <div className="app-shell app-shell-table">
         {header}
@@ -77,20 +168,20 @@ function PokerApp() {
     );
   }
 
-  const navClass = (target: "lobby" | "profile" | "friends") =>
-    `nav-button${view === target ? " active" : ""}`;
+  const view = route.kind;
+  const navClass = (target: "lobby" | "profile" | "friends") => `nav-button${view === target ? " active" : ""}`;
 
   return (
     <div className="app-shell">
       {header}
       <nav className="app-nav">
-        <button type="button" className={navClass("lobby")} onClick={() => setView("lobby")}>
+        <button type="button" className={navClass("lobby")} onClick={() => navigate("/")}>
           Lobby
         </button>
-        <button type="button" className={navClass("profile")} onClick={() => setView("profile")}>
+        <button type="button" className={navClass("profile")} onClick={() => navigate("/profile")}>
           Profile
         </button>
-        <button type="button" className={navClass("friends")} onClick={() => setView("friends")}>
+        <button type="button" className={navClass("friends")} onClick={() => navigate("/friends")}>
           Friends
         </button>
       </nav>

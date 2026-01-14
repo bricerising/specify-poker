@@ -4,16 +4,38 @@ import { authMiddleware } from "./middleware/auth";
 import { httpRateLimitMiddleware } from "./middleware/rateLimit";
 import { setupProxy } from "./proxy";
 import { getRedisClient } from "../storage/redisClient";
+import { recordHttpRequest } from "../observability/metrics";
 import tablesRouter from "./routes/tables";
 import profileRouter from "./routes/profile";
 import auditRouter from "./routes/audit";
 import pushRouter from "./routes/push";
+
+function getRouteLabel(req: { baseUrl?: unknown; route?: unknown; path?: unknown }) {
+  const baseUrl = typeof req.baseUrl === "string" ? req.baseUrl : "";
+  const routePath = (req.route as { path?: unknown } | undefined)?.path;
+  if (typeof routePath === "string") {
+    return `${baseUrl}${routePath}`;
+  }
+  return typeof req.path === "string" ? req.path : "unknown";
+}
 
 export function createRouter(): Router {
   const router = Router();
 
   // Body parsing
   router.use(json());
+
+  // HTTP duration metrics (Unauthenticated)
+  router.use((req, res, next) => {
+    const startedAt = Date.now();
+    res.on("finish", () => {
+      if (req.path === "/metrics") {
+        return;
+      }
+      recordHttpRequest(req.method, getRouteLabel(req), res.statusCode, Date.now() - startedAt);
+    });
+    next();
+  });
 
   // Metrics (Unauthenticated)
   router.get("/metrics", async (_req, res) => {

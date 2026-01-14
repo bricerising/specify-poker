@@ -54,11 +54,23 @@ export function createMockRes(): { res: MockResponse; done: Promise<MockResponse
     resolveDone = resolve;
   });
 
+  const listeners: Record<string, Array<() => void>> = {};
+
+  const emit = (event: string) => {
+    for (const listener of listeners[event] ?? []) {
+      listener();
+    }
+  };
+
   const res = {
     statusCode: 200,
     body: undefined,
     finished: false,
     headers: {},
+    on(event: string, listener: () => void) {
+      listeners[event] = [...(listeners[event] ?? []), listener];
+      return this;
+    },
     status(code: number) {
       this.statusCode = code;
       return this;
@@ -67,12 +79,14 @@ export function createMockRes(): { res: MockResponse; done: Promise<MockResponse
       this.body = payload;
       this.finished = true;
       this.headers["content-type"] = "application/json";
+      emit("finish");
       resolveDone(this);
       return this;
     },
     send(payload?: unknown) {
       this.body = payload;
       this.finished = true;
+      emit("finish");
       resolveDone(this);
       return this;
     },
@@ -81,6 +95,7 @@ export function createMockRes(): { res: MockResponse; done: Promise<MockResponse
         this.body = payload;
       }
       this.finished = true;
+      emit("finish");
       resolveDone(this);
       return this;
     },

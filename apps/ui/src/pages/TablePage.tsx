@@ -4,6 +4,7 @@ import { trace } from "@opentelemetry/api";
 import { ActionBar } from "../components/ActionBar";
 import { ChatPanel } from "../components/ChatPanel";
 import { ModerationMenu } from "../components/ModerationMenu";
+import { PlayingCard } from "../components/PlayingCard";
 import { TableLayout } from "../components/TableLayout";
 import { Timer } from "../components/Timer";
 import { deriveLegalActions } from "../state/deriveLegalActions";
@@ -19,6 +20,7 @@ interface TablePageProps {
 export function TablePage({ store = tableStore }: TablePageProps) {
   const [state, setState] = useState(store.getState());
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isChatCollapsed, setIsChatCollapsed] = useState(false);
 
   useEffect(() => store.subscribe(setState), [store]);
 
@@ -74,6 +76,7 @@ export function TablePage({ store = tableStore }: TablePageProps) {
   };
 
   const userId = profile?.userId ?? null;
+  const showModeration = Boolean(userId && state.tableState.ownerId === userId);
 
   return (
     <section className="table-page">
@@ -92,62 +95,64 @@ export function TablePage({ store = tableStore }: TablePageProps) {
         </div>
       </header>
 
-      <div className="table-stage">
-        <TableLayout
-          seats={state.tableState.seats}
-          currentUserSeatId={state.seatId}
-          currentTurnSeatId={hand?.currentTurnSeat ?? null}
-          buttonSeatId={state.tableState.button}
-          privateCards={state.privateHoleCards}
-        >
-          <div className="table-center-stack">
-            <div className="table-facts table-facts-top">
-              <div className="fact pot-pill">
-                <span>Pot</span>
-                <strong>{pot}</strong>
+      <div className="table-play-area">
+        <div className="table-stage">
+          <TableLayout
+            seats={state.tableState.seats}
+            currentUserSeatId={state.seatId}
+            currentTurnSeatId={hand?.currentTurnSeat ?? null}
+            buttonSeatId={state.tableState.button}
+            privateCards={state.privateHoleCards}
+          >
+            <div className="table-center-stack">
+              <div className="table-facts table-facts-top">
+                <div className="fact pot-pill">
+                  <span>Pot</span>
+                  <strong>{pot}</strong>
+                </div>
               </div>
-            </div>
-            <div className="board-row">
-              {communityCards.length > 0 ? (
-                communityCards.map((card, index) => (
-                  <span key={`${card}-${index}`} className="playing-card playing-card-lg">
-                    {card}
-                  </span>
-                ))
-              ) : (
-                <span className="card-ghost">Waiting</span>
-              )}
-            </div>
-            <div className="table-facts">
-              <div className="fact">
-                <span>Street</span>
-                <strong>{hand?.currentStreet ?? "Waiting"}</strong>
+              <div className="board-row">
+                {communityCards.length > 0 ? (
+                  communityCards.map((card, index) => (
+                    <PlayingCard key={`${card}-${index}`} card={card} size="lg" />
+                  ))
+                ) : (
+                  <span className="card-ghost">Waiting</span>
+                )}
               </div>
-              <div className="fact">
-                <span>Current Turn</span>
-                <strong>
-                  {hand?.currentTurnSeat !== undefined ? `Seat ${hand.currentTurnSeat + 1}` : "-"}
-                </strong>
+              <div className="table-facts">
+                <div className="fact">
+                  <span>Street</span>
+                  <strong>{hand?.currentStreet ?? "Waiting"}</strong>
+                </div>
+                <div className="fact">
+                  <span>Current Turn</span>
+                  <strong>{hand?.currentTurnSeat !== undefined ? `Seat ${hand.currentTurnSeat + 1}` : "-"}</strong>
+                </div>
               </div>
+              <Timer deadlineTs={hand?.actionTimerDeadline ?? null} />
             </div>
-            <Timer deadlineTs={hand?.actionTimerDeadline ?? null} />
-          </div>
-        </TableLayout>
-      </div>
-
-      <div className="table-dock">
-        <div className="table-dock-main">
-          <ActionBar actions={actions} pot={pot} onAction={(action) => store.sendAction(action)} />
+          </TableLayout>
         </div>
-        <div className="table-dock-side">
+
+        <div className={`table-dock${showModeration ? " table-dock-with-side" : ""}`}>
+          <div className="table-dock-main">
+            <ActionBar actions={actions} pot={pot} onAction={(action) => store.sendAction(action)} />
+          </div>
+          {showModeration ? (
+            <div className="table-dock-side">
+              <ModerationMenu tableId={state.tableState.tableId} seats={state.tableState.seats} />
+            </div>
+          ) : null}
+        </div>
+
+        <div className={`table-chat-dock${isChatCollapsed ? " is-collapsed" : ""}`}>
           <ChatPanel
             messages={state.chatMessages}
             onSend={(message) => store.sendChat(message)}
             error={state.chatError}
+            onCollapseChange={setIsChatCollapsed}
           />
-          {userId && state.tableState.ownerId === userId ? (
-            <ModerationMenu tableId={state.tableState.tableId} seats={state.tableState.seats} />
-          ) : null}
         </div>
       </div>
     </section>

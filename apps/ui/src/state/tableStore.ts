@@ -553,30 +553,33 @@ export function createTableStore(): TableStore {
       setState({ status: "idle" });
     });
 
-    socket.addEventListener("message", (event) => {
-      const message = JSON.parse(event.data as string);
-      if (message.type === "TableSnapshot" || message.type === "TablePatch") {
-        const incoming = message.type === "TableSnapshot"
-          ? (message.tableState as UnknownRecord | undefined)
-          : (message.patch as UnknownRecord | undefined);
-        if (!incoming) {
-          return;
-        }
-        const currentVersion = state.tableState?.version ?? null;
-        const incomingVersion = toNumber(incoming.version, 0);
-        if (isStaleVersion(currentVersion, incomingVersion)) {
-          return;
-        }
-        if (shouldResync(currentVersion, incomingVersion)) {
-          const tableId = String(incoming.tableId ?? incoming.table_id ?? "");
-          requestResync(socket, tableId);
-        }
-        const tableId = String(incoming.tableId ?? incoming.table_id ?? "");
-        const fallback = state.tables.find((table) => table.tableId === tableId);
-        const normalized = applyCachedProfiles(normalizeTableState(incoming, fallback));
-        const tokenUserId = currentUserIdFromToken();
-        const inferredSeatId =
-          tokenUserId && normalized.seats.some((seat) => seat.userId === tokenUserId)
+	    socket.addEventListener("message", (event) => {
+	      const message = JSON.parse(event.data as string);
+	      if (message.type === "TableSnapshot" || message.type === "TablePatch") {
+	        const incoming = message.type === "TableSnapshot"
+	          ? (message.tableState as UnknownRecord | undefined)
+	          : (message.patch as UnknownRecord | undefined);
+	        if (!incoming) {
+	          return;
+	        }
+	        const tableId = String(incoming.tableId ?? incoming.table_id ?? "");
+	        const activeTableId = state.tableState?.tableId ?? null;
+	        if (!activeTableId || !tableId || tableId !== activeTableId) {
+	          return;
+	        }
+	        const currentVersion = state.tableState?.version ?? null;
+	        const incomingVersion = toNumber(incoming.version, 0);
+	        if (isStaleVersion(currentVersion, incomingVersion)) {
+	          return;
+	        }
+	        if (shouldResync(currentVersion, incomingVersion)) {
+	          requestResync(socket, tableId);
+	        }
+	        const fallback = state.tables.find((table) => table.tableId === tableId);
+	        const normalized = applyCachedProfiles(normalizeTableState(incoming, fallback));
+	        const tokenUserId = currentUserIdFromToken();
+	        const inferredSeatId =
+	          tokenUserId && normalized.seats.some((seat) => seat.userId === tokenUserId)
             ? normalized.seats.find((seat) => seat.userId === tokenUserId)?.seatId ?? null
             : null;
         const shouldAdoptSeat =
@@ -736,7 +739,7 @@ export function createTableStore(): TableStore {
     subscribeLobby: () => {
       connect();
     },
-    joinSeat: async (tableId, seatId) => {
+	    joinSeat: async (tableId, seatId) => {
       clearRequestedHoleCards();
       const response = await apiFetch(`/api/tables/${tableId}/join`, {
         method: "POST",
@@ -769,22 +772,25 @@ export function createTableStore(): TableStore {
         };
         socket.addEventListener("open", handleOpen);
       }
-      snapshotPromise.then((snapshot) => {
-        if (!snapshot?.tableState) {
-          return;
-        }
-        if (state.tableState && snapshot.tableState.version < state.tableState.version) {
-          return;
-        }
-        setState({
-          tableState: snapshot.tableState,
+	      snapshotPromise.then((snapshot) => {
+	        if (!snapshot?.tableState) {
+	          return;
+	        }
+	        if (state.tableState?.tableId !== tableId) {
+	          return;
+	        }
+	        if (state.tableState && snapshot.tableState.version < state.tableState.version) {
+	          return;
+	        }
+	        setState({
+	          tableState: snapshot.tableState,
           privateHoleCards: snapshot.privateHoleCards ?? state.privateHoleCards,
           privateHandId: snapshot.privateHandId ?? state.privateHandId,
         });
         requestMissingProfiles(snapshot.tableState);
       });
     },
-    spectateTable: async (tableId) => {
+	    spectateTable: async (tableId) => {
       clearRequestedHoleCards();
       const snapshotPromise = loadTableSnapshotWithRetry(tableId);
       const placeholder = buildPlaceholderTableState(tableId);
@@ -811,15 +817,18 @@ export function createTableStore(): TableStore {
         };
         socket.addEventListener("open", handleOpen);
       }
-      snapshotPromise.then((snapshot) => {
-        if (!snapshot?.tableState) {
-          return;
-        }
-        if (state.tableState && snapshot.tableState.version < state.tableState.version) {
-          return;
-        }
-        setState({
-          tableState: snapshot.tableState,
+	      snapshotPromise.then((snapshot) => {
+	        if (!snapshot?.tableState) {
+	          return;
+	        }
+	        if (state.tableState?.tableId !== tableId) {
+	          return;
+	        }
+	        if (state.tableState && snapshot.tableState.version < state.tableState.version) {
+	          return;
+	        }
+	        setState({
+	          tableState: snapshot.tableState,
           privateHoleCards: snapshot.privateHoleCards ?? state.privateHoleCards,
           privateHandId: snapshot.privateHandId ?? state.privateHandId,
         });

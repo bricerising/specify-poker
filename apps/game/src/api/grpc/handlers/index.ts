@@ -1,6 +1,7 @@
 import { sendUnaryData, ServerUnaryCall } from "@grpc/grpc-js";
 import { tableService } from "../../../services/tableService";
 import { moderationService } from "../../../services/moderationService";
+import { recordGrpcRequest } from "../../../observability/metrics";
 import {
   Action,
   ActionInput,
@@ -224,19 +225,27 @@ function toProtoState(state: TableState) {
 }
 
 function handleUnary<Req, Res>(
+  method: string,
   call: ServerUnaryCall<Req, Res>,
   callback: sendUnaryData<Res>,
   handler: (request: Req) => Promise<Res> | Res,
 ) {
+  const startedAt = Date.now();
   Promise.resolve(handler(call.request))
-    .then((response) => callback(null, response))
-    .catch((err) => callback(err as Error));
+    .then((response) => {
+      recordGrpcRequest(method, "ok", Date.now() - startedAt);
+      callback(null, response);
+    })
+    .catch((err) => {
+      recordGrpcRequest(method, "error", Date.now() - startedAt);
+      callback(err as Error);
+    });
 }
 
 export function createHandlers() {
   return {
     CreateTable: (call: ServerUnaryCall<CreateTableRequest, ProtoTable>, callback: sendUnaryData<ProtoTable>) =>
-      handleUnary(call, callback, async ({ name, owner_id, config }) => {
+      handleUnary("CreateTable", call, callback, async ({ name, owner_id, config }) => {
         const table = await tableService.createTable(name, owner_id, {
           smallBlind: toNumber(config.small_blind, 1),
           bigBlind: toNumber(config.big_blind, 2),
@@ -249,7 +258,7 @@ export function createHandlers() {
       }),
 
     GetTable: (call: ServerUnaryCall<GetTableRequest, ProtoTable>, callback: sendUnaryData<ProtoTable>) =>
-      handleUnary(call, callback, async ({ table_id }) => {
+      handleUnary("GetTable", call, callback, async ({ table_id }) => {
         const table = await tableService.getTable(table_id);
         if (!table) {
           throw new Error("TABLE_NOT_FOUND");
@@ -258,7 +267,7 @@ export function createHandlers() {
       }),
 
     ListTables: (call: ServerUnaryCall<ListTablesRequest, ListTablesResponse>, callback: sendUnaryData<ListTablesResponse>) =>
-      handleUnary(call, callback, async () => {
+      handleUnary("ListTables", call, callback, async () => {
         await tableService.ensureMainTable();
         const tables = await tableService.listTableSummaries();
         return {
@@ -276,7 +285,7 @@ export function createHandlers() {
       }),
 
     DeleteTable: (call: ServerUnaryCall<DeleteTableRequest, Empty>, callback: sendUnaryData<Empty>) =>
-      handleUnary(call, callback, async ({ table_id }) => {
+      handleUnary("DeleteTable", call, callback, async ({ table_id }) => {
         const deleted = await tableService.deleteTable(table_id);
         if (!deleted) {
           throw new Error("TABLE_NOT_FOUND");
@@ -285,7 +294,7 @@ export function createHandlers() {
       }),
 
     GetTableState: (call: ServerUnaryCall<GetTableStateRequest, GetTableStateResponse>, callback: sendUnaryData<GetTableStateResponse>) =>
-      handleUnary(call, callback, async ({ table_id, user_id }) => {
+      handleUnary("GetTableState", call, callback, async ({ table_id, user_id }) => {
         const result = await tableService.getTableState(table_id, user_id);
         if (!result) {
           throw new Error("TABLE_NOT_FOUND");
@@ -297,22 +306,22 @@ export function createHandlers() {
       }),
 
     JoinSeat: (call: ServerUnaryCall<JoinSeatRequest, ActionResult>, callback: sendUnaryData<ActionResult>) =>
-      handleUnary(call, callback, ({ table_id, user_id, seat_id, buy_in_amount }) => {
+      handleUnary("JoinSeat", call, callback, ({ table_id, user_id, seat_id, buy_in_amount }) => {
         const buyInAmount = toNumber(buy_in_amount, 0);
         return tableService.joinSeat(table_id, user_id, seat_id, buyInAmount);
       }),
 
     LeaveSeat: (call: ServerUnaryCall<LeaveSeatRequest, ActionResult>, callback: sendUnaryData<ActionResult>) =>
-      handleUnary(call, callback, ({ table_id, user_id }) => tableService.leaveSeat(table_id, user_id)),
+      handleUnary("LeaveSeat", call, callback, ({ table_id, user_id }) => tableService.leaveSeat(table_id, user_id)),
 
     JoinSpectator: (call: ServerUnaryCall<JoinSpectatorRequest, ActionResult>, callback: sendUnaryData<ActionResult>) =>
-      handleUnary(call, callback, ({ table_id, user_id }) => tableService.joinSpectator(table_id, user_id)),
+      handleUnary("JoinSpectator", call, callback, ({ table_id, user_id }) => tableService.joinSpectator(table_id, user_id)),
 
     LeaveSpectator: (call: ServerUnaryCall<LeaveSpectatorRequest, ActionResult>, callback: sendUnaryData<ActionResult>) =>
-      handleUnary(call, callback, ({ table_id, user_id }) => tableService.leaveSpectator(table_id, user_id)),
+      handleUnary("LeaveSpectator", call, callback, ({ table_id, user_id }) => tableService.leaveSpectator(table_id, user_id)),
 
     SubmitAction: (call: ServerUnaryCall<SubmitActionRequest, ActionResult>, callback: sendUnaryData<ActionResult>) =>
-      handleUnary(call, callback, ({ table_id, user_id, action_type, amount }) => {
+      handleUnary("SubmitAction", call, callback, ({ table_id, user_id, action_type, amount }) => {
         const normalizedAction = action_type.toUpperCase() as ActionInput["type"];
         return tableService.submitAction(table_id, user_id, {
           type: normalizedAction,
@@ -321,7 +330,7 @@ export function createHandlers() {
       }),
 
     KickPlayer: (call: ServerUnaryCall<KickPlayerRequest, Empty>, callback: sendUnaryData<Empty>) =>
-      handleUnary(call, callback, async ({ table_id, owner_id, target_user_id }) => {
+      handleUnary("KickPlayer", call, callback, async ({ table_id, owner_id, target_user_id }) => {
         const result = await moderationService.kickPlayer(table_id, owner_id, target_user_id);
         if (!result.ok) {
           throw new Error(result.error || "KICK_FAILED");
@@ -330,7 +339,7 @@ export function createHandlers() {
       }),
 
     MutePlayer: (call: ServerUnaryCall<MutePlayerRequest, Empty>, callback: sendUnaryData<Empty>) =>
-      handleUnary(call, callback, async ({ table_id, owner_id, target_user_id }) => {
+      handleUnary("MutePlayer", call, callback, async ({ table_id, owner_id, target_user_id }) => {
         const result = await moderationService.mutePlayer(table_id, owner_id, target_user_id, true);
         if (!result.ok) {
           throw new Error(result.error || "MUTE_FAILED");
@@ -339,7 +348,7 @@ export function createHandlers() {
       }),
 
     UnmutePlayer: (call: ServerUnaryCall<UnmutePlayerRequest, Empty>, callback: sendUnaryData<Empty>) =>
-      handleUnary(call, callback, async ({ table_id, owner_id, target_user_id }) => {
+      handleUnary("UnmutePlayer", call, callback, async ({ table_id, owner_id, target_user_id }) => {
         const result = await moderationService.mutePlayer(table_id, owner_id, target_user_id, false);
         if (!result.ok) {
           throw new Error(result.error || "UNMUTE_FAILED");
@@ -348,7 +357,7 @@ export function createHandlers() {
       }),
 
     IsMuted: (call: ServerUnaryCall<IsMutedRequest, { is_muted: boolean }>, callback: sendUnaryData<{ is_muted: boolean }>) =>
-      handleUnary(call, callback, async ({ table_id, user_id }) => {
+      handleUnary("IsMuted", call, callback, async ({ table_id, user_id }) => {
         const is_muted = await moderationService.isMuted(table_id, user_id);
         return { is_muted };
       }),

@@ -1,5 +1,6 @@
 export interface ParsedCard {
   rank: string;
+  displayRank: string;
   suit: string;
   suitSymbol: string;
   suitColor: "red" | "black";
@@ -29,22 +30,39 @@ const RANK_DISPLAY: Record<string, string> = {
 };
 
 export function parseCard(card: string): ParsedCard | null {
-  if (card.length !== 2) {
+  const normalized = card.trim();
+
+  const rankToken =
+    normalized.length === 3 && normalized.startsWith("10")
+      ? "10"
+      : normalized.length === 2
+        ? normalized.charAt(0)
+        : "";
+  const suitToken =
+    normalized.length === 3 && normalized.startsWith("10")
+      ? normalized.charAt(2)
+      : normalized.length === 2
+        ? normalized.charAt(1)
+        : "";
+
+  if (!rankToken || !suitToken) {
     return null;
   }
-  const rank = card[0];
-  const suit = card[1].toLowerCase();
+
+  const rank = rankToken.toUpperCase();
+  const suit = suitToken.toLowerCase();
 
   if (!SUIT_SYMBOLS[suit]) {
     return null;
   }
 
-  const displayRank = RANK_DISPLAY[rank] ?? rank;
+  const displayRank = rank === "10" ? "10" : (RANK_DISPLAY[rank] ?? rank);
   const suitSymbol = SUIT_SYMBOLS[suit];
   const suitColor = SUIT_COLORS[suit];
 
   return {
     rank,
+    displayRank,
     suit,
     suitSymbol,
     suitColor,

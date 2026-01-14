@@ -177,8 +177,8 @@ test.describe("gameplay flow", () => {
     await page.goto("/");
     await page.getByRole("button", { name: "Join Seat 2" }).click();
 
-    await expect(page.getByText("Ah")).toBeVisible();
-    await expect(page.getByText("Kd")).toBeVisible();
+    await expect(page.getByLabel("A of hearts")).toBeVisible();
+    await expect(page.getByLabel("K of diamonds")).toBeVisible();
   });
 
   test("player can take action when it is their turn", async ({ page }) => {
@@ -205,9 +205,9 @@ test.describe("gameplay flow", () => {
     await page.getByRole("button", { name: "Join Seat 2" }).click();
     await page.getByRole("button", { name: "Check" }).click();
 
-    await expect(page.getByText("Qs")).toBeVisible();
-    await expect(page.getByText("Jh")).toBeVisible();
-    await expect(page.getByText("Tc")).toBeVisible();
+    await expect(page.getByLabel("Q of spades")).toBeVisible();
+    await expect(page.getByLabel("J of hearts")).toBeVisible();
+    await expect(page.getByLabel("10 of clubs")).toBeVisible();
   });
 
   test("pot amount is displayed", async ({ page }) => {

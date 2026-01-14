@@ -43,10 +43,12 @@ test.describe("Observability Stack", () => {
   });
 
   test("gateway exposes Prometheus metrics", async ({ request }) => {
+    await request.get(`${urls.gateway}/health`);
     const res = await request.get(`${urls.gateway}/metrics`);
     expect(res.ok()).toBeTruthy();
     const text = await res.text();
     expect(text).toContain("process_cpu_user_seconds_total");
+    expect(text).toContain("gateway_ws_active_connections");
+    expect(text).toContain("gateway_http_request_duration_seconds_bucket");
   });
 });
-

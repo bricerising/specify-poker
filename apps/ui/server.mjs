@@ -59,6 +59,10 @@ const server = http.createServer((req, res) => {
 
     const relativePath = urlPath.replace(/^\/+/, "");
     const candidate = resolveAssetPath(relativePath);
+    const hasExtension = Boolean(path.extname(relativePath));
+    if (!hasExtension && !fs.existsSync(candidate)) {
+      return sendFile(res, path.join(publicDir, "index.html"));
+    }
     return sendFile(res, candidate);
   });
 
