@@ -64,9 +64,12 @@ describe("profileService", () => {
     vi.mocked(profileRepository.findById).mockResolvedValue(null);
     vi.mocked(nicknameService.generateNickname).mockResolvedValue("PlayerRef");
     vi.mocked(profileRepository.create).mockResolvedValue({
-      ...baseProfile,
-      nickname: "PlayerRef",
-      referredBy: "referrer",
+      profile: {
+        ...baseProfile,
+        nickname: "PlayerRef",
+        referredBy: "referrer",
+      },
+      created: true,
     });
 
     await profileService.getProfile("user123", "referrer");

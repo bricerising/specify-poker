@@ -43,9 +43,12 @@ describe("Player service consumer architecture", () => {
     vi.mocked(profileRepository.findById).mockResolvedValue(null);
     vi.mocked(nicknameService.generateNickname).mockResolvedValue("PlayerAuto");
     vi.mocked(profileRepository.create).mockResolvedValue({
-      ...baseProfile,
-      userId: "user-new",
-      nickname: "PlayerAuto",
+      profile: {
+        ...baseProfile,
+        userId: "user-new",
+        nickname: "PlayerAuto",
+      },
+      created: true,
     });
 
     const profile = await profileService.getProfile("user-new");
@@ -86,10 +89,13 @@ describe("Player service consumer architecture", () => {
     vi.mocked(profileRepository.findById).mockResolvedValue(null);
     vi.mocked(nicknameService.generateNickname).mockResolvedValue("PlayerRef");
     vi.mocked(profileRepository.create).mockResolvedValue({
-      ...baseProfile,
-      userId: "user-new",
-      nickname: "PlayerRef",
-      referredBy: "referrer-1",
+      profile: {
+        ...baseProfile,
+        userId: "user-new",
+        nickname: "PlayerRef",
+        referredBy: "referrer-1",
+      },
+      created: true,
     });
 
     await profileService.getProfile("user-new", "referrer-1");

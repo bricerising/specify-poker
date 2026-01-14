@@ -44,6 +44,7 @@ describe('EventStore', () => {
     mockClient.query.mockResolvedValueOnce({ rows: [] }); // COMMIT
 
     const result = await eventStore.publishEvent(eventData);
+    await new Promise((resolve) => setImmediate(resolve));
 
     expect(result.type).toBe(eventData.type);
     expect(mockClient.query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO events"), expect.any(Array));

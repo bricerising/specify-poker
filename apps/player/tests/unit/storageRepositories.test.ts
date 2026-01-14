@@ -37,23 +37,39 @@ describe("storage repositories", () => {
   });
 
   it("creates and updates profiles via SQL", async () => {
-    vi.mocked(query).mockResolvedValue({
-      rows: [
-        {
-          user_id: "user-1",
-          nickname: "Nick",
-          avatar_url: null,
-          preferences: {},
-          last_login_at: null,
-          referred_by: null,
-          created_at: new Date("2024-01-01T00:00:00Z"),
-          updated_at: new Date("2024-01-01T00:00:00Z"),
-          deleted_at: null,
-        },
-      ],
-    } as never);
+    vi.mocked(query)
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            user_id: "user-1",
+            nickname: "Nick",
+            avatar_url: null,
+            preferences: {},
+            last_login_at: null,
+            referred_by: null,
+            created_at: new Date("2024-01-01T00:00:00Z"),
+            updated_at: new Date("2024-01-01T00:00:00Z"),
+            deleted_at: null,
+          },
+        ],
+      } as never)
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            user_id: "user-1",
+            nickname: "Nick2",
+            avatar_url: null,
+            preferences: {},
+            last_login_at: null,
+            referred_by: null,
+            created_at: new Date("2024-01-01T00:00:00Z"),
+            updated_at: new Date("2024-01-01T00:00:00Z"),
+            deleted_at: null,
+          },
+        ],
+      } as never);
 
-    const created = await profileRepository.create({
+    const createResult = await profileRepository.create({
       userId: "user-1",
       nickname: "Nick",
       avatarUrl: null,
@@ -65,10 +81,10 @@ describe("storage repositories", () => {
       deletedAt: null,
     });
 
-    const updated = await profileRepository.update({ ...created, nickname: "Nick2" });
+    const updated = await profileRepository.update({ ...createResult.profile, nickname: "Nick2" });
 
-    expect(created.userId).toBe("user-1");
-    expect(updated.nickname).toBe("Nick");
+    expect(createResult.profile.userId).toBe("user-1");
+    expect(updated.nickname).toBe("Nick2");
   });
 
   it("finds profiles by nickname when present", async () => {
