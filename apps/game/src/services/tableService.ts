@@ -10,6 +10,7 @@ import {
 } from "../domain/types";
 import { applyAction, startHand } from "../engine/handEngine";
 import { deriveLegalActions } from "../engine/actionRules";
+import { calculatePots } from "../engine/potCalculator";
 import { balanceClient, eventClient } from "../api/grpc/clients";
 import redisClient from "../storage/redisClient";
 import { tableStore } from "../storage/tableStore";
@@ -39,6 +40,75 @@ export class TableService {
 
   private now() {
     return new Date().toISOString();
+  }
+
+  private resolveSeatForUser(state: TableState, userId: string): Seat | undefined {
+    const matching = state.seats.filter((entry) => entry.userId === userId);
+    if (matching.length === 0) {
+      return undefined;
+    }
+    if (matching.length === 1) {
+      return matching[0];
+    }
+
+    const turnSeatId = state.hand?.turn;
+    if (typeof turnSeatId === "number") {
+      const turnMatch = matching.find((seat) => seat.seatId === turnSeatId);
+      if (turnMatch) {
+        return turnMatch;
+      }
+    }
+
+    const withHoleCards = matching.find((seat) => (seat.holeCards?.length ?? 0) === 2);
+    if (withHoleCards) {
+      return withHoleCards;
+    }
+
+    const inHandSeat =
+      matching.find((seat) => seat.status === "ACTIVE" || seat.status === "ALL_IN" || seat.status === "FOLDED") ??
+      matching[0];
+    return inHandSeat;
+  }
+
+  private findNextActiveTurn(seats: Seat[], startSeatId: number) {
+    if (seats.length === 0) {
+      return null;
+    }
+    const total = seats.length;
+    const normalizedStart = ((startSeatId % total) + total) % total;
+    for (let offset = 0; offset < total; offset += 1) {
+      const seatId = (normalizedStart + offset) % total;
+      const seat = seats[seatId];
+      if (seat?.status === "ACTIVE" && seat.userId) {
+        return seatId;
+      }
+    }
+    return null;
+  }
+
+  private async repairTurnIfNeeded(table: Table, state: TableState) {
+    if (!state.hand) {
+      return state;
+    }
+
+    const turnSeatId = state.hand.turn;
+    const seat = state.seats[turnSeatId];
+    if (seat?.status === "ACTIVE" && seat.userId) {
+      return state;
+    }
+
+    const nextTurn = this.findNextActiveTurn(state.seats, turnSeatId);
+    if (nextTurn === null) {
+      console.warn("turn.repair.failed", { tableId: state.tableId, turnSeatId });
+      return state;
+    }
+
+    state.hand.turn = nextTurn;
+    state.version += 1;
+    state.updatedAt = this.now();
+    await tableStateStore.save(state);
+    await this.publishTableState(table, state);
+    return state;
   }
 
   private idempotencyKey(operation: string, tableId: string, userId: string) {
@@ -186,7 +256,7 @@ export class TableService {
       if (!table || !state) {
         continue;
       }
-      const occupiedSeatIds = state.seats.filter((seat) => seat.userId).map((seat) => seat.seatId);
+      const occupiedSeatIds = state.seats.filter((seat) => seat.status !== "EMPTY").map((seat) => seat.seatId);
       summaries.push({
         tableId: table.tableId,
         name: table.name,
@@ -215,7 +285,13 @@ export class TableService {
     if (!state) {
       return null;
     }
-    const seat = userId ? state.seats.find((entry) => entry.userId === userId) : undefined;
+    if (state.hand && !this.turnTimers.has(tableId)) {
+      const table = await tableStore.get(tableId);
+      if (table) {
+        void this.startTurnTimer(table, state);
+      }
+    }
+    const seat = userId ? this.resolveSeatForUser(state, userId) : undefined;
     const holeCards = seat?.holeCards ?? [];
     return { state: this.redactTableState(state), holeCards };
   }
@@ -228,6 +304,14 @@ export class TableService {
     const startingStack = toNumber(table.config.startingStack, 200);
     const normalizedBuyIn = buyInAmount > 0 ? buyInAmount : startingStack;
     const finalBuyIn = normalizedBuyIn > 0 ? normalizedBuyIn : 200;
+
+    const existingSeat = state.seats.find((entry) => entry.userId === userId && entry.status !== "EMPTY");
+    if (existingSeat) {
+      if (existingSeat.seatId === seatId) {
+        return { ok: true };
+      }
+      return { ok: false, error: "ALREADY_SEATED" };
+    }
 
     const seat = state.seats.find((entry) => entry.seatId === seatId);
     if (!seat || seat.userId || seat.status !== "EMPTY") {
@@ -361,18 +445,82 @@ export class TableService {
     if (!loaded) return { ok: false, error: "TABLE_NOT_FOUND" };
     const { table, state } = loaded;
 
-    const seat = state.seats.find((entry) => entry.userId === userId);
+    const seat = this.resolveSeatForUser(state, userId);
     if (!seat) return { ok: false, error: "PLAYER_NOT_AT_TABLE" };
 
-    if (state.hand && seat.status !== "FOLDED") {
-      const result = applyAction(state, seat.seatId, { type: "FOLD" });
-      if (result.accepted) {
-        await tableStateStore.save(result.state);
-        await this.publishTableState(table, result.state);
+    const remainingStack = seat.stack;
+    const shouldCashOut = remainingStack > 0;
+
+    if (state.hand) {
+      const wasTurnSeat = state.hand.turn === seat.seatId;
+      const wasInHand =
+        seat.status === "ACTIVE" ||
+        seat.status === "ALL_IN" ||
+        seat.status === "FOLDED" ||
+        seat.status === "DISCONNECTED";
+
+      if (wasInHand && seat.status !== "FOLDED") {
+        seat.status = "FOLDED";
       }
+
+      seat.userId = null;
+      seat.stack = 0;
+      seat.holeCards = null;
+      seat.reservationId = undefined;
+
+      if (!wasInHand) {
+        seat.status = "EMPTY";
+      } else {
+        const foldedSeatIds = new Set(
+          state.seats.filter((entry) => entry.status === "FOLDED").map((entry) => entry.seatId),
+        );
+        state.hand.pots = calculatePots(state.hand.totalContributions, foldedSeatIds);
+      }
+
+      if (wasTurnSeat) {
+        const nextTurn = this.findNextActiveTurn(state.seats, state.hand.turn);
+        if (nextTurn !== null) {
+          state.hand.turn = nextTurn;
+        }
+      }
+
+      state.version += 1;
+      state.updatedAt = this.now();
+      await tableStateStore.save(state);
+      await this.publishTableAndLobby(table, state);
+      void this.emitGameEvent(tableId, state.hand.handId, userId, seat.seatId, "PLAYER_LEFT", { stack: remainingStack });
+
+      if (shouldCashOut) {
+        try {
+          const cashOut = await new Promise<BalanceCashOut>((resolve, reject) => {
+            balanceClient.ProcessCashOut(
+              {
+                account_id: userId,
+                table_id: tableId,
+                seat_id: seat.seatId,
+                amount: remainingStack,
+                idempotency_key: this.idempotencyKey("cashout", tableId, userId),
+              },
+              (err: Error | null, response: unknown) => {
+                if (err) reject(err);
+                else resolve(response as BalanceCashOut);
+              },
+            );
+          });
+          if (!cashOut.ok) {
+            void this.emitGameEvent(tableId, undefined, userId, seat.seatId, "CASHOUT_FAILED", { amount: remainingStack });
+          }
+        } catch {
+          void this.emitGameEvent(tableId, undefined, userId, seat.seatId, "BALANCE_UNAVAILABLE", { action: "CASH_OUT" });
+        }
+      }
+
+      if (wasTurnSeat) {
+        void this.startTurnTimer(table, state);
+      }
+      return { ok: true };
     }
 
-    const remainingStack = seat.stack;
     if (remainingStack > 0) {
       try {
         const cashOut = await new Promise<BalanceCashOut>((resolve, reject) => {
@@ -448,10 +596,10 @@ export class TableService {
     const { table, state } = loaded;
     if (!state.hand) return { ok: false, error: "NO_HAND_IN_PROGRESS" };
 
-    const seat = state.seats.find((entry) => entry.userId === userId);
+    const seat = this.resolveSeatForUser(state, userId);
     if (!seat) return { ok: false, error: "PLAYER_NOT_AT_TABLE" };
 
-    const result = applyAction(state, seat.seatId, action);
+    const result = applyAction(state, seat.seatId, action, { allowInactive: true });
     if (!result.accepted) {
       return { ok: false, error: result.reason || "INVALID_ACTION" };
     }
@@ -467,7 +615,7 @@ export class TableService {
       this.clearTurnTimer(tableId);
       await this.handleHandEnded(table, result.state);
     } else {
-      this.startTurnTimer(table, result.state);
+      void this.startTurnTimer(table, result.state);
     }
 
     return { ok: true };
@@ -495,33 +643,49 @@ export class TableService {
       participants,
     });
 
-    this.startTurnTimer(table, updatedState);
+    void this.startTurnTimer(table, updatedState);
   }
 
-  private startTurnTimer(table: Table, state: TableState) {
+  private async startTurnTimer(table: Table, state: TableState) {
     if (!state.hand) {
       this.clearTurnTimer(state.tableId);
       return;
     }
 
     this.clearTurnTimer(state.tableId);
+    const repairedState = await this.repairTurnIfNeeded(table, state);
     const timeoutMs = (table.config.turnTimerSeconds || 20) * 1000;
 
     const timer = setTimeout(async () => {
-      const currentState = await tableStateStore.get(state.tableId);
-      if (!currentState || !currentState.hand || currentState.hand.handId !== state.hand?.handId) return;
-      if (currentState.hand.turn !== state.hand.turn) return;
+      this.turnTimers.delete(repairedState.tableId);
+      const currentState = await tableStateStore.get(repairedState.tableId);
+      if (!currentState || !currentState.hand || currentState.hand.handId !== repairedState.hand?.handId) return;
+      if (currentState.hand.turn !== repairedState.hand.turn) return;
 
-      const seat = currentState.seats[currentState.hand.turn];
-      if (!seat || !seat.userId) return;
+      const expectedTurnSeatId = currentState.hand.turn;
+      const fixedState = await this.repairTurnIfNeeded(table, currentState);
+      if (!fixedState.hand) return;
+      if (fixedState.hand.turn !== expectedTurnSeatId) {
+        void this.startTurnTimer(table, fixedState);
+        return;
+      }
 
-      const legalActions = deriveLegalActions(currentState.hand, seat);
+      const seat = fixedState.seats[fixedState.hand?.turn ?? -1];
+      if (!seat || !seat.userId) {
+        void this.startTurnTimer(table, fixedState);
+        return;
+      }
+
+      const legalActions = deriveLegalActions(fixedState.hand, seat);
       const canCheck = legalActions.some((entry) => entry.type === "CHECK");
       const actionInput: ActionInput = canCheck ? { type: "CHECK" } : { type: "FOLD" };
-      await this.submitAction(state.tableId, seat.userId, actionInput);
+      const result = await this.submitAction(fixedState.tableId, seat.userId, actionInput);
+      if (!result.ok) {
+        void this.startTurnTimer(table, await tableStateStore.get(fixedState.tableId).then((fresh) => fresh ?? fixedState));
+      }
     }, timeoutMs);
 
-    this.turnTimers.set(state.tableId, timer);
+    this.turnTimers.set(repairedState.tableId, timer);
   }
 
   private clearTurnTimer(tableId: string) {

@@ -40,6 +40,14 @@ description: Triage and debug specify-poker issues using the LGTM stack (Grafana
 - All services for one trace: `{service=~"gateway|game|balance|player|event|notify"} | json | traceId="<traceId>"`
 - gRPC failures: `{service=~"gateway|game|balance|player|event|notify"} | json | err.code!=0`
 
+## Gameplay Stall Quick Checks
+
+- Stuck on `PREFLOP` / turn never advances:
+  - Inspect state: `curl -sS -H "Authorization: Bearer $TOKEN" "http://localhost:4000/api/tables/$TABLE_ID/state"`
+  - Look for `hand.turn` pointing at an `EMPTY`/inactive seat, or duplicate `user_id` across seats.
+  - Game logs: `docker compose logs --since 10m game | rg 'turn\\.repair\\.failed|NOT_YOUR_TURN'`
+  - Deep dive: use `.codex/skills/specify-poker-game-stall-triage/SKILL.md`.
+
 ## Tempo Tips
 
 - Gateway logs include `traceId`/`spanId` via Pino + OTel context.

@@ -75,6 +75,47 @@ test.describe("Gameplay Rules (Game + Gateway)", () => {
   test.skip(({ browserName }) => browserName !== "chromium", "API-heavy rules checks run once.");
   test.setTimeout(90_000);
 
+  test("rejects joining multiple seats with the same user", async ({ request }) => {
+    const runId = crypto.randomUUID().slice(0, 8);
+    const tableName = `E2E Single Seat ${runId}`;
+    const userId = `user-seat-${runId}`;
+
+    await ensureBalance(userId);
+    const token = generateToken(userId, `Seat${runId}`);
+
+    const create = await request.post(`${urls.gateway}/api/tables`, {
+      headers: { ...authHeaders(token), "Content-Type": "application/json" },
+      data: {
+        name: tableName,
+        config: {
+          smallBlind: 1,
+          bigBlind: 2,
+          maxPlayers: 9,
+          startingStack: 200,
+          turnTimerSeconds: 20,
+        },
+      },
+    });
+    expect(create.ok()).toBeTruthy();
+    const created = (await create.json()) as { table_id?: string; tableId?: string };
+    const tableId = tableIdFrom(created);
+    expect(tableId).toBeTruthy();
+
+    const joinFirst = await request.post(`${urls.gateway}/api/tables/${tableId}/join`, {
+      headers: { ...authHeaders(token), "Content-Type": "application/json" },
+      data: { seatId: 0 },
+    });
+    expect(joinFirst.ok()).toBeTruthy();
+
+    const joinSecond = await request.post(`${urls.gateway}/api/tables/${tableId}/join`, {
+      headers: { ...authHeaders(token), "Content-Type": "application/json" },
+      data: { seatId: 1 },
+    });
+    expect(joinSecond.status()).toBe(400);
+    const body = (await joinSecond.json()) as { error?: string };
+    expect(body.error).toBe("ALREADY_SEATED");
+  });
+
   test("starts hands only with 2+ players and posts blinds", async ({ request }) => {
     const setup = await createTwoPlayerTable(request, { smallBlind: 5, bigBlind: 10, turnTimerSeconds: 20 });
 

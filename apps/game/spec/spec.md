@@ -127,14 +127,17 @@ a player and their chat messages are blocked (via Gateway).
 ### Edge Cases
 
 - Player disconnects mid-hand (auto-fold on turn timeout).
+- Player leaves mid-hand (treated as fold; turn advances if needed).
 - All players but one fold before showdown.
 - Two or more players tie and pot must split.
 - Player goes all-in for less than minimum raise.
 - Multiple all-ins create complex side pots.
 - Hand starts with only two players (heads-up rules).
 - Player reconnects and needs state resync.
+- Game service restarts mid-hand (turn timer re-armed on next state access).
 - Balance Service unavailable during buy-in/cash-out.
 - Concurrent join requests for same seat.
+- User attempts to join multiple seats at one table (rejected).
 - Player attempts action after hand has ended.
 - Spectator disconnects and reconnects mid-hand.
 
@@ -185,6 +188,9 @@ a player and their chat messages are blocked (via Gateway).
   occupying a seat.
 - **FR-023**: System MUST ensure spectators only receive public table state
   (no hole cards, no private actions).
+- **FR-024**: System MUST ensure a user can occupy at most one seat per table (reject additional joins with `ALREADY_SEATED`).
+- **FR-025**: System MUST ensure `hand.turn` always points to a valid `ACTIVE` seat; if it becomes invalid (empty/inactive seat), the server MUST repair/advance the turn and continue timers.
+- **FR-026**: System SHOULD re-arm turn timers after a game-service restart for any in-progress hand.
 
 ### Non-Functional Requirements
 

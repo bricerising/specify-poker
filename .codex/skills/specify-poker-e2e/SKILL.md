@@ -35,6 +35,7 @@ Follow this loop until tests pass (prefer fixing root causes, not test retries):
 - `{"error":"ACCOUNT_NOT_FOUND"}` when joining a table: check Gateway table-join flow and Balance account provisioning.
 - `13 INTERNAL: Table ID is required` from gateway: check WS session-event publishing includes a non-empty `table_id`.
 - Player DB `profiles_pkey` duplicate key errors: check Player profile provisioning uses `INSERT ... ON CONFLICT` (avoid error-log spam).
+- Game stuck on `PREFLOP` / “Current Turn” points at an empty seat: inspect `hand.turn` + seat statuses and look for duplicate seating; use `.codex/skills/specify-poker-game-stall-triage/SKILL.md`.
 
 ## Resources
 

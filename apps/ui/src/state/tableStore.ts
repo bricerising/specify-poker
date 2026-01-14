@@ -4,6 +4,41 @@ import { isStaleVersion, requestResync, shouldResync } from "../services/wsClien
 
 type UnknownRecord = Record<string, unknown>;
 
+function decodeJwtUserId(token: string): string | null {
+  const parts = token.split(".");
+  if (parts.length < 2) {
+    return null;
+  }
+
+  const payloadBase64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+  const padded = payloadBase64.padEnd(Math.ceil(payloadBase64.length / 4) * 4, "=");
+
+  try {
+    const decoded = typeof globalThis.atob === "function" ? globalThis.atob(padded) : null;
+    if (!decoded) {
+      return null;
+    }
+
+    const parsed: unknown = JSON.parse(decoded);
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+    const record = parsed as Record<string, unknown>;
+    const sub = record.sub;
+    return typeof sub === "string" && sub.trim().length > 0 ? sub : null;
+  } catch {
+    return null;
+  }
+}
+
+function currentUserIdFromToken(): string | null {
+  const token = getToken();
+  if (!token) {
+    return null;
+  }
+  return decodeJwtUserId(token);
+}
+
 function toNumber(value: unknown, fallback = 0) {
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -539,16 +574,26 @@ export function createTableStore(): TableStore {
         const tableId = String(incoming.tableId ?? incoming.table_id ?? "");
         const fallback = state.tables.find((table) => table.tableId === tableId);
         const normalized = applyCachedProfiles(normalizeTableState(incoming, fallback));
+        const tokenUserId = currentUserIdFromToken();
+        const inferredSeatId =
+          tokenUserId && normalized.seats.some((seat) => seat.userId === tokenUserId)
+            ? normalized.seats.find((seat) => seat.userId === tokenUserId)?.seatId ?? null
+            : null;
+        const shouldAdoptSeat =
+          inferredSeatId !== null && (state.seatId === null || state.isSpectating || state.seatId !== inferredSeatId);
+        const effectiveSeatId = shouldAdoptSeat ? inferredSeatId : state.seatId;
+        const effectiveIsSpectating = shouldAdoptSeat ? false : state.isSpectating;
         const incomingHandId = normalized.hand?.handId ?? null;
         const shouldRequestHoleCards =
           Boolean(incomingHandId)
-          && state.seatId !== null
-          && !state.isSpectating
-          && (state.privateHoleCards === null || state.privateHandId !== incomingHandId);
+          && effectiveSeatId !== null
+          && !effectiveIsSpectating
+          && (shouldAdoptSeat || state.privateHoleCards === null || state.privateHandId !== incomingHandId);
         const clearPrivate =
           !incomingHandId || (state.privateHandId && state.privateHandId !== incomingHandId);
         setState({
           tableState: normalized,
+          ...(shouldAdoptSeat ? { seatId: inferredSeatId, isSpectating: false } : {}),
           ...(clearPrivate ? { privateHoleCards: null, privateHandId: null } : {}),
         });
         requestMissingProfiles(normalized);
