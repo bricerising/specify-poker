@@ -2,6 +2,10 @@ import { expect, test } from "@playwright/test";
 
 test.describe("gameplay flow", () => {
   test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      window.sessionStorage.setItem("poker.auth.token", "test-token");
+    });
+
     await page.route("**/api/me", async (route) => {
       await route.fulfill({
         status: 200,
@@ -40,7 +44,9 @@ test.describe("gameplay flow", () => {
             },
           ]),
         });
+        return;
       }
+      await route.continue();
     });
 
     await page.route("**/api/tables/*/join", async (route) => {
@@ -168,7 +174,7 @@ test.describe("gameplay flow", () => {
   });
 
   test("player can see hole cards after joining", async ({ page }) => {
-    await page.goto("http://localhost:3000");
+    await page.goto("/");
     await page.getByRole("button", { name: "Join Seat 2" }).click();
 
     await expect(page.getByText("Ah")).toBeVisible();
@@ -176,7 +182,7 @@ test.describe("gameplay flow", () => {
   });
 
   test("player can take action when it is their turn", async ({ page }) => {
-    await page.goto("http://localhost:3000");
+    await page.goto("/");
     await page.getByRole("button", { name: "Join Seat 2" }).click();
 
     await expect(page.getByRole("button", { name: "Call" })).toBeVisible();
@@ -185,7 +191,7 @@ test.describe("gameplay flow", () => {
   });
 
   test("action progresses the hand to next street", async ({ page }) => {
-    await page.goto("http://localhost:3000");
+    await page.goto("/");
     await page.getByRole("button", { name: "Join Seat 2" }).click();
 
     await page.getByRole("button", { name: "Call" }).click();
@@ -195,7 +201,7 @@ test.describe("gameplay flow", () => {
   });
 
   test("community cards appear after flop", async ({ page }) => {
-    await page.goto("http://localhost:3000");
+    await page.goto("/");
     await page.getByRole("button", { name: "Join Seat 2" }).click();
     await page.getByRole("button", { name: "Call" }).click();
 
@@ -205,7 +211,7 @@ test.describe("gameplay flow", () => {
   });
 
   test("pot amount is displayed", async ({ page }) => {
-    await page.goto("http://localhost:3000");
+    await page.goto("/");
     await page.getByRole("button", { name: "Join Seat 2" }).click();
 
     await expect(page.getByText("Pot")).toBeVisible();
@@ -341,7 +347,7 @@ test.describe("timer display", () => {
       window.WebSocket = MockWebSocket;
     });
 
-    await page.goto("http://localhost:3000");
+    await page.goto("/");
     await page.getByRole("button", { name: "Join Seat 2" }).click();
 
     await expect(page.getByText("Action Timer")).toBeVisible();

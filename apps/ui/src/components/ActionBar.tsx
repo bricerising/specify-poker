@@ -111,6 +111,9 @@ export function ActionBar({ actions, pot, onAction }: ActionBarProps) {
             <button type="button" className="btn btn-ghost" onClick={() => setAmount(String(clampAmount(pot / 2)))}>
               1/2 Pot
             </button>
+            <button type="button" className="btn btn-ghost" onClick={() => setAmount(String(clampAmount((pot * 3) / 4)))}>
+              3/4 Pot
+            </button>
             <button type="button" className="btn btn-ghost" onClick={() => setAmount(String(clampAmount(pot)))}>
               Pot
             </button>

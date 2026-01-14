@@ -12,3 +12,5 @@ build/
 *.log
 .env*
 *output*.txt
+*test-results*
+*playwright-report*

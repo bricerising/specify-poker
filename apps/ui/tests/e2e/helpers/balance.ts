@@ -1,9 +1,10 @@
 import crypto from "crypto";
 import { generateToken } from "./auth";
+import { urls } from "./urls";
 
 export async function ensureBalance(accountId: string, amount = 2000) {
   const token = generateToken(accountId, `Balance${accountId.slice(0, 4)}`);
-  await fetch(`http://localhost:3002/api/accounts/${accountId}`, {
+  await fetch(`${urls.gateway}/api/accounts/${accountId}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -13,7 +14,7 @@ export async function ensureBalance(accountId: string, amount = 2000) {
   });
 
   const idempotencyKey = crypto.randomUUID();
-  const res = await fetch(`http://localhost:3002/api/accounts/${accountId}/deposit`, {
+  const res = await fetch(`${urls.gateway}/api/accounts/${accountId}/deposit`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

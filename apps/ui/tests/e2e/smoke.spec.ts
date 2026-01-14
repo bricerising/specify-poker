@@ -159,7 +159,7 @@ test("smoke flow: login, create table, join, play hand", async ({ page }) => {
     window.WebSocket = MockWebSocket;
   });
 
-  await page.goto("http://localhost:3000");
+  await page.goto("/");
 
   await page.getByLabel("Name").fill("High Stakes");
   await page.getByRole("button", { name: "Create Table" }).click();

@@ -43,5 +43,5 @@ export function setupProxy(app: Router) {
   // Balance Service has HTTP API at its configured port
   // Game, Player, Event services are gRPC-only and handled by /http/routes/*
 
-  forward("/api/accounts", config.balanceServiceUrl);
+  forward("/api/accounts", config.balanceServiceHttpUrl);
 }
