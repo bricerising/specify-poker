@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import WebSocket from "ws";
+import { context, trace, SpanStatusCode, ROOT_CONTEXT } from "@opentelemetry/api";
 import { gameClient, playerClient } from "../../grpc/clients";
 import { WsPubSubMessage } from "../pubsub";
 import { checkWsRateLimit, parseChatMessage, parseTableId } from "../validators";
@@ -7,6 +8,7 @@ import { subscribeToChannel, unsubscribeFromChannel, unsubscribeAll, getSubscrib
 import { getLocalConnectionMeta, sendToLocal } from "../localRegistry";
 import { broadcastToChannel } from "../../services/broadcastService";
 import { saveChatMessage, getChatHistory } from "../../storage/chatStore";
+import logger from "../../observability/logger";
 
 function rawDataToString(data: WebSocket.RawData): string {
   if (typeof data === "string") return data;
@@ -160,24 +162,47 @@ export function attachChatHub(socket: WebSocket, userId: string, connectionId: s
     const type = typeof message.type === "string" ? message.type : null;
     const tableId = parseTableId(message.tableId);
 
-    switch (type) {
-      case "SubscribeChat": {
-        if (!tableId) return;
-        await handleSubscribe(connectionId, tableId);
-        return;
-      }
-      case "UnsubscribeChat": {
-        if (!tableId) return;
-        await handleUnsubscribe(connectionId, tableId);
-        return;
-      }
-      case "ChatSend": {
-        if (!tableId) return;
-        await handleChatSend(connectionId, userId, { tableId, message: message.message });
-        return;
-      }
-      default:
-        return;
+    const tracer = trace.getTracer("gateway-ws");
+    const attributes: Record<string, string> = {};
+    if (type) {
+      attributes["ws.message_type"] = type;
+    }
+    if (tableId) {
+      attributes["poker.table_id"] = tableId;
+    }
+
+    const span = tracer.startSpan("ws.chat", { attributes }, ROOT_CONTEXT);
+    try {
+      await context.with(trace.setSpan(ROOT_CONTEXT, span), async () => {
+        switch (type) {
+          case "SubscribeChat": {
+            if (!tableId) return;
+            await handleSubscribe(connectionId, tableId);
+            return;
+          }
+          case "UnsubscribeChat": {
+            if (!tableId) return;
+            await handleUnsubscribe(connectionId, tableId);
+            return;
+          }
+          case "ChatSend": {
+            if (!tableId) return;
+            await handleChatSend(connectionId, userId, { tableId, message: message.message });
+            return;
+          }
+          default:
+            return;
+        }
+      });
+    } catch (err: unknown) {
+      span.recordException(err as Error);
+      const message = err instanceof Error ? err.message : "unknown_error";
+      span.setStatus({ code: SpanStatusCode.ERROR, message });
+      context.with(trace.setSpan(ROOT_CONTEXT, span), () => {
+        logger.error({ err, type, tableId }, "ws.chat.failed");
+      });
+    } finally {
+      span.end();
     }
   });
 

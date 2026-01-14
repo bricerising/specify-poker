@@ -1,6 +1,7 @@
 import { Server } from "http";
 import WebSocket, { WebSocketServer } from "ws";
 import { randomUUID } from "crypto";
+import { context, ROOT_CONTEXT } from "@opentelemetry/api";
 import { authenticateWs, authenticateWsToken, WsAuthResult } from "./auth";
 import { registerConnection, unregisterConnection } from "./connectionRegistry";
 import { initWsPubSub } from "./pubsub";
@@ -100,8 +101,10 @@ export async function initWsServer(server: Server) {
     const authResult = await authenticateWs(request);
     (request as AuthenticatedRequest).wsAuthResult = authResult;
 
-    wss.handleUpgrade(request, socket, head, (ws) => {
-      wss.emit("connection", ws, request);
+    context.with(ROOT_CONTEXT, () => {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit("connection", ws, request);
+      });
     });
   });
 

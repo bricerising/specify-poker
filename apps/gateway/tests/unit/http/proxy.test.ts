@@ -26,7 +26,7 @@ vi.mock("http-proxy", () => ({
 
 vi.mock("../../../src/config", () => ({
   getConfig: () => ({
-    balanceServiceUrl: "balance:3002",
+    balanceServiceHttpUrl: "balance:3002",
   }),
 }));
 
