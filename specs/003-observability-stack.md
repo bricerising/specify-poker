@@ -9,7 +9,7 @@ metrics, logs, and traces.
 
 ## Architecture
 
-The stack follows the LGTM (Loki, Grafana, Tempo, Mimir/Prometheus) pattern,
+The stack follows the LGTM (Loki, Grafana, Tempo, Mimir) pattern,
 orchestrated via OpenTelemetry for a vendor-neutral instrumentation layer.
 
 ```
@@ -21,8 +21,8 @@ orchestrated via OpenTelemetry for a vendor-neutral instrumentation layer.
          │                                           │        │        │
          │ Logs (stdout)                             ▼        ▼        ▼
          ▼                                     ┌────────┐┌────────┐┌────────┐
-┌─────────────────┐                            │Prometheus Loki   ││ Tempo  │
-│  Docker Engine  │                            │(Metrics) (Logs)  ││(Traces)│
+┌─────────────────┐                            │ Mimir   Loki   ││ Tempo  │
+│  Docker Engine  │                            │(Metrics) (Logs) ││(Traces)│
 └────────┬────────┘                            └─────┬────────┬────────┬────┘
          │                                           │        │        │
          ▼                                           ▼        ▼        ▼
@@ -34,9 +34,9 @@ orchestrated via OpenTelemetry for a vendor-neutral instrumentation layer.
 
 ## Components
 
-### 1. Metrics (Prometheus)
+### 1. Metrics (Mimir)
 - **Role**: Quantitative data about system behavior.
-- **Exposure**: Services expose `/metrics` endpoint for Prometheus scraping.
+- **Exposure**: Services expose `/metrics` and the OpenTelemetry Collector scrapes them (Prometheus receiver) and forwards them to Mimir (remote write).
 - **Key Metrics**: RED (Rate, Error, Duration) for APIs, business metrics (pots, balances),
   and infrastructure metrics (Redis/DB connections).
 
@@ -56,19 +56,19 @@ orchestrated via OpenTelemetry for a vendor-neutral instrumentation layer.
 - **Root Trace**: Initiated by the Gateway Service for every client request.
 - **Propagation**: gRPC metadata (W3C Trace Context) ensures traces are linked
   across Balance, Game, Event, and Notify services.
-- **Service Map**: Generated from traces via OTel Collector `servicegraph`/`spanmetrics` connectors and visualized in Grafana’s Tempo datasource (backed by Prometheus metrics like `traces_service_graph_request_total`).
+- **Service Map**: Generated from traces via OTel Collector `servicegraph`/`spanmetrics` connectors and visualized in Grafana’s Tempo datasource (backed by metrics like `traces_service_graph_request_total`).
 
 ### 4. Visualization (Grafana)
 - **Role**: Single pane of glass for all telemetry data.
 - **Provisioning**: Dashboards and datasources are version-controlled in `/infra/grafana`.
-- **Integrations**: Log-to-trace (Loki -> Tempo) and Trace-to-metrics (Tempo -> Prometheus)
+- **Integrations**: Log-to-trace (Loki -> Tempo) and Trace-to-metrics (Tempo -> Mimir)
   navigation enabled via derived fields.
 
 ## Local Development (Docker Compose)
 
 The following services are included in the local environment:
 
-- **Prometheus**: `http://localhost:9090`
+- **Mimir**: `http://localhost:9009`
 - **Loki**: `http://localhost:3100`
 - **Tempo**: `http://localhost:3200`
 - **Grafana**: `http://localhost:3001` (Default login: admin/admin)

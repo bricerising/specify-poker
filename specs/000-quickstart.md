@@ -25,7 +25,7 @@ It is not designed as a public matchmaking or real-money gambling platform (see 
 - **WebSocket**: ws://localhost:4000/ws
 - **Balance Service (HTTP)**: http://localhost:3002/api
 - **Keycloak**: http://localhost:8080
-- **Prometheus**: http://localhost:9090
+- **Mimir (Prometheus API)**: http://localhost:9009
 - **Grafana**: http://localhost:3001
 - **Loki**: http://localhost:3100
 - **Tempo**: http://localhost:3200
@@ -42,7 +42,7 @@ It is not designed as a public matchmaking or real-money gambling platform (see 
 - **keycloak**: OIDC provider with Keycloak DB (PostgreSQL)
 - **redis**: State store for tables, profiles, friends, and caching.
 - **otel-collector**: Receives OTLP traces, metrics, and logs.
-- **prometheus**: Metrics storage and querying.
+- **mimir**: Metrics storage and querying (Prometheus API).
 - **loki**: Centralized log storage.
 - **tempo**: Distributed trace storage.
 - **grafana**: Unified visualization for metrics, logs, and traces.

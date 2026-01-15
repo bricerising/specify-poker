@@ -1,13 +1,13 @@
 ---
 name: specify-poker-observability-triage
-description: Triage and debug specify-poker issues using the LGTM stack (Grafana + Loki + Tempo + Prometheus) and docker compose logs, centered on OpenTelemetry traceId correlation across gateway/game/balance/player/event/notify; use for failing E2E tests, runtime 5xx/gRPC INTERNAL errors, auth/join-seat failures, or production-like compose debugging.
+description: Triage and debug specify-poker issues using the LGTM stack (Grafana + Loki + Tempo + Mimir) and docker compose logs, centered on OpenTelemetry traceId correlation across gateway/game/balance/player/event/notify; use for failing E2E tests, runtime 5xx/gRPC INTERNAL errors, auth/join-seat failures, or production-like compose debugging.
 ---
 
 # Specify Poker Observability Triage
 
 ## Quick Start (Local Compose)
 
-- Grafana: `http://localhost:3001` (datasources: Prometheus, Loki, Tempo)
+- Grafana: `http://localhost:3001` (datasources: Prometheus (Mimir), Loki, Tempo)
 - Tail logs: `docker compose logs -f gateway`
 
 ## Workflow Decision Tree
@@ -53,14 +53,14 @@ description: Triage and debug specify-poker issues using the LGTM stack (Grafana
 - Gateway logs include `traceId`/`spanId` via Pino + OTel context.
 - If a trace is missing spans, confirm the failing request actually hit the compose stack (not a locally-started service) and that `OTEL_EXPORTER_OTLP_ENDPOINT` is set for the service.
 - If Grafana trace search fails with `invalid start ... value out of range`, confirm `tempo-grafana-proxy` is running and Grafana’s Tempo datasource URL points to `http://tempo-grafana-proxy:3200` (Grafana uses ms, Tempo `api/search` expects seconds).
-- Service Map depends on Prometheus metrics produced from traces (OTel Collector `servicegraph`/`spanmetrics`); quick check: `traces_service_graph_request_total` should exist in Prometheus.
+- Service Map depends on metrics produced from traces (OTel Collector `servicegraph`/`spanmetrics`); quick check: `traces_service_graph_request_total` should exist in the Prometheus datasource (backed by Mimir).
 - For a focused “Grafana + Tempo traces/service map” playbook, use `.codex/skills/specify-poker-tempo-grafana-traces/SKILL.md`.
 
-## Prometheus / Metrics (When It’s Intermittent)
+## Metrics (When It’s Intermittent)
 
 - Use Grafana dashboards first (they’re provisioned in `infra/grafana/dashboards/`).
 - If you need a quick “is it spiking?” view:
-  - Check `job="gateway"` scrape target is `UP`.
+  - In Grafana Explore (Prometheus datasource), run `count by (job) (process_cpu_user_seconds_total)` to confirm all services are emitting metrics.
   - Look for request error-rate or latency panels; then pivot back to Loki/Tempo for the specific trace(s).
 
 ## Scripts

@@ -76,21 +76,21 @@ services:
     command: ["--config=/etc/otel/collector-config.yaml"]
     volumes:
       - ./infra/otel/collector-config.yaml:/etc/otel/collector-config.yaml
+    depends_on:
+      - mimir
     healthcheck:
-      test: ["CMD-SHELL", "true"]
+      test: ["CMD", "/otelcol-contrib", "--version"]
       interval: 10s
       timeout: 2s
       retries: 3
 
-  prometheus:
-    image: prom/prometheus:v2.50.0
-    command: ["--config.file=/etc/prometheus/prometheus.yaml"]
+  mimir:
+    image: grafana/mimir:2.11.0
+    command: ["-config.file=/etc/mimir/mimir.yaml"]
     ports:
-      - "9090:9090"
+      - "9009:9009"
     volumes:
-      - ./infra/prometheus:/etc/prometheus
-    depends_on:
-      - otel-collector
+      - ./infra/mimir/mimir.yaml:/etc/mimir/mimir.yaml
     healthcheck:
       test: ["CMD-SHELL", "true"]
       interval: 10s
@@ -105,7 +105,7 @@ services:
       - ./infra/grafana/provisioning:/etc/grafana/provisioning
       - ./infra/grafana/dashboards:/etc/grafana/dashboards
     depends_on:
-      - prometheus
+      - mimir
       - loki
       - tempo-grafana-proxy
     healthcheck:

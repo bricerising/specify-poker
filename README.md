@@ -27,7 +27,7 @@ More detail: `specs/000-quickstart.md`.
 - Gateway (HTTP API): http://localhost:4000/api
 - Gateway (WebSocket): ws://localhost:4000/ws
 - Keycloak: http://localhost:8080
-- Prometheus: http://localhost:9090
+- Mimir (Prometheus API): http://localhost:9009
 - Grafana: http://localhost:3001 (admin/admin)
 - Loki: http://localhost:3100
 - Tempo: http://localhost:3200
@@ -64,14 +64,14 @@ docker compose down -v
 - Redis: hot state, caching, pub/sub, and streams.
 - Postgres: durable storage for player + event services (and Keycloak).
 - Keycloak: OIDC auth provider (`infra/keycloak/realm-export.json`).
-- Observability: OpenTelemetry -> Prometheus/Loki/Tempo -> Grafana (`infra/` + `specs/003-observability-stack.md`).
+- Observability: OpenTelemetry -> Mimir/Loki/Tempo -> Grafana (`infra/` + `specs/003-observability-stack.md`).
 
 ## Repository Map
 
 ```text
 apps/           # Microservices + UI
 packages/       # Shared libraries (ex: packages/shared)
-infra/          # Keycloak, OTel collector, Prometheus, Grafana, Loki, Tempo configs
+infra/          # Keycloak, OTel collector, Mimir, Grafana, Loki, Tempo configs
 specs/          # System-level specifications and standards
 ```
 
@@ -193,7 +193,7 @@ Local stack (via docker compose):
 
 - OTLP ingest (Tempo): `localhost:4317` (OTLP gRPC), `localhost:4318` (OTLP HTTP)
 - Grafana: http://localhost:3001
-- Prometheus: http://localhost:9090
+- Mimir: http://localhost:9009
 - Loki: http://localhost:3100
 - Tempo: http://localhost:3200
 

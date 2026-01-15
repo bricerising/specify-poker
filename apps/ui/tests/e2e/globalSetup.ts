@@ -25,8 +25,8 @@ async function isStackReady(): Promise<boolean> {
   const keycloak = await fetch(`${urls.keycloak}/realms/poker-local`);
   if (!keycloak.ok) return false;
 
-  const prometheus = await fetch(`${urls.prometheus}/-/ready`);
-  if (!prometheus.ok) return false;
+  const mimir = await fetch(`${urls.mimir}/prometheus/api/v1/status/buildinfo`);
+  if (!mimir.ok) return false;
 
   const loki = await fetch(`${urls.loki}/ready`);
   if (!loki.ok) return false;

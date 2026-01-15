@@ -3,6 +3,35 @@ receivers:
     protocols:
       grpc:
       http:
+  prometheus:
+    config:
+      global:
+        scrape_interval: 15s
+      scrape_configs:
+        - job_name: "gateway"
+          metrics_path: "/metrics"
+          static_configs:
+            - targets: ["gateway:4000"]
+        - job_name: "balance"
+          metrics_path: "/metrics"
+          static_configs:
+            - targets: ["balance:9102"]
+        - job_name: "player"
+          metrics_path: "/metrics"
+          static_configs:
+            - targets: ["player:9103"]
+        - job_name: "game"
+          metrics_path: "/metrics"
+          static_configs:
+            - targets: ["game:9105"]
+        - job_name: "event"
+          metrics_path: "/metrics"
+          static_configs:
+            - targets: ["event:9104"]
+        - job_name: "notify"
+          metrics_path: "/metrics"
+          static_configs:
+            - targets: ["notify:9105"]
 
 connectors:
   servicegraph:
@@ -13,10 +42,8 @@ processors:
 
 exporters:
   logging:
-  prometheus:
-    endpoint: "0.0.0.0:8889"
-    resource_to_telemetry_conversion:
-      enabled: true
+  prometheusremotewrite:
+    endpoint: "http://mimir:9009/api/v1/push"
   otlp:
     endpoint: "tempo:4317"
     tls:
@@ -31,9 +58,9 @@ service:
       processors: [batch]
       exporters: [logging, otlp, servicegraph, spanmetrics]
     metrics:
-      receivers: [otlp, servicegraph, spanmetrics]
+      receivers: [otlp, prometheus, servicegraph, spanmetrics]
       processors: [batch]
-      exporters: [logging, prometheus]
+      exporters: [logging, prometheusremotewrite]
     logs:
       receivers: [otlp]
       processors: [batch]

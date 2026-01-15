@@ -17,8 +17,8 @@ test.describe("Quickstart Stack Health", () => {
     const keycloakRealm = await request.get(`${urls.keycloak}/realms/poker-local`);
     expect(keycloakRealm.ok()).toBeTruthy();
 
-    const prometheus = await request.get(urls.prometheus);
-    expect(prometheus.ok()).toBeTruthy();
+    const mimir = await request.get(`${urls.mimir}/prometheus/api/v1/status/buildinfo`);
+    expect(mimir.ok()).toBeTruthy();
 
     const grafana = await request.get(`${urls.grafana}/api/health`);
     expect(grafana.ok()).toBeTruthy();

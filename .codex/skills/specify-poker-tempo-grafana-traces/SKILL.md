@@ -8,7 +8,7 @@ description: Troubleshoot Grafana Tempo traces and the Tempo Service Map in spec
 ## Quick Checks
 
 1. Confirm the stack is up:
-   - `docker compose ps grafana tempo tempo-grafana-proxy otel-collector prometheus`
+   - `docker compose ps grafana tempo tempo-grafana-proxy otel-collector mimir`
 2. Confirm Tempo is reachable and has traces (direct):
    - `curl -sS http://localhost:3200/ready`
    - `curl -sS 'http://localhost:3200/api/search?q=%7B%7D' | jq '.traces | length'`
@@ -34,16 +34,16 @@ Fix:
 
 ### B) Service Map is empty
 
-Cause: Tempo Service Map in Grafana requires **Prometheus metrics derived from traces** (service graph).
+Cause: Tempo Service Map in Grafana requires **Prometheus-format metrics derived from traces** (service graph).
 
 Fix:
-- Enable OTel Collector connectors and export them to Prometheus:
+- Enable OTel Collector connectors and export them to the metrics backend (Mimir):
   - `infra/otel/collector-config.yaml` should include `connectors: servicegraph, spanmetrics`
 - Configure Tempo datasource service map to use Prometheus:
   - `infra/grafana/provisioning/datasources/datasource.yaml` `jsonData.serviceMap.datasourceUid: PROMETHEUS`
-- Validate metrics exist in Prometheus:
-  - `curl -sS 'http://localhost:9090/api/v1/label/__name__/values' | jq -r '.data[]' | rg '^traces_service_graph_' | head`
-  - `curl -sS 'http://localhost:9090/api/v1/query?query=traces_service_graph_request_total' | jq '.data.result | length'`
+- Validate metrics exist in Mimir (Prometheus API):
+  - `curl -sS 'http://localhost:9009/prometheus/api/v1/label/__name__/values' | jq -r '.data[]' | rg '^traces_service_graph_' | head`
+  - `curl -sS 'http://localhost:9009/prometheus/api/v1/query?query=traces_service_graph_request_total' | jq '.data.result | length'`
 
 ## Generate Traffic (If Data Is Sparse)
 
@@ -52,7 +52,7 @@ Fix:
 
 ## Diagnose Slow Service Map Edges
 
-1. Confirm the edge is actually slow (Prometheus from traces):
+1. Confirm the edge is actually slow (metrics from traces):
    - Top edges by p95: `topk(10, histogram_quantile(0.95, sum by (le, client, server) (rate(traces_service_graph_request_client_seconds_bucket{failed="false"}[5m]))))`
    - One edge (p95): `histogram_quantile(0.95, sum by (le) (rate(traces_service_graph_request_client_seconds_bucket{client="game-service",server="event-service",failed="false"}[5m])))`
 2. Find representative traces in Tempo (prefer Grafana Explore → Tempo):

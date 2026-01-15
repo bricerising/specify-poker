@@ -5,7 +5,7 @@ datasources:
     uid: PROMETHEUS
     type: prometheus
     access: proxy
-    url: http://prometheus:9090
+    url: http://mimir:9009/prometheus
     isDefault: true
 
   - name: Loki
