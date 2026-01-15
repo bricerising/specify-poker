@@ -4,6 +4,10 @@ receivers:
       grpc:
       http:
 
+connectors:
+  servicegraph:
+  spanmetrics:
+
 processors:
   batch:
 
@@ -25,9 +29,9 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [logging, otlp]
+      exporters: [logging, otlp, servicegraph, spanmetrics]
     metrics:
-      receivers: [otlp]
+      receivers: [otlp, servicegraph, spanmetrics]
       processors: [batch]
       exporters: [logging, prometheus]
     logs:

@@ -1,4 +1,4 @@
-import redisClient from "./redisClient";
+import redisClient, { blockingRedisClient } from "./redisClient";
 import { GameEvent } from "../domain/types";
 
 const STREAM_PREFIX = "event:streams";
@@ -43,7 +43,7 @@ export class StreamStore {
     count = 10,
     blockMs = 5000
   ): Promise<StreamResponse[] | null> {
-    const result = await redisClient.xRead(
+    const result = await blockingRedisClient.xRead(
       [{ key: streamKey(streamId), id: lastId }],
       { COUNT: count, BLOCK: blockMs }
     );

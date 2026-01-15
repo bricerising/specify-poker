@@ -1,4 +1,4 @@
-import redisClient from "../storage/redisClient";
+import { blockingRedisClient } from "../storage/redisClient";
 import { eventStore } from "../storage/eventStore";
 import { handStore } from "../storage/handStore";
 import {
@@ -24,7 +24,7 @@ export class HandMaterializer {
     this.isRunning = true;
 
     try {
-      await redisClient.xGroupCreate(this.streamKey, this.groupName, '$', { MKSTREAM: true });
+      await blockingRedisClient.xGroupCreate(this.streamKey, this.groupName, '$', { MKSTREAM: true });
     } catch (err: unknown) {
       if ((err as Error).message.includes('BUSYGROUP')) {
         return;
@@ -39,7 +39,7 @@ export class HandMaterializer {
   private async poll() {
     while (this.isRunning) {
       try {
-        const streams = await redisClient.xReadGroup(
+        const streams = await blockingRedisClient.xReadGroup(
           this.groupName,
           this.consumerName,
           [{ key: this.streamKey, id: '>' }],
@@ -53,7 +53,7 @@ export class HandMaterializer {
           for (const message of stream.messages) {
             const event = JSON.parse(message.message.data);
             await this.handleEvent(event);
-            await redisClient.xAck(this.streamKey, this.groupName, message.id);
+            await blockingRedisClient.xAck(this.streamKey, this.groupName, message.id);
           }
         }
       } catch (err) {

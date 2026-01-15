@@ -56,6 +56,7 @@ orchestrated via OpenTelemetry for a vendor-neutral instrumentation layer.
 - **Root Trace**: Initiated by the Gateway Service for every client request.
 - **Propagation**: gRPC metadata (W3C Trace Context) ensures traces are linked
   across Balance, Game, Event, and Notify services.
+- **Service Map**: Generated from traces via OTel Collector `servicegraph`/`spanmetrics` connectors and visualized in Grafana’s Tempo datasource (backed by Prometheus metrics like `traces_service_graph_request_total`).
 
 ### 4. Visualization (Grafana)
 - **Role**: Single pane of glass for all telemetry data.

@@ -1,4 +1,4 @@
-import { getRedisClient } from "../storage/redisClient";
+import { getBlockingRedisClient } from "../storage/redisClient";
 import { PushSenderService } from "./pushSenderService";
 import { getConfig } from "../config";
 import logger from "../observability/logger";
@@ -16,7 +16,7 @@ export class EventConsumer {
   }
 
   async start(): Promise<void> {
-    const client = await getRedisClient();
+    const client = await getBlockingRedisClient();
     this.isRunning = true;
 
     try {
@@ -35,7 +35,7 @@ export class EventConsumer {
   }
 
   private async poll(): Promise<void> {
-    const client = await getRedisClient();
+    const client = await getBlockingRedisClient();
     while (this.isRunning) {
       try {
         const streams = await client.xReadGroup(

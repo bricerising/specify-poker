@@ -6,7 +6,7 @@ import { PushSenderService } from "../../src/services/pushSenderService";
 vi.mock('../../src/storage/redisClient', () => {
   const xReadGroup = vi.fn().mockImplementation(() => new Promise(resolve => setTimeout(() => resolve(null), 100)));
   return {
-    getRedisClient: () => Promise.resolve({
+    getBlockingRedisClient: () => Promise.resolve({
       xGroupCreate: vi.fn(),
       xReadGroup,
       xAck: vi.fn(),

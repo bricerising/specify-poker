@@ -5,6 +5,15 @@ module.exports = {
     node: true,
     es2022: true,
   },
+  overrides: [
+    {
+      files: ["infra/tempo/grafana-proxy/server.js"],
+      rules: {
+        "@typescript-eslint/no-var-requires": "off",
+        "@typescript-eslint/no-require-imports": "off",
+      },
+    },
+  ],
   parser: "@typescript-eslint/parser",
   parserOptions: {
     ecmaVersion: "latest",

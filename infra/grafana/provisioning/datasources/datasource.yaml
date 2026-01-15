@@ -25,3 +25,10 @@ datasources:
     type: tempo
     access: proxy
     url: http://tempo-grafana-proxy:3200
+    jsonData:
+      nodeGraph:
+        enabled: true
+      serviceMap:
+        datasourceUid: PROMETHEUS
+      lokiSearch:
+        datasourceUid: LOKI
