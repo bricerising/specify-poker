@@ -71,6 +71,7 @@ describe("TableState version tracking", () => {
       seats: [],
       status: "lobby",
       hand: null,
+      button: 0,
       version: 1,
     };
 

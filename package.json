@@ -7,6 +7,7 @@
   ],
   "scripts": {
     "build": "npm run -ws --if-present build",
+    "env:local": "node scripts/generate-local-env.mjs",
     "lint": "eslint .",
     "test": "vitest run"
   },

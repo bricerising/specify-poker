@@ -4,7 +4,7 @@ test("profile flow updates nickname", async ({ page }) => {
   let profile = {
     userId: "user-1",
     nickname: "Ace",
-    avatarUrl: null,
+    avatarUrl: null as string | null,
     stats: { handsPlayed: 1, wins: 0 },
     friends: [],
   };

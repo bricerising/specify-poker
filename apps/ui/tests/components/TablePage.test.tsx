@@ -35,6 +35,7 @@ const mockStore = {
         actionTimerDeadline: null,
         bigBlind: 10,
       },
+      button: 0,
       version: 1,
     },
     seatId: 0,
