@@ -8,22 +8,30 @@ export async function runMigrations() {
     try {
         logger.info('Running database migrations...');
 
-        // Determine path to migrations directory based on runtime environment
-        // In dev (ts-node), it's ../../migrations relative to src/storage
-        // In prod (dist), it's ../../migrations relative to dist/storage if we copy it there
-        // Or we can use absolute path from process.cwd()
-        const migrationFile = path.resolve(process.cwd(), 'apps/player/migrations/001_initial.sql');
+        const migrationsDir = path.resolve(process.cwd(), 'apps/player/migrations');
+        logger.info({ path: migrationsDir }, 'Loading migration directory');
 
-        logger.info({ path: migrationFile }, 'Reading migration file');
-
-        if (!fs.existsSync(migrationFile)) {
-            throw new Error(`Migration file not found at ${migrationFile}`);
+        if (!fs.existsSync(migrationsDir)) {
+            throw new Error(`Migrations directory not found at ${migrationsDir}`);
         }
 
-        const sql = fs.readFileSync(migrationFile, 'utf8');
+        const files = fs
+            .readdirSync(migrationsDir)
+            .filter((file) => file.endsWith('.sql'))
+            .sort((a, b) => a.localeCompare(b));
+
+        if (files.length === 0) {
+            logger.info({ path: migrationsDir }, 'No migration files found');
+            return;
+        }
 
         await client.query('BEGIN');
-        await client.query(sql);
+        for (const file of files) {
+            const migrationFile = path.join(migrationsDir, file);
+            logger.info({ path: migrationFile }, 'Running migration file');
+            const sql = fs.readFileSync(migrationFile, 'utf8');
+            await client.query(sql);
+        }
         await client.query('COMMIT');
 
         logger.info('Migrations completed successfully');

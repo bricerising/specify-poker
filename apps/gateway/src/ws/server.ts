@@ -2,13 +2,14 @@ import { Server } from "http";
 import WebSocket, { WebSocketServer } from "ws";
 import { randomUUID } from "crypto";
 import { context, ROOT_CONTEXT } from "@opentelemetry/api";
+import { toStruct } from "@specify-poker/shared";
 import { authenticateWs, authenticateWsToken, WsAuthResult } from "./auth";
 import { registerConnection, unregisterConnection } from "./connectionRegistry";
 import { initWsPubSub } from "./pubsub";
 import { attachTableHub, handleTablePubSubEvent } from "./handlers/table";
 import { attachLobbyHub, handleLobbyPubSubEvent } from "./handlers/lobby";
 import { attachChatHub, handleChatPubSubEvent } from "./handlers/chat";
-import { eventClient } from "../grpc/clients";
+import { eventClient, playerClient } from "../grpc/clients";
 import { updatePresence } from "../storage/sessionStore";
 import { getConnectionsByUser } from "../storage/connectionStore";
 import { setupHeartbeat } from "./heartbeat";
@@ -22,27 +23,6 @@ interface AuthenticatedRequest extends IncomingMessage {
 
 const sessionMeta = new Map<string, { startedAt: number; clientType: string }>();
 const authTimeoutMs = 5000;
-
-function toStruct(obj: Record<string, unknown>) {
-  const struct: { fields: Record<string, unknown> } = { fields: {} };
-  for (const [key, value] of Object.entries(obj)) {
-    struct.fields[key] = toValue(value);
-  }
-  return struct;
-}
-
-function toValue(value: unknown): Record<string, unknown> {
-  if (typeof value === "string") return { stringValue: value };
-  if (typeof value === "number") return { numberValue: value };
-  if (typeof value === "boolean") return { boolValue: value };
-  if (Array.isArray(value)) {
-    return { listValue: { values: value.map((entry) => toValue(entry)) } };
-  }
-  if (value && typeof value === "object") {
-    return { structValue: toStruct(value as Record<string, unknown>) };
-  }
-  return { nullValue: 0 };
-}
 
 function emitSessionEvent(type: string, userId: string, payload: Record<string, unknown>) {
   eventClient.PublishEvent(
@@ -121,13 +101,21 @@ export async function initWsServer(server: Server) {
       return;
     }
 
-    const finalizeConnection = async (userId: string) => {
+    const finalizeConnection = async (userId: string, username?: string) => {
       const connectionId = randomUUID();
       const connectedAt = new Date().toISOString();
       const ip = getClientIp(request);
       const clientType = getClientType(request);
 
       logger.info({ userId, connectionId }, "WS connection established");
+
+      if (typeof username === "string" && username.trim().length > 0) {
+        playerClient.GetProfile({ user_id: userId, username }, (err) => {
+          if (err) {
+            logger.warn({ err, userId }, "Failed to sync username on websocket connect");
+          }
+        });
+      }
 
       await registerConnection({ connectionId, userId, connectedAt, ip }, ws);
       await updatePresence(userId, "online");
@@ -176,7 +164,7 @@ export async function initWsServer(server: Server) {
     };
 
     if (authResult.status === "ok") {
-      await finalizeConnection(authResult.userId);
+      await finalizeConnection(authResult.userId, authResult.username);
       return;
     }
 
@@ -207,7 +195,7 @@ export async function initWsServer(server: Server) {
         return;
       }
 
-      await finalizeConnection(result.userId);
+      await finalizeConnection(result.userId, result.username);
     };
 
     ws.on("message", handleAuth);

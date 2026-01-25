@@ -86,6 +86,7 @@ const PublishEvent = vi.fn((req: unknown, cb: (err: Error | null, response: { su
 });
 vi.mock("../../../src/grpc/clients", () => ({
   eventClient: { PublishEvent },
+  playerClient: { GetProfile: vi.fn() },
 }));
 
 vi.mock("crypto", () => ({

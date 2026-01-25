@@ -99,7 +99,7 @@ describe("SpectatorView structure", () => {
   it("has required fields", () => {
     const spectator = {
       userId: "user-1",
-      nickname: "Player1",
+      username: "player1",
       status: "active" as const,
     };
 

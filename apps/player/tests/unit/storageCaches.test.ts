@@ -31,10 +31,11 @@ describe("storage caches", () => {
 
   it("stores and retrieves profile cache entries", async () => {
     vi.spyOn(redisClient, "getRedisClient").mockResolvedValue(redis as never);
-    redis.get.mockResolvedValue(JSON.stringify({ userId: "user-1", nickname: "Nick" }));
+    redis.get.mockResolvedValue(JSON.stringify({ userId: "user-1", username: "user-1", nickname: "Nick" }));
 
     await profileCache.set({
       userId: "user-1",
+      username: "user-1",
       nickname: "Nick",
       avatarUrl: null,
       preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: "auto" },

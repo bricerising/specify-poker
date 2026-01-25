@@ -165,7 +165,7 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
     );
   });
 
-  const profileInitials = profile ? profile.nickname.slice(0, 2).toUpperCase() : "";
+  const profileInitials = profile ? profile.username.slice(0, 2).toUpperCase() : "";
 
   return (
     <section className="page">
@@ -202,14 +202,14 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
             <div className="profile-summary">
               <div className="avatar">
                 {profile.avatarUrl ? (
-                  <img src={profile.avatarUrl} alt={`${profile.nickname} avatar`} />
+                  <img src={profile.avatarUrl} alt={`${profile.username} avatar`} />
                 ) : (
                   <span>{profileInitials}</span>
                 )}
               </div>
               <div>
-                <div className="meta-line">Nickname</div>
-                <div className="table-name">{profile.nickname}</div>
+                <div className="meta-line">Username</div>
+                <div className="table-name">{profile.username}</div>
               </div>
             </div>
             <div className="stat-grid">

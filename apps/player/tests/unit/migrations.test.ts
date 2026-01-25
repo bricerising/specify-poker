@@ -6,9 +6,11 @@ const release = vi.fn();
 
 vi.mock("fs", () => ({
   existsSync: vi.fn(() => true),
+  readdirSync: vi.fn(() => ["001_initial.sql", "002_add_username.sql"]),
   readFileSync: vi.fn(() => "SELECT 1;"),
   default: {
     existsSync: vi.fn(() => true),
+    readdirSync: vi.fn(() => ["001_initial.sql", "002_add_username.sql"]),
     readFileSync: vi.fn(() => "SELECT 1;"),
   },
 }));

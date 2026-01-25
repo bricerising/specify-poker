@@ -349,6 +349,36 @@ function applyAllIn(
   return { resetActedSeats: raiseSize >= previousMinRaise };
 }
 
+function canPerformInactiveAction(seat: Seat, action: ActionInput, allowInactive: boolean | undefined) {
+  if (!allowInactive) {
+    return false;
+  }
+  if (seat.status !== "DISCONNECTED") {
+    return false;
+  }
+  return action.type === "FOLD" || action.type === "CHECK";
+}
+
+function endHandByFold(hand: HandState, seats: Seat[], buttonSeat: number, endedAt: string) {
+  settleWinners(hand, seats, buttonSeat);
+  resetHandSeats(seats);
+  hand.endedAt = endedAt;
+}
+
+function endHandByShowdown(hand: HandState, seats: Seat[], buttonSeat: number, endedAt: string) {
+  dealRemainingCommunityCards(hand);
+  hand.street = "SHOWDOWN";
+  settleShowdown(hand, seats, buttonSeat);
+  resetHandSeats(seats);
+  hand.endedAt = endedAt;
+}
+
+function endHandAtRiver(hand: HandState, seats: Seat[], buttonSeat: number, endedAt: string) {
+  settleShowdown(hand, seats, buttonSeat);
+  resetHandSeats(seats);
+  hand.endedAt = endedAt;
+}
+
 export function startHand(
   tableState: TableState,
   config: TableConfig,
@@ -496,10 +526,7 @@ export function applyAction(
     return { state: tableState, accepted: false, reason: "SEAT_MISSING" };
   }
 
-  const allowInactiveAction =
-    Boolean(options.allowInactive) &&
-    seat.status === "DISCONNECTED" &&
-    (action.type === "FOLD" || action.type === "CHECK");
+  const allowInactiveAction = canPerformInactiveAction(seat, action, options.allowInactive);
   if (seat.status !== "ACTIVE" && !allowInactiveAction) {
     return { state: tableState, accepted: false, reason: "SEAT_INACTIVE" };
   }
@@ -511,6 +538,7 @@ export function applyAction(
   }
 
   const now = options.now ?? (() => new Date().toISOString());
+  const timestamp = now();
   const previousMinRaise = hand.minRaise;
   let resetActedSeats = false;
 
@@ -542,7 +570,7 @@ export function applyAction(
       break;
   }
 
-  const actionRecord = createAction(hand.handId, seat, action, now());
+  const actionRecord = createAction(hand.handId, seat, action, timestamp);
   hand.actions.push(actionRecord);
   seat.lastAction = actionRecord.timestamp;
 
@@ -555,37 +583,58 @@ export function applyAction(
 
   const remaining = activeSeatsRemaining(tableState.seats);
   const active = activeSeats(tableState.seats);
-  let handComplete = false;
+
+  const seats = tableState.seats;
+  const buttonSeat = tableState.button;
 
   if (remaining.length === 1) {
-    settleWinners(hand, tableState.seats, tableState.button);
-    resetHandSeats(tableState.seats);
-    hand.endedAt = now();
-    handComplete = true;
-  } else if (active.length === 0 || (active.length === 1 && remaining.length > 1)) {
-    dealRemainingCommunityCards(hand);
-    hand.street = "SHOWDOWN";
-    settleShowdown(hand, tableState.seats, tableState.button);
-    resetHandSeats(tableState.seats);
-    hand.endedAt = now();
-    handComplete = true;
-  } else if (isBettingRoundComplete(hand, tableState.seats)) {
-    if (hand.street === "RIVER") {
-      settleShowdown(hand, tableState.seats, tableState.button);
-      resetHandSeats(tableState.seats);
-      hand.endedAt = now();
-      handComplete = true;
-    } else {
-      advanceStreet(hand, tableState.seats, tableState.button);
-    }
-  } else {
-    hand.turn = nextActiveSeat(tableState.seats, seatId);
+    endHandByFold(hand, seats, buttonSeat, timestamp);
+    return {
+      state: { ...tableState, version: tableState.version + 1, updatedAt: timestamp },
+      accepted: true,
+      action: actionRecord,
+      handComplete: true,
+    };
   }
 
+  const shouldShowdown = active.length === 0 || (active.length === 1 && remaining.length > 1);
+  if (shouldShowdown) {
+    endHandByShowdown(hand, seats, buttonSeat, timestamp);
+    return {
+      state: { ...tableState, version: tableState.version + 1, updatedAt: timestamp },
+      accepted: true,
+      action: actionRecord,
+      handComplete: true,
+    };
+  }
+
+  const roundComplete = isBettingRoundComplete(hand, seats);
+  if (!roundComplete) {
+    hand.turn = nextActiveSeat(seats, seatId);
+    return {
+      state: { ...tableState, version: tableState.version + 1, updatedAt: timestamp },
+      accepted: true,
+      action: actionRecord,
+      handComplete: false,
+    };
+  }
+
+  if (hand.street === "RIVER") {
+    endHandAtRiver(hand, seats, buttonSeat, timestamp);
+    return {
+      state: { ...tableState, version: tableState.version + 1, updatedAt: timestamp },
+      accepted: true,
+      action: actionRecord,
+      handComplete: true,
+    };
+  }
+
+  advanceStreet(hand, seats, buttonSeat);
+
   return {
-    state: { ...tableState, version: tableState.version + 1, updatedAt: now() },
+    state: { ...tableState, version: tableState.version + 1, updatedAt: timestamp },
     accepted: true,
     action: actionRecord,
-    handComplete,
+    handComplete: false,
   };
 }

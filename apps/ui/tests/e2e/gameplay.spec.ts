@@ -12,7 +12,7 @@ test.describe("gameplay flow", () => {
         contentType: "application/json",
         body: JSON.stringify({
           userId: "user-1",
-          nickname: "TestPlayer",
+          username: "TestPlayer",
           avatarUrl: null,
           stats: { handsPlayed: 10, wins: 3 },
           friends: [],
@@ -95,8 +95,8 @@ test.describe("gameplay flow", () => {
             bettingStructure: "NoLimit",
           },
           seats: [
-            { seatId: 0, userId: "owner-1", nickname: "Owner", stack: 495, status: "active" },
-            { seatId: 1, userId: "user-1", nickname: "TestPlayer", stack: 490, status: "active" },
+            { seatId: 0, userId: "owner-1", username: "Owner", stack: 495, status: "active" },
+            { seatId: 1, userId: "user-1", username: "TestPlayer", stack: 490, status: "active" },
           ],
           spectators: [],
           status: "in_hand",
@@ -231,7 +231,7 @@ test.describe("timer display", () => {
         contentType: "application/json",
         body: JSON.stringify({
           userId: "user-1",
-          nickname: "TestPlayer",
+          username: "TestPlayer",
           avatarUrl: null,
           stats: { handsPlayed: 0, wins: 0 },
           friends: [],

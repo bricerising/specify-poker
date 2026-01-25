@@ -24,6 +24,7 @@ describe("deletionService consumer behavior", () => {
   it("anonymizes and invalidates data on deletion requests", async () => {
     vi.mocked(profileRepository.findById).mockResolvedValue({
       userId: "user-1",
+      username: "user-1",
       nickname: "OldNick",
       avatarUrl: null,
       preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: "auto" },

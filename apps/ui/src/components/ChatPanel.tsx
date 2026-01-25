@@ -5,7 +5,7 @@ const CHAT_COLLAPSED_STORAGE_KEY = "poker.ui.chat.collapsed";
 export interface ChatMessage {
   id: string;
   userId: string;
-  nickname?: string;
+  username?: string;
   text: string;
   ts: string;
 }
@@ -75,7 +75,7 @@ export function ChatPanel({ messages, onSend, error, onCollapseChange }: ChatPan
             ) : (
               messages.map((entry) => (
                 <div key={entry.id} className="chat-message">
-                  <strong>{entry.nickname ?? entry.userId}</strong>: {entry.text}
+                  <strong>{entry.username ?? entry.userId}</strong>: {entry.text}
                 </div>
               ))
             )}

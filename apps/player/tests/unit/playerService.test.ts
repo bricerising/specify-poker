@@ -17,6 +17,7 @@ vi.mock("../../src/services/eventProducer");
 describe("profileService", () => {
   const baseProfile = {
     userId: "user123",
+    username: "user123",
     nickname: "Player123",
     avatarUrl: null,
     preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: "auto" },
@@ -32,30 +33,42 @@ describe("profileService", () => {
   });
 
   it("returns cached profile when available", async () => {
-    vi.mocked(deletedCache.isDeleted).mockResolvedValue(false);
-    vi.mocked(profileCache.get).mockResolvedValue(baseProfile);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2024-01-01T12:00:00Z"));
+    try {
+      vi.mocked(deletedCache.isDeleted).mockResolvedValue(false);
+      vi.mocked(profileCache.get).mockResolvedValue(baseProfile);
 
-    const profile = await profileService.getProfile("user123");
+      const profile = await profileService.getProfile("user123");
 
-    expect(profile.userId).toBe("user123");
-    expect(profileCache.get).toHaveBeenCalledWith("user123");
+      expect(profile.userId).toBe("user123");
+      expect(profileCache.get).toHaveBeenCalledWith("user123");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("updates nickname and invalidates old nickname", async () => {
-    vi.mocked(deletedCache.isDeleted).mockResolvedValue(false);
-    vi.mocked(profileCache.get).mockResolvedValue(baseProfile);
-    vi.mocked(nicknameService.validateNickname).mockImplementation(() => undefined);
-    vi.mocked(nicknameService.isAvailable).mockResolvedValue(true);
-    vi.mocked(profileRepository.update).mockResolvedValue({
-      ...baseProfile,
-      nickname: "NewNick",
-      updatedAt: "2024-02-01T00:00:00Z",
-    });
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2024-01-01T12:00:00Z"));
+    try {
+      vi.mocked(deletedCache.isDeleted).mockResolvedValue(false);
+      vi.mocked(profileCache.get).mockResolvedValue(baseProfile);
+      vi.mocked(nicknameService.validateNickname).mockImplementation(() => undefined);
+      vi.mocked(nicknameService.isAvailable).mockResolvedValue(true);
+      vi.mocked(profileRepository.update).mockResolvedValue({
+        ...baseProfile,
+        nickname: "NewNick",
+        updatedAt: "2024-02-01T00:00:00Z",
+      });
 
-    const updated = await profileService.updateProfile("user123", { nickname: "NewNick" });
+      const updated = await profileService.updateProfile("user123", { nickname: "NewNick" });
 
-    expect(updated.nickname).toBe("NewNick");
-    expect(profileCache.deleteNickname).toHaveBeenCalledWith("Player123");
+      expect(updated.nickname).toBe("NewNick");
+      expect(profileCache.deleteNickname).toHaveBeenCalledWith("Player123");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("tracks referrals on creation", async () => {

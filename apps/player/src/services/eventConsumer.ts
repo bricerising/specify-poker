@@ -2,6 +2,7 @@ import { createClient } from "redis";
 import { getRedisUrl } from "../storage/redisClient";
 import { incrementHandsPlayed, incrementWins } from "./statisticsService";
 import logger from "../observability/logger";
+import { decodeStructLike } from "@specify-poker/shared";
 
 export class EventConsumer {
   private isRunning: boolean = false;
@@ -95,52 +96,13 @@ export class EventConsumer {
       if (!handler) {
         return;
       }
-      const data = this.decodePayload(payload);
+      const data = decodeStructLike(payload);
 
       await handler(data);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "unknown";
       logger.error({ message }, "Error handling event");
     }
-  }
-
-  private decodePayload(payload: unknown): Record<string, unknown> {
-    if (payload && typeof payload === "object") {
-      const record = payload as Record<string, unknown>;
-      if ("fields" in record && record.fields && typeof record.fields === "object") {
-        return this.fromStruct(record as { fields: Record<string, unknown> });
-      }
-      return record;
-    }
-    return {};
-  }
-
-  private fromStruct(struct: { fields: Record<string, unknown> }): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(struct.fields)) {
-      result[key] = this.fromValue(value);
-    }
-    return result;
-  }
-
-  private fromValue(value: unknown): unknown {
-    if (!value || typeof value !== "object") {
-      return value;
-    }
-    const record = value as Record<string, unknown>;
-    if ("stringValue" in record) return record.stringValue as string;
-    if ("numberValue" in record) return record.numberValue as number;
-    if ("boolValue" in record) return record.boolValue as boolean;
-    if ("listValue" in record && record.listValue && typeof record.listValue === "object") {
-      const list = record.listValue as { values?: unknown[] };
-      return (list.values ?? []).map((v) => this.fromValue(v));
-    }
-    if ("structValue" in record && record.structValue && typeof record.structValue === "object") {
-      const struct = record.structValue as { fields: Record<string, unknown> };
-      return this.fromStruct(struct);
-    }
-    if ("nullValue" in record) return null;
-    return value;
   }
 
   stop(): void {

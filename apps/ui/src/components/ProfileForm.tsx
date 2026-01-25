@@ -1,38 +1,40 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 interface ProfileFormProps {
-  initialNickname: string;
+  username: string;
   initialAvatarUrl: string | null;
-  onSave: (input: { nickname: string; avatarUrl: string | null }) => Promise<void> | void;
+  onSave: (input: { avatarUrl: string | null }) => Promise<void> | void;
 }
 
-export function ProfileForm({ initialNickname, initialAvatarUrl, onSave }: ProfileFormProps) {
-  const [nickname, setNickname] = useState(initialNickname);
+export function ProfileForm({ username, initialAvatarUrl, onSave }: ProfileFormProps) {
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl ?? "");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setNickname(initialNickname);
     setAvatarUrl(initialAvatarUrl ?? "");
-  }, [initialNickname, initialAvatarUrl]);
+  }, [initialAvatarUrl]);
 
   const isValid = useMemo(() => {
-    const trimmed = nickname.trim();
-    if (trimmed.length < 2 || trimmed.length > 20) {
+    const trimmed = avatarUrl.trim();
+    if (!trimmed) {
+      return true;
+    }
+    try {
+      const url = new URL(trimmed);
+      return url.protocol === "http:" || url.protocol === "https:";
+    } catch {
       return false;
     }
-    return true;
-  }, [nickname]);
+  }, [avatarUrl]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!isValid) {
-      setError("Nickname must be 2-20 characters.");
+      setError("Avatar URL must be a valid http(s) URL.");
       return;
     }
     setError(null);
     await onSave({
-      nickname: nickname.trim(),
       avatarUrl: avatarUrl.trim() ? avatarUrl.trim() : null,
     });
   };
@@ -42,8 +44,8 @@ export function ProfileForm({ initialNickname, initialAvatarUrl, onSave }: Profi
       <h3>Profile</h3>
       <div className="form-grid">
         <label className="field">
-          <span className="field-label">Nickname</span>
-          <input value={nickname} onChange={(event) => setNickname(event.target.value)} />
+          <span className="field-label">Username</span>
+          <input value={username} disabled />
         </label>
         <label className="field">
           <span className="field-label">Avatar URL</span>

@@ -49,7 +49,10 @@ describe("Lobby WS handler", () => {
     expect(subscribeToChannel).toHaveBeenCalledWith("conn-1", "lobby");
     expect(sendToLocal).toHaveBeenCalledWith(
       "conn-1",
-      expect.objectContaining({ type: "LobbyTablesUpdated", tables: [{ table_id: "t1" }] })
+      expect.objectContaining({
+        type: "LobbyTablesUpdated",
+        tables: [expect.objectContaining({ tableId: "t1", spectatorCount: 0 })],
+      })
     );
   });
 
@@ -64,11 +67,17 @@ describe("Lobby WS handler", () => {
 
     expect(sendToLocal).toHaveBeenCalledWith(
       "conn-1",
-      expect.objectContaining({ type: "LobbyTablesUpdated", tables: [{ table_id: "t1" }] })
+      expect.objectContaining({
+        type: "LobbyTablesUpdated",
+        tables: [expect.objectContaining({ tableId: "t1", spectatorCount: 0 })],
+      })
     );
     expect(sendToLocal).toHaveBeenCalledWith(
       "conn-2",
-      expect.objectContaining({ type: "LobbyTablesUpdated", tables: [{ table_id: "t1" }] })
+      expect.objectContaining({
+        type: "LobbyTablesUpdated",
+        tables: [expect.objectContaining({ tableId: "t1", spectatorCount: 0 })],
+      })
     );
   });
 });

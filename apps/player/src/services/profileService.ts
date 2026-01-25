@@ -22,6 +22,7 @@ function deletedProfile(userId: string): Profile {
   const now = new Date().toISOString();
   return {
     userId,
+    username: DELETED_NICKNAME,
     nickname: DELETED_NICKNAME,
     avatarUrl: null,
     preferences: {
@@ -54,20 +55,38 @@ function isValidAvatarUrl(value: string): boolean {
   }
 }
 
-export async function getProfile(userId: string, referrerId?: string): Promise<Profile> {
+function normalizeUsername(value: string | undefined): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+export async function getProfile(userId: string, referrerId?: string, username?: string): Promise<Profile> {
   if (await deletedCache.isDeleted(userId)) {
     return deletedProfile(userId);
   }
 
+  const desiredUsername = normalizeUsername(username);
   const cached = await profileCache.get(userId);
   if (cached) {
     const nowIso = new Date().toISOString();
-    if (!sameDay(cached.lastLoginAt, nowIso)) {
-      const updated: Profile = { ...cached, lastLoginAt: nowIso, updatedAt: nowIso };
-      await profileRepository.update(updated);
-      await profileCache.set(updated);
-      await publishEvent("DAILY_LOGIN", { userId, date: nowIso.split("T")[0] }, userId);
-      return updated;
+    const shouldUpdateLogin = !sameDay(cached.lastLoginAt, nowIso);
+    const shouldUpdateUsername = Boolean(desiredUsername) && desiredUsername !== cached.username;
+    if (shouldUpdateLogin || shouldUpdateUsername) {
+      const updated: Profile = {
+        ...cached,
+        ...(shouldUpdateLogin ? { lastLoginAt: nowIso } : {}),
+        ...(shouldUpdateUsername ? { username: desiredUsername! } : {}),
+        updatedAt: nowIso,
+      };
+      const saved = await profileRepository.update(updated);
+      await profileCache.set(saved);
+      if (shouldUpdateLogin) {
+        await publishEvent("DAILY_LOGIN", { userId, date: nowIso.split("T")[0] }, userId);
+      }
+      return saved;
     }
     return cached;
   }
@@ -79,11 +98,20 @@ export async function getProfile(userId: string, referrerId?: string): Promise<P
       return deletedProfile(userId);
     }
     const nowIso = new Date().toISOString();
-    if (!sameDay(existing.lastLoginAt, nowIso)) {
-      const updated: Profile = { ...existing, lastLoginAt: nowIso, updatedAt: nowIso };
+    const shouldUpdateLogin = !sameDay(existing.lastLoginAt, nowIso);
+    const shouldUpdateUsername = Boolean(desiredUsername) && desiredUsername !== existing.username;
+    if (shouldUpdateLogin || shouldUpdateUsername) {
+      const updated: Profile = {
+        ...existing,
+        ...(shouldUpdateLogin ? { lastLoginAt: nowIso } : {}),
+        ...(shouldUpdateUsername ? { username: desiredUsername! } : {}),
+        updatedAt: nowIso,
+      };
       const saved = await profileRepository.update(updated);
       await profileCache.set(saved);
-      await publishEvent("DAILY_LOGIN", { userId, date: nowIso.split("T")[0] }, userId);
+      if (shouldUpdateLogin) {
+        await publishEvent("DAILY_LOGIN", { userId, date: nowIso.split("T")[0] }, userId);
+      }
       return saved;
     }
     await profileCache.set(existing);
@@ -92,7 +120,7 @@ export async function getProfile(userId: string, referrerId?: string): Promise<P
 
   const nickname = await generateNickname(userId);
   const now = new Date();
-  const profile = defaultProfile(userId, nickname, now);
+  const profile = defaultProfile(userId, nickname, now, desiredUsername ?? "");
 
   if (referrerId && referrerId !== userId) {
     profile.referredBy = referrerId;

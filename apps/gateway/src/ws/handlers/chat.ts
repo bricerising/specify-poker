@@ -1,6 +1,8 @@
 import { randomUUID } from "crypto";
 import WebSocket from "ws";
-import { context, trace, SpanStatusCode, ROOT_CONTEXT } from "@opentelemetry/api";
+import type { z } from "zod";
+import { wsClientMessageSchema } from "@specify-poker/shared";
+
 import { gameClient, playerClient } from "../../grpc/clients";
 import { WsPubSubMessage } from "../pubsub";
 import { checkWsRateLimit, parseChatMessage, parseTableId } from "../validators";
@@ -8,25 +10,18 @@ import { subscribeToChannel, unsubscribeFromChannel, unsubscribeAll, getSubscrib
 import { getLocalConnectionMeta, sendToLocal } from "../localRegistry";
 import { broadcastToChannel } from "../../services/broadcastService";
 import { saveChatMessage, getChatHistory } from "../../storage/chatStore";
-import logger from "../../observability/logger";
+import { parseJsonObject } from "../messageParsing";
+import { attachWsRouter } from "../router";
 
-function rawDataToString(data: WebSocket.RawData): string {
-  if (typeof data === "string") return data;
-  if (Buffer.isBuffer(data)) return data.toString("utf8");
-  if (Array.isArray(data)) return Buffer.concat(data).toString("utf8");
-  return Buffer.from(data).toString("utf8");
-}
+type WsClientMessage = z.infer<typeof wsClientMessageSchema>;
 
-function parseJsonObject(data: WebSocket.RawData): Record<string, unknown> | null {
-  try {
-    const parsed: unknown = JSON.parse(rawDataToString(data));
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return null;
-    }
-    return parsed as Record<string, unknown>;
-  } catch {
+function parseClientMessage(data: WebSocket.RawData): WsClientMessage | null {
+  const obj = parseJsonObject(data);
+  if (!obj) {
     return null;
   }
+  const parsed = wsClientMessageSchema.safeParse(obj);
+  return parsed.success ? parsed.data : null;
 }
 
 export async function handleChatPubSubEvent(message: WsPubSubMessage) {
@@ -78,15 +73,15 @@ async function isMuted(tableId: string, userId: string): Promise<boolean> {
   });
 }
 
-async function getNickname(userId: string): Promise<string> {
+async function getUsername(userId: string): Promise<string> {
   return new Promise((resolve) => {
     playerClient.GetProfile({ user_id: userId }, (err, response) => {
-      const nickname = response?.profile?.nickname;
-      if (err || typeof nickname !== "string" || nickname.trim().length === 0) {
+      const username = response?.profile?.username;
+      if (err || typeof username !== "string" || username.trim().length === 0) {
         resolve("Unknown");
         return;
       }
-      resolve(nickname);
+      resolve(username);
     });
   });
 }
@@ -135,11 +130,11 @@ async function handleChatSend(
     return;
   }
 
-  const nickname = await getNickname(userId);
+  const username = await getUsername(userId);
   const chatMessage = {
     id: randomUUID(),
     userId: userId,
-    nickname,
+    username,
     text: parsed.text,
     ts: new Date().toISOString(),
   };
@@ -153,60 +148,48 @@ async function handleChatSend(
 }
 
 export function attachChatHub(socket: WebSocket, userId: string, connectionId: string) {
-  socket.on("message", async (data) => {
-    const message = parseJsonObject(data);
-    if (!message) {
-      return;
-    }
-
-    const type = typeof message.type === "string" ? message.type : null;
-    const tableId = parseTableId(message.tableId);
-
-    const tracer = trace.getTracer("gateway-ws");
-    const attributes: Record<string, string> = {};
-    if (type) {
-      attributes["ws.message_type"] = type;
-    }
-    if (tableId) {
-      attributes["poker.table_id"] = tableId;
-    }
-
-    const span = tracer.startSpan("ws.chat", { attributes }, ROOT_CONTEXT);
-    try {
-      await context.with(trace.setSpan(ROOT_CONTEXT, span), async () => {
-        switch (type) {
-          case "SubscribeChat": {
-            if (!tableId) return;
-            await handleSubscribe(connectionId, tableId);
-            return;
-          }
-          case "UnsubscribeChat": {
-            if (!tableId) return;
-            await handleUnsubscribe(connectionId, tableId);
-            return;
-          }
-          case "ChatSend": {
-            if (!tableId) return;
-            await handleChatSend(connectionId, userId, { tableId, message: message.message });
-            return;
-          }
-          default:
-            return;
+  attachWsRouter(socket, {
+    hubName: "chat",
+    parseMessage: parseClientMessage,
+    getAttributes: (message) => {
+      return "tableId" in message && typeof message.tableId === "string"
+        ? { "poker.table_id": message.tableId }
+        : {};
+    },
+    handlers: {
+      SubscribeChat: async (message) => {
+        if (message.type !== "SubscribeChat") {
+          return;
         }
-      });
-    } catch (err: unknown) {
-      span.recordException(err as Error);
-      const message = err instanceof Error ? err.message : "unknown_error";
-      span.setStatus({ code: SpanStatusCode.ERROR, message });
-      context.with(trace.setSpan(ROOT_CONTEXT, span), () => {
-        logger.error({ err, type, tableId }, "ws.chat.failed");
-      });
-    } finally {
-      span.end();
-    }
-  });
-
-  socket.on("close", async () => {
-    await unsubscribeAll(connectionId);
+        const tableId = parseTableId(message.tableId);
+        if (!tableId) {
+          return;
+        }
+        await handleSubscribe(connectionId, tableId);
+      },
+      UnsubscribeChat: async (message) => {
+        if (message.type !== "UnsubscribeChat") {
+          return;
+        }
+        const tableId = parseTableId(message.tableId);
+        if (!tableId) {
+          return;
+        }
+        await handleUnsubscribe(connectionId, tableId);
+      },
+      ChatSend: async (message) => {
+        if (message.type !== "ChatSend") {
+          return;
+        }
+        const tableId = parseTableId(message.tableId);
+        if (!tableId) {
+          return;
+        }
+        await handleChatSend(connectionId, userId, { tableId, message: message.message });
+      },
+    },
+    onClose: async () => {
+      await unsubscribeAll(connectionId);
+    },
   });
 }

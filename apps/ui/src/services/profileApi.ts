@@ -2,7 +2,7 @@ import { apiFetch } from "./apiClient";
 
 export interface UserProfile {
   userId: string;
-  nickname: string;
+  username: string;
   avatarUrl: string | null;
   stats: {
     handsPlayed: number;
@@ -16,7 +16,7 @@ export async function fetchProfile() {
   return (await response.json()) as UserProfile;
 }
 
-export async function updateProfile(input: { nickname: string; avatarUrl: string | null }) {
+export async function updateProfile(input: { avatarUrl: string | null }) {
   const response = await apiFetch("/api/me", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },

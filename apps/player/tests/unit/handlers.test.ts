@@ -20,6 +20,7 @@ describe("gRPC Handlers", () => {
     it("should return profile", async () => {
       const mockProfile = {
         userId: "user1",
+        username: "user1",
         nickname: "Nick",
         avatarUrl: null,
         preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: "auto" },
@@ -37,9 +38,9 @@ describe("gRPC Handlers", () => {
       >;
       await handlers.GetProfile(call, callback);
 
-      expect(profileService.getProfile).toHaveBeenCalledWith("user1", "ref1");
+      expect(profileService.getProfile).toHaveBeenCalledWith("user1", "ref1", undefined);
       expect(callback).toHaveBeenCalledWith(null, {
-        profile: expect.objectContaining({ userId: "user1", nickname: "Nick" }),
+        profile: expect.objectContaining({ userId: "user1", username: "user1", nickname: "Nick" }),
       });
     });
   });
@@ -48,6 +49,7 @@ describe("gRPC Handlers", () => {
     it("should update and return profile", async () => {
       const mockProfile = {
         userId: "user1",
+        username: "user1",
         nickname: "NewNick",
         avatarUrl: "https://example.com/avatar.png",
         preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: "auto" },
@@ -66,7 +68,7 @@ describe("gRPC Handlers", () => {
       await handlers.UpdateProfile(call, callback);
 
       expect(callback).toHaveBeenCalledWith(null, {
-        profile: expect.objectContaining({ userId: "user1", nickname: "NewNick" }),
+        profile: expect.objectContaining({ userId: "user1", username: "user1", nickname: "NewNick" }),
       });
     });
   });

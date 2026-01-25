@@ -18,6 +18,7 @@ describe("storage repositories", () => {
       rows: [
         {
           user_id: "user-1",
+          username: "user-1",
           nickname: "Nick",
           avatar_url: null,
           preferences: { soundEnabled: false },
@@ -40,13 +41,14 @@ describe("storage repositories", () => {
     vi.mocked(query)
       .mockResolvedValueOnce({
         rows: [
-          {
-            user_id: "user-1",
-            nickname: "Nick",
-            avatar_url: null,
-            preferences: {},
-            last_login_at: null,
-            referred_by: null,
+        {
+          user_id: "user-1",
+          username: "user-1",
+          nickname: "Nick",
+          avatar_url: null,
+          preferences: {},
+          last_login_at: null,
+          referred_by: null,
             created_at: new Date("2024-01-01T00:00:00Z"),
             updated_at: new Date("2024-01-01T00:00:00Z"),
             deleted_at: null,
@@ -55,13 +57,14 @@ describe("storage repositories", () => {
       } as never)
       .mockResolvedValueOnce({
         rows: [
-          {
-            user_id: "user-1",
-            nickname: "Nick2",
-            avatar_url: null,
-            preferences: {},
-            last_login_at: null,
-            referred_by: null,
+        {
+          user_id: "user-1",
+          username: "user-1",
+          nickname: "Nick2",
+          avatar_url: null,
+          preferences: {},
+          last_login_at: null,
+          referred_by: null,
             created_at: new Date("2024-01-01T00:00:00Z"),
             updated_at: new Date("2024-01-01T00:00:00Z"),
             deleted_at: null,
@@ -71,6 +74,7 @@ describe("storage repositories", () => {
 
     const createResult = await profileRepository.create({
       userId: "user-1",
+      username: "user-1",
       nickname: "Nick",
       avatarUrl: null,
       preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: "auto" },
@@ -92,6 +96,7 @@ describe("storage repositories", () => {
       rows: [
         {
           user_id: "user-2",
+          username: "user-2",
           nickname: "Lucky",
           avatar_url: null,
           preferences: {},
@@ -114,6 +119,7 @@ describe("storage repositories", () => {
       rows: [
         {
           user_id: "user-3",
+          username: "user-3",
           nickname: "Upserted",
           avatar_url: null,
           preferences: {},
@@ -128,6 +134,7 @@ describe("storage repositories", () => {
 
     await profileRepository.upsert({
       userId: "user-3",
+      username: "user-3",
       nickname: "Upserted",
       avatarUrl: null,
       preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: "auto" },

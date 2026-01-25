@@ -23,6 +23,7 @@ vi.mock("../../src/storage/friendsCache");
 describe("Player service consumer architecture", () => {
   const baseProfile = {
     userId: "user-1",
+    username: "user-1",
     nickname: "PlayerOne",
     avatarUrl: "https://example.com/avatar.png",
     preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: "auto" },

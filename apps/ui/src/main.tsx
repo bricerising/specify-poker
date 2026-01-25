@@ -148,7 +148,7 @@ function PokerApp() {
       <div className="header-actions">
         <div className="user-badge">
           <div className="user-label">Signed in</div>
-          <div className="user-value">{profile ? profile.nickname : "Player"}</div>
+          <div className="user-value">{profile ? profile.username : "Player"}</div>
         </div>
         <button type="button" className="btn btn-ghost" onClick={handleClearToken}>
           Sign out

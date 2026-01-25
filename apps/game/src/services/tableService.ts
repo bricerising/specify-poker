@@ -1,7 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import {
   ActionInput,
-  HandState,
   Seat,
   Table,
   TableConfig,
@@ -11,8 +10,6 @@ import {
 import { applyAction, startHand } from "../engine/handEngine";
 import { deriveLegalActions } from "../engine/actionRules";
 import { calculatePots } from "../engine/potCalculator";
-import { balanceClient, eventClient } from "../api/grpc/clients";
-import redisClient from "../storage/redisClient";
 import { tableStore } from "../storage/tableStore";
 import { tableStateStore } from "../storage/tableStateStore";
 import {
@@ -27,13 +24,12 @@ import {
   setSpectatorCount,
 } from "../observability/metrics";
 
-type BalanceReservation = { ok: boolean; reservation_id?: string; error?: string };
-type BalanceCommit = { ok: boolean; error?: string };
-type BalanceCashOut = { ok: boolean; error?: string };
-type BalanceSettle = { ok: boolean; error?: string };
-type EventPublish = { success: boolean };
-
-const WS_PUBSUB_CHANNEL = "gateway:ws:events";
+import {
+  balanceClientAdapter,
+} from "./table/balanceClientAdapter";
+import { gatewayWsPublisher } from "./table/gatewayWsPublisher";
+import { gameEventPublisher } from "./table/gameEventPublisher";
+import { redactTableState } from "./table/tableViewBuilder";
 
 function toNumber(value: unknown, fallback = 0) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -120,75 +116,12 @@ export class TableService {
     state.version += 1;
     state.updatedAt = this.now();
     await tableStateStore.save(state);
-    await this.publishTableState(table, state);
+    await gatewayWsPublisher.publishTableState(table, state);
     return state;
   }
 
   private idempotencyKey(operation: string, tableId: string, userId: string) {
     return `${operation}:${tableId}:${userId}:${Date.now()}`;
-  }
-
-  private buildTableStateView(table: Table, state: TableState) {
-    const hand = state.hand ? this.redactHandState(state.hand) : null;
-    return {
-      tableId: table.tableId,
-      name: table.name,
-      ownerId: table.ownerId,
-      config: table.config,
-      status: table.status,
-      hand,
-      version: state.version,
-      seats: state.seats.map((seat) => ({ ...seat, holeCards: null })),
-      spectators: state.spectators,
-      updatedAt: state.updatedAt,
-      button: state.button,
-    };
-  }
-
-  private redactHandState(hand: HandState) {
-    return {
-      handId: hand.handId,
-      tableId: hand.tableId,
-      street: hand.street,
-      communityCards: hand.communityCards,
-      pots: hand.pots,
-      currentBet: hand.currentBet,
-      minRaise: hand.minRaise,
-      turn: hand.turn,
-      lastAggressor: hand.lastAggressor,
-      actions: hand.actions,
-      rakeAmount: hand.rakeAmount,
-      startedAt: hand.startedAt,
-      winners: hand.winners,
-      endedAt: hand.endedAt ?? null,
-    };
-  }
-
-  private async publishTableState(table: Table, state: TableState) {
-    const payload = { type: "TableSnapshot", tableState: this.buildTableStateView(table, state) };
-    await redisClient.publish(
-      WS_PUBSUB_CHANNEL,
-      JSON.stringify({ channel: "table", tableId: table.tableId, payload, sourceId: "game-service" }),
-    );
-  }
-
-  private async publishLobbyUpdate(tables: TableSummary[]) {
-    await redisClient.publish(
-      WS_PUBSUB_CHANNEL,
-      JSON.stringify({
-        channel: "lobby",
-        tableId: "lobby",
-        payload: { type: "LobbyTablesUpdated", tables },
-        sourceId: "game-service",
-      }),
-    );
-  }
-
-  private redactTableState(state: TableState): TableState {
-    return {
-      ...state,
-      seats: state.seats.map((seat) => ({ ...seat, holeCards: null })),
-    };
   }
 
   private async loadTableAndState(tableId: string) {
@@ -201,8 +134,8 @@ export class TableService {
   }
 
   private async publishTableAndLobby(table: Table, state: TableState) {
-    await this.publishTableState(table, state);
-    await this.publishLobbyUpdate(await this.listTableSummaries());
+    await gatewayWsPublisher.publishTableState(table, state);
+    await gatewayWsPublisher.publishLobbyUpdate(await this.listTableSummaries());
   }
 
   async createTable(name: string, ownerId: string, configInput: TableConfig): Promise<Table> {
@@ -237,8 +170,7 @@ export class TableService {
 
     await tableStore.save(table);
     await tableStateStore.save(state);
-    await this.publishTableState(table, state);
-    await this.publishLobbyUpdate(await this.listTableSummaries());
+    await this.publishTableAndLobby(table, state);
     return table;
   }
 
@@ -300,7 +232,7 @@ export class TableService {
     if (!table) return false;
     await tableStore.delete(tableId, table.ownerId);
     await tableStateStore.delete(tableId);
-    await this.publishLobbyUpdate(await this.listTableSummaries());
+    await gatewayWsPublisher.publishLobbyUpdate(await this.listTableSummaries());
     return true;
   }
 
@@ -317,7 +249,7 @@ export class TableService {
     }
     const seat = userId ? this.resolveSeatForUser(state, userId) : undefined;
     const holeCards = seat?.holeCards ?? [];
-    return { state: this.redactTableState(state), holeCards };
+    return { state: redactTableState(state), holeCards };
   }
 
   async joinSeat(tableId: string, userId: string, seatId: number, buyInAmount: number) {
@@ -356,20 +288,12 @@ export class TableService {
     await this.publishTableAndLobby(table, state);
 
     try {
-      const reservation = await new Promise<BalanceReservation>((resolve, reject) => {
-        balanceClient.ReserveForBuyIn(
-          {
-            account_id: userId,
-            table_id: tableId,
-            amount: finalBuyIn,
-            idempotency_key: this.idempotencyKey("reserve", tableId, userId),
-            timeout_seconds: 30,
-          },
-          (err: Error | null, response: unknown) => {
-            if (err) reject(err);
-            else resolve(response as BalanceReservation);
-          },
-        );
+      const reservation = await balanceClientAdapter.reserveForBuyIn({
+        account_id: userId,
+        table_id: tableId,
+        amount: finalBuyIn,
+        idempotency_key: this.idempotencyKey("reserve", tableId, userId),
+        timeout_seconds: 30,
       });
 
       const reservationId = reservation.reservation_id;
@@ -379,15 +303,7 @@ export class TableService {
         return { ok: false, error: reservation.error || "INSUFFICIENT_BALANCE" };
       }
 
-      const commit = await new Promise<BalanceCommit>((resolve, reject) => {
-        balanceClient.CommitReservation(
-          { reservation_id: reservationId },
-          (err: Error | null, response: unknown) => {
-            if (err) reject(err);
-            else resolve(response as BalanceCommit);
-          },
-        );
-      });
+      const commit = await balanceClientAdapter.commitReservation({ reservation_id: reservationId });
 
       if (!commit.ok) {
         await this.rollbackSeat(tableId, seatId, userId, reservation.reservation_id);
@@ -455,10 +371,7 @@ export class TableService {
 
   private async rollbackSeat(tableId: string, seatId: number, userId: string, reservationId?: string) {
     if (reservationId) {
-      balanceClient.ReleaseReservation(
-        { reservation_id: reservationId, reason: "buy_in_failed" },
-        () => undefined,
-      );
+      balanceClientAdapter.releaseReservation({ reservation_id: reservationId, reason: "buy_in_failed" });
     }
     const state = await tableStateStore.get(tableId);
     if (state) {
@@ -474,7 +387,7 @@ export class TableService {
         await tableStateStore.save(state);
         const table = await tableStore.get(tableId);
         if (table) {
-          await this.publishTableState(table, state);
+          await gatewayWsPublisher.publishTableState(table, state);
         }
       }
     }
@@ -532,20 +445,12 @@ export class TableService {
 
       if (shouldCashOut) {
         try {
-          const cashOut = await new Promise<BalanceCashOut>((resolve, reject) => {
-            balanceClient.ProcessCashOut(
-              {
-                account_id: userId,
-                table_id: tableId,
-                seat_id: seat.seatId,
-                amount: remainingStack,
-                idempotency_key: this.idempotencyKey("cashout", tableId, userId),
-              },
-              (err: Error | null, response: unknown) => {
-                if (err) reject(err);
-                else resolve(response as BalanceCashOut);
-              },
-            );
+          const cashOut = await balanceClientAdapter.processCashOut({
+            account_id: userId,
+            table_id: tableId,
+            seat_id: seat.seatId,
+            amount: remainingStack,
+            idempotency_key: this.idempotencyKey("cashout", tableId, userId),
           });
           if (!cashOut.ok) {
             void this.emitGameEvent(tableId, undefined, userId, seat.seatId, "CASHOUT_FAILED", { amount: remainingStack });
@@ -563,20 +468,12 @@ export class TableService {
 
     if (remainingStack > 0) {
       try {
-        const cashOut = await new Promise<BalanceCashOut>((resolve, reject) => {
-          balanceClient.ProcessCashOut(
-            {
-              account_id: userId,
-              table_id: tableId,
-              seat_id: seat.seatId,
-              amount: remainingStack,
-              idempotency_key: this.idempotencyKey("cashout", tableId, userId),
-            },
-            (err: Error | null, response: unknown) => {
-              if (err) reject(err);
-              else resolve(response as BalanceCashOut);
-            },
-          );
+        const cashOut = await balanceClientAdapter.processCashOut({
+          account_id: userId,
+          table_id: tableId,
+          seat_id: seat.seatId,
+          amount: remainingStack,
+          idempotency_key: this.idempotencyKey("cashout", tableId, userId),
         });
         if (!cashOut.ok) {
           void this.emitGameEvent(tableId, undefined, userId, seat.seatId, "CASHOUT_FAILED", { amount: remainingStack });
@@ -657,7 +554,7 @@ export class TableService {
     recordAction(action.type);
 
     await tableStateStore.save(result.state);
-    await this.publishTableState(table, result.state);
+    await gatewayWsPublisher.publishTableState(table, result.state);
 
     void this.emitGameEvent(tableId, result.state.hand?.handId, userId, seat.seatId, action.type, {
       amount: action.amount ?? 0,
@@ -820,19 +717,11 @@ export class TableService {
         });
 
         try {
-          const settle = await new Promise<BalanceSettle>((resolve, reject) => {
-            balanceClient.SettlePot(
-              {
-                table_id: table.tableId,
-                hand_id: hand.handId,
-                winners: winnersToSettle,
-                idempotency_key: this.idempotencyKey("settle", table.tableId, hand.handId),
-              },
-              (err: Error | null, response: unknown) => {
-                if (err) reject(err);
-                else resolve(response as BalanceSettle);
-              },
-            );
+          const settle = await balanceClientAdapter.settlePot({
+            table_id: table.tableId,
+            hand_id: hand.handId,
+            winners: winnersToSettle,
+            idempotency_key: this.idempotencyKey("settle", table.tableId, hand.handId),
           });
           if (!settle.ok) {
             void this.emitGameEvent(table.tableId, hand.handId, undefined, undefined, "SETTLEMENT_FAILED", {
@@ -853,8 +742,7 @@ export class TableService {
     table.status = "WAITING";
     await tableStore.save(table);
     await tableStateStore.save(state);
-    await this.publishTableState(table, state);
-    await this.publishLobbyUpdate(await this.listTableSummaries());
+    await this.publishTableAndLobby(table, state);
 
     setTimeout(async () => {
       const freshState = await tableStateStore.get(state.tableId);
@@ -873,50 +761,14 @@ export class TableService {
     type: string,
     payload: Record<string, unknown>,
   ) {
-    try {
-      const response = await new Promise<EventPublish>((resolve, reject) => {
-        eventClient.PublishEvent(
-          {
-            type,
-            table_id: tableId,
-            hand_id: handId,
-            user_id: userId,
-            seat_id: seatId,
-            payload: this.toStruct(payload),
-            idempotency_key: uuidv4(),
-          },
-          (err: Error | null, resp: unknown) => {
-            if (err) reject(err);
-            else resolve(resp as EventPublish);
-          },
-        );
-      });
-      if (!response.success) {
-        console.error("Failed to emit game event");
-      }
-    } catch (err) {
-      console.error("Failed to emit game event:", err);
-    }
-  }
-
-  private toStruct(obj: Record<string, unknown>) {
-    const struct: { fields: Record<string, unknown> } = { fields: {} };
-    for (const [key, value] of Object.entries(obj)) {
-      struct.fields[key] = this.toValue(value);
-    }
-    return struct;
-  }
-
-  private toValue(value: unknown): Record<string, unknown> {
-    if (typeof value === "string") return { stringValue: value };
-    if (typeof value === "number") return { numberValue: value };
-    if (typeof value === "boolean") return { boolValue: value };
-    if (Array.isArray(value)) {
-      return { listValue: { values: value.map((entry) => this.toValue(entry)) } };
-    }
-    if (value === null || value === undefined) return { nullValue: "NULL_VALUE" };
-    if (typeof value === "object") return { structValue: this.toStruct(value as Record<string, unknown>) };
-    return { stringValue: String(value) };
+    await gameEventPublisher.publish({
+      type,
+      tableId,
+      handId,
+      userId,
+      seatId,
+      payload,
+    });
   }
 
 }

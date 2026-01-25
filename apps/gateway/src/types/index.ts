@@ -105,7 +105,7 @@ export interface GameServiceClient {
 }
 
 export interface PlayerServiceClient {
-    GetProfile(request: { user_id: string }, callback: UnaryCallback<{ profile: Record<string, unknown> }>): void;
+    GetProfile(request: { user_id: string; referrer_id?: string; username?: string }, callback: UnaryCallback<{ profile: Record<string, unknown> }>): void;
     UpdateProfile(
         request: {
             user_id: string;

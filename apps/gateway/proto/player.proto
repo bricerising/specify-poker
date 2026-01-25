@@ -40,6 +40,7 @@ message Profile {
   string referred_by = 6;
   string created_at = 7;
   string updated_at = 8;
+  string username = 9;
 }
 
 message Statistics {
@@ -64,6 +65,7 @@ message FriendProfile {
 message GetProfileRequest {
   string user_id = 1;
   string referrer_id = 2;
+  string username = 3;
 }
 
 message GetProfileResponse {

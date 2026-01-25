@@ -2,10 +2,11 @@ import { PoolClient } from "pg";
 import { query } from "./db";
 import { Profile, UserPreferences } from "../domain/types";
 
-const profileColumns = `user_id, nickname, avatar_url, preferences, last_login_at, referred_by, created_at, updated_at, deleted_at`;
+const profileColumns = `user_id, username, nickname, avatar_url, preferences, last_login_at, referred_by, created_at, updated_at, deleted_at`;
 
 interface ProfileRow {
   user_id: string;
+  username: string;
   nickname: string;
   avatar_url: string | null;
   preferences: unknown;
@@ -37,6 +38,7 @@ function mapPreferences(value: unknown): UserPreferences {
 function mapProfile(row: ProfileRow): Profile {
   return {
     userId: row.user_id,
+    username: row.username,
     nickname: row.nickname,
     avatarUrl: row.avatar_url,
     preferences: mapPreferences(row.preferences),
@@ -90,12 +92,13 @@ export async function create(
   profile: Profile,
   client?: PoolClient,
 ): Promise<{ profile: Profile; created: boolean }> {
-  const sql = `INSERT INTO profiles (user_id, nickname, avatar_url, preferences, last_login_at, referred_by, created_at, updated_at, deleted_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+  const sql = `INSERT INTO profiles (user_id, username, nickname, avatar_url, preferences, last_login_at, referred_by, created_at, updated_at, deleted_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      ON CONFLICT (user_id) DO NOTHING
      RETURNING ${profileColumns}`;
   const params = [
     profile.userId,
+    profile.username,
     profile.nickname,
     profile.avatarUrl,
     profile.preferences,
@@ -128,17 +131,19 @@ export async function create(
 
 export async function update(profile: Profile, client?: PoolClient): Promise<Profile> {
   const sql = `UPDATE profiles
-     SET nickname = $2,
-         avatar_url = $3,
-         preferences = $4,
-         last_login_at = $5,
-         referred_by = $6,
-         updated_at = $7,
-         deleted_at = $8
+     SET username = $2,
+         nickname = $3,
+         avatar_url = $4,
+         preferences = $5,
+         last_login_at = $6,
+         referred_by = $7,
+         updated_at = $8,
+         deleted_at = $9
      WHERE user_id = $1
      RETURNING ${profileColumns}`;
   const params = [
     profile.userId,
+    profile.username,
     profile.nickname,
     profile.avatarUrl,
     profile.preferences,
@@ -155,10 +160,11 @@ export async function update(profile: Profile, client?: PoolClient): Promise<Pro
 
 export async function upsert(profile: Profile): Promise<Profile> {
   const result = await query<ProfileRow>(
-    `INSERT INTO profiles (user_id, nickname, avatar_url, preferences, last_login_at, referred_by, created_at, updated_at, deleted_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `INSERT INTO profiles (user_id, username, nickname, avatar_url, preferences, last_login_at, referred_by, created_at, updated_at, deleted_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      ON CONFLICT (user_id)
-     DO UPDATE SET nickname = EXCLUDED.nickname,
+     DO UPDATE SET username = EXCLUDED.username,
+                  nickname = EXCLUDED.nickname,
                   avatar_url = EXCLUDED.avatar_url,
                   preferences = EXCLUDED.preferences,
                   last_login_at = EXCLUDED.last_login_at,
@@ -168,6 +174,7 @@ export async function upsert(profile: Profile): Promise<Profile> {
      RETURNING ${profileColumns}`,
     [
       profile.userId,
+      profile.username,
       profile.nickname,
       profile.avatarUrl,
       profile.preferences,
@@ -187,6 +194,7 @@ export async function softDelete(userId: string, deletedAt: Date): Promise<void>
     `UPDATE profiles
      SET deleted_at = $2,
          nickname = 'Deleted User',
+         username = 'Deleted User',
          avatar_url = NULL,
          preferences = $3,
          updated_at = $2

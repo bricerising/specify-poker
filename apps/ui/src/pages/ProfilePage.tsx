@@ -45,7 +45,7 @@ export function ProfilePage({ onProfileUpdated }: ProfilePageProps) {
     span.end();
   }, [profile?.userId]);
 
-  const handleSave = async (input: { nickname: string; avatarUrl: string | null }) => {
+  const handleSave = async (input: { avatarUrl: string | null }) => {
     try {
       const updated = await updateProfile(input);
       setProfile(updated);
@@ -61,7 +61,7 @@ export function ProfilePage({ onProfileUpdated }: ProfilePageProps) {
     return <div>{status === "loading" ? "Loading profile..." : "Profile unavailable."}</div>;
   }
 
-  const initials = profile.nickname.slice(0, 2).toUpperCase();
+  const initials = profile.username.slice(0, 2).toUpperCase();
 
   return (
     <section className="page">
@@ -76,14 +76,14 @@ export function ProfilePage({ onProfileUpdated }: ProfilePageProps) {
           <div className="profile-summary">
             <div className="avatar">
               {profile.avatarUrl ? (
-                <img src={profile.avatarUrl} alt={`${profile.nickname} avatar`} />
+                <img src={profile.avatarUrl} alt={`${profile.username} avatar`} />
               ) : (
                 <span>{initials}</span>
               )}
             </div>
             <div>
-              <div className="meta-line">Nickname</div>
-              <div className="table-name">{profile.nickname}</div>
+              <div className="meta-line">Username</div>
+              <div className="table-name">{profile.username}</div>
             </div>
           </div>
           <div className="stat-grid">
@@ -98,7 +98,7 @@ export function ProfilePage({ onProfileUpdated }: ProfilePageProps) {
           </div>
         </div>
         <ProfileForm
-          initialNickname={profile.nickname}
+          username={profile.username}
           initialAvatarUrl={profile.avatarUrl}
           onSave={handleSave}
         />

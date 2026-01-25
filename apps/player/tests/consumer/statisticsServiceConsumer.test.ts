@@ -44,15 +44,19 @@ describe("statisticsService consumer behavior", () => {
     vi.mocked(profileRepository.findById).mockResolvedValue(null);
     vi.mocked(nicknameService.generateNickname).mockResolvedValue("PlayerAuto");
     vi.mocked(profileRepository.create).mockResolvedValue({
-      userId: "user-2",
-      nickname: "PlayerAuto",
-      avatarUrl: null,
-      preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: "auto" },
-      lastLoginAt: "2024-01-01T00:00:00Z",
-      referredBy: null,
-      createdAt: "2024-01-01T00:00:00Z",
-      updatedAt: "2024-01-01T00:00:00Z",
-      deletedAt: null,
+      profile: {
+        userId: "user-2",
+        username: "",
+        nickname: "PlayerAuto",
+        avatarUrl: null,
+        preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: "auto" },
+        lastLoginAt: "2024-01-01T00:00:00Z",
+        referredBy: null,
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+        deletedAt: null,
+      },
+      created: true,
     });
     vi.mocked(statisticsRepository.upsert).mockImplementation(async (stats) => ({
       ...stats,

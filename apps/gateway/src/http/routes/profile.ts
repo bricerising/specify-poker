@@ -37,12 +37,34 @@ function toNumber(value: unknown, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function normalizeUsernameFromClaims(claims: Record<string, unknown> | undefined): string | null {
+  const candidates = [
+    claims?.preferred_username,
+    claims?.username,
+    claims?.nickname,
+    claims?.email,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate !== "string") {
+      continue;
+    }
+    const trimmed = candidate.trim();
+    if (trimmed.length > 0) {
+      return trimmed;
+    }
+  }
+
+  return null;
+}
+
 function normalizeProfile(profile: UnknownRecord, fallbackUserId: string) {
   const userId = toString(profile.userId ?? profile.user_id) || fallbackUserId;
+  const username = toString(profile.username);
   const nickname = toString(profile.nickname) || "Unknown";
   const avatarRaw = toString(profile.avatarUrl ?? profile.avatar_url);
   const avatarUrl = avatarRaw.length > 0 ? avatarRaw : null;
-  return { userId, nickname, avatarUrl };
+  return { userId, username, nickname, avatarUrl };
 }
 
 function normalizeStats(stats: UnknownRecord | undefined) {
@@ -72,17 +94,20 @@ router.get("/me", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
+    const username = normalizeUsernameFromClaims(req.auth?.claims ?? undefined);
+
     const [profileResponse, statsResponse, friendsResponse] = await Promise.all([
-      grpcCall(playerClient.GetProfile.bind(playerClient), { user_id: userId }),
+      grpcCall(playerClient.GetProfile.bind(playerClient), { user_id: userId, ...(username ? { username } : {}) }),
       grpcCall(playerClient.GetStatistics.bind(playerClient), { user_id: userId }),
       grpcCall(playerClient.GetFriends.bind(playerClient), { user_id: userId }),
     ]);
 
     const profile = normalizeProfile((profileResponse.profile || {}) as UnknownRecord, userId);
+    const hydratedProfile = username && !profile.username ? { ...profile, username } : profile;
     const stats = normalizeStats(statsResponse.statistics as UnknownRecord | undefined);
     const friends = normalizeFriendIds((friendsResponse as UnknownRecord).friends);
 
-    return res.json({ ...profile, stats, friends });
+    return res.json({ ...hydratedProfile, stats, friends });
   } catch (err) {
     logger.error({ err }, "Failed to get profile");
     return res.status(500).json({ error: "Failed to get profile" });
@@ -95,6 +120,7 @@ router.put("/me", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
+    const username = normalizeUsernameFromClaims(req.auth?.claims ?? undefined);
     const body = req.body as UnknownRecord;
     const nickname = body.nickname;
     const avatarUrl = body.avatarUrl;
@@ -140,10 +166,11 @@ router.put("/me", async (req: Request, res: Response) => {
     ]);
 
     const profile = normalizeProfile((updateResponse.profile || {}) as UnknownRecord, userId);
+    const hydratedProfile = username && !profile.username ? { ...profile, username } : profile;
     const stats = normalizeStats(statsResponse.statistics as UnknownRecord | undefined);
     const friends = normalizeFriendIds((friendsResponse as UnknownRecord).friends);
 
-    return res.json({ ...profile, stats, friends });
+    return res.json({ ...hydratedProfile, stats, friends });
   } catch (err) {
     logger.error({ err }, "Failed to update profile");
     return res.status(500).json({ error: "Failed to update profile" });
@@ -156,6 +183,7 @@ router.post("/profile", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
+    const username = normalizeUsernameFromClaims(req.auth?.claims ?? undefined);
     const body = req.body as UnknownRecord;
     const nickname = body.nickname;
     const avatarUrl = body.avatarUrl;
@@ -178,10 +206,11 @@ router.post("/profile", async (req: Request, res: Response) => {
     ]);
 
     const profile = normalizeProfile((updateResponse.profile || {}) as UnknownRecord, userId);
+    const hydratedProfile = username && !profile.username ? { ...profile, username } : profile;
     const stats = normalizeStats(statsResponse.statistics as UnknownRecord | undefined);
     const friends = normalizeFriendIds((friendsResponse as UnknownRecord).friends);
 
-    return res.json({ ...profile, stats, friends });
+    return res.json({ ...hydratedProfile, stats, friends });
   } catch (err) {
     logger.error({ err }, "Failed to update profile");
     return res.status(500).json({ error: "Failed to update profile" });

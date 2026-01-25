@@ -10,7 +10,7 @@ test("smoke flow: login, create table, join, play hand", async ({ page }) => {
       contentType: "application/json",
       body: JSON.stringify({
         userId: "user-1",
-        nickname: "Ace",
+        username: "Ace",
         avatarUrl: null,
         stats: { handsPlayed: 0, wins: 0 },
         friends: [],

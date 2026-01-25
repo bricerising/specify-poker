@@ -30,7 +30,7 @@ describe("shared schemas", () => {
     };
 
     expect(tableConfigSchema.parse(config)).toEqual(config);
-    expect(tableSummarySchema.parse(summary)).toEqual(summary);
+    expect(tableSummarySchema.parse(summary)).toEqual({ ...summary, spectatorCount: 0 });
   });
 
   it("validates user profile and moderation request", () => {

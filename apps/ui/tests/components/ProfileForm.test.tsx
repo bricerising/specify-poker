@@ -5,11 +5,11 @@ import { describe, expect, it } from "vitest";
 import { ProfileForm } from "../../src/components/ProfileForm";
 
 describe("ProfileForm", () => {
-  it("disables submit when nickname is too short", () => {
+  it("disables submit when avatar url is invalid", () => {
     const html = renderToString(
       <ProfileForm
-        initialNickname="A"
-        initialAvatarUrl={null}
+        username="tester"
+        initialAvatarUrl="not-a-url"
         onSave={() => {}}
       />,
     );

@@ -3,6 +3,7 @@ import * as protoLoader from "@grpc/proto-loader";
 import * as path from "path";
 import { config } from "../config";
 import logger from "../observability/logger";
+import { StructFields, toStructFields } from "@specify-poker/shared";
 
 const PROTO_PATH = path.resolve(__dirname, "../../proto/event.proto");
 
@@ -13,16 +14,6 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
   defaults: true,
   oneofs: true,
 });
-
-type StructValue =
-  | { nullValue: 0 }
-  | { boolValue: boolean }
-  | { numberValue: number }
-  | { stringValue: string }
-  | { listValue: { values: StructValue[] } }
-  | { structValue: { fields: StructFields } };
-
-type StructFields = Record<string, StructValue>;
 
 interface PublishEventResponse {
   success: boolean;
@@ -100,7 +91,7 @@ export async function publishEvent(event: GameEvent): Promise<PublishResult> {
         hand_id: event.handId,
         user_id: event.userId,
         seat_id: event.seatId,
-        payload: { fields: objectToStructFields(event.payload) },
+        payload: { fields: toStructFields(event.payload) },
         idempotency_key: event.idempotencyKey,
       },
       (err: grpc.ServiceError | null, response: PublishEventResponse) => {
@@ -125,7 +116,7 @@ export async function publishEvents(events: GameEvent[]): Promise<{ success: boo
           hand_id: e.handId,
           user_id: e.userId,
           seat_id: e.seatId,
-          payload: { fields: objectToStructFields(e.payload) },
+          payload: { fields: toStructFields(e.payload) },
           idempotency_key: e.idempotencyKey,
         })),
       },
@@ -139,37 +130,6 @@ export async function publishEvents(events: GameEvent[]): Promise<{ success: boo
       }
     );
   });
-}
-
-// Helper function to convert a plain object to protobuf Struct fields
-function objectToStructFields(obj: Record<string, unknown>): StructFields {
-  const fields: StructFields = {};
-  for (const [key, value] of Object.entries(obj)) {
-    fields[key] = valueToStructValue(value);
-  }
-  return fields;
-}
-
-function valueToStructValue(value: unknown): StructValue {
-  if (value === null || value === undefined) {
-    return { nullValue: 0 };
-  }
-  if (typeof value === "boolean") {
-    return { boolValue: value };
-  }
-  if (typeof value === "number") {
-    return { numberValue: value };
-  }
-  if (typeof value === "string") {
-    return { stringValue: value };
-  }
-  if (Array.isArray(value)) {
-    return { listValue: { values: value.map(valueToStructValue) } };
-  }
-  if (typeof value === "object") {
-    return { structValue: { fields: objectToStructFields(value as Record<string, unknown>) } };
-  }
-  return { stringValue: String(value) };
 }
 
 // Event type constants

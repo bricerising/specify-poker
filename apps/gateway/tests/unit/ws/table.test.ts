@@ -7,6 +7,7 @@ vi.mock("../../../src/grpc/clients", () => ({
   gameClient: {
     JoinSpectator: vi.fn(),
     LeaveSpectator: vi.fn(),
+    GetTable: vi.fn(),
     GetTableState: vi.fn(),
     SubmitAction: vi.fn(),
     JoinSeat: vi.fn(),
@@ -60,9 +61,46 @@ describe("Table WS handler", () => {
 
   it("subscribes and sends snapshot on SubscribeTable", async () => {
     const socket = new MockSocket();
+    vi.mocked(gameClient.GetTable).mockImplementation((_req, callback) => {
+      callback(null, {
+        table_id: "t1",
+        name: "Test Table",
+        owner_id: "owner-1",
+        status: "WAITING",
+        config: {
+          small_blind: 1,
+          big_blind: 2,
+          ante: 0,
+          max_players: 9,
+          starting_stack: 200,
+          turn_timer_seconds: 20,
+        },
+      });
+    });
     vi.mocked(gameClient.GetTableState).mockImplementation((_req, callback) => {
       callback(null, {
-        state: { table_id: "t1", hand: { hand_id: "h1" } },
+        state: {
+          table_id: "t1",
+          version: 1,
+          button: 0,
+          updated_at: { seconds: 0, nanos: 0 },
+          seats: [],
+          spectators: [],
+          hand: {
+            hand_id: "h1",
+            table_id: "t1",
+            street: "PREFLOP",
+            community_cards: [],
+            pots: [],
+            current_bet: 0,
+            min_raise: 0,
+            turn: 0,
+            last_aggressor: 0,
+            actions: [],
+            rake_amount: 0,
+            started_at: { seconds: 0, nanos: 0 },
+          },
+        },
         hole_cards: ["As", "Kd"],
       });
     });
@@ -78,7 +116,10 @@ describe("Table WS handler", () => {
     );
     expect(sendToLocal).toHaveBeenCalledWith(
       "conn-1",
-      expect.objectContaining({ type: "TableSnapshot", tableState: { table_id: "t1", hand: { hand_id: "h1" } } })
+      expect.objectContaining({
+        type: "TableSnapshot",
+        tableState: expect.objectContaining({ tableId: "t1", hand: expect.objectContaining({ handId: "h1" }) }),
+      })
     );
     expect(sendToLocal).toHaveBeenCalledWith(
       "conn-1",

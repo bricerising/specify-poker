@@ -7,10 +7,11 @@ export const defaultPreferences: UserPreferences = {
   theme: "auto",
 };
 
-export function defaultProfile(userId: string, nickname: string, now: Date): Profile {
+export function defaultProfile(userId: string, nickname: string, now: Date, username = ""): Profile {
   const timestamp = now.toISOString();
   return {
     userId,
+    username,
     nickname,
     avatarUrl: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(userId)}`,
     preferences: { ...defaultPreferences },

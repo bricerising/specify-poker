@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-test("profile flow updates nickname", async ({ page }) => {
+test("profile flow updates avatar url", async ({ page }) => {
   let profile = {
     userId: "user-1",
-    nickname: "Ace",
+    username: "Ace",
     avatarUrl: null as string | null,
     stats: { handsPlayed: 1, wins: 0 },
     friends: [],
@@ -21,12 +21,10 @@ test("profile flow updates nickname", async ({ page }) => {
 
     if (request.method() === "PUT") {
       const payload = JSON.parse(request.postData() ?? "{}") as {
-        nickname?: string;
         avatarUrl?: string | null;
       };
       profile = {
         ...profile,
-        nickname: payload.nickname ?? profile.nickname,
         avatarUrl: payload.avatarUrl ?? profile.avatarUrl,
       };
       await route.fulfill({
@@ -47,8 +45,9 @@ test("profile flow updates nickname", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Profile" }).click();
 
-  await page.getByLabel("Nickname").fill("RiverRat");
+  const avatarUrl = "https://example.com/avatar.png";
+  await page.getByLabel("Avatar URL").fill(avatarUrl);
   await page.getByRole("button", { name: "Save Profile" }).click();
 
-  await expect(page.locator(".profile-panel .table-name")).toHaveText("RiverRat");
+  await expect(page.locator('.profile-summary img[alt="Ace avatar"]')).toHaveAttribute("src", avatarUrl);
 });

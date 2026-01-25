@@ -28,7 +28,7 @@ describe("Chat store", () => {
     const message: ChatMessage = {
       id: "m1",
       userId: "user-1",
-      nickname: "User",
+      username: "User",
       text: "hello",
       ts: "now",
     };
@@ -42,12 +42,15 @@ describe("Chat store", () => {
 
   it("returns chat history in chronological order", async () => {
     redis.lRange.mockResolvedValueOnce([
-      JSON.stringify({ id: "m2" }),
-      JSON.stringify({ id: "m1" }),
+      JSON.stringify({ id: "m2", userId: "user-2", username: "User2", text: "two", ts: "t2" }),
+      JSON.stringify({ id: "m1", userId: "user-1", username: "User1", text: "one", ts: "t1" }),
     ]);
     const { getChatHistory } = await import("../../../src/storage/chatStore");
     const history = await getChatHistory("table-1");
 
-    expect(history).toEqual([{ id: "m1" }, { id: "m2" }]);
+    expect(history).toEqual([
+      { id: "m1", userId: "user-1", username: "User1", text: "one", ts: "t1" },
+      { id: "m2", userId: "user-2", username: "User2", text: "two", ts: "t2" },
+    ]);
   });
 });

@@ -1,8 +1,11 @@
 import { apiFetch, getApiBaseUrl } from "../services/apiClient";
 import { getToken } from "../services/auth";
 import { isStaleVersion, requestResync, shouldResync } from "../services/wsClient";
+import type { z } from "zod";
+import { wsServerMessageSchema } from "@specify-poker/shared";
 
 type UnknownRecord = Record<string, unknown>;
+type WsServerMessage = z.infer<typeof wsServerMessageSchema>;
 
 function decodeJwtUserId(token: string): string | null {
   const parts = token.split(".");
@@ -72,7 +75,7 @@ function normalizeSeat(raw: UnknownRecord): TableSeat {
   return {
     seatId: toNumber(raw.seatId ?? raw.seat_id, 0),
     userId: (raw.userId ?? raw.user_id ?? null) as string | null,
-    nickname: raw.nickname as string | undefined,
+    username: raw.username as string | undefined,
     avatarUrl: (raw.avatarUrl ?? raw.avatar_url ?? null) as string | null,
     stack: toNumber(raw.stack, 0),
     status: String(raw.status ?? "EMPTY"),
@@ -93,11 +96,11 @@ function normalizeChatMessage(raw: unknown): ChatMessage | null {
         : "";
   const text = typeof record.text === "string" ? record.text : "";
   const ts = typeof record.ts === "string" ? record.ts : "";
-  const nickname = typeof record.nickname === "string" ? record.nickname : undefined;
+  const username = typeof record.username === "string" ? record.username : undefined;
   if (!id || !userId || !text || !ts) {
     return null;
   }
-  return { id, userId, nickname, text, ts };
+  return { id, userId, username, text, ts };
 }
 
 function cardToString(card: unknown): string | null {
@@ -166,7 +169,7 @@ function normalizeTableState(raw: UnknownRecord, fallback?: TableSummary): Table
     seats: ((raw.seats ?? []) as UnknownRecord[]).map(normalizeSeat),
     spectators: ((raw.spectators ?? []) as UnknownRecord[]).map((spectator) => ({
       userId: String(spectator.userId ?? spectator.user_id ?? ""),
-      nickname: spectator.nickname as string | undefined,
+      username: spectator.username as string | undefined,
       status: String(spectator.status ?? "active") as SpectatorView["status"],
     })),
     status: String(raw.status ?? (raw.hand ? "in_hand" : "lobby")),
@@ -198,14 +201,14 @@ export interface TableSummary {
 
 export interface SpectatorView {
   userId: string;
-  nickname?: string;
+  username?: string;
   status: "active" | "disconnected";
 }
 
 export interface TableSeat {
   seatId: number;
   userId: string | null;
-  nickname?: string;
+  username?: string;
   avatarUrl?: string | null;
   stack: number;
   status: string;
@@ -270,7 +273,7 @@ export interface TableStore {
 export interface ChatMessage {
   id: string;
   userId: string;
-  nickname?: string;
+  username?: string;
   text: string;
   ts: string;
 }
@@ -290,7 +293,7 @@ export function createTableStore(): TableStore {
   const listeners = new Set<(state: TableStoreState) => void>();
   let socket: WebSocket | null = null;
   const requestedHoleCards = new Set<string>();
-  const profileCache = new Map<string, { nickname: string; avatarUrl: string | null }>();
+  const profileCache = new Map<string, { username: string; avatarUrl: string | null }>();
   const requestedProfiles = new Set<string>();
 
   const notify = () => {
@@ -320,24 +323,24 @@ export function createTableStore(): TableStore {
       if (!cached) {
         return seat;
       }
-      const currentNickname = typeof seat.nickname === "string" ? seat.nickname.trim() : "";
-      const shouldSetNickname = !currentNickname || currentNickname === seat.userId;
+      const currentUsername = typeof seat.username === "string" ? seat.username.trim() : "";
+      const shouldSetUsername = !currentUsername || currentUsername === seat.userId;
       const shouldSetAvatar = (seat.avatarUrl === undefined || seat.avatarUrl === null) && cached.avatarUrl !== null;
 
-      if (!shouldSetNickname && !shouldSetAvatar) {
+      if (!shouldSetUsername && !shouldSetAvatar) {
         return seat;
       }
 
       changed = true;
       return {
         ...seat,
-        ...(shouldSetNickname ? { nickname: cached.nickname } : {}),
+        ...(shouldSetUsername ? { username: cached.username } : {}),
         ...(shouldSetAvatar ? { avatarUrl: cached.avatarUrl } : {}),
       };
     });
 
     const spectators = tableState.spectators?.map((spectator) => {
-      if (!spectator.userId || spectator.nickname) {
+      if (!spectator.userId || spectator.username) {
         return spectator;
       }
       const cached = profileCache.get(spectator.userId);
@@ -345,7 +348,7 @@ export function createTableStore(): TableStore {
         return spectator;
       }
       changed = true;
-      return { ...spectator, nickname: cached.nickname };
+      return { ...spectator, username: cached.username };
     });
 
     if (!changed) {
@@ -359,17 +362,17 @@ export function createTableStore(): TableStore {
     };
   };
 
-  async function fetchPublicProfile(userId: string): Promise<{ nickname: string; avatarUrl: string | null } | null> {
+  async function fetchPublicProfile(userId: string): Promise<{ username: string; avatarUrl: string | null } | null> {
     if (!userId) {
       return null;
     }
     try {
       const response = await apiFetch(`/api/profile/${encodeURIComponent(userId)}`);
-      const payload = (await response.json()) as { nickname?: unknown; avatarUrl?: unknown; avatar_url?: unknown };
-      const nickname = typeof payload.nickname === "string" ? payload.nickname.trim() : "";
+      const payload = (await response.json()) as { username?: unknown; avatarUrl?: unknown; avatar_url?: unknown };
+      const username = typeof payload.username === "string" ? payload.username.trim() : "";
       const avatarRaw = payload.avatarUrl ?? payload.avatar_url;
       const avatarUrl = typeof avatarRaw === "string" && avatarRaw.trim().length > 0 ? avatarRaw.trim() : null;
-      return nickname.length > 0 ? { nickname, avatarUrl } : null;
+      return username.length > 0 ? { username, avatarUrl } : null;
     } catch {
       return null;
     }
@@ -378,18 +381,18 @@ export function createTableStore(): TableStore {
   const requestMissingProfiles = (tableState: TableState) => {
     const userIds = new Set<string>();
     for (const seat of tableState.seats) {
-      const nickname = typeof seat.nickname === "string" ? seat.nickname.trim() : "";
-      const needsNickname = !nickname || nickname === seat.userId;
+      const username = typeof seat.username === "string" ? seat.username.trim() : "";
+      const needsUsername = !username || username === seat.userId;
       const needsAvatar = seat.avatarUrl === undefined || seat.avatarUrl === null;
-      if (!seat.userId || profileCache.has(seat.userId) || (!needsNickname && !needsAvatar)) {
+      if (!seat.userId || profileCache.has(seat.userId) || (!needsUsername && !needsAvatar)) {
         continue;
       }
       userIds.add(seat.userId);
     }
     for (const spectator of tableState.spectators ?? []) {
-      const nickname = typeof spectator.nickname === "string" ? spectator.nickname.trim() : "";
-      const needsNickname = !nickname || nickname === spectator.userId;
-      if (!spectator.userId || profileCache.has(spectator.userId) || !needsNickname) {
+      const username = typeof spectator.username === "string" ? spectator.username.trim() : "";
+      const needsUsername = !username || username === spectator.userId;
+      if (!spectator.userId || profileCache.has(spectator.userId) || !needsUsername) {
         continue;
       }
       userIds.add(spectator.userId);
@@ -554,11 +557,24 @@ export function createTableStore(): TableStore {
     });
 
     socket.addEventListener("message", (event) => {
-      const message = JSON.parse(event.data as string);
+      let raw: unknown;
+      try {
+        raw = JSON.parse(event.data as string);
+      } catch {
+        return;
+      }
+
+      const parsed = wsServerMessageSchema.safeParse(raw);
+      if (!parsed.success) {
+        return;
+      }
+
+      const message: WsServerMessage = parsed.data;
       if (message.type === "TableSnapshot" || message.type === "TablePatch") {
-        const incoming = message.type === "TableSnapshot"
-          ? (message.tableState as UnknownRecord | undefined)
-          : (message.patch as UnknownRecord | undefined);
+        const incoming =
+          message.type === "TableSnapshot"
+            ? (message.tableState as UnknownRecord | undefined)
+            : (message.patch as UnknownRecord | undefined);
         if (!incoming) {
           return;
         }
@@ -606,10 +622,8 @@ export function createTableStore(): TableStore {
         return;
       }
       if (message.type === "HoleCards") {
-        const cards = (message.cards as unknown[] | undefined)
-          ?.map((card) => cardToString(card))
-          .filter((card): card is string => Boolean(card));
-        const handId = (message.handId as string | undefined) ?? null;
+        const cards = message.cards.map((card) => cardToString(card)).filter((card): card is string => Boolean(card));
+        const handId = message.handId ?? null;
         if (cards && cards.length === 2) {
           setState({ privateHoleCards: cards, privateHandId: handId });
         }
@@ -620,7 +634,7 @@ export function createTableStore(): TableStore {
         return;
       }
       if (message.type === "ChatSubscribed") {
-        const history = (message.history as unknown[] | undefined) ?? [];
+        const history = message.history ?? [];
         const chatMessages = history.map(normalizeChatMessage).filter((entry): entry is ChatMessage => Boolean(entry));
         setState({ chatMessages, chatError: undefined });
         return;
@@ -630,18 +644,13 @@ export function createTableStore(): TableStore {
         return;
       }
       if (message.type === "LobbyTablesUpdated") {
-        const tables = (message.tables as UnknownRecord[] | undefined)?.map((table) =>
-          normalizeTableSummary(table),
-        );
-        if (tables) {
-          setState({ tables });
-        }
+        setState({ tables: message.tables });
         return;
       }
       if (message.type === "TimerUpdate") {
-        const handId = message.handId as string | undefined;
-        const deadlineTs = message.deadlineTs as string | undefined;
-        const currentTurnSeat = message.currentTurnSeat as number | undefined;
+        const handId = message.handId;
+        const deadlineTs = message.deadlineTs;
+        const currentTurnSeat = message.currentTurnSeat;
         if (!state.tableState?.hand || state.tableState.hand.handId !== handId) {
           return;
         }
@@ -658,13 +667,13 @@ export function createTableStore(): TableStore {
         return;
       }
       if (message.type === "SpectatorJoined" || message.type === "SpectatorLeft") {
-        const spectatorCount = message.spectatorCount as number | undefined;
+        const spectatorCount = message.spectatorCount;
         if (state.tableState && spectatorCount !== undefined) {
           const spectators = state.tableState.spectators ?? [];
           if (message.type === "SpectatorJoined") {
             const newSpectator: SpectatorView = {
-              userId: message.userId as string,
-              nickname: message.nickname as string | undefined,
+              userId: message.userId,
+              username: message.username,
               status: "active",
             };
             setState({

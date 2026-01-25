@@ -148,7 +148,7 @@ describe("Chat WS handler", () => {
       callback(null, { is_muted: false });
     });
     vi.mocked(playerClient.GetProfile).mockImplementation((_req, callback) => {
-      callback(null, { profile: { nickname: "SpecUser" } });
+      callback(null, { profile: { username: "SpecUser" } });
     });
     const socket = new MockSocket();
     attachChatHub(socket as unknown as WebSocket, "user-1", "conn-1");
@@ -157,14 +157,14 @@ describe("Chat WS handler", () => {
 
     expect(saveChatMessage).toHaveBeenCalledWith(
       "t1",
-      expect.objectContaining({ text: "hello", nickname: "SpecUser", userId: "user-1" })
+      expect.objectContaining({ text: "hello", username: "SpecUser", userId: "user-1" })
     );
     expect(broadcastToChannel).toHaveBeenCalledWith(
       "chat:t1",
       expect.objectContaining({
         type: "ChatMessage",
         tableId: "t1",
-        message: expect.objectContaining({ text: "hello", nickname: "SpecUser" }),
+        message: expect.objectContaining({ text: "hello", username: "SpecUser" }),
       })
     );
   });

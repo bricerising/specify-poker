@@ -19,6 +19,7 @@ vi.mock("../../src/services/statisticsService", () => ({
 describe("profileService consumer flows", () => {
   const activeProfile = {
     userId: "user-1",
+    username: "user-1",
     nickname: "PlayerOne",
     avatarUrl: null,
     preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: "auto" },

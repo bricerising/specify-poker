@@ -9,6 +9,7 @@ import logger from "../../observability/logger";
 interface GetProfileRequest {
   userId: string;
   referrerId?: string;
+  username?: string;
 }
 
 interface GetProfilesRequest {
@@ -62,6 +63,7 @@ interface GetNicknamesRequest {
 function mapProfile(profile: Profile) {
   return {
     userId: profile.userId,
+    username: profile.username,
     nickname: profile.nickname,
     avatarUrl: profile.avatarUrl ?? "",
     preferences: {
@@ -128,7 +130,8 @@ export const handlers = {
     try {
       const profile = await profileService.getProfile(
         call.request.userId,
-        normalizeOptionalString(call.request.referrerId)
+        normalizeOptionalString(call.request.referrerId),
+        normalizeOptionalString(call.request.username)
       );
       recordProfileLookup(profile.deletedAt ? "deleted" : "ok");
       callback(null, { profile: mapProfile(profile) });
