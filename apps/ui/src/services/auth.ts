@@ -1,4 +1,5 @@
 import { trace } from "@opentelemetry/api";
+import { asRecord, readTrimmedString } from "../utils/unknown";
 
 const DEFAULT_KEYCLOAK_URL = "http://localhost:8080";
 const DEFAULT_REALM = "poker-local";
@@ -126,8 +127,8 @@ export async function hydrateTokenFromCallback() {
     throw new Error(`Token exchange failed: ${response.status}`);
   }
 
-  const payload = (await response.json()) as { access_token?: string };
-  const accessToken = payload.access_token ?? null;
+  const payload = asRecord(await response.json());
+  const accessToken = readTrimmedString(payload?.access_token) ?? null;
 
   if (accessToken) {
     setToken(accessToken);

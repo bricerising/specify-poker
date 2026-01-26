@@ -1,34 +1,55 @@
-import { getSubscribers } from "../ws/subscriptions";
-import { sendToLocal } from "../ws/localRegistry";
+import { deliverToSubscribers } from "../ws/delivery";
 import * as pubsub from "../ws/pubsub";
 import logger from "../observability/logger";
 
+type BroadcastChannel =
+  | { kind: "table"; tableId: string }
+  | { kind: "chat"; tableId: string }
+  | { kind: "lobby" };
+
+function parseBroadcastChannel(channel: string): BroadcastChannel | null {
+  if (channel === "lobby") {
+    return { kind: "lobby" };
+  }
+
+  const [prefix, tableId] = channel.split(":");
+  if (prefix === "table" && tableId) {
+    return { kind: "table", tableId };
+  }
+  if (prefix === "chat" && tableId) {
+    return { kind: "chat", tableId };
+  }
+
+  return null;
+}
+
 export async function broadcastToChannel(channel: string, payload: Record<string, unknown>) {
   try {
-    // 1. Get all subscribers for this channel (from Redis)
-    const connectionIds = await getSubscribers(channel);
-
-    // 2. Deliver to local connections
-    for (const connId of connectionIds) {
-      sendToLocal(connId, payload);
-    }
+    // 1. Deliver to local subscribers (from Redis index).
+    await deliverToSubscribers(channel, payload);
 
     // 3. Publish to Redis for other instances
     // Note: The channel here might be "table:123" or "lobby" or "chat:123"
     // Our pubsub implementation currently uses specific methods.
-    if (channel.startsWith("table:")) {
-      const tableId = channel.split(":")[1];
-      await pubsub.publishTableEvent(tableId, payload);
-    } else if (channel.startsWith("chat:")) {
-      const tableId = channel.split(":")[1];
-      await pubsub.publishChatEvent(tableId, payload);
-    } else if (channel === "lobby") {
-      // Lobby event in pubsub expects an array of tables... 
-      // maybe we should generalize pubsub a bit more.
-      // For now, let's just handle it.
-      const tables = payload.tables;
-      if (Array.isArray(tables)) {
-        await pubsub.publishLobbyEvent(tables);
+    const parsedChannel = parseBroadcastChannel(channel);
+    if (!parsedChannel) {
+      logger.warn({ channel }, "Failed to publish to unknown channel");
+      return;
+    }
+
+    switch (parsedChannel.kind) {
+      case "table":
+        await pubsub.publishTableEvent(parsedChannel.tableId, payload);
+        break;
+      case "chat":
+        await pubsub.publishChatEvent(parsedChannel.tableId, payload);
+        break;
+      case "lobby": {
+        const tables = payload.tables;
+        if (Array.isArray(tables)) {
+          await pubsub.publishLobbyEvent(tables);
+        }
+        break;
       }
     }
   } catch (err) {

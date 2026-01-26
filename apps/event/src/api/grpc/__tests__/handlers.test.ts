@@ -53,7 +53,7 @@ describe('gRPC Handlers', () => {
   it('should handle publishEvent', async () => {
     const call = {
       request: {
-        type: 'TEST',
+        type: "PLAYER_JOINED",
         tableId: 't1',
         payload: { foo: 'bar' }
       }
@@ -64,7 +64,7 @@ describe('gRPC Handlers', () => {
     await handlers.publishEvent(call as unknown as Record<string, unknown>, callback);
 
     expect(eventIngestionService.ingestEvent).toHaveBeenCalledWith({
-      type: "TEST",
+      type: "PLAYER_JOINED",
       tableId: "t1",
       payload: { foo: "bar" },
       handId: undefined,
@@ -112,8 +112,8 @@ describe('gRPC Handlers', () => {
     const call = {
       request: {
         events: [
-          { type: 'T1', tableId: 't1', payload: {} },
-          { type: 'T2', tableId: 't1', payload: {} }
+          { type: "PLAYER_JOINED", tableId: "t1", payload: {} },
+          { type: "PLAYER_LEFT", tableId: "t1", payload: {} }
         ]
       }
     } as unknown as Record<string, unknown>;
@@ -291,7 +291,7 @@ describe('gRPC Handlers', () => {
   });
 
   it('should handle publishEvent error', async () => {
-    const call = { request: { type: 'TEST', tableId: 't1' } } as unknown as Record<string, unknown>;
+    const call = { request: { type: "PLAYER_JOINED", tableId: "t1", payload: {} } } as unknown as Record<string, unknown>;
     const callback = vi.fn();
     vi.mocked(eventIngestionService.ingestEvent).mockRejectedValue(new Error("Test Error"));
 

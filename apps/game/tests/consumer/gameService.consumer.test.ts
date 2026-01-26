@@ -81,6 +81,10 @@ vi.mock("../../src/storage/redisClient", () => {
   };
 });
 
+vi.mock("../../src/observability/logger", () => ({
+  default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
 vi.mock("../../src/api/grpc/clients", () => ({
   balanceClient: {
     ReserveForBuyIn: (request: unknown, callback: (err: Error | null, response?: unknown) => void) => {
@@ -209,6 +213,36 @@ describe("TableService consumer flows", () => {
     expect(state?.seats[0].reservationId).toBe("reservation-1");
   });
 
+  it("resumes a reserved seat by reusing the buy-in idempotency key", async () => {
+    const table = await tableService.createTable("Reserved Seat", "owner-1", defaultConfig);
+
+    const state = await tableStateStore.get(table.tableId);
+    expect(state).toBeTruthy();
+
+    state!.seats[0].userId = "user-1";
+    state!.seats[0].status = "RESERVED";
+    state!.seats[0].pendingBuyInAmount = 150;
+    state!.seats[0].buyInIdempotencyKey = "buyin-key-1";
+    state!.version += 1;
+    state!.updatedAt = new Date().toISOString();
+    await tableStateStore.save(state!);
+
+    const result = await tableService.joinSeat(table.tableId, "user-1", 0, 150);
+
+    expect(result.ok).toBe(true);
+    expect(grpcState.reserveCalls).toHaveLength(1);
+    expect(grpcState.commitCalls).toHaveLength(1);
+
+    const reserveCall = grpcState.reserveCalls[0] as { idempotency_key?: string };
+    expect(reserveCall.idempotency_key).toBe("buyin-key-1");
+
+    const finalState = await tableStateStore.get(table.tableId);
+    expect(finalState?.seats[0].status).toBe("SEATED");
+    expect(finalState?.seats[0].stack).toBe(150);
+    expect(finalState?.seats[0].pendingBuyInAmount).toBeUndefined();
+    expect(finalState?.seats[0].buyInIdempotencyKey).toBeUndefined();
+  });
+
   it("releases the reservation when the commit fails", async () => {
     grpcState.commitResponse = { ok: false, error: "COMMIT_FAILED" };
 
@@ -225,21 +259,21 @@ describe("TableService consumer flows", () => {
   });
 
   it("seats players when balance service is unavailable and emits an event", async () => {
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const loggerModule = await import("../../src/observability/logger");
+    const logger = loggerModule.default as unknown as { error: ReturnType<typeof vi.fn> };
     grpcState.reserveError = new Error("balance down");
 
     const table = await tableService.createTable("Main Table", "owner-1", defaultConfig);
     const result = await tableService.joinSeat(table.tableId, "user-1", 0, 120);
 
     expect(result.ok).toBe(true);
+    expect(logger.error).toHaveBeenCalled();
     expect(grpcState.publishedEvents.some((event) => event.type === "BALANCE_UNAVAILABLE")).toBe(true);
 
     const state = await tableStateStore.get(table.tableId);
     expect(state?.seats[0].status).toBe("SEATED");
     expect(state?.seats[0].stack).toBe(120);
     expect(state?.seats[0].reservationId).toBeUndefined();
-
-    consoleSpy.mockRestore();
   });
 
   it("attempts cash-out and emits failure telemetry when Balance declines", async () => {

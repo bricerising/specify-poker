@@ -41,7 +41,7 @@ describe("EventConsumer", () => {
         },
       };
 
-      await (consumer as unknown as { handleEvent: (event: unknown) => Promise<void> }).handleEvent(event);
+      await consumer.handleEvent(event);
 
       expect(statisticsService.incrementHandsPlayed).toHaveBeenCalledWith("user1");
       expect(statisticsService.incrementHandsPlayed).toHaveBeenCalledWith("user2");
@@ -61,7 +61,7 @@ describe("EventConsumer", () => {
         },
       };
 
-      await (consumer as unknown as { handleEvent: (event: unknown) => Promise<void> }).handleEvent(event);
+      await consumer.handleEvent(event);
 
       expect(statisticsService.incrementWins).toHaveBeenCalledWith("user1");
     });
@@ -69,7 +69,7 @@ describe("EventConsumer", () => {
     it("ignores events without a type", async () => {
       const event = { payload: {} };
 
-      await (consumer as unknown as { handleEvent: (event: unknown) => Promise<void> }).handleEvent(event);
+      await consumer.handleEvent(event);
 
       expect(statisticsService.incrementHandsPlayed).not.toHaveBeenCalled();
       expect(statisticsService.incrementWins).not.toHaveBeenCalled();
@@ -81,7 +81,7 @@ describe("EventConsumer", () => {
         payload: { winnerUserIds: ["user3"] },
       };
 
-      await (consumer as unknown as { handleEvent: (event: unknown) => Promise<void> }).handleEvent(event);
+      await consumer.handleEvent(event);
 
       expect(statisticsService.incrementWins).toHaveBeenCalledWith("user3");
     });
@@ -95,7 +95,7 @@ describe("EventConsumer", () => {
         payload: { participants: ["user4"] },
       };
 
-      await (consumer as unknown as { handleEvent: (event: unknown) => Promise<void> }).handleEvent(event);
+      await consumer.handleEvent(event);
 
       expect(logger.default.error).toHaveBeenCalled();
     });
@@ -119,7 +119,7 @@ describe("EventConsumer", () => {
         },
       };
 
-      await (consumer as unknown as { handleEvent: (event: unknown) => Promise<void> }).handleEvent(event);
+      await consumer.handleEvent(event);
 
       expect(statisticsService.incrementHandsPlayed).toHaveBeenCalledWith("user-a");
       expect(statisticsService.incrementHandsPlayed).not.toHaveBeenCalledWith("user-b");
@@ -142,7 +142,7 @@ describe("EventConsumer", () => {
         },
       };
 
-      await (consumer as unknown as { handleEvent: (event: unknown) => Promise<void> }).handleEvent(event);
+      await consumer.handleEvent(event);
 
       expect(statisticsService.incrementWins).toHaveBeenCalledWith("user-x");
     });

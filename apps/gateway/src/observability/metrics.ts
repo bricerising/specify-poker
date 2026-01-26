@@ -44,9 +44,11 @@ const wsActiveConnections =
 const wsSessionDuration =
   "Histogram" in promClient
     ? getOrCreateMetric<Histogram<string>>("gateway_ws_session_duration_seconds", () => {
-      const HistogramConstructor = (promClient as { Histogram: new (...args: unknown[]) => Histogram<string> }).Histogram;
-      return new HistogramConstructor({
-        name: "gateway_ws_session_duration_seconds",
+        const HistogramConstructor = (promClient as {
+          Histogram: new (...args: unknown[]) => Histogram<string>;
+        }).Histogram;
+        return new HistogramConstructor({
+          name: "gateway_ws_session_duration_seconds",
           help: "WebSocket session duration in seconds.",
           labelNames: ["client_type"],
           buckets: [1, 5, 10, 30, 60, 120, 300, 600, 1800],
@@ -57,9 +59,11 @@ const wsSessionDuration =
 const httpDuration =
   "Histogram" in promClient
     ? getOrCreateMetric<Histogram<string>>("gateway_http_request_duration_seconds", () => {
-      const HistogramConstructor = (promClient as { Histogram: new (...args: unknown[]) => Histogram<string> }).Histogram;
-      return new HistogramConstructor({
-        name: "gateway_http_request_duration_seconds",
+        const HistogramConstructor = (promClient as {
+          Histogram: new (...args: unknown[]) => Histogram<string>;
+        }).Histogram;
+        return new HistogramConstructor({
+          name: "gateway_http_request_duration_seconds",
           help: "HTTP request duration in seconds.",
           labelNames: ["method", "route", "status"],
           buckets: [0.005, 0.01, 0.05, 0.1, 0.2, 0.5, 1, 2, 5],

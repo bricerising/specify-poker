@@ -1,5 +1,7 @@
 import { createHash } from "crypto";
 import { LedgerEntry } from "../domain/types";
+import logger from "../observability/logger";
+import { tryJsonParse } from "../utils/json";
 import { getRedisClient } from "./redisClient";
 
 const LEDGER_PREFIX = "balance:ledger:";
@@ -90,7 +92,17 @@ export async function getLedgerEntries(
     const total = await redis.lLen(`${LEDGER_PREFIX}${accountId}`);
     const rawEntries = await redis.lRange(`${LEDGER_PREFIX}${accountId}`, -limit, -1);
 
-    let entries = rawEntries.map((raw) => JSON.parse(raw) as LedgerEntry).reverse();
+    const parsedEntries: LedgerEntry[] = [];
+    for (const raw of rawEntries) {
+      const parsed = tryJsonParse<LedgerEntry>(raw);
+      if (!parsed.ok) {
+        logger.warn({ err: parsed.error, accountId }, "ledgerStore.parse.failed");
+        continue;
+      }
+      parsedEntries.push(parsed.value);
+    }
+
+    let entries = parsedEntries.reverse();
 
     // Filter by time range if specified
     if (from) {
@@ -134,11 +146,19 @@ export async function verifyLedgerIntegrity(accountId: string): Promise<{
   firstInvalidEntry?: string;
 }> {
   const redis = await getRedisClient();
-  let entries: LedgerEntry[];
+  let entries: LedgerEntry[] = [];
 
   if (redis) {
     const rawEntries = await redis.lRange(`${LEDGER_PREFIX}${accountId}`, 0, -1);
-    entries = rawEntries.map((raw) => JSON.parse(raw) as LedgerEntry);
+    for (let i = 0; i < rawEntries.length; i++) {
+      const raw = rawEntries[i];
+      const parsed = tryJsonParse<LedgerEntry>(raw);
+      if (!parsed.ok) {
+        logger.error({ err: parsed.error, accountId, index: i }, "ledgerStore.parse.failed");
+        return { valid: false, entriesChecked: i, firstInvalidEntry: "PARSE_FAILED" };
+      }
+      entries.push(parsed.value);
+    }
   } else {
     entries = ledgerByAccount.get(accountId) ?? [];
   }
@@ -148,11 +168,12 @@ export async function verifyLedgerIntegrity(accountId: string): Promise<{
   }
 
   let previousChecksum = "GENESIS";
-  for (const entry of entries) {
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
     if (entry.previousChecksum !== previousChecksum) {
       return {
         valid: false,
-        entriesChecked: entries.indexOf(entry),
+        entriesChecked: i,
         firstInvalidEntry: entry.entryId,
       };
     }
@@ -176,7 +197,7 @@ export async function verifyLedgerIntegrity(accountId: string): Promise<{
     if (entry.checksum !== expectedChecksum) {
       return {
         valid: false,
-        entriesChecked: entries.indexOf(entry),
+        entriesChecked: i,
         firstInvalidEntry: entry.entryId,
       };
     }

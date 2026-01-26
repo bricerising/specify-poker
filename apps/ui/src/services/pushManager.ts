@@ -1,5 +1,6 @@
 import { apiFetch } from "./apiClient";
 import { registerPushSubscription } from "./pushClient";
+import { asRecord, readTrimmedString } from "../utils/unknown";
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -26,16 +27,14 @@ export async function ensurePushSubscription() {
   let subscription = await registration.pushManager.getSubscription();
   if (!subscription) {
     const response = await apiFetch("/api/push/vapid");
-    if (!response.ok) {
-      return;
-    }
-    const payload = (await response.json()) as { publicKey?: string };
-    if (!payload.publicKey) {
+    const payload = asRecord(await response.json());
+    const publicKey = readTrimmedString(payload?.publicKey);
+    if (!publicKey) {
       return;
     }
     subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(payload.publicKey),
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
     });
   }
 

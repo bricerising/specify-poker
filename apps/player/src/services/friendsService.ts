@@ -2,6 +2,7 @@ import { FriendProfile } from "../domain/types";
 import * as friendsRepository from "../storage/friendsRepository";
 import * as friendsCache from "../storage/friendsCache";
 import { getProfileSummaries } from "./profileService";
+import { ValidationError } from "../domain/errors";
 
 export async function getFriends(userId: string): Promise<FriendProfile[]> {
   const cached = await friendsCache.get(userId);
@@ -20,7 +21,7 @@ export async function getFriends(userId: string): Promise<FriendProfile[]> {
 
 export async function addFriend(userId: string, friendId: string): Promise<void> {
   if (userId === friendId) {
-    throw new Error("Cannot add yourself as a friend");
+    throw new ValidationError("Cannot add yourself as a friend");
   }
   await friendsRepository.addFriend(userId, friendId);
   await friendsCache.add(userId, friendId);

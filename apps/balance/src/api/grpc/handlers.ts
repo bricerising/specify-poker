@@ -1,3 +1,4 @@
+import * as grpc from "@grpc/grpc-js";
 import {
   getBalance,
   ensureAccount,
@@ -15,13 +16,14 @@ import {
 } from "../../services/tablePotService";
 import { recordGrpcRequest } from "../../observability/metrics";
 import logger from "../../observability/logger";
+import { toNonEmptyString, toNumber } from "../validation";
 
 function recordDuration(method: string, startedAt: number, status: "ok" | "error") {
   recordGrpcRequest(method, status, Date.now() - startedAt);
 }
 
 type UnaryCall<Req> = { request: Req };
-type UnaryCallback<Res> = (error: Error | null, response?: Res) => void;
+type UnaryCallback<Res> = grpc.sendUnaryData<Res>;
 
 class InvalidArgumentError extends Error {
   override name = "InvalidArgumentError";
@@ -29,6 +31,32 @@ class InvalidArgumentError extends Error {
 
 function invalidArgument(message: string): never {
   throw new InvalidArgumentError(message);
+}
+
+function isServiceError(error: unknown): error is grpc.ServiceError {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      typeof (error as { code?: unknown }).code === "number"
+  );
+}
+
+function asServiceError(error: unknown): grpc.ServiceError {
+  if (isServiceError(error)) {
+    return error;
+  }
+
+  if (error instanceof InvalidArgumentError) {
+    const serviceError = new Error(error.message) as grpc.ServiceError;
+    serviceError.code = grpc.status.INVALID_ARGUMENT;
+    return serviceError;
+  }
+
+  const message = error instanceof Error ? error.message : "Unknown error";
+  const serviceError = new Error(message) as grpc.ServiceError;
+  serviceError.code = grpc.status.INTERNAL;
+  return serviceError;
 }
 
 function handleUnary<Req, Res>(
@@ -45,33 +73,11 @@ function handleUnary<Req, Res>(
     })
     .catch((error: unknown) => {
       recordDuration(method, startedAt, "error");
-      if (!(error instanceof InvalidArgumentError)) {
+      if (!(error instanceof InvalidArgumentError) && !isServiceError(error)) {
         logger.error({ err: error }, `${method} failed`);
       }
-      callback(error as Error);
+      callback(asServiceError(error));
     });
-}
-
-function toNumber(value: unknown, fallback = 0) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  }
-  return fallback;
-}
-
-function toNonEmptyString(value: unknown): string | null {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : null;
-  }
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return String(value);
-  }
-  return null;
 }
 
 // gRPC handler implementations
@@ -153,8 +159,8 @@ export const handlers = {
 
       return {
         ok: result.ok,
-        reservation_id: result.reservationId ?? "",
-        error: result.error ?? "",
+        reservation_id: result.ok ? result.reservationId : "",
+        error: result.ok ? "" : result.error,
         available_balance: result.availableBalance ?? 0,
       };
     });
@@ -172,9 +178,9 @@ export const handlers = {
       const result = await commitReservation(reservationId);
       return {
         ok: result.ok,
-        transaction_id: result.transactionId ?? "",
-        error: result.error ?? "",
-        new_balance: result.newBalance ?? 0,
+        transaction_id: result.ok ? result.transactionId : "",
+        error: result.ok ? "" : result.error,
+        new_balance: result.ok ? (result.newBalance ?? 0) : 0,
       };
     });
   },
@@ -191,8 +197,8 @@ export const handlers = {
       const result = await releaseReservation(reservationId, reason);
       return {
         ok: result.ok,
-        error: result.error ?? "",
-        available_balance: result.availableBalance ?? 0,
+        error: result.ok ? "" : result.error,
+        available_balance: result.ok ? (result.availableBalance ?? 0) : 0,
       };
     });
   },
@@ -232,9 +238,9 @@ export const handlers = {
 
       return {
         ok: result.ok,
-        transaction_id: result.transactionId ?? "",
-        error: result.error ?? "",
-        new_balance: result.newBalance ?? 0,
+        transaction_id: result.ok ? result.transactionId : "",
+        error: result.ok ? "" : result.error,
+        new_balance: result.ok ? result.newBalance : 0,
       };
     });
   },
@@ -254,21 +260,40 @@ export const handlers = {
     callback: UnaryCallback<unknown>
   ) {
     return handleUnary("RecordContribution", call, callback, async (request) => {
+      const tableId = toNonEmptyString(request.table_id);
+      const handId = toNonEmptyString(request.hand_id);
+      const accountId = toNonEmptyString(request.account_id);
+      const contributionType = toNonEmptyString(request.contribution_type);
+      const idempotencyKey = toNonEmptyString(request.idempotency_key);
+      const seatId = toNumber(request.seat_id, -1);
+      const amount = toNumber(request.amount, 0);
+      if (
+        !tableId ||
+        !handId ||
+        !accountId ||
+        !contributionType ||
+        !idempotencyKey ||
+        seatId < 0 ||
+        amount <= 0
+      ) {
+        invalidArgument("invalid RecordContribution request");
+      }
+
       const result = await recordContribution(
-        request.table_id,
-        request.hand_id,
-        request.seat_id,
-        request.account_id,
-        request.amount,
-        request.contribution_type,
-        request.idempotency_key
+        tableId,
+        handId,
+        seatId,
+        accountId,
+        amount,
+        contributionType,
+        idempotencyKey
       );
 
       return {
         ok: result.ok,
-        error: result.error ?? "",
-        total_pot: result.totalPot ?? 0,
-        seat_contribution: result.seatContribution ?? 0,
+        error: result.ok ? "" : result.error,
+        total_pot: result.ok ? result.totalPot : 0,
+        seat_contribution: result.ok ? result.seatContribution : 0,
       };
     });
   },
@@ -285,27 +310,42 @@ export const handlers = {
     callback: UnaryCallback<unknown>
   ) {
     return handleUnary("SettlePot", call, callback, async ({ table_id, hand_id, winners, idempotency_key }) => {
+      const tableId = toNonEmptyString(table_id);
+      const handId = toNonEmptyString(hand_id);
+      const idempotencyKey = toNonEmptyString(idempotency_key);
+      if (!tableId || !handId || !idempotencyKey) {
+        invalidArgument("invalid SettlePot request");
+      }
+
+      const parsedWinners = winners.map((winner) => {
+        const accountId = toNonEmptyString(winner.account_id);
+        const seatId = toNumber(winner.seat_id, -1);
+        const amount = toNumber(winner.amount, -1);
+        if (!accountId || seatId < 0 || amount < 0) {
+          invalidArgument("invalid SettlePot winner");
+        }
+        return { seatId, accountId, amount };
+      });
+
       const result = await settlePot(
-        table_id,
-        hand_id,
-        winners.map((w) => ({
-          seatId: w.seat_id,
-          accountId: w.account_id,
-          amount: w.amount,
-        })),
-        idempotency_key
+        tableId,
+        handId,
+        parsedWinners,
+        idempotencyKey
       );
 
       return {
         ok: result.ok,
-        error: result.error ?? "",
+        error: result.ok ? "" : result.error,
         results:
-          result.results?.map((r) => ({
-            account_id: r.accountId,
-            transaction_id: r.transactionId,
-            amount: r.amount,
-            new_balance: r.newBalance,
-          })) ?? [],
+          result.ok
+            ? result.results.map((r) => ({
+                account_id: r.accountId,
+                transaction_id: r.transactionId,
+                amount: r.amount,
+                new_balance: r.newBalance,
+              }))
+            : [],
       };
     });
   },
@@ -315,7 +355,14 @@ export const handlers = {
     callback: UnaryCallback<unknown>
   ) {
     return handleUnary("CancelPot", call, callback, async ({ table_id, hand_id, reason }) => {
-      const result = await cancelPot(table_id, hand_id, reason);
+      const tableId = toNonEmptyString(table_id);
+      const handId = toNonEmptyString(hand_id);
+      const cancelReason = toNonEmptyString(reason);
+      if (!tableId || !handId || !cancelReason) {
+        invalidArgument("invalid CancelPot request");
+      }
+
+      const result = await cancelPot(tableId, handId, cancelReason);
       return {
         ok: result.ok,
         error: result.error ?? "",

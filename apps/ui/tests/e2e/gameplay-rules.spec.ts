@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { APIRequestContext } from "@playwright/test";
 import crypto from "crypto";
+import { decodeStructLike } from "@specify-poker/shared";
 import { ensureBalance } from "./helpers/balance";
 import { generateToken } from "./helpers/auth";
 import { authHeaders } from "./helpers/http";
@@ -240,9 +241,14 @@ test.describe("Gameplay Rules (Game + Gateway)", () => {
       const eventsRes = await request.get(`${urls.gateway}/api/audit/events?tableId=${setup.tableId}&limit=100`, {
         headers: authHeaders(setup.aliceToken),
       });
-      const payload = (await eventsRes.json()) as { events?: Array<{ type?: string }> };
-      const types = payload.events?.map((event) => event.type) ?? [];
-      return types.some((type) => type === "FOLD" || type === "CHECK");
+      const payload = (await eventsRes.json()) as { events?: Array<{ type?: string; payload?: unknown }> };
+      return (payload.events ?? []).some((event) => {
+        if (event.type !== "ACTION_TAKEN") {
+          return false;
+        }
+        const decoded = decodeStructLike(event.payload);
+        return decoded.action === "FOLD" || decoded.action === "CHECK";
+      });
     }, { timeout: 20_000 }).toBe(true);
   });
 });

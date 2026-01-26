@@ -1,8 +1,7 @@
-import * as dotenv from "dotenv";
-dotenv.config();
-
 import { startObservability, stopObservability } from "./observability";
-startObservability();
+if (require.main === module) {
+  startObservability();
+}
 
 import express from "express";
 import { getConfig } from "./config";

@@ -2,6 +2,8 @@ import { sendUnaryData, ServerUnaryCall } from "@grpc/grpc-js";
 import { tableService } from "../../../services/tableService";
 import { moderationService } from "../../../services/moderationService";
 import { recordGrpcRequest } from "../../../observability/metrics";
+import { coerceNumber } from "../../../utils/coerce";
+import { toServiceError } from "./grpcError";
 import {
   Action,
   ActionInput,
@@ -110,17 +112,6 @@ type KickPlayerRequest = { table_id: string; owner_id: string; target_user_id: s
 type MutePlayerRequest = { table_id: string; owner_id: string; target_user_id: string };
 type UnmutePlayerRequest = { table_id: string; owner_id: string; target_user_id: string };
 type IsMutedRequest = { table_id: string; user_id: string };
-
-function toNumber(value: unknown, fallback = 0) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  }
-  return fallback;
-}
 
 function toTimestamp(value: string) {
   const date = new Date(value);
@@ -238,7 +229,7 @@ function handleUnary<Req, Res>(
     })
     .catch((err) => {
       recordGrpcRequest(method, "error", Date.now() - startedAt);
-      callback(err as Error);
+      callback(toServiceError(err));
     });
 }
 
@@ -247,12 +238,12 @@ export function createHandlers() {
     CreateTable: (call: ServerUnaryCall<CreateTableRequest, ProtoTable>, callback: sendUnaryData<ProtoTable>) =>
       handleUnary("CreateTable", call, callback, async ({ name, owner_id, config }) => {
         const table = await tableService.createTable(name, owner_id, {
-          smallBlind: toNumber(config.small_blind, 1),
-          bigBlind: toNumber(config.big_blind, 2),
-          ante: toNumber(config.ante ?? 0, 0),
-          maxPlayers: toNumber(config.max_players, 6),
-          startingStack: toNumber(config.starting_stack, 200),
-          turnTimerSeconds: toNumber(config.turn_timer_seconds ?? 20, 20),
+          smallBlind: coerceNumber(config.small_blind, 1),
+          bigBlind: coerceNumber(config.big_blind, 2),
+          ante: coerceNumber(config.ante ?? 0, 0),
+          maxPlayers: coerceNumber(config.max_players, 6),
+          startingStack: coerceNumber(config.starting_stack, 200),
+          turnTimerSeconds: coerceNumber(config.turn_timer_seconds ?? 20, 20),
         });
         return toProtoTable(table);
       }),
@@ -307,7 +298,7 @@ export function createHandlers() {
 
     JoinSeat: (call: ServerUnaryCall<JoinSeatRequest, ActionResult>, callback: sendUnaryData<ActionResult>) =>
       handleUnary("JoinSeat", call, callback, ({ table_id, user_id, seat_id, buy_in_amount }) => {
-        const buyInAmount = toNumber(buy_in_amount, 0);
+        const buyInAmount = coerceNumber(buy_in_amount, 0);
         return tableService.joinSeat(table_id, user_id, seat_id, buyInAmount);
       }),
 
@@ -325,7 +316,7 @@ export function createHandlers() {
         const normalizedAction = action_type.toUpperCase() as ActionInput["type"];
         return tableService.submitAction(table_id, user_id, {
           type: normalizedAction,
-          amount: amount === undefined ? undefined : toNumber(amount, 0),
+          amount: amount === undefined ? undefined : coerceNumber(amount, 0),
         });
       }),
 

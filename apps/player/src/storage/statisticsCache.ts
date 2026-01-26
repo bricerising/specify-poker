@@ -1,5 +1,6 @@
 import { Statistics } from "../domain/types";
 import { getRedisClient } from "./redisClient";
+import { decodeStatistics } from "../domain/decoders";
 
 const STATS_TTL_SECONDS = 60;
 
@@ -16,7 +17,11 @@ export async function get(userId: string): Promise<Statistics | null> {
   if (!data) {
     return null;
   }
-  return JSON.parse(data) as Statistics;
+  try {
+    return decodeStatistics(JSON.parse(data));
+  } catch {
+    return null;
+  }
 }
 
 export async function set(stats: Statistics): Promise<void> {

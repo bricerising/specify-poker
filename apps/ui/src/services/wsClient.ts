@@ -1,4 +1,4 @@
-import { trace } from "@opentelemetry/api";
+import { recordWebSocketMessage } from "../observability/otel";
 
 export function isStaleVersion(currentVersion: number | null, incomingVersion: number) {
   if (currentVersion === null || currentVersion < 0) {
@@ -18,9 +18,7 @@ export function requestResync(socket: WebSocket | null, tableId: string) {
   if (!socket || socket.readyState !== WebSocket.OPEN) {
     return;
   }
-  const tracer = trace.getTracer("ui");
-  const span = tracer.startSpan("ui.table.resync");
-  span.end();
+  recordWebSocketMessage("ResyncTable", "sent", tableId);
 
   socket.send(JSON.stringify({ type: "ResyncTable", tableId }));
 }

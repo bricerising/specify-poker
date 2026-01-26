@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { addService, bindAsync, forceShutdown, createHandlers } = vi.hoisted(() => ({
+const { addService, bindAsync, forceShutdown, start, createHandlers } = vi.hoisted(() => ({
   addService: vi.fn(),
   bindAsync: vi.fn(),
   forceShutdown: vi.fn(),
+  start: vi.fn(),
   createHandlers: vi.fn(() => ({
     publishEvent: vi.fn(),
     publishEvents: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock("@grpc/grpc-js", () => ({
     addService,
     bindAsync,
     forceShutdown,
+    start,
   })),
   ServerCredentials: {
     createInsecure: vi.fn(() => "creds"),
@@ -66,6 +68,7 @@ describe("event gRPC server", () => {
       })
     );
     expect(bindAsync).toHaveBeenCalledWith("0.0.0.0:50054", "creds", expect.any(Function));
+    expect(start).toHaveBeenCalledTimes(1);
   });
 
   it("rejects when bind fails", async () => {

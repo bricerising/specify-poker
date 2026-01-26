@@ -1,20 +1,13 @@
 import { Router, Request, Response } from "express";
 import { gameClient } from "../../grpc/clients";
+import { grpcCall } from "../../grpc/grpcCall";
 import logger from "../../observability/logger";
 import { getConfig } from "../../config";
+import { requireUserId } from "../utils/requireUserId";
 
 const router = Router();
 
 const DAILY_LOGIN_BONUS_CHIPS = 1000;
-
-function requireUserId(req: Request, res: Response) {
-  const userId = req.auth?.userId;
-  if (!userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return null;
-  }
-  return userId;
-}
 
 function buildWsUrl(req: Request) {
   const host = req.get("host");
@@ -69,19 +62,6 @@ async function ensureDailyLoginBonus(userId: string): Promise<void> {
   } finally {
     clearTimeout(timeout);
   }
-}
-
-// Helper to convert gRPC callback to promise
-function grpcCall<TRequest, TResponse>(
-  method: (request: TRequest, callback: (err: Error | null, response: TResponse) => void) => void,
-  request: TRequest
-): Promise<TResponse> {
-  return new Promise((resolve, reject) => {
-    method(request, (err: Error | null, response: TResponse) => {
-      if (err) reject(err);
-      else resolve(response);
-    });
-  });
 }
 
 function parseSeatId(value: unknown): number | null {

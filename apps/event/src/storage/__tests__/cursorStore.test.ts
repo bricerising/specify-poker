@@ -66,6 +66,28 @@ describe("CursorStore", () => {
     expect(redisClient.sAdd).toHaveBeenCalledWith("event:cursors:by-subscriber:sub-1", "table:t1:sub-1");
   });
 
+  it("falls back to database when cached cursor is invalid", async () => {
+    vi.mocked(redisClient.get).mockResolvedValue("{bad json");
+    vi.mocked(pool.query).mockResolvedValue({
+      rows: [
+        {
+          cursor_id: "table:t1:sub-1",
+          stream_id: "table:t1",
+          subscriber_id: "sub-1",
+          position: 8,
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
+      ],
+    } as never);
+
+    const cursor = await store.getCursor("table:t1", "sub-1");
+
+    expect(cursor?.position).toBe(8);
+    expect(redisClient.del).toHaveBeenCalledWith("event:cursors:table:t1:sub-1");
+    expect(pool.query).toHaveBeenCalledTimes(1);
+  });
+
   it("upserts cursor position", async () => {
     vi.mocked(pool.query).mockResolvedValue({
       rows: [

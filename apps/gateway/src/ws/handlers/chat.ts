@@ -4,86 +4,67 @@ import type { z } from "zod";
 import { wsClientMessageSchema } from "@specify-poker/shared";
 
 import { gameClient, playerClient } from "../../grpc/clients";
+import { grpcCall } from "../../grpc/grpcCall";
 import { WsPubSubMessage } from "../pubsub";
 import { checkWsRateLimit, parseChatMessage, parseTableId } from "../validators";
-import { subscribeToChannel, unsubscribeFromChannel, unsubscribeAll, getSubscribers } from "../subscriptions";
+import { subscribeToChannel, unsubscribeFromChannel, unsubscribeAll } from "../subscriptions";
 import { getLocalConnectionMeta, sendToLocal } from "../localRegistry";
+import { deliverToSubscribers } from "../delivery";
 import { broadcastToChannel } from "../../services/broadcastService";
 import { saveChatMessage, getChatHistory } from "../../storage/chatStore";
-import { parseJsonObject } from "../messageParsing";
+import { parseJsonWithSchema } from "../messageParsing";
 import { attachWsRouter } from "../router";
 
 type WsClientMessage = z.infer<typeof wsClientMessageSchema>;
 
 function parseClientMessage(data: WebSocket.RawData): WsClientMessage | null {
-  const obj = parseJsonObject(data);
-  if (!obj) {
-    return null;
-  }
-  const parsed = wsClientMessageSchema.safeParse(obj);
-  return parsed.success ? parsed.data : null;
+  return parseJsonWithSchema(data, wsClientMessageSchema);
 }
 
 export async function handleChatPubSubEvent(message: WsPubSubMessage) {
   if (message.channel !== "chat") {
     return;
   }
-  const channel = `chat:${message.tableId}`;
-  const subscribers = await getSubscribers(channel);
-  for (const connId of subscribers) {
-    sendToLocal(connId, message.payload);
+  await deliverToSubscribers(`chat:${message.tableId}`, message.payload);
+}
+
+async function getMembership(tableId: string, userId: string): Promise<{ seated: boolean; spectator: boolean }> {
+  try {
+    const response = await grpcCall(gameClient.GetTableState.bind(gameClient), {
+      table_id: tableId,
+      user_id: userId,
+    });
+    const seated = response.state?.seats?.some((s) => s.user_id === userId && s.status !== "empty") || false;
+    const spectator = response.state?.spectators?.some((s) => s.user_id === userId) || false;
+    return { seated, spectator };
+  } catch {
+    return { seated: false, spectator: false };
   }
 }
 
-async function isSeated(tableId: string, userId: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    gameClient.GetTableState({ table_id: tableId, user_id: userId }, (err, response) => {
-      if (err || !response?.state) {
-        resolve(false);
-        return;
-      }
-      const isSeated = response.state?.seats?.some((s) => s.user_id === userId && s.status !== "empty") || false;
-      resolve(isSeated);
-    });
-  });
-}
-
-async function isSpectator(tableId: string, userId: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    gameClient.GetTableState({ table_id: tableId, user_id: userId }, (err, response) => {
-      if (err || !response?.state) {
-        resolve(false);
-        return;
-      }
-      const found = response.state?.spectators?.some((s) => s.user_id === userId) || false;
-      resolve(found);
-    });
-  });
-}
-
 async function isMuted(tableId: string, userId: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    gameClient.IsMuted({ table_id: tableId, user_id: userId }, (err, response) => {
-      if (err || !response) {
-        resolve(false);
-        return;
-      }
-      resolve(response.is_muted);
+  try {
+    const response = await grpcCall(gameClient.IsMuted.bind(gameClient), {
+      table_id: tableId,
+      user_id: userId,
     });
-  });
+    return response.is_muted;
+  } catch {
+    return false;
+  }
 }
 
 async function getUsername(userId: string): Promise<string> {
-  return new Promise((resolve) => {
-    playerClient.GetProfile({ user_id: userId }, (err, response) => {
-      const username = response?.profile?.username;
-      if (err || typeof username !== "string" || username.trim().length === 0) {
-        resolve("Unknown");
-        return;
-      }
-      resolve(username);
-    });
-  });
+  try {
+    const response = await grpcCall(playerClient.GetProfile.bind(playerClient), { user_id: userId });
+    const username = (response.profile as { username?: unknown } | undefined)?.username;
+    if (typeof username === "string" && username.trim().length > 0) {
+      return username;
+    }
+    return "Unknown";
+  } catch {
+    return "Unknown";
+  }
 }
 
 async function handleSubscribe(connectionId: string, tableId: string) {
@@ -118,8 +99,7 @@ async function handleChatSend(
     return;
   }
 
-  const seated = await isSeated(tableId, userId);
-  const spectator = seated ? false : await isSpectator(tableId, userId);
+  const { seated, spectator } = await getMembership(tableId, userId);
   if (!seated && !spectator) {
     sendToLocal(connectionId, { type: "ChatError", tableId, reason: "not_seated" });
     return;
@@ -159,9 +139,6 @@ export function attachChatHub(socket: WebSocket, userId: string, connectionId: s
     },
     handlers: {
       SubscribeChat: async (message) => {
-        if (message.type !== "SubscribeChat") {
-          return;
-        }
         const tableId = parseTableId(message.tableId);
         if (!tableId) {
           return;
@@ -169,9 +146,6 @@ export function attachChatHub(socket: WebSocket, userId: string, connectionId: s
         await handleSubscribe(connectionId, tableId);
       },
       UnsubscribeChat: async (message) => {
-        if (message.type !== "UnsubscribeChat") {
-          return;
-        }
         const tableId = parseTableId(message.tableId);
         if (!tableId) {
           return;
@@ -179,9 +153,6 @@ export function attachChatHub(socket: WebSocket, userId: string, connectionId: s
         await handleUnsubscribe(connectionId, tableId);
       },
       ChatSend: async (message) => {
-        if (message.type !== "ChatSend") {
-          return;
-        }
         const tableId = parseTableId(message.tableId);
         if (!tableId) {
           return;

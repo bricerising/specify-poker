@@ -1,68 +1,68 @@
-import webpush from "web-push";
 import { NotificationPayload } from "../domain/types";
 import { SubscriptionStore } from "../storage/subscriptionStore";
-import { getConfig } from "../config";
 import logger from "../observability/logger";
 import { recordPushDelivery } from "../observability/metrics";
+import { createWebPushClient, type WebPushClient } from "./webPushClient";
 
 export class PushSenderService {
-  private subscriptionStore: SubscriptionStore;
+  constructor(
+    private readonly subscriptionStore: SubscriptionStore,
+    private readonly webPushClient: WebPushClient = createWebPushClient()
+  ) {}
 
-  constructor(subscriptionStore: SubscriptionStore) {
-    this.subscriptionStore = subscriptionStore;
-
-    const config = getConfig();
-    const publicVapidKey = config.vapidPublicKey;
-    const privateVapidKey = config.vapidPrivateKey;
-    const vapidSubject = config.vapidSubject;
-
-    if (publicVapidKey && privateVapidKey) {
-      webpush.setVapidDetails(vapidSubject, publicVapidKey, privateVapidKey);
-    } else {
-      logger.warn("VAPID keys not set. Push notifications will fail.");
+  private getStatusCode(error: unknown): number | null {
+    if (!error || typeof error !== "object") {
+      return null;
     }
+
+    const statusCode = (error as { statusCode?: unknown }).statusCode;
+    if (typeof statusCode !== "number") {
+      return null;
+    }
+
+    return statusCode;
   }
 
   async sendToUser(userId: string, payload: NotificationPayload): Promise<{ success: number; failure: number }> {
     const subscriptions = await this.subscriptionStore.getSubscriptions(userId);
-    let success = 0;
-    let failure = 0;
 
     const results = await Promise.all(
       subscriptions.map(async (sub) => {
         try {
-          await webpush.sendNotification(
-            {
-              endpoint: sub.endpoint,
-              keys: sub.keys,
-            },
-            JSON.stringify(payload)
-          );
-          await this.subscriptionStore.incrementStat('success');
+          await this.webPushClient.sendNotification(sub, JSON.stringify(payload));
+          await this.subscriptionStore.incrementStat("success");
           recordPushDelivery("success");
-          return { ok: true };
+          return "success" as const;
         } catch (error: unknown) {
-          const statusCode = (error as { statusCode?: number }).statusCode;
+          const statusCode = this.getStatusCode(error);
           if (statusCode === 404 || statusCode === 410) {
             logger.info({ userId, endpoint: sub.endpoint }, "Removing expired subscription");
             await this.subscriptionStore.deleteSubscription(userId, sub.endpoint);
-            await this.subscriptionStore.incrementStat('cleanup');
+            await this.subscriptionStore.incrementStat("cleanup");
             recordPushDelivery("cleanup");
-          } else {
-            logger.error({ err: error, userId, endpoint: sub.endpoint }, "Failed to send notification");
-            await this.subscriptionStore.incrementStat('failure');
-            recordPushDelivery("failure");
+            return "failure" as const;
           }
-          return { ok: false };
+
+          logger.error({ err: error, userId, endpoint: sub.endpoint }, "Failed to send notification");
+          await this.subscriptionStore.incrementStat("failure");
+          recordPushDelivery("failure");
+          return "failure" as const;
         }
       })
     );
 
-    results.forEach((r) => {
-      if (r.ok) success++;
-      else failure++;
-    });
+    const counts = results.reduce(
+      (acc, result) => {
+        if (result === "success") {
+          acc.success += 1;
+          return acc;
+        }
+        acc.failure += 1;
+        return acc;
+      },
+      { success: 0, failure: 0 }
+    );
 
-    return { success, failure };
+    return counts;
   }
 }

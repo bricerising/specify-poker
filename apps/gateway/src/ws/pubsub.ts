@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { createClient, RedisClientType } from "redis";
 import { getConfig } from "../config";
 import logger from "../observability/logger";
+import { isRecord, safeJsonParseRecord } from "../utils/json";
 
 type WsChannel = "table" | "chat" | "timer" | "lobby";
 
@@ -17,6 +18,27 @@ const instanceId = randomUUID();
 let pubClient: RedisClientType | null = null;
 let subClient: RedisClientType | null = null;
 let initialized = false;
+
+function parseWsPubSubMessage(raw: string): WsPubSubMessage | null {
+  const record = safeJsonParseRecord(raw);
+  if (!record) {
+    return null;
+  }
+
+  const channel = record.channel;
+  if (channel !== "table" && channel !== "chat" && channel !== "timer" && channel !== "lobby") {
+    return null;
+  }
+
+  const tableId = typeof record.tableId === "string" ? record.tableId : "";
+  const sourceId = typeof record.sourceId === "string" ? record.sourceId : "";
+  const payload = record.payload;
+  if (!tableId || !sourceId || !isRecord(payload)) {
+    return null;
+  }
+
+  return { channel, tableId, payload, sourceId };
+}
 
 export function getWsInstanceId() {
   return instanceId;
@@ -48,31 +70,23 @@ export async function initWsPubSub(handlers: {
   await pubClient.connect();
   await subClient.connect();
 
+  const handlerByChannel: Record<WsChannel, (message: WsPubSubMessage) => void> = {
+    table: handlers.onTableEvent,
+    chat: handlers.onChatEvent,
+    timer: handlers.onTimerEvent,
+    lobby: handlers.onLobbyEvent,
+  };
+
   await subClient.subscribe(PUBSUB_CHANNEL, (message) => {
-    let parsed: WsPubSubMessage;
-    try {
-      parsed = JSON.parse(message) as WsPubSubMessage;
-    } catch {
+    const parsed = parseWsPubSubMessage(message);
+    if (!parsed) {
       return;
     }
     if (parsed.sourceId === instanceId) {
       return;
     }
-    if (parsed.channel === "table") {
-      handlers.onTableEvent(parsed);
-      return;
-    }
-    if (parsed.channel === "chat") {
-      handlers.onChatEvent(parsed);
-      return;
-    }
-    if (parsed.channel === "timer") {
-      handlers.onTimerEvent(parsed);
-      return;
-    }
-    if (parsed.channel === "lobby") {
-      handlers.onLobbyEvent(parsed);
-    }
+
+    handlerByChannel[parsed.channel](parsed);
   });
 
   initialized = true;

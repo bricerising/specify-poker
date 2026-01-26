@@ -31,7 +31,20 @@ describe("storage caches", () => {
 
   it("stores and retrieves profile cache entries", async () => {
     vi.spyOn(redisClient, "getRedisClient").mockResolvedValue(redis as never);
-    redis.get.mockResolvedValue(JSON.stringify({ userId: "user-1", username: "user-1", nickname: "Nick" }));
+    redis.get.mockResolvedValue(
+      JSON.stringify({
+        userId: "user-1",
+        username: "user-1",
+        nickname: "Nick",
+        avatarUrl: null,
+        preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: "auto" },
+        lastLoginAt: null,
+        referredBy: null,
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+        deletedAt: null,
+      })
+    );
 
     await profileCache.set({
       userId: "user-1",
@@ -61,11 +74,25 @@ describe("storage caches", () => {
 
   it("loads multiple profiles from cache", async () => {
     vi.spyOn(redisClient, "getRedisClient").mockResolvedValue(redis as never);
-    redis.mGet.mockResolvedValue([JSON.stringify({ userId: "user-1" }), null]);
+    redis.mGet.mockResolvedValue([
+      JSON.stringify({
+        userId: "user-1",
+        username: "user-1",
+        nickname: "Nick",
+        avatarUrl: null,
+        preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: "auto" },
+        lastLoginAt: null,
+        referredBy: null,
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+        deletedAt: null,
+      }),
+      null,
+    ]);
 
     const result = await profileCache.getMulti(["user-1", "user-2"]);
 
-    expect(result.get("user-1")).toEqual({ userId: "user-1" });
+    expect(result.get("user-1")?.nickname).toEqual("Nick");
     expect(result.has("user-2")).toBe(false);
   });
 
@@ -147,11 +174,33 @@ describe("storage caches", () => {
 
   it("returns cached statistics when present", async () => {
     vi.spyOn(redisClient, "getRedisClient").mockResolvedValue(redis as never);
-    redis.get.mockResolvedValue(JSON.stringify({ userId: "user-1", handsPlayed: 3 }));
+    redis.get.mockResolvedValue(
+      JSON.stringify({
+        userId: "user-1",
+        handsPlayed: 3,
+        wins: 1,
+        vpip: 10,
+        pfr: 5,
+        allInCount: 0,
+        biggestPot: 20,
+        referralCount: 0,
+        lastUpdated: "2024-01-01T00:00:00Z",
+      })
+    );
 
     const stats = await statisticsCache.get("user-1");
 
-    expect(stats).toEqual({ userId: "user-1", handsPlayed: 3 });
+    expect(stats).toEqual({
+      userId: "user-1",
+      handsPlayed: 3,
+      wins: 1,
+      vpip: 10,
+      pfr: 5,
+      allInCount: 0,
+      biggestPot: 20,
+      referralCount: 0,
+      lastUpdated: "2024-01-01T00:00:00Z",
+    });
   });
 
   it("returns null when statistics cache is unavailable", async () => {

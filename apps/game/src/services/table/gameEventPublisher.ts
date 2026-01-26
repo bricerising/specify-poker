@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from "uuid";
 import { toStruct } from "@specify-poker/shared";
 
 import { eventClient } from "../../api/grpc/clients";
+import logger from "../../observability/logger";
 import { unaryCall } from "./grpcUnary";
 
 type EventPublish = { success: boolean };
@@ -38,13 +39,18 @@ export class GameEventPublisher {
         idempotency_key: params.idempotencyKey ?? uuidv4(),
       });
       if (!response.success) {
-        console.error("Failed to emit game event");
+        logger.error(
+          { eventType: params.type, tableId: params.tableId, handId: params.handId },
+          "Failed to emit game event",
+        );
       }
     } catch (err) {
-      console.error("Failed to emit game event:", err);
+      logger.error(
+        { err, eventType: params.type, tableId: params.tableId, handId: params.handId },
+        "Failed to emit game event",
+      );
     }
   }
 }
 
 export const gameEventPublisher = new GameEventPublisher();
-

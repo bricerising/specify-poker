@@ -45,13 +45,22 @@ export async function renderMetrics(): Promise<string> {
 }
 
 export function startMetricsServer(port: number): http.Server {
-  const server = http.createServer(async (req, res) => {
+  const server = http.createServer((req, res) => {
     if (req.url === "/metrics") {
-      res.statusCode = 200;
-      res.setHeader("Content-Type", registry.contentType);
-      res.end(await renderMetrics());
+      void renderMetrics()
+        .then((body) => {
+          res.statusCode = 200;
+          res.setHeader("Content-Type", registry.contentType);
+          res.end(body);
+        })
+        .catch((err: unknown) => {
+          logger.error({ err }, "Failed to render metrics");
+          res.statusCode = 500;
+          res.end("Internal Server Error");
+        });
       return;
     }
+
     res.statusCode = 404;
     res.end("Not Found");
   });

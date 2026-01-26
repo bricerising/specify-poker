@@ -6,6 +6,12 @@ vi.mock("../../../src/auth/jwt", () => ({
   verifyToken: vi.fn(),
 }));
 
+vi.mock("../../../src/observability/logger", () => ({
+  default: {
+    warn: vi.fn(),
+  },
+}));
+
 import { verifyToken } from "../../../src/auth/jwt";
 
 describe("Auth middleware", () => {

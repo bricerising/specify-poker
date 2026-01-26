@@ -51,6 +51,8 @@ export interface Seat {
   status: SeatStatus;
   holeCards: Card[] | null;
   reservationId?: string;
+  buyInIdempotencyKey?: string;
+  pendingBuyInAmount?: number;
   lastAction?: string;
 }
 

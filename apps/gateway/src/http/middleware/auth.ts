@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { verifyToken } from "../../auth/jwt";
+import logger from "../../observability/logger";
 
 export interface AuthContext {
   userId: string;
@@ -51,8 +52,8 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     };
     
     return next();
-  } catch (error) {
-    console.warn("auth.failed", { error: error instanceof Error ? error.message : String(error) });
+  } catch (err: unknown) {
+    logger.warn({ err }, "auth.failed");
     return deny(res, "Invalid token");
   }
 }

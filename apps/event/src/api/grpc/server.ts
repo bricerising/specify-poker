@@ -1,9 +1,10 @@
-import * as grpc from '@grpc/grpc-js';
-import * as protoLoader from '@grpc/proto-loader';
-import * as path from 'path';
-import { createHandlers } from './handlers';
+import * as grpc from "@grpc/grpc-js";
+import * as protoLoader from "@grpc/proto-loader";
+import * as path from "path";
+import { createHandlers } from "./handlers";
+import logger from "../../observability/logger";
 
-const PROTO_PATH = path.resolve(__dirname, '../../../proto/event.proto');
+const PROTO_PATH = path.resolve(__dirname, "../../../proto/event.proto");
 
 let server: grpc.Server | null = null;
 
@@ -20,11 +21,11 @@ export async function startGrpcServer(port: number): Promise<void> {
     event: { EventService: { service: grpc.ServiceDefinition } };
   };
 
-  server = new grpc.Server();
+  const grpcServer = new grpc.Server();
 
   const handlers = createHandlers();
 
-  server.addService(proto.event.EventService.service, {
+  grpcServer.addService(proto.event.EventService.service, {
     PublishEvent: handlers.publishEvent,
     PublishEvents: handlers.publishEvents,
     QueryEvents: handlers.queryEvents,
@@ -38,16 +39,19 @@ export async function startGrpcServer(port: number): Promise<void> {
     UpdateCursor: handlers.updateCursor,
   } as unknown as grpc.UntypedServiceImplementation);
 
-  return new Promise((resolve, reject) => {
-    server!.bindAsync(`0.0.0.0:${port}`, grpc.ServerCredentials.createInsecure(), (error, boundPort) => {
+  await new Promise<void>((resolve, reject) => {
+    grpcServer.bindAsync(`0.0.0.0:${port}`, grpc.ServerCredentials.createInsecure(), (error, boundPort) => {
       if (error) {
         reject(error);
         return;
       }
-      console.log(`Event gRPC server listening on port ${boundPort}`);
+      grpcServer.start();
+      logger.info({ port: boundPort }, "Event gRPC server listening");
       resolve();
     });
   });
+
+  server = grpcServer;
 }
 
 export function stopGrpcServer(): void {

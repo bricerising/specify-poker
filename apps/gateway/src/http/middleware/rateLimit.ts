@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import { incrementRateLimit } from "../../storage/rateLimitStore";
 import logger from "../../observability/logger";
+import { readIntEnv } from "../../utils/env";
 
-const HTTP_WINDOW_MS = Number(process.env.HTTP_RATE_LIMIT_WINDOW_MS ?? 60000);
-const HTTP_MAX = Number(process.env.HTTP_RATE_LIMIT_MAX ?? 100);
+const HTTP_WINDOW_MS = readIntEnv("HTTP_RATE_LIMIT_WINDOW_MS", 60_000, { min: 1 });
+const HTTP_MAX = readIntEnv("HTTP_RATE_LIMIT_MAX", 100, { min: 1 });
 
 export async function httpRateLimitMiddleware(req: Request, res: Response, next: NextFunction) {
   const ip = req.ip || req.socket.remoteAddress || "unknown";

@@ -6,19 +6,16 @@ import {
   SettlementResultItem,
   TablePot,
 } from "../domain/types";
+import { nowIso } from "../utils/time";
 import {
   getTablePot,
   saveTablePot,
   updateTablePot,
 } from "../storage/tablePotStore";
 import { creditBalance } from "./accountService";
-import { getIdempotentResponse, setIdempotentResponse } from "../storage/idempotencyStore";
 import { recordPotContribution, recordPotSettlement } from "../observability/metrics";
 import logger from "../observability/logger";
-
-function now(): string {
-  return new Date().toISOString();
-}
+import { withIdempotentResponse } from "../utils/idempotency";
 
 function calculateRake(totalPot: number): number {
   if (totalPot <= 20) {
@@ -66,7 +63,7 @@ export async function createPot(tableId: string, handId: string): Promise<TableP
     rakeAmount: 0,
     status: "ACTIVE",
     version: 0,
-    createdAt: now(),
+    createdAt: nowIso(),
     settledAt: null,
   };
 
@@ -91,46 +88,40 @@ export async function recordContribution(
   contributionType: string,
   idempotencyKey: string
 ): Promise<ContributionResult> {
-  // Check idempotency
-  const existingResponse = await getIdempotentResponse(idempotencyKey);
-  if (existingResponse) {
-    return existingResponse as ContributionResult;
-  }
+  return withIdempotentResponse(idempotencyKey, async () => {
+    if (amount <= 0) {
+      return { ok: false, error: "INVALID_AMOUNT" };
+    }
 
-  const pot = await ensurePot(tableId, handId);
-  if (pot.status !== "ACTIVE") {
-    const result: ContributionResult = { ok: false, error: "POT_NOT_ACTIVE" };
-    await setIdempotentResponse(idempotencyKey, result);
-    return result;
-  }
+    const pot = await ensurePot(tableId, handId);
+    if (pot.status !== "ACTIVE") {
+      return { ok: false, error: "POT_NOT_ACTIVE" };
+    }
 
-  // Update contributions
-  const updated = await updateTablePot(tableId, handId, (current) => {
-    const newContributions = { ...current.contributions };
-    newContributions[seatId] = (newContributions[seatId] ?? 0) + amount;
+    // Update contributions
+    const updated = await updateTablePot(tableId, handId, (current) => {
+      const newContributions = { ...current.contributions };
+      newContributions[seatId] = (newContributions[seatId] ?? 0) + amount;
+      return {
+        ...current,
+        contributions: newContributions,
+      };
+    });
+
+    if (!updated) {
+      return { ok: false, error: "UPDATE_FAILED" };
+    }
+
+    const totalPot = Object.values(updated.contributions).reduce((sum, c) => sum + c, 0);
+    const seatContribution = updated.contributions[seatId] ?? 0;
+    recordPotContribution(amount);
+
     return {
-      ...current,
-      contributions: newContributions,
+      ok: true,
+      totalPot,
+      seatContribution,
     };
   });
-
-  if (!updated) {
-    const result: ContributionResult = { ok: false, error: "UPDATE_FAILED" };
-    await setIdempotentResponse(idempotencyKey, result);
-    return result;
-  }
-
-  const totalPot = Object.values(updated.contributions).reduce((sum, c) => sum + c, 0);
-  const seatContribution = updated.contributions[seatId] ?? 0;
-  recordPotContribution(amount);
-
-  const result: ContributionResult = {
-    ok: true,
-    totalPot,
-    seatContribution,
-  };
-  await setIdempotentResponse(idempotencyKey, result);
-  return result;
 }
 
 // Calculate pots including side pots for all-in scenarios
@@ -186,86 +177,69 @@ export async function settlePot(
   winners: SettlementWinner[],
   idempotencyKey: string
 ): Promise<SettlePotResult> {
-  // Check idempotency
-  const existingResponse = await getIdempotentResponse(idempotencyKey);
-  if (existingResponse) {
-    return existingResponse as SettlePotResult;
-  }
-
-  const pot = await getTablePot(tableId, handId);
-  if (!pot) {
-    const result: SettlePotResult = { ok: false, error: "POT_NOT_FOUND" };
-    await setIdempotentResponse(idempotencyKey, result);
-    return result;
-  }
-
-  if (pot.status === "SETTLED") {
-    // Already settled - return success (idempotent)
-    const result: SettlePotResult = { ok: true, results: [] };
-    await setIdempotentResponse(idempotencyKey, result);
-    return result;
-  }
-
-  if (pot.status !== "ACTIVE") {
-    const result: SettlePotResult = { ok: false, error: "POT_NOT_ACTIVE" };
-    await setIdempotentResponse(idempotencyKey, result);
-    return result;
-  }
-
-  const totalPot = Object.values(pot.contributions).reduce((sum, amount) => sum + amount, 0);
-  const rakeAmount = calculateRake(totalPot);
-  const netPot = Math.max(totalPot - rakeAmount, 0);
-  const normalizedWinners = normalizeWinners(winners, netPot);
-
-  // Process each winner
-  const settlementResults: SettlementResultItem[] = [];
-
-  for (const winner of normalizedWinners) {
-    if (winner.amount <= 0) {
-      continue;
+  return withIdempotentResponse(idempotencyKey, async () => {
+    const pot = await getTablePot(tableId, handId);
+    if (!pot) {
+      return { ok: false, error: "POT_NOT_FOUND" };
     }
 
-    const creditResult = await creditBalance(
-      winner.accountId,
-      winner.amount,
-      "POT_WIN",
-      `${idempotencyKey}:${winner.seatId}`,
-      {
-        tableId,
-        handId,
-        seatId: winner.seatId,
-      }
-    );
+    if (pot.status === "SETTLED") {
+      // Already settled - return success (idempotent)
+      return { ok: true, results: [] };
+    }
 
-    if (creditResult.ok && creditResult.transaction) {
+    if (pot.status !== "ACTIVE") {
+      return { ok: false, error: "POT_NOT_ACTIVE" };
+    }
+
+    const totalPot = Object.values(pot.contributions).reduce((sum, amount) => sum + amount, 0);
+    const rakeAmount = calculateRake(totalPot);
+    const netPot = Math.max(totalPot - rakeAmount, 0);
+    const normalizedWinners = normalizeWinners(winners, netPot);
+
+    // Process each winner
+    const settlementResults: SettlementResultItem[] = [];
+
+    for (const winner of normalizedWinners) {
+      if (winner.amount <= 0) {
+        continue;
+      }
+
+      const creditResult = await creditBalance(
+        winner.accountId,
+        winner.amount,
+        "POT_WIN",
+        `${idempotencyKey}:${winner.seatId}`,
+        {
+          tableId,
+          handId,
+          seatId: winner.seatId,
+        }
+      );
+
+      if (!creditResult.ok) {
+        return { ok: false, error: creditResult.error };
+      }
+
       settlementResults.push({
         accountId: winner.accountId,
         transactionId: creditResult.transaction.transactionId,
         amount: winner.amount,
         newBalance: creditResult.transaction.balanceAfter,
       });
-    } else {
-      const result: SettlePotResult = {
-        ok: false,
-        error: creditResult.error ?? "SETTLEMENT_FAILED",
-      };
-      await setIdempotentResponse(idempotencyKey, result);
-      return result;
     }
-  }
 
-  // Mark pot as settled
-  await updateTablePot(tableId, handId, (current) => ({
-    ...current,
-    status: "SETTLED",
-    rakeAmount,
-    settledAt: now(),
-  }));
-  recordPotSettlement(totalPot, rakeAmount);
+    // Mark pot as settled
+    await updateTablePot(tableId, handId, (current) => ({
+      ...current,
+      status: "SETTLED",
+      rakeAmount,
+      settledAt: nowIso(),
+    }));
+    recordPotSettlement(totalPot, rakeAmount);
 
-  const result: SettlePotResult = { ok: true, results: settlementResults };
-  await setIdempotentResponse(idempotencyKey, result);
-  return result;
+    return { ok: true, results: settlementResults };
+  });
 }
 
 export async function cancelPot(
@@ -285,7 +259,7 @@ export async function cancelPot(
   await updateTablePot(tableId, handId, (current) => ({
     ...current,
     status: "CANCELLED",
-    settledAt: now(),
+    settledAt: nowIso(),
   }));
 
   logger.info({ tableId, handId, reason }, "pot.cancelled");

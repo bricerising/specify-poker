@@ -1,4 +1,5 @@
 import WebSocket from "ws";
+import type { z } from "zod";
 
 export function rawDataToString(data: WebSocket.RawData): string {
   if (typeof data === "string") return data;
@@ -19,3 +20,14 @@ export function parseJsonObject(data: WebSocket.RawData): Record<string, unknown
   }
 }
 
+export function parseJsonWithSchema<TSchema extends z.ZodTypeAny>(
+  data: WebSocket.RawData,
+  schema: TSchema,
+): z.infer<TSchema> | null {
+  const obj = parseJsonObject(data);
+  if (!obj) {
+    return null;
+  }
+  const parsed = schema.safeParse(obj);
+  return parsed.success ? parsed.data : null;
+}

@@ -1,6 +1,7 @@
 import pool from "./pgClient";
 import redisClient from "./redisClient";
 import { Cursor } from "../domain/types";
+import { isRecord } from "../errors";
 
 const cursorKey = (cursorId: string) => `event:cursors:${cursorId}`;
 const subscriberKey = (subscriberId: string) => `event:cursors:by-subscriber:${subscriberId}`;
@@ -41,12 +42,54 @@ function hydrateCursor(raw: {
   };
 }
 
+function parseCachedCursor(raw: string): Cursor | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed)) {
+      return null;
+    }
+    const { cursorId, streamId, subscriberId, position, createdAt, updatedAt } = parsed;
+
+    if (typeof cursorId !== "string" || typeof streamId !== "string" || typeof subscriberId !== "string") {
+      return null;
+    }
+    if (typeof position !== "number" || !Number.isFinite(position)) {
+      return null;
+    }
+    if (typeof createdAt !== "string" && !(createdAt instanceof Date)) {
+      return null;
+    }
+    if (typeof updatedAt !== "string" && !(updatedAt instanceof Date)) {
+      return null;
+    }
+
+    return hydrateCursor({
+      cursorId,
+      streamId,
+      subscriberId,
+      position,
+      createdAt,
+      updatedAt,
+    });
+  } catch {
+    return null;
+  }
+}
+
 export class CursorStore {
   async getCursor(streamId: string, subscriberId: string): Promise<Cursor | null> {
     const cursorId = `${streamId}:${subscriberId}`;
     const cached = await redisClient.get(cursorKey(cursorId));
     if (cached) {
-      return hydrateCursor(JSON.parse(cached) as Cursor);
+      const parsed = parseCachedCursor(cached);
+      if (parsed) {
+        return parsed;
+      }
+      try {
+        await redisClient.del(cursorKey(cursorId));
+      } catch {
+        // ignore cache eviction failure and fall back to DB
+      }
     }
 
     const res = await pool.query("SELECT * FROM cursors WHERE stream_id = $1 AND subscriber_id = $2", [

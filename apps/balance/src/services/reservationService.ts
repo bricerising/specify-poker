@@ -6,6 +6,7 @@ import {
   ReservationResult,
 } from "../domain/types";
 import { getBalance, debitBalance } from "./accountService";
+import { nowIso } from "../utils/time";
 import {
   getReservation,
   saveReservation,
@@ -13,12 +14,8 @@ import {
   getActiveReservationsByAccount,
   getExpiredReservations,
 } from "../storage/reservationStore";
-import { getIdempotentResponse, setIdempotentResponse } from "../storage/idempotencyStore";
 import logger from "../observability/logger";
-
-function now(): string {
-  return new Date().toISOString();
-}
+import { withIdempotentResponse } from "../utils/idempotency";
 
 export async function reserveForBuyIn(
   accountId: string,
@@ -27,57 +24,51 @@ export async function reserveForBuyIn(
   idempotencyKey: string,
   timeoutSeconds?: number
 ): Promise<ReservationResult> {
-  // Check idempotency
-  const existingResponse = await getIdempotentResponse(idempotencyKey);
-  if (existingResponse) {
-    return existingResponse as ReservationResult;
-  }
+  return withIdempotentResponse(idempotencyKey, async () => {
+    if (amount <= 0) {
+      return { ok: false, error: "INVALID_AMOUNT" };
+    }
 
-  // Get balance info
-  const balanceInfo = await getBalance(accountId);
-  if (!balanceInfo) {
-    const result: ReservationResult = { ok: false, error: "ACCOUNT_NOT_FOUND" };
-    await setIdempotentResponse(idempotencyKey, result);
-    return result;
-  }
+    // Get balance info
+    const balanceInfo = await getBalance(accountId);
+    if (!balanceInfo) {
+      return { ok: false, error: "ACCOUNT_NOT_FOUND" };
+    }
 
-  // Check available balance
-  if (balanceInfo.availableBalance < amount) {
-    const result: ReservationResult = {
-      ok: false,
-      error: "INSUFFICIENT_BALANCE",
-      availableBalance: balanceInfo.availableBalance,
+    // Check available balance
+    if (balanceInfo.availableBalance < amount) {
+      return {
+        ok: false,
+        error: "INSUFFICIENT_BALANCE",
+        availableBalance: balanceInfo.availableBalance,
+      };
+    }
+
+    // Create reservation
+    const timeoutMs = (timeoutSeconds ?? 30) * 1000;
+    const expiresAt = new Date(Date.now() + timeoutMs).toISOString();
+
+    const reservation: Reservation = {
+      reservationId: randomUUID(),
+      accountId,
+      amount,
+      tableId,
+      idempotencyKey,
+      expiresAt,
+      status: "HELD",
+      createdAt: nowIso(),
+      committedAt: null,
+      releasedAt: null,
     };
-    await setIdempotentResponse(idempotencyKey, result);
-    return result;
-  }
 
-  // Create reservation
-  const timeoutMs = (timeoutSeconds ?? 30) * 1000;
-  const expiresAt = new Date(Date.now() + timeoutMs).toISOString();
+    await saveReservation(reservation);
 
-  const reservation: Reservation = {
-    reservationId: randomUUID(),
-    accountId,
-    amount,
-    tableId,
-    idempotencyKey,
-    expiresAt,
-    status: "HELD",
-    createdAt: now(),
-    committedAt: null,
-    releasedAt: null,
-  };
-
-  await saveReservation(reservation);
-
-  const result: ReservationResult = {
-    ok: true,
-    reservationId: reservation.reservationId,
-    availableBalance: balanceInfo.availableBalance - amount,
-  };
-  await setIdempotentResponse(idempotencyKey, result);
-  return result;
+    return {
+      ok: true,
+      reservationId: reservation.reservationId,
+      availableBalance: balanceInfo.availableBalance - amount,
+    };
+  });
 }
 
 export async function commitReservation(reservationId: string): Promise<CommitResult> {
@@ -109,7 +100,7 @@ export async function commitReservation(reservationId: string): Promise<CommitRe
     await updateReservation(reservationId, (r) => ({
       ...r,
       status: "EXPIRED",
-      releasedAt: now(),
+      releasedAt: nowIso(),
     }));
     return { ok: false, error: "RESERVATION_EXPIRED" };
   }
@@ -135,13 +126,13 @@ export async function commitReservation(reservationId: string): Promise<CommitRe
   await updateReservation(reservationId, (r) => ({
     ...r,
     status: "COMMITTED",
-    committedAt: now(),
+    committedAt: nowIso(),
   }));
 
   return {
     ok: true,
-    transactionId: debitResult.transaction?.transactionId,
-    newBalance: debitResult.transaction?.balanceAfter,
+    transactionId: debitResult.transaction.transactionId,
+    newBalance: debitResult.transaction.balanceAfter,
   };
 }
 
@@ -168,7 +159,7 @@ export async function releaseReservation(
   await updateReservation(reservationId, (r) => ({
     ...r,
     status: "RELEASED",
-    releasedAt: now(),
+    releasedAt: nowIso(),
   }));
 
   const balanceInfo = await getBalance(reservation.accountId);
@@ -184,7 +175,7 @@ export async function processExpiredReservations(): Promise<number> {
       await updateReservation(reservation.reservationId, (r) => ({
         ...r,
         status: "EXPIRED",
-        releasedAt: now(),
+        releasedAt: nowIso(),
       }));
       count++;
       logger.info({

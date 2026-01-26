@@ -4,6 +4,20 @@ import { incrementHandsPlayed, incrementWins } from "./statisticsService";
 import logger from "../observability/logger";
 import { decodeStructLike } from "@specify-poker/shared";
 
+type UnknownRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function safeJsonParse(value: string): unknown | null {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
 export class EventConsumer {
   private isRunning: boolean = false;
   private streamKey: string = "events:all";
@@ -54,7 +68,7 @@ export class EventConsumer {
     }
 
     logger.info("Player EventConsumer started");
-    this.poll();
+    void this.poll();
   }
 
   private async poll(): Promise<void> {
@@ -75,9 +89,7 @@ export class EventConsumer {
         if (streams) {
           for (const stream of streams) {
             for (const message of stream.messages) {
-              const event = JSON.parse(message.message.data as string) as { type?: string; payload?: unknown };
-              await this.handleEvent(event);
-              await client.xAck(this.streamKey, this.groupName, message.id);
+              await this.processMessage(client, message);
             }
           }
         }
@@ -89,14 +101,52 @@ export class EventConsumer {
     }
   }
 
-  private async handleEvent(event: { type?: string; payload?: unknown }): Promise<void> {
+  private async processMessage(
+    client: ReturnType<typeof createClient>,
+    message: { id: string; message: Record<string, unknown> }
+  ): Promise<void> {
     try {
-      const { type, payload } = event;
-      const handler = type ? this.handlers[type] : undefined;
+      const rawData = message.message.data;
+      if (typeof rawData !== "string") {
+        logger.warn({ messageId: message.id }, "eventConsumer.invalidMessage");
+        return;
+      }
+
+      const parsed = safeJsonParse(rawData);
+      if (!parsed) {
+        logger.warn({ messageId: message.id }, "eventConsumer.invalidJson");
+        return;
+      }
+
+      await this.handleEvent(parsed);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "unknown";
+      logger.error({ message }, "Error processing event message");
+    } finally {
+      try {
+        await client.xAck(this.streamKey, this.groupName, message.id);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "unknown";
+        logger.error({ message }, "Error acknowledging event message");
+      }
+    }
+  }
+
+  async handleEvent(event: unknown): Promise<void> {
+    try {
+      if (!isRecord(event)) {
+        return;
+      }
+      const type = typeof event.type === "string" ? event.type : null;
+      if (!type) {
+        return;
+      }
+      const handler = this.handlers[type];
       if (!handler) {
         return;
       }
-      const data = decodeStructLike(payload);
+
+      const data = decodeStructLike(event.payload);
 
       await handler(data);
     } catch (err: unknown) {

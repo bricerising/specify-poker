@@ -1,9 +1,10 @@
-import pool from './pgClient';
+import pool from "./pgClient";
+import logger from "../observability/logger";
 
 export async function runMigrations() {
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS events (
@@ -73,11 +74,11 @@ export async function runMigrations() {
 
     await client.query(`CREATE INDEX IF NOT EXISTS idx_cursors_stream ON cursors(stream_id);`);
 
-    await client.query('COMMIT');
-    console.log('Migrations completed successfully');
+    await client.query("COMMIT");
+    logger.info("Migrations completed successfully");
   } catch (err) {
-    await client.query('ROLLBACK');
-    console.error('Migration failed:', err);
+    await client.query("ROLLBACK");
+    logger.error({ error: err }, "Migration failed");
     throw err;
   } finally {
     client.release();

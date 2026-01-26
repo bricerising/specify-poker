@@ -3,12 +3,14 @@ import type { z } from "zod";
 import { wsClientMessageSchema } from "@specify-poker/shared";
 
 import { gameClient } from "../../grpc/clients";
+import { grpcCall } from "../../grpc/grpcCall";
 import { WsPubSubMessage } from "../pubsub";
 import { parseActionType, parseSeatId, parseTableId, checkWsRateLimit } from "../validators";
-import { subscribeToChannel, unsubscribeFromChannel, unsubscribeAll, getSubscribers } from "../subscriptions";
+import { subscribeToChannel, unsubscribeFromChannel, unsubscribeAll } from "../subscriptions";
 import { sendToLocal, getLocalConnectionMeta } from "../localRegistry";
+import { deliverToSubscribers } from "../delivery";
 import logger from "../../observability/logger";
-import { parseJsonObject } from "../messageParsing";
+import { parseJsonWithSchema } from "../messageParsing";
 import { attachWsRouter } from "../router";
 import { toWireTableStateView } from "../transforms/gameWire";
 
@@ -26,27 +28,7 @@ function parseAmount(value: unknown): number | null {
 type WsClientMessage = z.infer<typeof wsClientMessageSchema>;
 
 function parseClientMessage(data: WebSocket.RawData): WsClientMessage | null {
-  const obj = parseJsonObject(data);
-  if (!obj) {
-    return null;
-  }
-  const parsed = wsClientMessageSchema.safeParse(obj);
-  return parsed.success ? parsed.data : null;
-}
-
-function grpcCall<TRequest, TResponse>(
-  method: (request: TRequest, callback: (err: Error | null, response: TResponse) => void) => void,
-  request: TRequest,
-): Promise<TResponse> {
-  return new Promise((resolve, reject) => {
-    method(request, (err: Error | null, response: TResponse) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve(response);
-    });
-  });
+  return parseJsonWithSchema(data, wsClientMessageSchema);
 }
 
 export async function handleTablePubSubEvent(message: WsPubSubMessage) {
@@ -54,11 +36,7 @@ export async function handleTablePubSubEvent(message: WsPubSubMessage) {
     return;
   }
 
-  const channel = `table:${message.tableId}`;
-  const subscribers = await getSubscribers(channel);
-  for (const connId of subscribers) {
-    sendToLocal(connId, message.payload);
-  }
+  await deliverToSubscribers(`table:${message.tableId}`, message.payload);
 }
 
 async function handleSubscribe(connectionId: string, userId: string, tableId: string) {
@@ -123,23 +101,22 @@ async function handleAction(
     request.amount = payload.amount;
   }
 
-  gameClient.SubmitAction(request, (err, response) => {
-    if (err) {
-      sendToLocal(connectionId, {
-        type: "ActionResult",
-        tableId: payload.tableId,
-        accepted: false,
-        reason: "internal_error",
-      });
-      return;
-    }
+  try {
+    const response = await grpcCall(gameClient.SubmitAction.bind(gameClient), request);
     sendToLocal(connectionId, {
       type: "ActionResult",
       tableId: payload.tableId,
       accepted: response.ok,
-      reason: response.error
+      reason: response.error,
     });
-  });
+  } catch {
+    sendToLocal(connectionId, {
+      type: "ActionResult",
+      tableId: payload.tableId,
+      accepted: false,
+      reason: "internal_error",
+    });
+  }
 }
 
 async function handleJoinSeat(
@@ -147,29 +124,31 @@ async function handleJoinSeat(
   userId: string,
   payload: { tableId: string; seatId: number; buyInAmount?: number },
 ) {
-  gameClient.JoinSeat({
-    table_id: payload.tableId,
-    user_id: userId,
-    seat_id: payload.seatId,
-    buy_in_amount: payload.buyInAmount && payload.buyInAmount > 0 ? payload.buyInAmount : 200
-  }, (err, response) => {
-    if (err) {
-      sendToLocal(connectionId, { type: "Error", message: "Internal error" });
-      return;
-    }
+  const buyInAmount = payload.buyInAmount && payload.buyInAmount > 0 ? payload.buyInAmount : 200;
+  try {
+    const response = await grpcCall(gameClient.JoinSeat.bind(gameClient), {
+      table_id: payload.tableId,
+      user_id: userId,
+      seat_id: payload.seatId,
+      buy_in_amount: buyInAmount,
+    });
     if (!response.ok) {
       sendToLocal(connectionId, { type: "Error", message: response.error });
     }
-  });
+  } catch {
+    sendToLocal(connectionId, { type: "Error", message: "Internal error" });
+  }
 }
 
 async function handleLeaveTable(userId: string, tableId: string) {
-  gameClient.LeaveSeat({
-    table_id: tableId,
-    user_id: userId
-  }, (err, _response) => {
-    if (err) return;
-  });
+  try {
+    await grpcCall(gameClient.LeaveSeat.bind(gameClient), {
+      table_id: tableId,
+      user_id: userId,
+    });
+  } catch {
+    // Best-effort.
+  }
 }
 
 export function attachTableHub(socket: WebSocket, userId: string, connectionId: string) {
@@ -184,22 +163,13 @@ export function attachTableHub(socket: WebSocket, userId: string, connectionId: 
     },
     handlers: {
       SubscribeTable: async (message) => {
-        if (message.type !== "SubscribeTable") {
-          return;
-        }
         await handleSubscribe(connectionId, userId, message.tableId);
       },
       UnsubscribeTable: async (message) => {
-        if (message.type !== "UnsubscribeTable") {
-          return;
-        }
         gameClient.LeaveSpectator({ table_id: message.tableId, user_id: userId }, (_err: unknown) => undefined);
         await handleUnsubscribe(connectionId, message.tableId);
       },
       JoinSeat: async (message) => {
-        if (message.type !== "JoinSeat") {
-          return;
-        }
         const seatId = parseSeatId(message.seatId);
         if (seatId === null) {
           return;
@@ -208,15 +178,9 @@ export function attachTableHub(socket: WebSocket, userId: string, connectionId: 
         await handleJoinSeat(connectionId, userId, { tableId: message.tableId, seatId, buyInAmount });
       },
       LeaveTable: async (message) => {
-        if (message.type !== "LeaveTable") {
-          return;
-        }
         await handleLeaveTable(userId, message.tableId);
       },
       Action: async (message) => {
-        if (message.type !== "Action") {
-          return;
-        }
         const tableId = parseTableId(message.tableId);
         if (!tableId) {
           return;
@@ -232,7 +196,7 @@ export function attachTableHub(socket: WebSocket, userId: string, connectionId: 
           return;
         }
 
-        const requiresAmount = actionType === "BET" || actionType === "RAISE" || actionType === "ALL_IN";
+        const requiresAmount = actionType === "BET" || actionType === "RAISE";
         const amount = parseAmount(message.amount);
         if (requiresAmount && amount === null) {
           sendToLocal(connectionId, {
@@ -251,9 +215,6 @@ export function attachTableHub(socket: WebSocket, userId: string, connectionId: 
         });
       },
       ResyncTable: async (message) => {
-        if (message.type !== "ResyncTable") {
-          return;
-        }
         await handleSubscribe(connectionId, userId, message.tableId);
       },
     },

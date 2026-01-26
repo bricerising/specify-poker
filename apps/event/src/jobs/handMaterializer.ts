@@ -1,6 +1,7 @@
 import { blockingRedisClient } from "../storage/redisClient";
 import { eventStore } from "../storage/eventStore";
 import { handStore } from "../storage/handStore";
+import { streamKey } from "../storage/streamStore";
 import {
   ActionTakenPayload,
   Card,
@@ -13,6 +14,8 @@ import {
   StreetAdvancedPayload,
 } from "../domain/types";
 import { recordMaterializationLag } from "../observability/metrics";
+import logger from "../observability/logger";
+import { getErrorMessage, isRecord } from "../errors";
 
 export interface HandMaterializerDependencies {
   redisClient: typeof blockingRedisClient;
@@ -155,24 +158,25 @@ export class HandMaterializer {
   constructor(private readonly deps: HandMaterializerDependencies) {}
 
   private isRunning = false;
-  private streamKey = 'events:all';
-  private groupName = 'hand-materializer';
+  private streamRedisKey = streamKey("all");
+  private groupName = "hand-materializer";
   private consumerName = `materializer-${process.pid}`;
 
   async start() {
     this.isRunning = true;
 
     try {
-      await this.deps.redisClient.xGroupCreate(this.streamKey, this.groupName, '$', { MKSTREAM: true });
+      await this.deps.redisClient.xGroupCreate(this.streamRedisKey, this.groupName, "$", { MKSTREAM: true });
     } catch (err: unknown) {
-      if ((err as Error).message.includes('BUSYGROUP')) {
-        return;
+      if (getErrorMessage(err).includes("BUSYGROUP")) {
+        logger.info({ streamKey: this.streamRedisKey, group: this.groupName }, "HandMaterializer consumer group exists");
+      } else {
+        logger.error({ error: err, streamKey: this.streamRedisKey, group: this.groupName }, "Error creating consumer group");
       }
-      console.error('Error creating consumer group:', err);
     }
 
-    console.log(`HandMaterializer started, listening on ${this.streamKey}`);
-    this.poll();
+    logger.info({ streamKey: this.streamRedisKey, group: this.groupName }, "HandMaterializer started");
+    void this.poll();
   }
 
   private async poll() {
@@ -181,7 +185,7 @@ export class HandMaterializer {
         const streams = await this.deps.redisClient.xReadGroup(
           this.groupName,
           this.consumerName,
-          [{ key: this.streamKey, id: '>' }],
+          [{ key: this.streamRedisKey, id: ">" }],
           { COUNT: 1, BLOCK: 5000 }
         );
 
@@ -190,24 +194,34 @@ export class HandMaterializer {
         }
         for (const stream of streams) {
           for (const message of stream.messages) {
-            const event = JSON.parse(message.message.data);
-            await this.handleEvent(event);
-            await this.deps.redisClient.xAck(this.streamKey, this.groupName, message.id);
+            const parsed = safeJsonParse(message.message.data);
+            if (!parsed) {
+              logger.error(
+                { streamKey: this.streamRedisKey, group: this.groupName, messageId: message.id },
+                "Invalid JSON in HandMaterializer stream message"
+              );
+              await this.deps.redisClient.xAck(this.streamRedisKey, this.groupName, message.id);
+              continue;
+            }
+
+            await this.handleEvent(parsed);
+            await this.deps.redisClient.xAck(this.streamRedisKey, this.groupName, message.id);
           }
         }
       } catch (err) {
-        console.error('Error polling events in HandMaterializer:', err);
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        logger.error({ error: err }, "Error polling events in HandMaterializer");
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
   }
 
   private async handleEvent(event: Record<string, unknown>) {
-    if (event.type !== 'HAND_COMPLETED') {
+    const handCompleted = parseHandCompletedEvent(event);
+    if (!handCompleted) {
       return;
     }
-    console.log(`Hand completed: ${event.handId}. Materializing record...`);
-    await this.materializeHand(event.handId as string, event.tableId as string);
+    logger.info({ handId: handCompleted.handId, tableId: handCompleted.tableId }, "Materializing hand record");
+    await this.materializeHand(handCompleted.handId, handCompleted.tableId);
   }
 
   private async materializeHand(handId: string, tableId: string) {
@@ -223,9 +237,9 @@ export class HandMaterializer {
       // 3. Save HandRecord
       await this.deps.handStore.saveHandRecord(record);
       this.deps.recordMaterializationLag(Date.now() - record.completedAt.getTime());
-      console.log(`Hand record saved for hand ${handId}`);
+      logger.info({ handId }, "Hand record saved");
     } catch (err) {
-      console.error(`Failed to materialize hand ${handId}:`, err);
+      logger.error({ error: err, handId }, "Failed to materialize hand");
     }
   }
 
@@ -290,6 +304,32 @@ export function createHandMaterializer(
 }
 
 export const handMaterializer = createHandMaterializer();
+
+type HandCompletedEvent = { type: "HAND_COMPLETED"; handId: string; tableId: string };
+
+function parseHandCompletedEvent(event: Record<string, unknown>): HandCompletedEvent | null {
+  if (event.type !== "HAND_COMPLETED") {
+    return null;
+  }
+  const handId = event.handId;
+  const tableId = event.tableId;
+  if (typeof handId !== "string" || handId.trim().length === 0) {
+    return null;
+  }
+  if (typeof tableId !== "string" || tableId.trim().length === 0) {
+    return null;
+  }
+  return { type: "HAND_COMPLETED", handId, tableId };
+}
+
+function safeJsonParse(raw: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 function getSeats(
   payload: HandStartedPayload,

@@ -1,29 +1,10 @@
 import { Request, Response, Router } from "express";
 import { notifyClient } from "../../grpc/clients";
+import { grpcCall } from "../../grpc/grpcCall";
+import { requireUserId } from "../utils/requireUserId";
 import logger from "../../observability/logger";
 
 const router = Router();
-
-function requireUserId(req: Request, res: Response) {
-  const userId = req.auth?.userId;
-  if (!userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return null;
-  }
-  return userId;
-}
-
-function grpcCall<TRequest, TResponse>(
-  method: (request: TRequest, callback: (err: Error | null, response: TResponse) => void) => void,
-  request: TRequest,
-): Promise<TResponse> {
-  return new Promise((resolve, reject) => {
-    method(request, (err: Error | null, response: TResponse) => {
-      if (err) reject(err);
-      else resolve(response);
-    });
-  });
-}
 
 type ParsedSubscription =
   | { ok: true; subscription: { endpoint: string; keys: { p256dh: string; auth: string } } }

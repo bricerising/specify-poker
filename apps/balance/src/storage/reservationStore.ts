@@ -1,4 +1,6 @@
 import { Reservation } from "../domain/types";
+import logger from "../observability/logger";
+import { tryJsonParse } from "../utils/json";
 import { getRedisClient } from "./redisClient";
 
 const RESERVATIONS_KEY = "balance:reservations";
@@ -19,7 +21,12 @@ export async function getReservation(reservationId: string): Promise<Reservation
   if (redis) {
     const payload = await redis.hGet(RESERVATIONS_KEY, reservationId);
     if (payload) {
-      const reservation = JSON.parse(payload) as Reservation;
+      const parsed = tryJsonParse<Reservation>(payload);
+      if (!parsed.ok) {
+        logger.warn({ err: parsed.error, reservationId }, "reservationStore.parse.failed");
+        return null;
+      }
+      const reservation = parsed.value;
       reservations.set(reservationId, reservation);
       return reservation;
     }

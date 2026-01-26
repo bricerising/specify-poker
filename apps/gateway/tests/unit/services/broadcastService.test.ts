@@ -6,7 +6,7 @@ vi.mock("../../../src/ws/subscriptions", () => ({
 }));
 
 vi.mock("../../../src/ws/localRegistry", () => ({
-  sendToLocal: vi.fn(),
+  sendToLocalText: vi.fn(),
 }));
 
 vi.mock("../../../src/ws/pubsub", () => ({
@@ -22,7 +22,7 @@ vi.mock("../../../src/observability/logger", () => ({
 }));
 
 import { getSubscribers } from "../../../src/ws/subscriptions";
-import { sendToLocal } from "../../../src/ws/localRegistry";
+import { sendToLocalText } from "../../../src/ws/localRegistry";
 import { publishTableEvent, publishChatEvent, publishLobbyEvent } from "../../../src/ws/pubsub";
 import logger from "../../../src/observability/logger";
 
@@ -33,27 +33,30 @@ describe("Broadcast service", () => {
 
   it("broadcasts table updates locally and via pubsub", async () => {
     vi.mocked(getSubscribers).mockResolvedValue(["conn-1", "conn-2"]);
-    await broadcastToChannel("table:t1", { type: "TablePatch", tableId: "t1" });
+    const payload = { type: "TablePatch", tableId: "t1" };
+    await broadcastToChannel("table:t1", payload);
 
-    expect(sendToLocal).toHaveBeenCalledWith("conn-1", { type: "TablePatch", tableId: "t1" });
-    expect(sendToLocal).toHaveBeenCalledWith("conn-2", { type: "TablePatch", tableId: "t1" });
-    expect(publishTableEvent).toHaveBeenCalledWith("t1", { type: "TablePatch", tableId: "t1" });
+    expect(sendToLocalText).toHaveBeenCalledWith("conn-1", JSON.stringify(payload));
+    expect(sendToLocalText).toHaveBeenCalledWith("conn-2", JSON.stringify(payload));
+    expect(publishTableEvent).toHaveBeenCalledWith("t1", payload);
   });
 
   it("broadcasts chat updates locally and via pubsub", async () => {
     vi.mocked(getSubscribers).mockResolvedValue(["conn-1"]);
-    await broadcastToChannel("chat:t2", { type: "ChatMessage", tableId: "t2" });
+    const payload = { type: "ChatMessage", tableId: "t2" };
+    await broadcastToChannel("chat:t2", payload);
 
-    expect(sendToLocal).toHaveBeenCalledWith("conn-1", { type: "ChatMessage", tableId: "t2" });
-    expect(publishChatEvent).toHaveBeenCalledWith("t2", { type: "ChatMessage", tableId: "t2" });
+    expect(sendToLocalText).toHaveBeenCalledWith("conn-1", JSON.stringify(payload));
+    expect(publishChatEvent).toHaveBeenCalledWith("t2", payload);
   });
 
   it("broadcasts lobby updates with table payloads", async () => {
     vi.mocked(getSubscribers).mockResolvedValue(["conn-1"]);
     const tables = [{ table_id: "t1" }];
-    await broadcastToChannel("lobby", { type: "LobbyTablesUpdated", tables });
+    const payload = { type: "LobbyTablesUpdated", tables };
+    await broadcastToChannel("lobby", payload);
 
-    expect(sendToLocal).toHaveBeenCalledWith("conn-1", { type: "LobbyTablesUpdated", tables });
+    expect(sendToLocalText).toHaveBeenCalledWith("conn-1", JSON.stringify(payload));
     expect(publishLobbyEvent).toHaveBeenCalledWith(tables);
   });
 

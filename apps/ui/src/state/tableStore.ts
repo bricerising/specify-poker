@@ -1,14 +1,42 @@
 import { apiFetch, getApiBaseUrl } from "../services/apiClient";
 import { getToken } from "../services/auth";
 import { isStaleVersion, requestResync, shouldResync } from "../services/wsClient";
+import { recordWebSocketMessage } from "../observability/otel";
+import { asRecord, readTrimmedString } from "../utils/unknown";
 import type { z } from "zod";
 import { wsServerMessageSchema } from "@specify-poker/shared";
 
-type UnknownRecord = Record<string, unknown>;
+import { applyTablePatch } from "./tablePatching";
+import {
+  cardToString,
+  normalizeChatMessage,
+  normalizeConfig,
+  normalizeTableState,
+  normalizeTableSummary,
+  type UnknownRecord,
+} from "./tableNormalization";
+import type {
+  ChatMessage,
+  SpectatorView,
+  TableSeat,
+  TableState,
+  TableStore,
+  TableStoreState,
+} from "./tableTypes";
+
+export type {
+  ChatMessage,
+  HandState,
+  SpectatorView,
+  TableConfig,
+  TableSeat,
+  TableState,
+  TableStore,
+  TableStoreState,
+  TableSummary,
+} from "./tableTypes";
+
 type WsServerMessage = z.infer<typeof wsServerMessageSchema>;
-type WsServerMessageHandlerMap = {
-  [K in WsServerMessage["type"]]?: (message: Extract<WsServerMessage, { type: K }>) => void;
-};
 
 function decodeJwtUserId(token: string): string | null {
   const parts = token.split(".");
@@ -26,12 +54,8 @@ function decodeJwtUserId(token: string): string | null {
     }
 
     const parsed: unknown = JSON.parse(decoded);
-    if (!parsed || typeof parsed !== "object") {
-      return null;
-    }
-    const record = parsed as Record<string, unknown>;
-    const sub = record.sub;
-    return typeof sub === "string" && sub.trim().length > 0 ? sub : null;
+    const record = asRecord(parsed);
+    return record ? readTrimmedString(record.sub) : null;
   } catch {
     return null;
   }
@@ -45,240 +69,18 @@ function currentUserIdFromToken(): string | null {
   return decodeJwtUserId(token);
 }
 
-function toNumber(value: unknown, fallback = 0) {
+function toIncomingVersion(message: Extract<WsServerMessage, { type: "TableSnapshot" | "TablePatch" }>) {
+  if (message.type === "TableSnapshot") {
+    return message.tableState.version;
+  }
+
+  const value = message.patch.version;
+  if (value === undefined || value === null) {
+    return null;
+  }
+
   const parsed = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function normalizeConfig(raw: UnknownRecord | undefined): TableConfig {
-  return {
-    smallBlind: toNumber(raw?.small_blind ?? raw?.smallBlind, 1),
-    bigBlind: toNumber(raw?.big_blind ?? raw?.bigBlind, 2),
-    ante: raw?.ante === undefined || raw?.ante === null ? null : toNumber(raw.ante, 0),
-    maxPlayers: toNumber(raw?.max_players ?? raw?.maxPlayers, 6),
-    startingStack: toNumber(raw?.starting_stack ?? raw?.startingStack, 200),
-    bettingStructure: "NoLimit",
-  };
-}
-
-function normalizeTableSummary(raw: UnknownRecord): TableSummary {
-  return {
-    tableId: String(raw.tableId ?? raw.table_id ?? ""),
-    name: String(raw.name ?? "Table"),
-    ownerId: String(raw.ownerId ?? raw.owner_id ?? ""),
-    config: normalizeConfig((raw.config ?? {}) as UnknownRecord),
-    seatsTaken: toNumber(raw.seatsTaken ?? raw.seats_taken, 0),
-    occupiedSeatIds: (raw.occupiedSeatIds ?? raw.occupied_seat_ids ?? []) as number[],
-    inProgress: Boolean(raw.inProgress ?? raw.in_progress ?? false),
-    spectatorCount: toNumber(raw.spectatorCount ?? raw.spectator_count, 0),
-  };
-}
-
-function normalizeSeat(raw: UnknownRecord): TableSeat {
-  return {
-    seatId: toNumber(raw.seatId ?? raw.seat_id, 0),
-    userId: (raw.userId ?? raw.user_id ?? null) as string | null,
-    username: raw.username as string | undefined,
-    avatarUrl: (raw.avatarUrl ?? raw.avatar_url ?? null) as string | null,
-    stack: toNumber(raw.stack, 0),
-    status: String(raw.status ?? "EMPTY"),
-  };
-}
-
-function normalizeChatMessage(raw: unknown): ChatMessage | null {
-  if (!raw || typeof raw !== "object") {
-    return null;
-  }
-  const record = raw as UnknownRecord;
-  const id = typeof record.id === "string" ? record.id : "";
-  const userId =
-    typeof record.userId === "string"
-      ? record.userId
-      : typeof record.user_id === "string"
-        ? record.user_id
-        : "";
-  const text = typeof record.text === "string" ? record.text : "";
-  const ts = typeof record.ts === "string" ? record.ts : "";
-  const username = typeof record.username === "string" ? record.username : undefined;
-  if (!id || !userId || !text || !ts) {
-    return null;
-  }
-  return { id, userId, username, text, ts };
-}
-
-function cardToString(card: unknown): string | null {
-  if (typeof card === "string") {
-    return card;
-  }
-  if (card && typeof card === "object") {
-    const raw = card as { rank?: string; suit?: string };
-    const rank = raw.rank;
-    const suit = raw.suit;
-    if (typeof rank === "string" && typeof suit === "string") {
-      const normalizedSuit = suit.trim().toLowerCase();
-      const suitChar =
-        normalizedSuit.startsWith("h")
-          ? "h"
-          : normalizedSuit.startsWith("d")
-            ? "d"
-            : normalizedSuit.startsWith("c")
-              ? "c"
-              : normalizedSuit.startsWith("s")
-                ? "s"
-                : normalizedSuit.charAt(0);
-      return `${rank}${suitChar}`;
-    }
-  }
-  return null;
-}
-
-function normalizeHand(raw: UnknownRecord | null | undefined, config: TableConfig): HandState | null {
-  if (!raw) {
-    return null;
-  }
-
-  const community = (raw.communityCards ?? raw.community_cards ?? []) as unknown[];
-  const communityCards = community
-    .map((card) => cardToString(card))
-    .filter((card): card is string => Boolean(card));
-  const pots = ((raw.pots ?? []) as UnknownRecord[]).map((pot) => ({
-    amount: toNumber(pot.amount, 0),
-    eligibleSeatIds: (pot.eligibleSeatIds ?? pot.eligible_seat_ids ?? []) as number[],
-  }));
-
-  return {
-    handId: String(raw.handId ?? raw.hand_id ?? ""),
-    currentStreet: String(raw.currentStreet ?? raw.street ?? "Lobby"),
-    currentTurnSeat: toNumber(raw.currentTurnSeat ?? raw.turn, 0),
-    currentBet: toNumber(raw.currentBet ?? raw.current_bet, 0),
-    minRaise: toNumber(raw.minRaise ?? raw.min_raise, 0),
-    raiseCapped: Boolean(raw.raiseCapped ?? raw.raise_capped ?? false),
-    roundContributions: (raw.roundContributions ?? raw.round_contributions ?? {}) as Record<number, number>,
-    actedSeats: (raw.actedSeats ?? raw.acted_seats ?? []) as number[],
-    communityCards,
-    pots,
-    actionTimerDeadline: (raw.actionTimerDeadline ?? raw.action_timer_deadline ?? null) as string | null,
-    bigBlind: toNumber(raw.bigBlind ?? raw.big_blind ?? config.bigBlind, config.bigBlind),
-  };
-}
-
-function normalizeTableState(raw: UnknownRecord, fallback?: TableSummary): TableState {
-  const config = normalizeConfig((raw.config ?? fallback?.config ?? {}) as UnknownRecord);
-  return {
-    tableId: String(raw.tableId ?? raw.table_id ?? fallback?.tableId ?? ""),
-    name: String(raw.name ?? fallback?.name ?? "Table"),
-    ownerId: String(raw.ownerId ?? raw.owner_id ?? fallback?.ownerId ?? ""),
-    config,
-    seats: ((raw.seats ?? []) as UnknownRecord[]).map(normalizeSeat),
-    spectators: ((raw.spectators ?? []) as UnknownRecord[]).map((spectator) => ({
-      userId: String(spectator.userId ?? spectator.user_id ?? ""),
-      username: spectator.username as string | undefined,
-      status: String(spectator.status ?? "active") as SpectatorView["status"],
-    })),
-    status: String(raw.status ?? (raw.hand ? "in_hand" : "lobby")),
-    hand: normalizeHand(raw.hand as UnknownRecord | null | undefined, config),
-    button: toNumber(raw.button, 0),
-    version: toNumber(raw.version, 0),
-  };
-}
-
-export interface TableConfig {
-  smallBlind: number;
-  bigBlind: number;
-  ante?: number | null;
-  maxPlayers: number;
-  startingStack: number;
-  bettingStructure: "NoLimit";
-}
-
-export interface TableSummary {
-  tableId: string;
-  name: string;
-  ownerId: string;
-  config: TableConfig;
-  seatsTaken: number;
-  occupiedSeatIds: number[];
-  inProgress: boolean;
-  spectatorCount?: number;
-}
-
-export interface SpectatorView {
-  userId: string;
-  username?: string;
-  status: "active" | "disconnected";
-}
-
-export interface TableSeat {
-  seatId: number;
-  userId: string | null;
-  username?: string;
-  avatarUrl?: string | null;
-  stack: number;
-  status: string;
-}
-
-export interface HandState {
-  handId: string;
-  currentStreet: string;
-  currentTurnSeat: number;
-  currentBet: number;
-  minRaise: number;
-  raiseCapped: boolean;
-  roundContributions: Record<number, number>;
-  actedSeats: number[];
-  communityCards: string[];
-  pots: { amount: number; eligibleSeatIds: number[] }[];
-  actionTimerDeadline: string | null;
-  bigBlind: number;
-  winners?: number[];
-}
-
-export interface TableState {
-  tableId: string;
-  name: string;
-  ownerId: string;
-  config: TableConfig;
-  seats: TableSeat[];
-  spectators?: SpectatorView[];
-  status: string;
-  hand: HandState | null;
-  button: number;
-  version: number;
-}
-
-export interface TableStoreState {
-  tables: TableSummary[];
-  tableState: TableState | null;
-  seatId: number | null;
-  isSpectating: boolean;
-  status: "idle" | "connecting" | "connected" | "error";
-  error?: string;
-  chatMessages: ChatMessage[];
-  chatError?: string;
-  privateHoleCards: string[] | null;
-  privateHandId: string | null;
-}
-
-export interface TableStore {
-  getState(): TableStoreState;
-  subscribe(listener: (state: TableStoreState) => void): () => void;
-  fetchTables(): Promise<void>;
-  subscribeLobby(): void;
-  joinSeat(tableId: string, seatId: number): Promise<void>;
-  spectateTable(tableId: string): void;
-  leaveTable(): void;
-  subscribeTable(tableId: string): void;
-  sendAction(action: { type: string; amount?: number }): void;
-  subscribeChat(tableId: string): void;
-  sendChat(message: string): void;
-}
-
-export interface ChatMessage {
-  id: string;
-  userId: string;
-  username?: string;
-  text: string;
-  ts: string;
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 export function createTableStore(): TableStore {
@@ -311,6 +113,39 @@ export function createTableStore(): TableStore {
   };
 
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const sendWhenSocketOpen = (send: (socket: WebSocket) => void) => {
+    if (!socket) {
+      return;
+    }
+    const activeSocket = socket;
+    if (activeSocket.readyState === WebSocket.OPEN) {
+      send(activeSocket);
+      return;
+    }
+    activeSocket.addEventListener("open", () => send(activeSocket), { once: true });
+  };
+
+  type WsClientMessage = { type: string; tableId?: string } & Record<string, unknown>;
+
+  const sendWsMessage = (activeSocket: WebSocket, message: WsClientMessage) => {
+    recordWebSocketMessage(message.type, "sent", typeof message.tableId === "string" ? message.tableId : undefined);
+    activeSocket.send(JSON.stringify(message));
+  };
+
+  const sendWsMessageNow = (message: WsClientMessage) => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+    sendWsMessage(socket, message);
+    return true;
+  };
+
+  const sendWsMessageOnOpen = (message: WsClientMessage) => {
+    sendWhenSocketOpen((activeSocket) => {
+      sendWsMessage(activeSocket, message);
+    });
+  };
 
   const clearRequestedHoleCards = () => {
     requestedHoleCards.clear();
@@ -371,11 +206,13 @@ export function createTableStore(): TableStore {
     }
     try {
       const response = await apiFetch(`/api/profile/${encodeURIComponent(userId)}`);
-      const payload = (await response.json()) as { username?: unknown; avatarUrl?: unknown; avatar_url?: unknown };
-      const username = typeof payload.username === "string" ? payload.username.trim() : "";
-      const avatarRaw = payload.avatarUrl ?? payload.avatar_url;
-      const avatarUrl = typeof avatarRaw === "string" && avatarRaw.trim().length > 0 ? avatarRaw.trim() : null;
-      return username.length > 0 ? { username, avatarUrl } : null;
+      const payload = asRecord(await response.json());
+      const username = readTrimmedString(payload?.username ?? payload?.nickname);
+      if (!username) {
+        return null;
+      }
+      const avatarUrl = readTrimmedString(payload?.avatarUrl ?? payload?.avatar_url) ?? null;
+      return { username, avatarUrl };
     } catch {
       return null;
     }
@@ -429,30 +266,24 @@ export function createTableStore(): TableStore {
   async function fetchHoleCardsForHand(tableId: string, expectedHandId: string): Promise<string[] | null> {
     try {
       const response = await apiFetch(`/api/tables/${tableId}/state`);
-      const payload = (await response.json()) as {
-        state?: UnknownRecord;
-        hole_cards?: unknown[];
-        holeCards?: unknown[];
-      };
-
-      const statePayload = payload.state;
-      if (!statePayload) {
+      const payload = asRecord(await response.json());
+      const statePayload = asRecord(payload?.state);
+      if (!payload || !statePayload) {
         return null;
       }
 
-      const handPayload = (statePayload.hand ?? null) as UnknownRecord | null;
-      const handId =
-        typeof handPayload?.handId === "string"
-          ? handPayload.handId
-          : typeof handPayload?.hand_id === "string"
-            ? handPayload.hand_id
-            : null;
+      const handPayload = asRecord(statePayload.hand);
+      const handId = readTrimmedString(handPayload?.handId ?? handPayload?.hand_id);
 
       if (!handId || handId !== expectedHandId) {
         return null;
       }
 
-      const holeCardsPayload = payload.hole_cards ?? payload.holeCards ?? [];
+      const holeCardsPayload = Array.isArray(payload.hole_cards)
+        ? payload.hole_cards
+        : Array.isArray(payload.holeCards)
+          ? payload.holeCards
+          : [];
       const cards = holeCardsPayload
         .map((card) => cardToString(card))
         .filter((card): card is string => Boolean(card));
@@ -513,7 +344,7 @@ export function createTableStore(): TableStore {
 
   const buildPlaceholderTableState = (tableId: string): TableState => {
     const fallback = state.tables.find((table) => table.tableId === tableId);
-    const config = fallback?.config ?? normalizeConfig(undefined);
+    const config = normalizeConfig(undefined, fallback?.config);
     const seatCount = Math.max(0, config.maxPlayers);
     const seats: TableSeat[] = Array.from({ length: seatCount }, (_, index) => ({
       seatId: index,
@@ -540,28 +371,28 @@ export function createTableStore(): TableStore {
   const handleTableStateMessage = (
     message: Extract<WsServerMessage, { type: "TableSnapshot" | "TablePatch" }>,
   ) => {
-    const incoming =
-      message.type === "TableSnapshot"
-        ? (message.tableState as UnknownRecord | undefined)
-        : (message.patch as UnknownRecord | undefined);
-    if (!incoming) {
-      return;
-    }
-    const tableId = String(incoming.tableId ?? incoming.table_id ?? "");
+    const activeTableState = state.tableState;
     const activeTableId = state.tableState?.tableId ?? null;
-    if (!activeTableId || !tableId || tableId !== activeTableId) {
+    const tableId = message.type === "TablePatch" ? message.tableId : message.tableState.tableId;
+    if (!activeTableState || !activeTableId || !tableId || tableId !== activeTableId) {
       return;
     }
     const currentVersion = state.tableState?.version ?? null;
-    const incomingVersion = toNumber(incoming.version, 0);
-    if (isStaleVersion(currentVersion, incomingVersion)) {
-      return;
+    const incomingVersion = toIncomingVersion(message);
+    if (incomingVersion !== null) {
+      if (isStaleVersion(currentVersion, incomingVersion)) {
+        return;
+      }
+      if (shouldResync(currentVersion, incomingVersion)) {
+        requestResync(socket, tableId);
+      }
     }
-    if (shouldResync(currentVersion, incomingVersion)) {
-      requestResync(socket, tableId);
-    }
+
     const fallback = state.tables.find((table) => table.tableId === tableId);
-    const normalized = applyCachedProfiles(normalizeTableState(incoming, fallback));
+    const normalized =
+      message.type === "TablePatch"
+        ? applyCachedProfiles(applyTablePatch(activeTableState, message.patch, fallback))
+        : applyCachedProfiles(normalizeTableState(message.tableState as UnknownRecord, fallback));
     const tokenUserId = currentUserIdFromToken();
     const inferredSeatId =
       tokenUserId && normalized.seats.some((seat) => seat.userId === tokenUserId)
@@ -670,25 +501,47 @@ export function createTableStore(): TableStore {
     });
   };
 
-  const wsServerMessageHandlers: WsServerMessageHandlerMap = {
-    TableSnapshot: handleTableStateMessage,
-    TablePatch: handleTableStateMessage,
-    HoleCards: handleHoleCardsMessage,
-    ChatMessage: handleChatMessage,
-    ChatSubscribed: handleChatSubscribed,
-    ChatError: handleChatError,
-    LobbyTablesUpdated: handleLobbyTablesUpdated,
-    TimerUpdate: handleTimerUpdate,
-    SpectatorJoined: handleSpectatorMessage,
-    SpectatorLeft: handleSpectatorMessage,
+  const handleWsServerMessage = (message: WsServerMessage) => {
+    switch (message.type) {
+      case "TableSnapshot":
+      case "TablePatch":
+        handleTableStateMessage(message);
+        return;
+      case "HoleCards":
+        handleHoleCardsMessage(message);
+        return;
+      case "ChatMessage":
+        handleChatMessage(message);
+        return;
+      case "ChatSubscribed":
+        handleChatSubscribed(message);
+        return;
+      case "ChatError":
+        handleChatError(message);
+        return;
+      case "LobbyTablesUpdated":
+        handleLobbyTablesUpdated(message);
+        return;
+      case "TimerUpdate":
+        handleTimerUpdate(message);
+        return;
+      case "SpectatorJoined":
+      case "SpectatorLeft":
+        handleSpectatorMessage(message);
+        return;
+      default:
+        return;
+    }
   };
 
-  const handleWsServerMessage = (message: WsServerMessage) => {
-    const handler = wsServerMessageHandlers[message.type];
-    if (!handler) {
-      return;
+  const tableIdForMessage = (message: WsServerMessage): string | undefined => {
+    if ("tableId" in message && typeof message.tableId === "string") {
+      return message.tableId;
     }
-    (handler as (message: WsServerMessage) => void)(message);
+    if (message.type === "TableSnapshot") {
+      return message.tableState.tableId;
+    }
+    return undefined;
   };
 
   const connect = (wsUrl?: string) => {
@@ -702,18 +555,36 @@ export function createTableStore(): TableStore {
     if (token && !url.searchParams.has("token")) {
       url.searchParams.set("token", token);
     }
-    setState({ status: "connecting" });
-    socket = new WebSocket(url.toString());
+    setState({ status: "connecting", error: undefined });
+    const nextSocket = new WebSocket(url.toString());
+    socket = nextSocket;
 
-    socket.addEventListener("open", () => {
-      setState({ status: "connected" });
+    nextSocket.addEventListener("open", () => {
+      if (socket !== nextSocket) {
+        return;
+      }
+      setState({ status: "connected", error: undefined });
     });
 
-    socket.addEventListener("close", () => {
+    nextSocket.addEventListener("close", () => {
+      if (socket !== nextSocket) {
+        return;
+      }
+      socket = null;
       setState({ status: "idle" });
     });
 
-    socket.addEventListener("message", (event) => {
+    nextSocket.addEventListener("error", () => {
+      if (socket !== nextSocket) {
+        return;
+      }
+      setState({ status: "error", error: "WebSocket error" });
+    });
+
+    nextSocket.addEventListener("message", (event) => {
+      if (socket !== nextSocket) {
+        return;
+      }
       let raw: unknown;
       try {
         raw = JSON.parse(event.data as string);
@@ -727,6 +598,7 @@ export function createTableStore(): TableStore {
       }
 
       const message: WsServerMessage = parsed.data;
+      recordWebSocketMessage(message.type, "received", tableIdForMessage(message));
       handleWsServerMessage(message);
     });
   };
@@ -734,17 +606,18 @@ export function createTableStore(): TableStore {
   const loadTableSnapshot = async (tableId: string) => {
     try {
       const response = await apiFetch(`/api/tables/${tableId}/state`);
-      const payload = (await response.json()) as {
-        state?: UnknownRecord;
-        hole_cards?: unknown[];
-        holeCards?: unknown[];
-      };
-      if (!payload.state) {
+      const payload = asRecord(await response.json());
+      const statePayload = asRecord(payload?.state);
+      if (!payload || !statePayload) {
         return null;
       }
       const fallback = state.tables.find((table) => table.tableId === tableId);
-      const tableState = applyCachedProfiles(normalizeTableState(payload.state, fallback));
-      const holeCardsPayload = payload.hole_cards ?? payload.holeCards ?? [];
+      const tableState = applyCachedProfiles(normalizeTableState(statePayload, fallback));
+      const holeCardsPayload = Array.isArray(payload.hole_cards)
+        ? payload.hole_cards
+        : Array.isArray(payload.holeCards)
+          ? payload.holeCards
+          : [];
       const privateHoleCards = holeCardsPayload
         .map((card) => cardToString(card))
         .filter((card): card is string => Boolean(card));
@@ -769,6 +642,50 @@ export function createTableStore(): TableStore {
     return null;
   };
 
+  type EnterTableMode =
+    | { kind: "seat"; seatId: number; wsUrl?: string }
+    | { kind: "spectate"; wsUrl?: string };
+
+  const enterTable = (tableId: string, mode: EnterTableMode) => {
+    clearRequestedHoleCards();
+    const snapshotPromise = loadTableSnapshotWithRetry(tableId);
+    const placeholder = buildPlaceholderTableState(tableId);
+
+    setState({
+      tableState: placeholder,
+      seatId: mode.kind === "seat" ? mode.seatId : null,
+      isSpectating: mode.kind === "spectate",
+      chatMessages: [],
+      chatError: undefined,
+      privateHoleCards: null,
+      privateHandId: null,
+    });
+
+    connect(mode.wsUrl);
+    sendWhenSocketOpen((activeSocket) => {
+      sendWsMessage(activeSocket, { type: "SubscribeTable", tableId });
+      sendWsMessage(activeSocket, { type: "SubscribeChat", tableId });
+    });
+
+    snapshotPromise.then((snapshot) => {
+      if (!snapshot?.tableState) {
+        return;
+      }
+      if (state.tableState?.tableId !== tableId) {
+        return;
+      }
+      if (state.tableState && snapshot.tableState.version < state.tableState.version) {
+        return;
+      }
+      setState({
+        tableState: snapshot.tableState,
+        privateHoleCards: snapshot.privateHoleCards ?? state.privateHoleCards,
+        privateHandId: snapshot.privateHandId ?? state.privateHandId,
+      });
+      requestMissingProfiles(snapshot.tableState);
+    });
+  };
+
   return {
     getState: () => state,
     subscribe: (listener) => {
@@ -777,117 +694,40 @@ export function createTableStore(): TableStore {
     },
     fetchTables: async () => {
       const response = await apiFetch("/api/tables");
-      const payload = (await response.json()) as UnknownRecord[];
-      const tables = payload.map((table) => normalizeTableSummary(table));
+      const payload: unknown = await response.json();
+      if (!Array.isArray(payload)) {
+        throw new Error("Invalid tables response");
+      }
+      const tables = payload
+        .map((entry) => asRecord(entry))
+        .filter((entry): entry is UnknownRecord => Boolean(entry))
+        .map((table) => normalizeTableSummary(table));
       setState({ tables });
     },
     subscribeLobby: () => {
       connect();
     },
     joinSeat: async (tableId, seatId) => {
-      clearRequestedHoleCards();
       const response = await apiFetch(`/api/tables/${tableId}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ seatId }),
       });
-      const payload = await response.json();
-      const snapshotPromise = loadTableSnapshotWithRetry(tableId);
-      const placeholder = buildPlaceholderTableState(tableId);
-      setState({
-        tableState: placeholder,
-        seatId,
-        isSpectating: false,
-        chatMessages: [],
-        chatError: undefined,
-        privateHoleCards: null,
-        privateHandId: null,
-      });
-      connect(payload.wsUrl);
-      const subscribe = () => {
-        socket?.send(JSON.stringify({ type: "SubscribeTable", tableId }));
-        socket?.send(JSON.stringify({ type: "SubscribeChat", tableId }));
-      };
-      if (socket?.readyState === WebSocket.OPEN) {
-        subscribe();
-      } else if (socket) {
-        const handleOpen = () => {
-          subscribe();
-          socket?.removeEventListener("open", handleOpen);
-        };
-        socket.addEventListener("open", handleOpen);
-      }
-      snapshotPromise.then((snapshot) => {
-        if (!snapshot?.tableState) {
-          return;
-        }
-        if (state.tableState?.tableId !== tableId) {
-          return;
-        }
-        if (state.tableState && snapshot.tableState.version < state.tableState.version) {
-          return;
-        }
-        setState({
-          tableState: snapshot.tableState,
-          privateHoleCards: snapshot.privateHoleCards ?? state.privateHoleCards,
-          privateHandId: snapshot.privateHandId ?? state.privateHandId,
-        });
-        requestMissingProfiles(snapshot.tableState);
-      });
+      const payload = asRecord(await response.json());
+      const wsUrl = readTrimmedString(payload?.wsUrl) ?? undefined;
+      enterTable(tableId, { kind: "seat", seatId, wsUrl });
     },
-    spectateTable: async (tableId) => {
-      clearRequestedHoleCards();
-      const snapshotPromise = loadTableSnapshotWithRetry(tableId);
-      const placeholder = buildPlaceholderTableState(tableId);
-      setState({
-        tableState: placeholder,
-        seatId: null,
-        isSpectating: true,
-        chatMessages: [],
-        chatError: undefined,
-        privateHoleCards: null,
-        privateHandId: null,
-      });
-      connect();
-      const subscribe = () => {
-        socket?.send(JSON.stringify({ type: "SubscribeTable", tableId }));
-        socket?.send(JSON.stringify({ type: "SubscribeChat", tableId }));
-      };
-      if (socket?.readyState === WebSocket.OPEN) {
-        subscribe();
-      } else if (socket) {
-        const handleOpen = () => {
-          subscribe();
-          socket?.removeEventListener("open", handleOpen);
-        };
-        socket.addEventListener("open", handleOpen);
-      }
-      snapshotPromise.then((snapshot) => {
-        if (!snapshot?.tableState) {
-          return;
-        }
-        if (state.tableState?.tableId !== tableId) {
-          return;
-        }
-        if (state.tableState && snapshot.tableState.version < state.tableState.version) {
-          return;
-        }
-        setState({
-          tableState: snapshot.tableState,
-          privateHoleCards: snapshot.privateHoleCards ?? state.privateHoleCards,
-          privateHandId: snapshot.privateHandId ?? state.privateHandId,
-        });
-        requestMissingProfiles(snapshot.tableState);
-      });
+    spectateTable: (tableId) => {
+      enterTable(tableId, { kind: "spectate" });
     },
     leaveTable: () => {
       clearRequestedHoleCards();
       const tableId = state.tableState?.tableId;
-      if (tableId && socket?.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: "UnsubscribeTable", tableId }));
-        socket.send(JSON.stringify({ type: "UnsubscribeChat", tableId }));
+      if (tableId) {
+        sendWsMessageNow({ type: "UnsubscribeTable", tableId });
+        sendWsMessageNow({ type: "UnsubscribeChat", tableId });
         if (state.seatId !== null) {
-          socket.send(JSON.stringify({ type: "LeaveTable", tableId }));
+          sendWsMessageNow({ type: "LeaveTable", tableId });
         }
       }
       setState({
@@ -902,51 +742,29 @@ export function createTableStore(): TableStore {
     },
     subscribeTable: (tableId) => {
       connect();
-      if (socket?.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: "SubscribeTable", tableId }));
-      } else {
-        socket?.addEventListener("open", () => {
-          socket?.send(JSON.stringify({ type: "SubscribeTable", tableId }));
-        });
-      }
+      sendWsMessageOnOpen({ type: "SubscribeTable", tableId });
     },
     sendAction: (action) => {
-      if (!socket || socket.readyState !== WebSocket.OPEN || !state.tableState?.hand) {
+      if (!state.tableState?.hand) {
         return;
       }
-      socket.send(
-        JSON.stringify({
-          type: "Action",
-          tableId: state.tableState.tableId,
-          handId: state.tableState.hand.handId,
-          action: action.type,
-          amount: action.amount,
-        }),
-      );
+      sendWsMessageNow({
+        type: "Action",
+        tableId: state.tableState.tableId,
+        handId: state.tableState.hand.handId,
+        action: action.type,
+        amount: action.amount,
+      });
     },
     subscribeChat: (tableId) => {
-      if (!socket) {
-        return;
-      }
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: "SubscribeChat", tableId }));
-      } else {
-        socket.addEventListener("open", () => {
-          socket?.send(JSON.stringify({ type: "SubscribeChat", tableId }));
-        });
-      }
+      connect();
+      sendWsMessageOnOpen({ type: "SubscribeChat", tableId });
     },
     sendChat: (message) => {
-      if (!socket || socket.readyState !== WebSocket.OPEN || !state.tableState) {
+      if (!state.tableState) {
         return;
       }
-      socket.send(
-        JSON.stringify({
-          type: "ChatSend",
-          tableId: state.tableState.tableId,
-          message,
-        }),
-      );
+      sendWsMessageNow({ type: "ChatSend", tableId: state.tableState.tableId, message });
     },
   };
 }

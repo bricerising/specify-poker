@@ -1,35 +1,36 @@
-import { ServerUnaryCall, sendUnaryData } from "@grpc/grpc-js";
 import * as profileService from "../../services/profileService";
 import * as statisticsService from "../../services/statisticsService";
 import * as friendsService from "../../services/friendsService";
-import { recordFriendMutation, recordGrpcRequest, recordProfileLookup, recordProfileUpdate, recordStatisticsUpdate } from "../../observability/metrics";
-import { Profile, Statistics, FriendProfile, ThemePreference } from "../../domain/types";
+import {
+  recordFriendMutation,
+  recordGrpcRequest,
+  recordProfileLookup,
+  recordProfileUpdate,
+  recordStatisticsUpdate,
+} from "../../observability/metrics";
+import type { FriendProfile, Profile, Statistics, ThemePreference } from "../../domain/types";
 import logger from "../../observability/logger";
+import { ValidationError } from "../../domain/errors";
+import { toGrpcServiceError } from "./errors";
+import { createUnaryHandler, withUnaryErrorHandling, withUnaryHooks, withUnaryTiming } from "./unary";
 
-type UnaryHandler<Req, Res> = (call: ServerUnaryCall<Req, Res>, callback: sendUnaryData<Res>) => Promise<void>;
-
-function createUnaryHandler<Req, Res>(
+function createPlayerUnaryHandler<Req, Res>(
   method: string,
   handler: (request: Req) => Promise<Res> | Res,
   hooks?: {
     onSuccess?: (request: Req, response: Res) => void;
     onError?: (request: Req, error: unknown) => void;
   }
-): UnaryHandler<Req, Res> {
-  return async (call, callback) => {
-    const startedAt = Date.now();
-    try {
-      const response = await handler(call.request);
-      hooks?.onSuccess?.(call.request, response);
-      recordGrpcRequest(method, "ok", Date.now() - startedAt);
-      callback(null, response);
-    } catch (error: unknown) {
-      hooks?.onError?.(call.request, error);
-      logger.error({ err: error }, `${method} failed`);
-      recordGrpcRequest(method, "error", Date.now() - startedAt);
-      callback(error as Error);
-    }
-  };
+) {
+  return createUnaryHandler<Req, Res>({
+    method,
+    handler,
+    interceptors: [
+      withUnaryTiming({ method, recordGrpcRequest }),
+      withUnaryErrorHandling({ method, logger, toServiceError: toGrpcServiceError }),
+      withUnaryHooks(hooks),
+    ],
+  });
 }
 
 interface GetProfileRequest {
@@ -151,22 +152,22 @@ function toStatisticType(value: string): statisticsService.StatisticType | null 
 }
 
 export const handlers = {
-  GetProfile: createUnaryHandler<GetProfileRequest, unknown>("GetProfile", async (request) => {
-      const profile = await profileService.getProfile(
-        request.userId,
-        normalizeOptionalString(request.referrerId),
-        normalizeOptionalString(request.username)
-      );
-      recordProfileLookup(profile.deletedAt ? "deleted" : "ok");
-      return { profile: mapProfile(profile) };
-    }),
+  GetProfile: createPlayerUnaryHandler<GetProfileRequest, unknown>("GetProfile", async (request) => {
+    const profile = await profileService.getProfile(
+      request.userId,
+      normalizeOptionalString(request.referrerId),
+      normalizeOptionalString(request.username)
+    );
+    recordProfileLookup(profile.deletedAt ? "deleted" : "ok");
+    return { profile: mapProfile(profile) };
+  }),
 
-  GetProfiles: createUnaryHandler<GetProfilesRequest, unknown>("GetProfiles", async (request) => {
+  GetProfiles: createPlayerUnaryHandler<GetProfilesRequest, unknown>("GetProfiles", async (request) => {
     const profiles = await profileService.getProfiles(request.userIds ?? []);
     return { profiles: profiles.map(mapProfile) };
   }),
 
-  UpdateProfile: createUnaryHandler<UpdateProfileRequest, unknown>(
+  UpdateProfile: createPlayerUnaryHandler<UpdateProfileRequest, unknown>(
     "UpdateProfile",
     async (request) => {
       const nickname = normalizeOptionalString(request.nickname);
@@ -185,32 +186,39 @@ export const handlers = {
     }
   ),
 
-  DeleteProfile: createUnaryHandler<DeleteProfileRequest, unknown>("DeleteProfile", async (request) => {
+  DeleteProfile: createPlayerUnaryHandler<DeleteProfileRequest, unknown>("DeleteProfile", async (request) => {
     await profileService.deleteProfile(request.userId);
     return { success: true };
   }),
 
-  GetStatistics: createUnaryHandler<GetStatisticsRequest, unknown>("GetStatistics", async (request) => {
+  GetStatistics: createPlayerUnaryHandler<GetStatisticsRequest, unknown>("GetStatistics", async (request) => {
     const statistics = await statisticsService.getStatistics(request.userId);
     return { statistics: mapStatistics(statistics) };
   }),
 
-  IncrementStatistic: createUnaryHandler<IncrementStatisticRequest, unknown>("IncrementStatistic", async (request) => {
-    const type = toStatisticType(request.type);
+  IncrementStatistic: createPlayerUnaryHandler<IncrementStatisticRequest, unknown>(
+    "IncrementStatistic",
+    async (request) => {
+      const type = toStatisticType(request.type);
       if (!type) {
-        throw new Error("Invalid statistic type");
+        throw new ValidationError("Invalid statistic type");
       }
-    const updated = await statisticsService.incrementStatistic(request.userId, type, request.amount ?? 0);
-    recordStatisticsUpdate(type);
-    return mapStatistics(updated);
-  }),
+      const updated = await statisticsService.incrementStatistic(
+        request.userId,
+        type,
+        request.amount ?? 0
+      );
+      recordStatisticsUpdate(type);
+      return mapStatistics(updated);
+    }
+  ),
 
-  GetFriends: createUnaryHandler<GetFriendsRequest, unknown>("GetFriends", async (request) => {
+  GetFriends: createPlayerUnaryHandler<GetFriendsRequest, unknown>("GetFriends", async (request) => {
     const friends = await friendsService.getFriends(request.userId);
     return { friends: friends.map(mapFriendProfile) };
   }),
 
-  AddFriend: createUnaryHandler<AddFriendRequest, unknown>(
+  AddFriend: createPlayerUnaryHandler<AddFriendRequest, unknown>(
     "AddFriend",
     async (request) => {
       await friendsService.addFriend(request.userId, request.friendId);
@@ -222,7 +230,7 @@ export const handlers = {
     }
   ),
 
-  RemoveFriend: createUnaryHandler<RemoveFriendRequest, unknown>(
+  RemoveFriend: createPlayerUnaryHandler<RemoveFriendRequest, unknown>(
     "RemoveFriend",
     async (request) => {
       await friendsService.removeFriend(request.userId, request.friendId);
@@ -234,7 +242,7 @@ export const handlers = {
     }
   ),
 
-  GetNicknames: createUnaryHandler<GetNicknamesRequest, unknown>("GetNicknames", async (request) => {
+  GetNicknames: createPlayerUnaryHandler<GetNicknamesRequest, unknown>("GetNicknames", async (request) => {
     const profiles = await profileService.getProfiles(request.userIds ?? []);
     const nicknames = profiles.map((profile) => ({
       userId: profile.userId,

@@ -1,9 +1,11 @@
-import { createClient, RedisClientType } from "redis";
+import { createClient } from "redis";
 import { getConfig } from "../config";
 import logger from "../observability/logger";
 
-let client: RedisClientType | null = null;
-let connection: Promise<RedisClientType | null> | null = null;
+type RedisClient = ReturnType<typeof createClient>;
+
+let client: RedisClient | null = null;
+let connection: Promise<RedisClient | null> | null = null;
 
 export function getRedisUrl(): string | null {
   return getConfig().redisUrl;
@@ -13,7 +15,7 @@ export function isRedisEnabled(): boolean {
   return Boolean(getRedisUrl());
 }
 
-export async function getRedisClient(): Promise<RedisClientType | null> {
+export async function getRedisClient(): Promise<RedisClient | null> {
   const url = getRedisUrl();
   if (!url) {
     return null;
@@ -22,15 +24,19 @@ export async function getRedisClient(): Promise<RedisClientType | null> {
     return client;
   }
   if (!connection) {
-    client = createClient({ url });
-    client.on("error", (error) => {
+    const nextClient = createClient({ url });
+    nextClient.on("error", (error) => {
       logger.warn({ message: error.message }, "redis.error");
     });
-    connection = client
+    connection = nextClient
       .connect()
-      .then(() => client)
+      .then(() => {
+        client = nextClient;
+        return nextClient;
+      })
       .catch((error) => {
         logger.warn({ message: error.message }, "redis.connect.failed");
+        connection = null;
         return null;
       });
   }

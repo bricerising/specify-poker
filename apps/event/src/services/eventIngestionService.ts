@@ -1,6 +1,7 @@
 import { eventStore } from "../storage/eventStore";
-import { EventType, NewGameEvent } from "../domain/types";
+import { EventType, isEventType, NewGameEvent } from "../domain/types";
 import { recordIngestion } from "../observability/metrics";
+import { InvalidArgumentError, isRecord } from "../errors";
 
 const HAND_EVENT_TYPES = new Set<EventType>([
   "HAND_STARTED",
@@ -34,17 +35,26 @@ export class EventIngestionService {
   }
 
   private validateEvent(event: NewGameEvent): void {
-    const requiresHandId = event.type ? HAND_EVENT_TYPES.has(event.type) : false;
+    if (!event.type) {
+      throw new InvalidArgumentError("Event type is required");
+    }
+    if (!isEventType(event.type)) {
+      throw new InvalidArgumentError(`Unknown event type: ${event.type}`);
+    }
+
+    const requiresHandId = HAND_EVENT_TYPES.has(event.type);
     const validations: Array<[boolean, string]> = [
-      [Boolean(event.type), "Event type is required"],
-      [Boolean(event.tableId), "Table ID is required"],
-      [Boolean(event.payload && typeof event.payload === "object"), "Payload must be an object"],
-      [!requiresHandId || Boolean(event.handId), `handId is required for event type ${event.type}`],
+      [typeof event.tableId === "string" && event.tableId.trim().length > 0, "Table ID is required"],
+      [isRecord(event.payload), "Payload must be an object"],
+      [
+        !requiresHandId || (typeof event.handId === "string" && event.handId.trim().length > 0),
+        `handId is required for event type ${event.type}`,
+      ],
     ];
 
     for (const [isValid, message] of validations) {
       if (!isValid) {
-        throw new Error(message);
+        throw new InvalidArgumentError(message);
       }
     }
   }

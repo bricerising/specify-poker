@@ -3,10 +3,20 @@ import { Archiver } from "../archiver";
 
 const ONE_HOUR_MS = 3600 * 1000;
 
+const { loggerInfo } = vi.hoisted(() => ({
+  loggerInfo: vi.fn(),
+}));
+
+vi.mock("../../observability/logger", () => ({
+  default: {
+    info: loggerInfo,
+  },
+}));
+
 describe("Archiver", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -19,13 +29,11 @@ describe("Archiver", () => {
 
     await archiver.start();
 
-    expect(console.log).toHaveBeenCalledWith("Archiver started");
+    expect(loggerInfo).toHaveBeenCalledWith("Archiver started");
 
     await vi.advanceTimersByTimeAsync(ONE_HOUR_MS);
 
-    expect(console.log).toHaveBeenCalledWith(
-      "Archiver: Checking for events older than retention period..."
-    );
+    expect(loggerInfo).toHaveBeenCalledWith("Archiver: Checking for events older than retention period...");
   });
 
   it("does not run after stop", async () => {
@@ -33,10 +41,10 @@ describe("Archiver", () => {
 
     await archiver.start();
     archiver.stop();
-    vi.mocked(console.log).mockClear();
+    vi.mocked(loggerInfo).mockClear();
 
     await archiver.run();
 
-    expect(console.log).not.toHaveBeenCalled();
+    expect(loggerInfo).not.toHaveBeenCalled();
   });
 });

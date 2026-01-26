@@ -1,17 +1,12 @@
 import { v4 as uuidv4 } from "uuid";
-import {
-  ActionInput,
-  Seat,
-  Table,
-  TableConfig,
-  TableState,
-  TableSummary,
-} from "../domain/types";
+
+import { ActionInput, Seat, Table, TableConfig, TableState, TableSummary } from "../domain/types";
 import { applyAction, startHand } from "../engine/handEngine";
 import { deriveLegalActions } from "../engine/actionRules";
 import { calculatePots } from "../engine/potCalculator";
 import { tableStore } from "../storage/tableStore";
 import { tableStateStore } from "../storage/tableStateStore";
+import logger from "../observability/logger";
 import {
   recordAction,
   recordHandCompleted,
@@ -23,32 +18,40 @@ import {
   setSeatedPlayers,
   setSpectatorCount,
 } from "../observability/metrics";
+import { coerceNumber } from "../utils/coerce";
 
-import {
-  balanceClientAdapter,
-} from "./table/balanceClientAdapter";
+import { balanceClientAdapter } from "./table/balanceClientAdapter";
 import { gatewayWsPublisher } from "./table/gatewayWsPublisher";
 import { gameEventPublisher } from "./table/gameEventPublisher";
 import { redactTableState } from "./table/tableViewBuilder";
 
-function toNumber(value: unknown, fallback = 0) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  }
-  return fallback;
-}
+type TurnStartMeta = { handId: string; seatId: number; street: string; startedAt: number };
+type HandTimeoutMeta = { handId: string; hadTimeout: boolean };
 
 export class TableService {
   private turnTimers = new Map<string, NodeJS.Timeout>();
-  private turnStartMeta = new Map<string, { handId: string; seatId: number; street: string; startedAt: number }>();
-  private handTimeoutMeta = new Map<string, { handId: string; hadTimeout: boolean }>();
+  private turnStartMeta = new Map<string, TurnStartMeta>();
+  private handTimeoutMeta = new Map<string, HandTimeoutMeta>();
 
   private now() {
     return new Date().toISOString();
+  }
+
+  private touchState(state: TableState) {
+    state.version += 1;
+    state.updatedAt = this.now();
+  }
+
+  private newIdempotencyKey(prefix: string) {
+    return `${prefix}:${uuidv4()}`;
+  }
+
+  private settlePotIdempotencyKey(tableId: string, handId: string, potIndex: number) {
+    return `settle:${tableId}:${handId}:pot:${potIndex}`;
+  }
+
+  private cashOutIdempotencyKey(tableId: string, userId: string, seatId: number) {
+    return this.newIdempotencyKey(`cashout:${tableId}:${userId}:${seatId}`);
   }
 
   private resolveSeatForUser(state: TableState, userId: string): Seat | undefined {
@@ -108,7 +111,7 @@ export class TableService {
 
     const nextTurn = this.findNextActiveTurn(state.seats, turnSeatId);
     if (nextTurn === null) {
-      console.warn("turn.repair.failed", { tableId: state.tableId, turnSeatId });
+      logger.warn({ tableId: state.tableId, turnSeatId }, "turn.repair.failed");
       return state;
     }
 
@@ -118,10 +121,6 @@ export class TableService {
     await tableStateStore.save(state);
     await gatewayWsPublisher.publishTableState(table, state);
     return state;
-  }
-
-  private idempotencyKey(operation: string, tableId: string, userId: string) {
-    return `${operation}:${tableId}:${userId}:${Date.now()}`;
   }
 
   private async loadTableAndState(tableId: string) {
@@ -260,18 +259,36 @@ export class TableService {
     }
     const { table, state } = loaded;
 
-    const startingStack = toNumber(table.config.startingStack, 200);
+    const startingStack = coerceNumber(table.config.startingStack, 200);
     const normalizedBuyIn = buyInAmount > 0 ? buyInAmount : startingStack;
     const finalBuyIn = normalizedBuyIn > 0 ? normalizedBuyIn : 200;
 
     const existingSeat = state.seats.find((entry) => entry.userId === userId && entry.status !== "EMPTY");
     if (existingSeat) {
-      if (existingSeat.seatId === seatId) {
+      if (existingSeat.seatId !== seatId) {
+        recordSeatJoin("error", "ALREADY_SEATED");
+        return { ok: false, error: "ALREADY_SEATED" };
+      }
+
+      if (existingSeat.status === "SEATED") {
         recordSeatJoin("ok", "IDEMPOTENT");
         return { ok: true };
       }
-      recordSeatJoin("error", "ALREADY_SEATED");
-      return { ok: false, error: "ALREADY_SEATED" };
+
+      if (existingSeat.status !== "RESERVED") {
+        recordSeatJoin("error", "ALREADY_SEATED");
+        return { ok: false, error: "ALREADY_SEATED" };
+      }
+
+      try {
+        const result = await this.finalizeReservedSeatJoin(table, tableId, seatId, userId, finalBuyIn);
+        recordSeatJoin(result.ok ? "ok" : "error", result.ok ? "RESUMED" : (result.error ?? "UNKNOWN"));
+        return result;
+      } catch (err) {
+        await this.handleBalanceUnavailable(tableId, seatId, userId, finalBuyIn, err);
+        recordSeatJoin("ok", "BALANCE_UNAVAILABLE");
+        return { ok: true };
+      }
     }
 
     const seat = state.seats.find((entry) => entry.seatId === seatId);
@@ -282,66 +299,101 @@ export class TableService {
 
     seat.userId = userId;
     seat.status = "RESERVED";
-    state.version += 1;
-    state.updatedAt = this.now();
+    seat.pendingBuyInAmount = finalBuyIn;
+    seat.buyInIdempotencyKey = this.newIdempotencyKey(`buyin:${tableId}:${seatId}:${userId}`);
+    this.touchState(state);
     await tableStateStore.save(state);
     await this.publishTableAndLobby(table, state);
 
     try {
-      const reservation = await balanceClientAdapter.reserveForBuyIn({
-        account_id: userId,
-        table_id: tableId,
-        amount: finalBuyIn,
-        idempotency_key: this.idempotencyKey("reserve", tableId, userId),
-        timeout_seconds: 30,
-      });
-
-      const reservationId = reservation.reservation_id;
-      if (!reservation.ok || !reservationId) {
-        await this.rollbackSeat(tableId, seatId, userId);
-        recordSeatJoin("error", reservation.error || "INSUFFICIENT_BALANCE");
-        return { ok: false, error: reservation.error || "INSUFFICIENT_BALANCE" };
-      }
-
-      const commit = await balanceClientAdapter.commitReservation({ reservation_id: reservationId });
-
-      if (!commit.ok) {
-        await this.rollbackSeat(tableId, seatId, userId, reservation.reservation_id);
-        recordSeatJoin("error", commit.error || "COMMIT_FAILED");
-        return { ok: false, error: commit.error || "COMMIT_FAILED" };
-      }
-
-      const finalState = await tableStateStore.get(tableId);
-      if (!finalState) {
-        recordSeatJoin("error", "TABLE_LOST");
-        return { ok: false, error: "TABLE_LOST" };
-      }
-      const finalSeat = finalState.seats.find((entry) => entry.seatId === seatId);
-      if (!finalSeat || finalSeat.userId !== userId) {
-        recordSeatJoin("error", "SEAT_LOST");
-        return { ok: false, error: "SEAT_LOST" };
-      }
-
-      finalSeat.stack = finalBuyIn;
-      finalSeat.status = "SEATED";
-      finalSeat.reservationId = reservationId;
-      finalState.version += 1;
-      finalState.updatedAt = this.now();
-
-      await tableStateStore.save(finalState);
-      await this.publishTableAndLobby(table, finalState);
-
-      void this.emitGameEvent(tableId, undefined, userId, seatId, "PLAYER_JOINED", { stack: finalBuyIn });
-
-      await this.checkStartHand(table, finalState);
-
-      recordSeatJoin("ok", "OK");
-      return { ok: true };
+      const result = await this.finalizeReservedSeatJoin(table, tableId, seatId, userId, finalBuyIn);
+      recordSeatJoin(result.ok ? "ok" : "error", result.ok ? "OK" : (result.error ?? "UNKNOWN"));
+      return result;
     } catch (err) {
       await this.handleBalanceUnavailable(tableId, seatId, userId, finalBuyIn, err);
       recordSeatJoin("ok", "BALANCE_UNAVAILABLE");
       return { ok: true };
     }
+  }
+
+  private async finalizeReservedSeatJoin(
+    table: Table,
+    tableId: string,
+    seatId: number,
+    userId: string,
+    fallbackBuyInAmount: number,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const reservedState = await tableStateStore.get(tableId);
+    if (!reservedState) {
+      return { ok: false, error: "TABLE_LOST" };
+    }
+
+    const reservedSeat = reservedState.seats.find((entry) => entry.seatId === seatId);
+    if (!reservedSeat || reservedSeat.userId !== userId || reservedSeat.status !== "RESERVED") {
+      return { ok: false, error: "SEAT_LOST" };
+    }
+
+    const pendingBuyInAmount = coerceNumber(reservedSeat.pendingBuyInAmount, fallbackBuyInAmount);
+    const buyInAmount = pendingBuyInAmount > 0 ? pendingBuyInAmount : fallbackBuyInAmount;
+
+    if (!reservedSeat.buyInIdempotencyKey) {
+      reservedSeat.buyInIdempotencyKey = this.newIdempotencyKey(`buyin:${tableId}:${seatId}:${userId}`);
+      reservedSeat.pendingBuyInAmount = buyInAmount;
+      this.touchState(reservedState);
+      await tableStateStore.save(reservedState);
+    }
+
+    let reservationId = reservedSeat.reservationId;
+    if (!reservationId) {
+      const reservation = await balanceClientAdapter.reserveForBuyIn({
+        account_id: userId,
+        table_id: tableId,
+        amount: buyInAmount,
+        idempotency_key: reservedSeat.buyInIdempotencyKey,
+        timeout_seconds: 30,
+      });
+
+      reservationId = reservation.reservation_id;
+      if (!reservation.ok || !reservationId) {
+        await this.rollbackSeat(tableId, seatId, userId);
+        return { ok: false, error: reservation.error || "INSUFFICIENT_BALANCE" };
+      }
+
+      reservedSeat.reservationId = reservationId;
+      this.touchState(reservedState);
+      await tableStateStore.save(reservedState);
+    }
+
+    const commit = await balanceClientAdapter.commitReservation({ reservation_id: reservationId });
+    if (!commit.ok) {
+      await this.rollbackSeat(tableId, seatId, userId, reservationId);
+      return { ok: false, error: commit.error || "COMMIT_FAILED" };
+    }
+
+    const finalState = await tableStateStore.get(tableId);
+    if (!finalState) {
+      return { ok: false, error: "TABLE_LOST" };
+    }
+    const finalSeat = finalState.seats.find((entry) => entry.seatId === seatId);
+    if (!finalSeat || finalSeat.userId !== userId) {
+      return { ok: false, error: "SEAT_LOST" };
+    }
+
+    finalSeat.stack = buyInAmount;
+    finalSeat.status = "SEATED";
+    finalSeat.reservationId = reservationId;
+    finalSeat.pendingBuyInAmount = undefined;
+    finalSeat.buyInIdempotencyKey = undefined;
+
+    this.touchState(finalState);
+    await tableStateStore.save(finalState);
+    await this.publishTableAndLobby(table, finalState);
+
+    void this.emitGameEvent(tableId, undefined, userId, seatId, "PLAYER_JOINED", { stack: buyInAmount });
+
+    await this.checkStartHand(table, finalState);
+
+    return { ok: true };
   }
 
   private async handleBalanceUnavailable(
@@ -351,7 +403,7 @@ export class TableService {
     buyInAmount: number,
     err: unknown,
   ) {
-    console.error("Balance service unavailable:", err);
+    logger.error({ err, tableId, seatId, userId }, "Balance service unavailable");
     const state = await tableStateStore.get(tableId);
     if (!state) return;
     const seat = state.seats.find((entry) => entry.seatId === seatId);
@@ -359,8 +411,9 @@ export class TableService {
     seat.stack = buyInAmount;
     seat.status = "SEATED";
     seat.reservationId = undefined;
-    state.version += 1;
-    state.updatedAt = this.now();
+    seat.pendingBuyInAmount = undefined;
+    seat.buyInIdempotencyKey = undefined;
+    this.touchState(state);
     await tableStateStore.save(state);
     void this.emitGameEvent(tableId, undefined, userId, seatId, "BALANCE_UNAVAILABLE", { action: "BUY_IN" });
     const table = await tableStore.get(tableId);
@@ -382,12 +435,13 @@ export class TableService {
         seat.stack = 0;
         seat.holeCards = null;
         seat.reservationId = undefined;
-        state.version += 1;
-        state.updatedAt = this.now();
+        seat.pendingBuyInAmount = undefined;
+        seat.buyInIdempotencyKey = undefined;
+        this.touchState(state);
         await tableStateStore.save(state);
         const table = await tableStore.get(tableId);
         if (table) {
-          await gatewayWsPublisher.publishTableState(table, state);
+          await this.publishTableAndLobby(table, state);
         }
       }
     }
@@ -400,6 +454,10 @@ export class TableService {
 
     const seat = this.resolveSeatForUser(state, userId);
     if (!seat) return { ok: false, error: "PLAYER_NOT_AT_TABLE" };
+
+    if (seat.status === "RESERVED" && seat.reservationId) {
+      balanceClientAdapter.releaseReservation({ reservation_id: seat.reservationId, reason: "player_left" });
+    }
 
     const remainingStack = seat.stack;
     const shouldCashOut = remainingStack > 0;
@@ -420,6 +478,8 @@ export class TableService {
       seat.stack = 0;
       seat.holeCards = null;
       seat.reservationId = undefined;
+      seat.pendingBuyInAmount = undefined;
+      seat.buyInIdempotencyKey = undefined;
 
       if (!wasInHand) {
         seat.status = "EMPTY";
@@ -437,8 +497,7 @@ export class TableService {
         }
       }
 
-      state.version += 1;
-      state.updatedAt = this.now();
+      this.touchState(state);
       await tableStateStore.save(state);
       await this.publishTableAndLobby(table, state);
       void this.emitGameEvent(tableId, state.hand.handId, userId, seat.seatId, "PLAYER_LEFT", { stack: remainingStack });
@@ -450,7 +509,7 @@ export class TableService {
             table_id: tableId,
             seat_id: seat.seatId,
             amount: remainingStack,
-            idempotency_key: this.idempotencyKey("cashout", tableId, userId),
+            idempotency_key: this.cashOutIdempotencyKey(tableId, userId, seat.seatId),
           });
           if (!cashOut.ok) {
             void this.emitGameEvent(tableId, undefined, userId, seat.seatId, "CASHOUT_FAILED", { amount: remainingStack });
@@ -473,7 +532,7 @@ export class TableService {
           table_id: tableId,
           seat_id: seat.seatId,
           amount: remainingStack,
-          idempotency_key: this.idempotencyKey("cashout", tableId, userId),
+          idempotency_key: this.cashOutIdempotencyKey(tableId, userId, seat.seatId),
         });
         if (!cashOut.ok) {
           void this.emitGameEvent(tableId, undefined, userId, seat.seatId, "CASHOUT_FAILED", { amount: remainingStack });
@@ -488,8 +547,9 @@ export class TableService {
     seat.status = "EMPTY";
     seat.holeCards = null;
     seat.reservationId = undefined;
-    state.version += 1;
-    state.updatedAt = this.now();
+    seat.pendingBuyInAmount = undefined;
+    seat.buyInIdempotencyKey = undefined;
+    this.touchState(state);
 
     await tableStateStore.save(state);
     await this.publishTableAndLobby(table, state);
@@ -533,6 +593,8 @@ export class TableService {
     const { table, state } = loaded;
     if (!state.hand) return { ok: false, error: "NO_HAND_IN_PROGRESS" };
 
+    const actionStreet = state.hand.street;
+
     const seat = this.resolveSeatForUser(state, userId);
     if (!seat) return { ok: false, error: "PLAYER_NOT_AT_TABLE" };
 
@@ -556,8 +618,16 @@ export class TableService {
     await tableStateStore.save(result.state);
     await gatewayWsPublisher.publishTableState(table, result.state);
 
-    void this.emitGameEvent(tableId, result.state.hand?.handId, userId, seat.seatId, action.type, {
-      amount: action.amount ?? 0,
+    const hand = result.state.hand;
+    const actionRecord = hand?.actions[hand.actions.length - 1];
+    const actedSeat = result.state.seats[seat.seatId];
+    const isAllIn = actedSeat?.status === "ALL_IN" || actionRecord?.type === "ALL_IN";
+    void this.emitGameEvent(tableId, hand?.handId, userId, seat.seatId, "ACTION_TAKEN", {
+      seatId: seat.seatId,
+      action: actionRecord?.type ?? action.type,
+      amount: actionRecord?.amount ?? action.amount ?? 0,
+      isAllIn,
+      street: actionStreet,
     });
 
     if (result.handComplete && result.state.hand) {
@@ -696,7 +766,8 @@ export class TableService {
       rakeAmount: hand.rakeAmount,
     });
 
-    for (const pot of hand.pots) {
+    for (let potIndex = 0; potIndex < hand.pots.length; potIndex += 1) {
+      const pot = hand.pots[potIndex];
       if (pot.amount > 0 && pot.winners && pot.winners.length > 0) {
         const share = Math.floor(pot.amount / pot.winners.length);
         let remainder = pot.amount - share * pot.winners.length;
@@ -721,7 +792,7 @@ export class TableService {
             table_id: table.tableId,
             hand_id: hand.handId,
             winners: winnersToSettle,
-            idempotency_key: this.idempotencyKey("settle", table.tableId, hand.handId),
+            idempotency_key: this.settlePotIdempotencyKey(table.tableId, hand.handId, potIndex),
           });
           if (!settle.ok) {
             void this.emitGameEvent(table.tableId, hand.handId, undefined, undefined, "SETTLEMENT_FAILED", {
@@ -737,8 +808,7 @@ export class TableService {
     }
 
     state.hand = null;
-    state.version += 1;
-    state.updatedAt = this.now();
+    this.touchState(state);
     table.status = "WAITING";
     await tableStore.save(table);
     await tableStateStore.save(state);

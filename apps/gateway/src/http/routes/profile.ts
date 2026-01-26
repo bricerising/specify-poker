@@ -1,32 +1,13 @@
 import { Router, Request, Response } from "express";
 import { playerClient } from "../../grpc/clients";
+import { grpcCall } from "../../grpc/grpcCall";
+import { normalizeUsernameFromClaims } from "../../auth/claims";
+import { requireUserId } from "../utils/requireUserId";
 import logger from "../../observability/logger";
 
 const router = Router();
 
 type UnknownRecord = Record<string, unknown>;
-
-function requireUserId(req: Request, res: Response) {
-  const userId = req.auth?.userId;
-  if (!userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return null;
-  }
-  return userId;
-}
-
-// Helper to convert gRPC callback to promise
-function grpcCall<TRequest, TResponse>(
-  method: (request: TRequest, callback: (err: Error | null, response: TResponse) => void) => void,
-  request: TRequest
-): Promise<TResponse> {
-  return new Promise((resolve, reject) => {
-    method(request, (err: Error | null, response: TResponse) => {
-      if (err) reject(err);
-      else resolve(response);
-    });
-  });
-}
 
 function toString(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -35,27 +16,6 @@ function toString(value: unknown): string {
 function toNumber(value: unknown, fallback = 0): number {
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function normalizeUsernameFromClaims(claims: Record<string, unknown> | undefined): string | null {
-  const candidates = [
-    claims?.preferred_username,
-    claims?.username,
-    claims?.nickname,
-    claims?.email,
-  ];
-
-  for (const candidate of candidates) {
-    if (typeof candidate !== "string") {
-      continue;
-    }
-    const trimmed = candidate.trim();
-    if (trimmed.length > 0) {
-      return trimmed;
-    }
-  }
-
-  return null;
 }
 
 function normalizeProfile(profile: UnknownRecord, fallbackUserId: string) {

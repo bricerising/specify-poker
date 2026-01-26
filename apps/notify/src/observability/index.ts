@@ -16,8 +16,13 @@ const sdk = new NodeSDK({
 });
 
 export function startObservability() {
-  sdk.start();
-  logger.info("OpenTelemetry SDK started");
+  Promise.resolve(sdk.start())
+    .then(() => {
+      logger.info("OpenTelemetry SDK started");
+    })
+    .catch((err: unknown) => {
+      logger.error({ err }, "OpenTelemetry SDK failed to start");
+    });
 }
 
 export async function stopObservability() {

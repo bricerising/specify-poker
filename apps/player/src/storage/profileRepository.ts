@@ -1,6 +1,7 @@
 import { PoolClient } from "pg";
 import { query } from "./db";
-import { Profile, UserPreferences } from "../domain/types";
+import { Profile } from "../domain/types";
+import { normalizeUserPreferences } from "../domain/decoders";
 
 const profileColumns = `user_id, username, nickname, avatar_url, preferences, last_login_at, referred_by, created_at, updated_at, deleted_at`;
 
@@ -17,31 +18,13 @@ interface ProfileRow {
   deleted_at: Date | null;
 }
 
-function mapPreferences(value: unknown): UserPreferences {
-  if (!value || typeof value !== "object") {
-    return {
-      soundEnabled: true,
-      chatEnabled: true,
-      showHandStrength: true,
-      theme: "auto",
-    };
-  }
-  const prefs = value as Partial<UserPreferences>;
-  return {
-    soundEnabled: prefs.soundEnabled ?? true,
-    chatEnabled: prefs.chatEnabled ?? true,
-    showHandStrength: prefs.showHandStrength ?? true,
-    theme: prefs.theme ?? "auto",
-  };
-}
-
 function mapProfile(row: ProfileRow): Profile {
   return {
     userId: row.user_id,
     username: row.username,
     nickname: row.nickname,
     avatarUrl: row.avatar_url,
-    preferences: mapPreferences(row.preferences),
+    preferences: normalizeUserPreferences(row.preferences),
     lastLoginAt: row.last_login_at?.toISOString() ?? null,
     referredBy: row.referred_by,
     createdAt: row.created_at.toISOString(),
@@ -109,19 +92,19 @@ export async function create(
     profile.deletedAt ? new Date(profile.deletedAt) : null,
   ];
   const result = client
-    ? await client.query(sql, params)
+    ? await client.query<ProfileRow>(sql, params)
     : await query<ProfileRow>(sql, params);
-  const row = result.rows[0] as ProfileRow | undefined;
+  const row = result.rows[0];
   if (row) {
     return { profile: mapProfile(row), created: true };
   }
 
   const selectSql = `SELECT ${profileColumns} FROM profiles WHERE user_id = $1`;
   const selectResult = client
-    ? await client.query(selectSql, [profile.userId])
+    ? await client.query<ProfileRow>(selectSql, [profile.userId])
     : await query<ProfileRow>(selectSql, [profile.userId]);
 
-  const existingRow = selectResult.rows[0] as ProfileRow | undefined;
+  const existingRow = selectResult.rows[0];
   if (!existingRow) {
     throw new Error("PROFILE_CREATE_FAILED");
   }
@@ -153,9 +136,9 @@ export async function update(profile: Profile, client?: PoolClient): Promise<Pro
     profile.deletedAt ? new Date(profile.deletedAt) : null,
   ];
   const result = client
-    ? await client.query(sql, params)
+    ? await client.query<ProfileRow>(sql, params)
     : await query<ProfileRow>(sql, params);
-  return mapProfile(result.rows[0] as ProfileRow);
+  return mapProfile(result.rows[0]);
 }
 
 export async function upsert(profile: Profile): Promise<Profile> {

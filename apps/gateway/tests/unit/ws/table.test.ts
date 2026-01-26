@@ -24,6 +24,7 @@ vi.mock("../../../src/ws/subscriptions", () => ({
 
 vi.mock("../../../src/ws/localRegistry", () => ({
   sendToLocal: vi.fn(),
+  sendToLocalText: vi.fn(),
   getLocalConnectionMeta: vi.fn(),
 }));
 
@@ -43,7 +44,7 @@ vi.mock("../../../src/ws/validators", async (importOriginal) => {
 
 import { gameClient } from "../../../src/grpc/clients";
 import { subscribeToChannel, unsubscribeFromChannel, getSubscribers } from "../../../src/ws/subscriptions";
-import { sendToLocal, getLocalConnectionMeta } from "../../../src/ws/localRegistry";
+import { sendToLocal, sendToLocalText, getLocalConnectionMeta } from "../../../src/ws/localRegistry";
 import { checkWsRateLimit } from "../../../src/ws/validators";
 
 class MockSocket extends EventEmitter {
@@ -201,14 +202,15 @@ describe("Table WS handler", () => {
 
   it("routes pubsub table updates to local subscribers", async () => {
     vi.mocked(getSubscribers).mockResolvedValue(["conn-1", "conn-2"]);
+    const payload = { type: "TablePatch", tableId: "t1" };
     await handleTablePubSubEvent({
       channel: "table",
       tableId: "t1",
-      payload: { type: "TablePatch", tableId: "t1" },
+      payload,
       sourceId: "other",
     });
 
-    expect(sendToLocal).toHaveBeenCalledWith("conn-1", { type: "TablePatch", tableId: "t1" });
-    expect(sendToLocal).toHaveBeenCalledWith("conn-2", { type: "TablePatch", tableId: "t1" });
+    expect(sendToLocalText).toHaveBeenCalledWith("conn-1", JSON.stringify(payload));
+    expect(sendToLocalText).toHaveBeenCalledWith("conn-2", JSON.stringify(payload));
   });
 });

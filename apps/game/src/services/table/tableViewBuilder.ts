@@ -1,5 +1,16 @@
 import { HandState, Table, TableState } from "../../domain/types";
 
+function redactSeatForBroadcast(seat: TableState["seats"][number]) {
+  return {
+    seatId: seat.seatId,
+    userId: seat.userId,
+    stack: seat.stack,
+    status: seat.status,
+    lastAction: seat.lastAction,
+    holeCards: null,
+  };
+}
+
 export function redactHandState(hand: HandState) {
   return {
     handId: hand.handId,
@@ -32,7 +43,7 @@ export function buildTableStateView(table: Table, state: TableState) {
     status: table.status,
     hand,
     version: state.version,
-    seats: state.seats.map((seat) => ({ ...seat, holeCards: null })),
+    seats: state.seats.map(redactSeatForBroadcast),
     spectators: state.spectators,
     updatedAt: state.updatedAt,
     button: state.button,
@@ -42,6 +53,6 @@ export function buildTableStateView(table: Table, state: TableState) {
 export function redactTableState(state: TableState): TableState {
   return {
     ...state,
-    seats: state.seats.map((seat) => ({ ...seat, holeCards: null })),
+    seats: state.seats.map((seat) => ({ ...redactSeatForBroadcast(seat) })),
   };
 }

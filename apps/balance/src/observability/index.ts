@@ -6,24 +6,34 @@ import { SemanticResourceAttributes } from "@opentelemetry/semantic-conventions"
 import { getConfig } from "../config";
 import logger from "./logger";
 
-const config = getConfig();
-
-const sdk = new NodeSDK({
-  resource: new Resource({
-    [SemanticResourceAttributes.SERVICE_NAME]: "balance-service",
-  }),
-  traceExporter: new OTLPTraceExporter({
-    url: config.otelExporterEndpoint,
-  }),
-  instrumentations: [getNodeAutoInstrumentations()],
-});
+let sdk: NodeSDK | null = null;
 
 export function startObservability() {
+  if (sdk) {
+    return;
+  }
+
+  const config = getConfig();
+  sdk = new NodeSDK({
+    resource: new Resource({
+      [SemanticResourceAttributes.SERVICE_NAME]: "balance-service",
+    }),
+    traceExporter: new OTLPTraceExporter({
+      url: config.otelExporterEndpoint,
+    }),
+    instrumentations: [getNodeAutoInstrumentations()],
+  });
+
   sdk.start();
   logger.info("OpenTelemetry SDK started");
 }
 
 export async function stopObservability() {
+  if (!sdk) {
+    return;
+  }
+
   await sdk.shutdown();
+  sdk = null;
   logger.info("OpenTelemetry SDK shut down");
 }

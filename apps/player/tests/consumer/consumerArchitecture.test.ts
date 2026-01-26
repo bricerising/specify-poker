@@ -153,9 +153,8 @@ describe("Player service consumer architecture", () => {
 
   it("updates statistics based on hand events", async () => {
     const consumer = new EventConsumer();
-    const handleEvent = consumer as unknown as { handleEvent: (event: unknown) => Promise<void> };
 
-    await handleEvent.handleEvent({
+    await consumer.handleEvent({
       type: "HAND_STARTED",
       payload: {
         fields: {
