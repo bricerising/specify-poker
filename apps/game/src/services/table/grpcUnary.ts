@@ -1,7 +1,7 @@
 export type UnaryCallback<TResponse> = (err: Error | null, response: TResponse) => void;
 
 export function unaryCall<TRequest, TResponse>(
-  fn: (request: TRequest, callback: UnaryCallback<TResponse>) => void,
+  fn: (request: TRequest, callback: UnaryCallback<unknown>) => void,
   request: TRequest,
 ): Promise<TResponse> {
   return new Promise((resolve, reject) => {
@@ -10,8 +10,7 @@ export function unaryCall<TRequest, TResponse>(
         reject(err);
         return;
       }
-      resolve(response);
+      resolve(response as TResponse);
     });
   });
 }
-

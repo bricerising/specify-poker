@@ -151,10 +151,11 @@ export function attachChatHub(socket: WebSocket, userId: string, connectionId: s
   attachWsRouter(socket, {
     hubName: "chat",
     parseMessage: parseClientMessage,
-    getAttributes: (message) => {
-      return "tableId" in message && typeof message.tableId === "string"
-        ? { "poker.table_id": message.tableId }
-        : {};
+    getAttributes: (message): Record<string, string> => {
+      if ("tableId" in message && typeof message.tableId === "string") {
+        return { "poker.table_id": message.tableId };
+      }
+      return {};
     },
     handlers: {
       SubscribeChat: async (message) => {

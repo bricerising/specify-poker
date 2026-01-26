@@ -29,21 +29,21 @@ test.describe("Docker Compose Stack", () => {
     const pageA = await contextA.newPage();
     await loginAs(pageA, aliceId, aliceName);
 
-    await pageA.getByLabel("Name").fill(tableName);
-    await pageA.getByRole("button", { name: "Create Table" }).click();
+    await pageA.getByTestId("create-table-name").fill(tableName);
+    await pageA.getByTestId("create-table-submit").click();
 
-    const tableCardA = pageA.locator(".table-card", { hasText: tableName });
+    const tableCardA = pageA.getByTestId("lobby-table-card").filter({ hasText: tableName });
     await expect(tableCardA).toBeVisible({ timeout: 15000 });
-    await tableCardA.getByRole("button", { name: "Join Seat 1" }).click();
+    await tableCardA.locator('[data-testid="lobby-join-seat"][data-seat-number="1"]').click();
     await expect(pageA.getByText("Table ID:")).toBeVisible({ timeout: 15_000 });
 
     const contextB = await browser.newContext();
     const pageB = await contextB.newPage();
     await loginAs(pageB, bobId, bobName);
 
-    const tableCardB = pageB.locator(".table-card", { hasText: tableName });
+    const tableCardB = pageB.getByTestId("lobby-table-card").filter({ hasText: tableName });
     await expect(tableCardB).toBeVisible();
-    await tableCardB.getByRole("button", { name: "Join Seat 2" }).click();
+    await tableCardB.locator('[data-testid="lobby-join-seat"][data-seat-number="2"]').click();
     await expect(pageB.getByText("Table ID:")).toBeVisible({ timeout: 15_000 });
 
     const apiToken = generateToken(aliceId, aliceName);

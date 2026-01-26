@@ -23,52 +23,51 @@ test.describe("Tables: spectator + chat + moderation", () => {
     const pageAlice = await contextAlice.newPage();
     await loginAs(pageAlice, aliceId, `Alice${runId}`);
 
-    await pageAlice.getByLabel("Name").fill(tableName);
-    await pageAlice.getByRole("button", { name: "Create Table" }).click();
-    const tableCardAlice = pageAlice.locator(".table-card", { hasText: tableName });
+    await pageAlice.getByTestId("create-table-name").fill(tableName);
+    await pageAlice.getByTestId("create-table-submit").click();
+    const tableCardAlice = pageAlice.getByTestId("lobby-table-card").filter({ hasText: tableName });
     await expect(tableCardAlice).toBeVisible({ timeout: 15_000 });
-    await tableCardAlice.getByRole("button", { name: "Join Seat 1" }).click();
+    await tableCardAlice.locator('[data-testid="lobby-join-seat"][data-seat-number="1"]').click();
     await expect(pageAlice.getByText("Table ID:")).toBeVisible({ timeout: 15_000 });
 
     const contextBob = await browser.newContext();
     const pageBob = await contextBob.newPage();
     await loginAs(pageBob, bobId, `Bob${runId}`);
 
-    const tableCardBob = pageBob.locator(".table-card", { hasText: tableName });
+    const tableCardBob = pageBob.getByTestId("lobby-table-card").filter({ hasText: tableName });
     await expect(tableCardBob).toBeVisible({ timeout: 15_000 });
-    await tableCardBob.getByRole("button", { name: "Join Seat 2" }).click();
+    await tableCardBob.locator('[data-testid="lobby-join-seat"][data-seat-number="2"]').click();
     await expect(pageBob.getByText("Table ID:")).toBeVisible({ timeout: 15_000 });
 
     const contextSpectator = await browser.newContext();
     const pageSpectator = await contextSpectator.newPage();
     await loginAs(pageSpectator, spectatorId, `Spec${runId}`);
 
-    const tableCardSpectator = pageSpectator.locator(".table-card", { hasText: tableName });
+    const tableCardSpectator = pageSpectator.getByTestId("lobby-table-card").filter({ hasText: tableName });
     await expect(tableCardSpectator).toBeVisible({ timeout: 15_000 });
-    await tableCardSpectator.getByRole("button", { name: "Watch" }).click();
+    await tableCardSpectator.getByTestId("lobby-watch-table").click();
     await expect(pageSpectator.getByText("Table ID:")).toBeVisible({ timeout: 15_000 });
 
     // Spectator should see card backs, not hole card faces.
     await expect(pageSpectator.locator(".seat-cards .playing-card")).toHaveCount(0);
     await expect(pageSpectator.locator(".seat-cards .card-back")).toHaveCount(4);
 
-    await pageAlice.getByLabel("Message").fill("hello from alice");
-    await pageAlice.getByRole("button", { name: "Send" }).click();
+    await pageAlice.getByTestId("chat-message").fill("hello from alice");
+    await pageAlice.getByTestId("chat-send").click();
 
     await expect(pageBob.getByText("hello from alice")).toBeVisible({ timeout: 10_000 });
     await expect(pageSpectator.getByText("hello from alice")).toBeVisible({ timeout: 10_000 });
 
     // Owner mutes Bob via moderation menu.
-    const moderationSeat2 = pageAlice.locator(".moderation-seat", { hasText: "Seat 2" });
-    await expect(moderationSeat2).toBeVisible();
-    await moderationSeat2.getByRole("button", { name: "Mute" }).click();
+    await expect(pageAlice.locator('[data-testid="moderation-mute"][data-seat-number="2"]')).toBeVisible();
+    await pageAlice.locator('[data-testid="moderation-mute"][data-seat-number="2"]').click();
 
-    await pageBob.getByLabel("Message").fill("bob should be muted");
-    await pageBob.getByRole("button", { name: "Send" }).click();
+    await pageBob.getByTestId("chat-message").fill("bob should be muted");
+    await pageBob.getByTestId("chat-send").click();
     await expect(pageBob.getByRole("alert")).toContainText("muted");
 
-    await pageSpectator.getByLabel("Message").fill("spectator chat ok");
-    await pageSpectator.getByRole("button", { name: "Send" }).click();
+    await pageSpectator.getByTestId("chat-message").fill("spectator chat ok");
+    await pageSpectator.getByTestId("chat-send").click();
     await expect(pageAlice.getByText("spectator chat ok")).toBeVisible({ timeout: 10_000 });
 
     await contextAlice.close();

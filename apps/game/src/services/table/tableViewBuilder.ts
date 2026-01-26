@@ -6,7 +6,10 @@ export function redactHandState(hand: HandState) {
     tableId: hand.tableId,
     street: hand.street,
     communityCards: hand.communityCards,
-    pots: hand.pots,
+    pots: hand.pots.map((pot) => ({
+      ...pot,
+      eligibleSeatIds: pot.eligibleSeats,
+    })),
     currentBet: hand.currentBet,
     minRaise: hand.minRaise,
     turn: hand.turn,
@@ -42,4 +45,3 @@ export function redactTableState(state: TableState): TableState {
     seats: state.seats.map((seat) => ({ ...seat, holeCards: null })),
   };
 }
-

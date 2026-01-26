@@ -8,6 +8,8 @@
   "scripts": {
     "build": "npm run -ws --if-present build",
     "env:local": "node scripts/generate-local-env.mjs",
+    "grafana": "node scripts/grafana.mjs",
+    "redis": "node scripts/redis.mjs",
     "lint": "eslint .",
     "test": "vitest run"
   },

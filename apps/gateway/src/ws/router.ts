@@ -31,7 +31,7 @@ export function attachWsRouter<TMessage extends { type: string }>(
     const span = tracer.startSpan(`ws.${options.hubName}`, { attributes }, ROOT_CONTEXT);
     try {
       await context.with(trace.setSpan(ROOT_CONTEXT, span), async () => {
-        const handler = options.handlers[message.type] as WsMessageHandler<TMessage> | undefined;
+        const handler = options.handlers[message.type as TMessage["type"]] as WsMessageHandler<TMessage> | undefined;
         if (!handler) {
           return;
         }
@@ -55,4 +55,3 @@ export function attachWsRouter<TMessage extends { type: string }>(
     }
   });
 }
-

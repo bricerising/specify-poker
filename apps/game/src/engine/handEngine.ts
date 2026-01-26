@@ -349,6 +349,44 @@ function applyAllIn(
   return { resetActedSeats: raiseSize >= previousMinRaise };
 }
 
+type PlayerActionType = Exclude<ActionInput["type"], "POST_BLIND">;
+
+type PlayerActionHandler = (
+  hand: HandState,
+  seat: Seat,
+  seatId: number,
+  action: ActionInput,
+  ctx: { previousMinRaise: number },
+) => { resetActedSeats: boolean };
+
+const playerActionHandlers = {
+  FOLD: (_hand: HandState, seat: Seat) => {
+    seat.status = "FOLDED";
+    return { resetActedSeats: false };
+  },
+  CHECK: () => ({ resetActedSeats: false }),
+  CALL: (hand: HandState, seat: Seat, seatId: number) => {
+    applyCall(hand, seat, seatId);
+    return { resetActedSeats: false };
+  },
+  BET: (hand: HandState, seat: Seat, seatId: number, action: ActionInput) =>
+    applyBet(hand, seat, seatId, action.amount ?? 0),
+  RAISE: (
+    hand: HandState,
+    seat: Seat,
+    seatId: number,
+    action: ActionInput,
+    ctx: { previousMinRaise: number },
+  ) => applyRaise(hand, seat, seatId, action.amount ?? hand.currentBet, ctx.previousMinRaise),
+  ALL_IN: (
+    hand: HandState,
+    seat: Seat,
+    seatId: number,
+    _action: ActionInput,
+    ctx: { previousMinRaise: number },
+  ) => applyAllIn(hand, seat, seatId, ctx.previousMinRaise),
+} satisfies Record<PlayerActionType, PlayerActionHandler>;
+
 function canPerformInactiveAction(seat: Seat, action: ActionInput, allowInactive: boolean | undefined) {
   if (!allowInactive) {
     return false;
@@ -540,35 +578,14 @@ export function applyAction(
   const now = options.now ?? (() => new Date().toISOString());
   const timestamp = now();
   const previousMinRaise = hand.minRaise;
-  let resetActedSeats = false;
-
-  switch (action.type) {
-    case "FOLD":
-      seat.status = "FOLDED";
-      break;
-    case "CHECK":
-      break;
-    case "CALL":
-      applyCall(hand, seat, seatId);
-      break;
-    case "BET": {
-      const update = applyBet(hand, seat, seatId, action.amount ?? 0);
-      resetActedSeats = update.resetActedSeats;
-      break;
-    }
-    case "RAISE": {
-      const update = applyRaise(hand, seat, seatId, action.amount ?? hand.currentBet, previousMinRaise);
-      resetActedSeats = update.resetActedSeats;
-      break;
-    }
-    case "ALL_IN": {
-      const update = applyAllIn(hand, seat, seatId, previousMinRaise);
-      resetActedSeats = update.resetActedSeats;
-      break;
-    }
-    default:
-      break;
+  if (!(action.type in playerActionHandlers)) {
+    return { state: tableState, accepted: false, reason: "ILLEGAL_ACTION" };
   }
+
+  const update = playerActionHandlers[action.type as PlayerActionType](hand, seat, seatId, action, {
+    previousMinRaise,
+  });
+  const resetActedSeats = update.resetActedSeats;
 
   const actionRecord = createAction(hand.handId, seat, action, timestamp);
   hand.actions.push(actionRecord);

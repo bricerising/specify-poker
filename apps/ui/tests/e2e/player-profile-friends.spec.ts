@@ -40,19 +40,19 @@ test.describe("Player Service (via Gateway)", () => {
       const username = `Player${runId}`;
       await loginAs(page, userId, username);
 
-      await page.getByRole("button", { name: "Profile" }).click();
+      await page.getByTestId("nav-profile").click();
       await expect(page.getByRole("heading", { name: "Profile & Stats" })).toBeVisible();
 
       await expect(page.locator(".profile-summary .table-name")).toHaveText(username);
 
-      const avatarInput = page.getByLabel("Avatar URL");
+      const avatarInput = page.getByTestId("profile-avatar-url");
       await avatarInput.fill("not-a-url");
-      await expect(page.getByRole("button", { name: "Save Profile" })).toBeDisabled();
+      await expect(page.getByTestId("profile-save")).toBeDisabled();
 
       const avatarUrl = `https://example.com/${runId}.png`;
       await avatarInput.fill(avatarUrl);
-      await expect(page.getByRole("button", { name: "Save Profile" })).toBeEnabled();
-      await page.getByRole("button", { name: "Save Profile" }).click();
+      await expect(page.getByTestId("profile-save")).toBeEnabled();
+      await page.getByTestId("profile-save").click();
       await expect(page.locator(`.profile-summary img[alt="${username} avatar"]`)).toHaveAttribute("src", avatarUrl);
     });
 
@@ -61,15 +61,15 @@ test.describe("Player Service (via Gateway)", () => {
       const userId = `user-friends-${runId}`;
       await loginAs(page, userId, `Player${runId}`);
 
-      await page.getByRole("button", { name: "Friends" }).click();
+      await page.getByTestId("nav-friends").click();
       await expect(page.getByRole("heading", { name: "Friends" })).toBeVisible();
 
       const friendId = `friend-${crypto.randomUUID().slice(0, 6)}`;
-      await page.getByLabel("Add Friend").fill(friendId);
-      await page.getByRole("button", { name: "Add" }).click();
+      await page.getByTestId("friends-add-input").fill(friendId);
+      await page.getByTestId("friends-add").click();
       await expect(page.getByText(friendId)).toBeVisible();
 
-      await page.getByRole("button", { name: "Remove" }).click();
+      await page.locator(`[data-testid="friends-remove"][data-friend="${friendId}"]`).click();
       await expect(page.getByText(friendId)).toBeHidden();
     });
   });

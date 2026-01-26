@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { trace } from "@opentelemetry/api";
 
 import { ActionType, LegalAction } from "../state/deriveLegalActions";
+import { testIds } from "../utils/testIds";
 
 interface ActionBarProps {
   actions: LegalAction[];
@@ -114,6 +115,7 @@ export function ActionBar({ actions, pot, onAction }: ActionBarProps) {
             min={0}
             value={amount}
             onChange={(event) => setAmount(event.target.value)}
+            data-testid={testIds.action.amount}
           />
         </label>
         {betLimits ? (
@@ -126,6 +128,7 @@ export function ActionBar({ actions, pot, onAction }: ActionBarProps) {
               step={1}
               value={clampAmount(Number(amount))}
               onChange={(event) => setAmount(String(clampAmount(Number(event.target.value))))}
+              data-testid={testIds.action.betSizing}
             />
           </label>
         ) : null}
@@ -133,19 +136,35 @@ export function ActionBar({ actions, pot, onAction }: ActionBarProps) {
       {betLimits ? (
         <>
           <div className="action-buttons action-presets">
-            <button type="button" className="btn btn-ghost" onClick={() => setAmount(String(clampAmount(pot / 2)))}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setAmount(String(clampAmount(pot / 2)))}
+              data-testid={testIds.action.presetHalfPot}
+            >
               1/2 Pot
             </button>
-            <button type="button" className="btn btn-ghost" onClick={() => setAmount(String(clampAmount((pot * 3) / 4)))}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setAmount(String(clampAmount((pot * 3) / 4)))}
+              data-testid={testIds.action.presetThreeQuarterPot}
+            >
               3/4 Pot
             </button>
-            <button type="button" className="btn btn-ghost" onClick={() => setAmount(String(clampAmount(pot)))}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setAmount(String(clampAmount(pot)))}
+              data-testid={testIds.action.presetPot}
+            >
               Pot
             </button>
             <button
               type="button"
               className="btn btn-ghost"
               onClick={() => setAmount(String(clampAmount(betLimits.max ?? 0)))}
+              data-testid={testIds.action.presetAllIn}
             >
               All-in
             </button>
@@ -159,6 +178,8 @@ export function ActionBar({ actions, pot, onAction }: ActionBarProps) {
             type="button"
             className={actionClass(action)}
             onClick={() => handleAction(action)}
+            data-testid={testIds.action.submit}
+            data-action={action}
           >
             {actionLabel(action)}
           </button>

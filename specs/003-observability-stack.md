@@ -76,6 +76,76 @@ The following services are included in the local environment:
 
 Note: Grafana queries Tempo via an internal `tempo-grafana-proxy` that normalizes `start`/`end` query parameters (Grafana uses milliseconds, Tempo `api/search` expects seconds).
 
+## Troubleshooting via Grafana CLI
+
+This repo includes a small, production-aligned CLI that talks to Grafana’s HTTP API and queries Loki/Tempo/Mimir through Grafana datasource proxy endpoints (mirrors how Grafana Explore queries data sources).
+
+- Entry point: `scripts/grafana.mjs`
+- Runner: `npm run grafana -- <command> [options]`
+
+### Local (Docker Compose)
+
+Grafana runs at `http://localhost:3001` with `admin/admin`.
+
+```bash
+npm run grafana -- health --local
+npm run grafana -- ds list --local
+
+# Logs (Loki)
+npm run grafana -- logs services --local --since 1h
+npm run grafana -- logs service gateway --local --since 15m
+npm run grafana -- logs trace <traceId> --local --since 30m
+
+# Metrics (Prometheus/Mimir)
+npm run grafana -- metrics query 'up' --local --since 15m
+
+# Traces (Tempo)
+npm run grafana -- traces get <traceId> --local
+npm run grafana -- correlate trace <traceId> --local --since 30m
+```
+
+### Production / Grafana Cloud
+
+Use a Grafana API token and point at the production Grafana URL:
+
+- `--url=<grafanaUrl>` or `GRAFANA_URL`
+- `--token=<grafanaApiToken>` or `GRAFANA_TOKEN`
+- If datasource UIDs differ from local provisioning, pass `--uid=<uid>` per command or set:
+  - `GRAFANA_LOKI_UID`, `GRAFANA_TEMPO_UID`, `GRAFANA_PROMETHEUS_UID`
+
+Tip: add `--json` for machine-readable output when scripting investigations.
+
+## Troubleshooting via Redis CLI
+
+This repo includes a Redis troubleshooting CLI for inspecting keyspace state and pub/sub traffic (useful when debugging WebSocket fanout, lobby updates, chat history, etc.).
+
+- Entry point: `scripts/redis.mjs`
+- Runner: `npm run redis -- <command> [options]`
+
+### Local (Docker Compose)
+
+Redis is exposed at `redis://localhost:6379`.
+
+```bash
+npm run redis -- health --local
+npm run redis -- info --section=keyspace --local
+
+# Inspect keyspace safely (SCAN)
+npm run redis -- keys scan --match 'gateway:*' --limit 200 --local
+
+# Pub/sub troubleshooting (e.g. table updates -> gateway WS)
+npm run redis -- pubsub channels --pattern 'gateway:*' --local
+npm run redis -- pubsub subscribe gateway:ws:events --parse-json --table-id <tableId> --duration 30s --local
+```
+
+### Production / Managed Redis
+
+Point at your production Redis the same way as local:
+
+- `--url=<redisUrl>` or `REDIS_URL`
+- `--user=<username>` or `REDIS_USERNAME` (ACL user, if enabled)
+- `--password=<password>` or `REDIS_PASSWORD`
+
 ## Success Criteria
 
 - **Correlation**: 100% of error logs contain a `traceId`.

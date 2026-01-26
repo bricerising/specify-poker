@@ -12,6 +12,7 @@ import { TableStore, tableStore } from "../state/tableStore";
 import { fetchProfile, UserProfile } from "../services/profileApi";
 import { recordAction } from "../observability/otel";
 import { formatBlinds } from "../utils/chipFormatter";
+import { testIds } from "../utils/testIds";
 
 interface TablePageProps {
   store?: TableStore;
@@ -91,7 +92,12 @@ export function TablePage({ store = tableStore, onLeave }: TablePageProps) {
           </div>
         </div>
         <div className="table-topbar-actions">
-          <button type="button" className="btn btn-ghost" onClick={handleLeaveTable}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={handleLeaveTable}
+            data-testid={testIds.table.leave}
+          >
             Leave Table
           </button>
         </div>

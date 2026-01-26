@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 
+import { testIds } from "../utils/testIds";
+
 const CHAT_COLLAPSED_STORAGE_KEY = "poker.ui.chat.collapsed";
 
 export interface ChatMessage {
@@ -59,6 +61,7 @@ export function ChatPanel({ messages, onSend, error, onCollapseChange }: ChatPan
           onClick={() => setIsCollapsed((current) => !current)}
           aria-expanded={!isCollapsed}
           aria-label={isCollapsed ? "Expand chat" : "Collapse chat"}
+          data-testid={testIds.chat.toggle}
         >
           {isCollapsed ? "Expand" : "Collapse"}
           <span className="chat-panel-count" aria-hidden="true">
@@ -83,11 +86,15 @@ export function ChatPanel({ messages, onSend, error, onCollapseChange }: ChatPan
           <form onSubmit={handleSubmit} className="form-grid">
             <label className="field">
               <span className="field-label">Message</span>
-              <input value={message} onChange={(event) => setMessage(event.target.value)} />
+              <input
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+                data-testid={testIds.chat.message}
+              />
             </label>
             <div className="field">
               <span className="field-label">&nbsp;</span>
-              <button type="submit" className="btn btn-primary">
+              <button type="submit" className="btn btn-primary" data-testid={testIds.chat.send}>
                 Send
               </button>
             </div>

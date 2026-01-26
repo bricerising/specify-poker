@@ -6,6 +6,9 @@ import { wsServerMessageSchema } from "@specify-poker/shared";
 
 type UnknownRecord = Record<string, unknown>;
 type WsServerMessage = z.infer<typeof wsServerMessageSchema>;
+type WsServerMessageHandlerMap = {
+  [K in WsServerMessage["type"]]?: (message: Extract<WsServerMessage, { type: K }>) => void;
+};
 
 function decodeJwtUserId(token: string): string | null {
   const parts = token.split(".");
@@ -534,6 +537,160 @@ export function createTableStore(): TableStore {
     };
   };
 
+  const handleTableStateMessage = (
+    message: Extract<WsServerMessage, { type: "TableSnapshot" | "TablePatch" }>,
+  ) => {
+    const incoming =
+      message.type === "TableSnapshot"
+        ? (message.tableState as UnknownRecord | undefined)
+        : (message.patch as UnknownRecord | undefined);
+    if (!incoming) {
+      return;
+    }
+    const tableId = String(incoming.tableId ?? incoming.table_id ?? "");
+    const activeTableId = state.tableState?.tableId ?? null;
+    if (!activeTableId || !tableId || tableId !== activeTableId) {
+      return;
+    }
+    const currentVersion = state.tableState?.version ?? null;
+    const incomingVersion = toNumber(incoming.version, 0);
+    if (isStaleVersion(currentVersion, incomingVersion)) {
+      return;
+    }
+    if (shouldResync(currentVersion, incomingVersion)) {
+      requestResync(socket, tableId);
+    }
+    const fallback = state.tables.find((table) => table.tableId === tableId);
+    const normalized = applyCachedProfiles(normalizeTableState(incoming, fallback));
+    const tokenUserId = currentUserIdFromToken();
+    const inferredSeatId =
+      tokenUserId && normalized.seats.some((seat) => seat.userId === tokenUserId)
+        ? normalized.seats.find((seat) => seat.userId === tokenUserId)?.seatId ?? null
+        : null;
+    const shouldAdoptSeat =
+      inferredSeatId !== null && (state.seatId === null || state.isSpectating || state.seatId !== inferredSeatId);
+    const effectiveSeatId = shouldAdoptSeat ? inferredSeatId : state.seatId;
+    const effectiveIsSpectating = shouldAdoptSeat ? false : state.isSpectating;
+    const incomingHandId = normalized.hand?.handId ?? null;
+    const shouldRequestHoleCards =
+      Boolean(incomingHandId)
+      && effectiveSeatId !== null
+      && !effectiveIsSpectating
+      && (shouldAdoptSeat || state.privateHoleCards === null || state.privateHandId !== incomingHandId);
+    const clearPrivate = !incomingHandId || (state.privateHandId && state.privateHandId !== incomingHandId);
+    setState({
+      tableState: normalized,
+      ...(shouldAdoptSeat ? { seatId: inferredSeatId, isSpectating: false } : {}),
+      ...(clearPrivate ? { privateHoleCards: null, privateHandId: null } : {}),
+    });
+    requestMissingProfiles(normalized);
+    if (incomingHandId && shouldRequestHoleCards) {
+      requestPrivateHoleCards(tableId, incomingHandId);
+    }
+  };
+
+  const handleHoleCardsMessage = (message: Extract<WsServerMessage, { type: "HoleCards" }>) => {
+    const cards = message.cards.map((card) => cardToString(card)).filter((card): card is string => Boolean(card));
+    const handId = message.handId ?? null;
+    if (cards && cards.length === 2) {
+      setState({ privateHoleCards: cards, privateHandId: handId });
+    }
+  };
+
+  const handleChatMessage = (message: Extract<WsServerMessage, { type: "ChatMessage" }>) => {
+    const normalized = normalizeChatMessage(message.message);
+    if (!normalized) {
+      return;
+    }
+    setState({ chatMessages: [...state.chatMessages, normalized], chatError: undefined });
+  };
+
+  const handleChatSubscribed = (message: Extract<WsServerMessage, { type: "ChatSubscribed" }>) => {
+    const history = message.history ?? [];
+    const chatMessages = history.map(normalizeChatMessage).filter((entry): entry is ChatMessage => Boolean(entry));
+    setState({ chatMessages, chatError: undefined });
+  };
+
+  const handleChatError = (message: Extract<WsServerMessage, { type: "ChatError" }>) => {
+    setState({ chatError: message.reason });
+  };
+
+  const handleLobbyTablesUpdated = (message: Extract<WsServerMessage, { type: "LobbyTablesUpdated" }>) => {
+    setState({ tables: message.tables });
+  };
+
+  const handleTimerUpdate = (message: Extract<WsServerMessage, { type: "TimerUpdate" }>) => {
+    const handId = message.handId;
+    const deadlineTs = message.deadlineTs;
+    const currentTurnSeat = message.currentTurnSeat;
+    if (!state.tableState?.hand || state.tableState.hand.handId !== handId) {
+      return;
+    }
+    setState({
+      tableState: {
+        ...state.tableState,
+        hand: {
+          ...state.tableState.hand,
+          actionTimerDeadline: deadlineTs ?? null,
+          currentTurnSeat: currentTurnSeat ?? state.tableState.hand.currentTurnSeat,
+        },
+      },
+    });
+  };
+
+  const handleSpectatorMessage = (
+    message: Extract<WsServerMessage, { type: "SpectatorJoined" | "SpectatorLeft" }>,
+  ) => {
+    const spectatorCount = message.spectatorCount;
+    if (!state.tableState || spectatorCount === undefined) {
+      return;
+    }
+
+    const spectators = state.tableState.spectators ?? [];
+    if (message.type === "SpectatorJoined") {
+      const newSpectator: SpectatorView = {
+        userId: message.userId,
+        username: message.username,
+        status: "active",
+      };
+      setState({
+        tableState: {
+          ...state.tableState,
+          spectators: [...spectators.filter((s) => s.userId !== newSpectator.userId), newSpectator],
+        },
+      });
+      return;
+    }
+
+    setState({
+      tableState: {
+        ...state.tableState,
+        spectators: spectators.filter((s) => s.userId !== message.userId),
+      },
+    });
+  };
+
+  const wsServerMessageHandlers: WsServerMessageHandlerMap = {
+    TableSnapshot: handleTableStateMessage,
+    TablePatch: handleTableStateMessage,
+    HoleCards: handleHoleCardsMessage,
+    ChatMessage: handleChatMessage,
+    ChatSubscribed: handleChatSubscribed,
+    ChatError: handleChatError,
+    LobbyTablesUpdated: handleLobbyTablesUpdated,
+    TimerUpdate: handleTimerUpdate,
+    SpectatorJoined: handleSpectatorMessage,
+    SpectatorLeft: handleSpectatorMessage,
+  };
+
+  const handleWsServerMessage = (message: WsServerMessage) => {
+    const handler = wsServerMessageHandlers[message.type];
+    if (!handler) {
+      return;
+    }
+    (handler as (message: WsServerMessage) => void)(message);
+  };
+
   const connect = (wsUrl?: string) => {
     if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
       return;
@@ -570,128 +727,7 @@ export function createTableStore(): TableStore {
       }
 
       const message: WsServerMessage = parsed.data;
-      if (message.type === "TableSnapshot" || message.type === "TablePatch") {
-        const incoming =
-          message.type === "TableSnapshot"
-            ? (message.tableState as UnknownRecord | undefined)
-            : (message.patch as UnknownRecord | undefined);
-        if (!incoming) {
-          return;
-        }
-        const tableId = String(incoming.tableId ?? incoming.table_id ?? "");
-        const activeTableId = state.tableState?.tableId ?? null;
-        if (!activeTableId || !tableId || tableId !== activeTableId) {
-          return;
-        }
-        const currentVersion = state.tableState?.version ?? null;
-        const incomingVersion = toNumber(incoming.version, 0);
-        if (isStaleVersion(currentVersion, incomingVersion)) {
-          return;
-        }
-        if (shouldResync(currentVersion, incomingVersion)) {
-          requestResync(socket, tableId);
-        }
-        const fallback = state.tables.find((table) => table.tableId === tableId);
-        const normalized = applyCachedProfiles(normalizeTableState(incoming, fallback));
-        const tokenUserId = currentUserIdFromToken();
-        const inferredSeatId =
-          tokenUserId && normalized.seats.some((seat) => seat.userId === tokenUserId)
-            ? normalized.seats.find((seat) => seat.userId === tokenUserId)?.seatId ?? null
-            : null;
-        const shouldAdoptSeat =
-          inferredSeatId !== null && (state.seatId === null || state.isSpectating || state.seatId !== inferredSeatId);
-        const effectiveSeatId = shouldAdoptSeat ? inferredSeatId : state.seatId;
-        const effectiveIsSpectating = shouldAdoptSeat ? false : state.isSpectating;
-        const incomingHandId = normalized.hand?.handId ?? null;
-        const shouldRequestHoleCards =
-          Boolean(incomingHandId)
-          && effectiveSeatId !== null
-          && !effectiveIsSpectating
-          && (shouldAdoptSeat || state.privateHoleCards === null || state.privateHandId !== incomingHandId);
-        const clearPrivate =
-          !incomingHandId || (state.privateHandId && state.privateHandId !== incomingHandId);
-        setState({
-          tableState: normalized,
-          ...(shouldAdoptSeat ? { seatId: inferredSeatId, isSpectating: false } : {}),
-          ...(clearPrivate ? { privateHoleCards: null, privateHandId: null } : {}),
-        });
-        requestMissingProfiles(normalized);
-        if (incomingHandId && shouldRequestHoleCards) {
-          requestPrivateHoleCards(tableId, incomingHandId);
-        }
-        return;
-      }
-      if (message.type === "HoleCards") {
-        const cards = message.cards.map((card) => cardToString(card)).filter((card): card is string => Boolean(card));
-        const handId = message.handId ?? null;
-        if (cards && cards.length === 2) {
-          setState({ privateHoleCards: cards, privateHandId: handId });
-        }
-        return;
-      }
-      if (message.type === "ChatMessage") {
-        setState({ chatMessages: [...state.chatMessages, message.message], chatError: undefined });
-        return;
-      }
-      if (message.type === "ChatSubscribed") {
-        const history = message.history ?? [];
-        const chatMessages = history.map(normalizeChatMessage).filter((entry): entry is ChatMessage => Boolean(entry));
-        setState({ chatMessages, chatError: undefined });
-        return;
-      }
-      if (message.type === "ChatError") {
-        setState({ chatError: message.reason });
-        return;
-      }
-      if (message.type === "LobbyTablesUpdated") {
-        setState({ tables: message.tables });
-        return;
-      }
-      if (message.type === "TimerUpdate") {
-        const handId = message.handId;
-        const deadlineTs = message.deadlineTs;
-        const currentTurnSeat = message.currentTurnSeat;
-        if (!state.tableState?.hand || state.tableState.hand.handId !== handId) {
-          return;
-        }
-        setState({
-          tableState: {
-            ...state.tableState,
-            hand: {
-              ...state.tableState.hand,
-              actionTimerDeadline: deadlineTs ?? null,
-              currentTurnSeat: currentTurnSeat ?? state.tableState.hand.currentTurnSeat,
-            },
-          },
-        });
-        return;
-      }
-      if (message.type === "SpectatorJoined" || message.type === "SpectatorLeft") {
-        const spectatorCount = message.spectatorCount;
-        if (state.tableState && spectatorCount !== undefined) {
-          const spectators = state.tableState.spectators ?? [];
-          if (message.type === "SpectatorJoined") {
-            const newSpectator: SpectatorView = {
-              userId: message.userId,
-              username: message.username,
-              status: "active",
-            };
-            setState({
-              tableState: {
-                ...state.tableState,
-                spectators: [...spectators.filter((s) => s.userId !== newSpectator.userId), newSpectator],
-              },
-            });
-          } else {
-            setState({
-              tableState: {
-                ...state.tableState,
-                spectators: spectators.filter((s) => s.userId !== message.userId),
-              },
-            });
-          }
-        }
-      }
+      handleWsServerMessage(message);
     });
   };
 

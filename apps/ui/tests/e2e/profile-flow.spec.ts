@@ -43,11 +43,11 @@ test("profile flow updates avatar url", async ({ page }) => {
   });
 
   await page.goto("/");
-  await page.getByRole("button", { name: "Profile" }).click();
+  await page.getByTestId("nav-profile").click();
 
   const avatarUrl = "https://example.com/avatar.png";
-  await page.getByLabel("Avatar URL").fill(avatarUrl);
-  await page.getByRole("button", { name: "Save Profile" }).click();
+  await page.getByTestId("profile-avatar-url").fill(avatarUrl);
+  await page.getByTestId("profile-save").click();
 
   await expect(page.locator('.profile-summary img[alt="Ace avatar"]')).toHaveAttribute("src", avatarUrl);
 });

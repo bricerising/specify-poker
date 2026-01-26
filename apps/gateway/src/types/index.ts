@@ -136,7 +136,7 @@ export interface EventServiceClient {
             hand_id?: string;
             user_id?: string;
             seat_id?: number;
-            payload: Record<string, unknown>;
+            payload: unknown;
             idempotency_key: string;
         },
         callback: UnaryCallback<{ success: boolean; event_id?: string }>
@@ -149,7 +149,7 @@ export interface EventServiceClient {
                 hand_id?: string;
                 user_id?: string;
                 seat_id?: number;
-                payload: Record<string, unknown>;
+                payload: unknown;
                 idempotency_key: string;
             }>;
         },

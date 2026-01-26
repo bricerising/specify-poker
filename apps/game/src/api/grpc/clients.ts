@@ -84,12 +84,25 @@ type EventProto = { event: { EventService: GrpcClientConstructor<EventServiceCli
 const balanceProto = loadProto(BALANCE_PROTO_PATH) as unknown as BalanceProto;
 const eventProto = loadProto(EVENT_PROTO_PATH) as unknown as EventProto;
 
-export const balanceClient = new balanceProto.balance.BalanceService(
-  config.balanceServiceAddr,
-  grpc.credentials.createInsecure(),
-);
+type GrpcClientsConfig = Pick<typeof config, "balanceServiceAddr" | "eventServiceAddr">;
 
-export const eventClient = new eventProto.event.EventService(
-  config.eventServiceAddr,
-  grpc.credentials.createInsecure(),
-);
+export interface GrpcClients {
+  balanceClient: BalanceServiceClient;
+  eventClient: EventServiceClient;
+}
+
+export function createGrpcClients(configOverride: GrpcClientsConfig = config): GrpcClients {
+  const credentials = grpc.credentials.createInsecure();
+  return {
+    balanceClient: new balanceProto.balance.BalanceService(
+      configOverride.balanceServiceAddr,
+      credentials,
+    ),
+    eventClient: new eventProto.event.EventService(
+      configOverride.eventServiceAddr,
+      credentials,
+    ),
+  };
+}
+
+export const { balanceClient, eventClient } = createGrpcClients();

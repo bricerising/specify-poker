@@ -11,6 +11,7 @@ import { clearToken, hydrateTokenFromCallback, isAuthenticated, startLogin } fro
 import { ensurePushSubscription } from "./services/pushManager";
 import { tableStore } from "./state/tableStore";
 import { fetchProfile, UserProfile } from "./services/profileApi";
+import { testIds } from "./utils/testIds";
 
 const rootElement = document.getElementById("root");
 
@@ -150,7 +151,12 @@ function PokerApp() {
           <div className="user-label">Signed in</div>
           <div className="user-value">{profile ? profile.username : "Player"}</div>
         </div>
-        <button type="button" className="btn btn-ghost" onClick={handleClearToken}>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={handleClearToken}
+          data-testid={testIds.auth.signOut}
+        >
           Sign out
         </button>
       </div>
@@ -175,13 +181,28 @@ function PokerApp() {
     <div className="app-shell">
       {header}
       <nav className="app-nav">
-        <button type="button" className={navClass("lobby")} onClick={() => navigate("/")}>
+        <button
+          type="button"
+          className={navClass("lobby")}
+          onClick={() => navigate("/")}
+          data-testid={testIds.nav.lobby}
+        >
           Lobby
         </button>
-        <button type="button" className={navClass("profile")} onClick={() => navigate("/profile")}>
+        <button
+          type="button"
+          className={navClass("profile")}
+          onClick={() => navigate("/profile")}
+          data-testid={testIds.nav.profile}
+        >
           Profile
         </button>
-        <button type="button" className={navClass("friends")} onClick={() => navigate("/friends")}>
+        <button
+          type="button"
+          className={navClass("friends")}
+          onClick={() => navigate("/friends")}
+          data-testid={testIds.nav.friends}
+        >
           Friends
         </button>
       </nav>
@@ -251,6 +272,7 @@ function AppRoot() {
                   <a
                     className="btn btn-primary"
                     href="#"
+                    data-testid={testIds.auth.login}
                     onClick={(event) => {
                       event.preventDefault();
                       void startLogin(window.location.origin);

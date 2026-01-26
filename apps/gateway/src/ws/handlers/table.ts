@@ -176,10 +176,11 @@ export function attachTableHub(socket: WebSocket, userId: string, connectionId: 
   attachWsRouter(socket, {
     hubName: "table",
     parseMessage: parseClientMessage,
-    getAttributes: (message) => {
-      return "tableId" in message && typeof message.tableId === "string"
-        ? { "poker.table_id": message.tableId }
-        : {};
+    getAttributes: (message): Record<string, string> => {
+      if ("tableId" in message && typeof message.tableId === "string") {
+        return { "poker.table_id": message.tableId };
+      }
+      return {};
     },
     handlers: {
       SubscribeTable: async (message) => {

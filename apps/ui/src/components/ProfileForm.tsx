@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 
+import { testIds } from "../utils/testIds";
+
 interface ProfileFormProps {
   username: string;
   initialAvatarUrl: string | null;
@@ -45,7 +47,7 @@ export function ProfileForm({ username, initialAvatarUrl, onSave }: ProfileFormP
       <div className="form-grid">
         <label className="field">
           <span className="field-label">Username</span>
-          <input value={username} disabled />
+          <input value={username} disabled data-testid={testIds.profile.username} />
         </label>
         <label className="field">
           <span className="field-label">Avatar URL</span>
@@ -53,10 +55,16 @@ export function ProfileForm({ username, initialAvatarUrl, onSave }: ProfileFormP
             value={avatarUrl}
             onChange={(event) => setAvatarUrl(event.target.value)}
             placeholder="https://"
+            data-testid={testIds.profile.avatarUrl}
           />
         </label>
       </div>
-      <button type="submit" className="btn btn-primary" disabled={!isValid}>
+      <button
+        type="submit"
+        className="btn btn-primary"
+        disabled={!isValid}
+        data-testid={testIds.profile.save}
+      >
         Save Profile
       </button>
       {error ? (

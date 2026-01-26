@@ -70,8 +70,10 @@ test.describe("gameplay flow", () => {
 
         handState = {
           handId: "hand-1",
-          currentStreet: "preflop",
-          currentTurnSeat: 1,
+          tableId: "table-1",
+          street: "preflop",
+          turn: 1,
+          lastAggressor: 0,
           currentBet: 10,
           minRaise: 10,
           roundContributions: { 0: 5, 1: 10 },
@@ -81,6 +83,7 @@ test.describe("gameplay flow", () => {
           pots: [{ amount: 15, eligibleSeatIds: [0, 1] }],
           actionTimerDeadline: new Date(Date.now() + 20000).toISOString(),
           bigBlind: 10,
+          startedAt: new Date(Date.now() - 1000).toISOString(),
         };
 
         tableState = {
@@ -102,6 +105,8 @@ test.describe("gameplay flow", () => {
           status: "in_hand",
           hand: this.handState,
           version: 1,
+          button: 0,
+          updatedAt: new Date().toISOString(),
         };
 
         constructor(url: string) {
@@ -150,14 +155,15 @@ test.describe("gameplay flow", () => {
               ...this.tableState,
               hand: {
                 ...this.handState,
-                currentStreet: "flop",
+                street: "flop",
                 communityCards: ["Qs", "Jh", "Tc"],
-                currentTurnSeat: 0,
+                turn: 0,
               },
               version: this.tableState.version + 1,
+              updatedAt: new Date().toISOString(),
             };
             this.emit("message", {
-              data: JSON.stringify({ type: "TablePatch", patch: this.tableState }),
+              data: JSON.stringify({ type: "TablePatch", tableId: "table-1", handId: "hand-1", patch: this.tableState }),
             });
           }
         }
@@ -175,7 +181,7 @@ test.describe("gameplay flow", () => {
 
   test("player can see hole cards after joining", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: "Join Seat 2" }).click();
+    await page.locator('[data-testid="lobby-join-seat"][data-seat-number="2"]').click();
 
     await expect(page.getByLabel("A of hearts")).toBeVisible();
     await expect(page.getByLabel("K of diamonds")).toBeVisible();
@@ -183,18 +189,18 @@ test.describe("gameplay flow", () => {
 
   test("player can take action when it is their turn", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: "Join Seat 2" }).click();
+    await page.locator('[data-testid="lobby-join-seat"][data-seat-number="2"]').click();
 
-    await expect(page.getByRole("button", { name: "Check" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Raise" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Fold" })).toBeVisible();
+    await expect(page.locator('[data-testid="action-submit"][data-action="Check"]')).toBeVisible();
+    await expect(page.locator('[data-testid="action-submit"][data-action="Raise"]')).toBeVisible();
+    await expect(page.locator('[data-testid="action-submit"][data-action="Fold"]')).toBeVisible();
   });
 
   test("action progresses the hand to next street", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: "Join Seat 2" }).click();
+    await page.locator('[data-testid="lobby-join-seat"][data-seat-number="2"]').click();
 
-    await page.getByRole("button", { name: "Check" }).click();
+    await page.locator('[data-testid="action-submit"][data-action="Check"]').click();
 
     await expect(page.getByText("Street")).toBeVisible();
     await expect(page.getByText("flop")).toBeVisible();
@@ -202,8 +208,8 @@ test.describe("gameplay flow", () => {
 
   test("community cards appear after flop", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: "Join Seat 2" }).click();
-    await page.getByRole("button", { name: "Check" }).click();
+    await page.locator('[data-testid="lobby-join-seat"][data-seat-number="2"]').click();
+    await page.locator('[data-testid="action-submit"][data-action="Check"]').click();
 
     await expect(page.getByLabel("Q of spades")).toBeVisible();
     await expect(page.getByLabel("J of hearts")).toBeVisible();
@@ -212,7 +218,7 @@ test.describe("gameplay flow", () => {
 
   test("pot amount is displayed", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: "Join Seat 2" }).click();
+    await page.locator('[data-testid="lobby-join-seat"][data-seat-number="2"]').click();
 
     const potFact = page.locator(".table-facts .fact").filter({ hasText: "Pot" });
     await expect(potFact).toContainText("15");
@@ -323,8 +329,10 @@ test.describe("timer display", () => {
                   status: "in_hand",
                   hand: {
                     handId: "hand-1",
-                    currentStreet: "preflop",
-                    currentTurnSeat: 1,
+                    tableId: "table-1",
+                    street: "preflop",
+                    turn: 1,
+                    lastAggressor: 0,
                     currentBet: 10,
                     minRaise: 10,
                     roundContributions: {},
@@ -334,8 +342,11 @@ test.describe("timer display", () => {
                     pots: [{ amount: 15, eligibleSeatIds: [0, 1] }],
                     actionTimerDeadline: new Date(Date.now() + 15000).toISOString(),
                     bigBlind: 10,
+                    startedAt: new Date(Date.now() - 1000).toISOString(),
                   },
                   version: 1,
+                  button: 0,
+                  updatedAt: new Date().toISOString(),
                 },
               }),
             });
@@ -352,7 +363,7 @@ test.describe("timer display", () => {
     });
 
     await page.goto("/");
-    await page.getByRole("button", { name: "Join Seat 2" }).click();
+    await page.locator('[data-testid="lobby-join-seat"][data-seat-number="2"]').click();
 
     await expect(page.getByText("Action Timer")).toBeVisible();
   });

@@ -97,8 +97,10 @@ test("smoke flow: login, create table, join, play hand", async ({ page }) => {
         status: "in_hand",
         hand: {
           handId: "hand-1",
-          currentStreet: "preflop",
-          currentTurnSeat: 0,
+          tableId: "table-1",
+          street: "preflop",
+          turn: 0,
+          lastAggressor: 0,
           currentBet: 0,
           minRaise: 10,
           roundContributions: { 0: 0, 1: 0 },
@@ -108,8 +110,11 @@ test("smoke flow: login, create table, join, play hand", async ({ page }) => {
           pots: [{ amount: 0, eligibleSeatIds: [0] }],
           actionTimerDeadline: null,
           bigBlind: 10,
+          startedAt: new Date(Date.now() - 1000).toISOString(),
         },
         version: 1,
+        button: 0,
+        updatedAt: new Date().toISOString(),
       };
 
       constructor(url: string) {
@@ -139,12 +144,13 @@ test("smoke flow: login, create table, join, play hand", async ({ page }) => {
             ...this.tableState,
             hand: {
               ...this.tableState.hand,
-              currentStreet: "ended",
+              street: "ended",
             },
             version: this.tableState.version + 1,
+            updatedAt: new Date().toISOString(),
           };
           this.emit("message", {
-            data: JSON.stringify({ type: "TablePatch", patch: this.tableState }),
+            data: JSON.stringify({ type: "TablePatch", tableId: "table-1", handId: "hand-1", patch: this.tableState }),
           });
         }
       }
@@ -161,12 +167,13 @@ test("smoke flow: login, create table, join, play hand", async ({ page }) => {
 
   await page.goto("/");
 
-  await page.getByLabel("Name").fill("High Stakes");
-  await page.getByRole("button", { name: "Create Table" }).click();
-  await page.getByRole("button", { name: "Join Seat 1" }).click();
+  await page.getByTestId("create-table-name").fill("High Stakes");
+  await page.getByTestId("create-table-submit").click();
+  const tableCard = page.getByTestId("lobby-table-card").filter({ hasText: "High Stakes" });
+  await tableCard.locator('[data-testid="lobby-join-seat"][data-seat-number="1"]').click();
 
   await expect(page.getByText("Table ID: table-1")).toBeVisible();
-  await page.getByRole("button", { name: "Check" }).click();
+  await page.locator('[data-testid="action-submit"][data-action="Check"]').click();
   const streetFact = page.locator(".table-facts .fact").filter({ hasText: "Street" });
   await expect(streetFact).toContainText("ended");
 });

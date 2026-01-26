@@ -6,6 +6,7 @@ import { PokerArt } from "../components/PokerArt";
 import { createTable } from "../services/lobbyApi";
 import { fetchProfile, UserProfile } from "../services/profileApi";
 import { TableStore, tableStore, TableSummary } from "../state/tableStore";
+import { testIds } from "../utils/testIds";
 
 interface LobbyPageProps {
   store?: TableStore;
@@ -122,6 +123,10 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
           className="btn btn-seat"
           onClick={() => joinSeat(table.tableId, index)}
           disabled={isTaken}
+          data-testid={testIds.lobby.joinSeat}
+          data-table-id={table.tableId}
+          data-seat-id={index}
+          data-seat-number={index + 1}
         >
           {isTaken ? `Seat ${index + 1} Taken` : `Join Seat ${index + 1}`}
         </button>
@@ -132,6 +137,8 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
         key={table.tableId}
         className="card table-card stagger-item"
         style={{ "--stagger": index } as React.CSSProperties}
+        data-testid={testIds.lobby.tableCard}
+        data-table-id={table.tableId}
       >
         <div className="table-card-header">
           <div>
@@ -157,6 +164,8 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
             type="button"
             className="btn btn-ghost"
             onClick={() => spectateTable(table.tableId)}
+            data-testid={testIds.lobby.watchTable}
+            data-table-id={table.tableId}
           >
             Watch
           </button>
@@ -183,7 +192,13 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
           <h3>Invite Friends</h3>
           <p className="meta-line">Share this lobby link with friends so they can sign in and join.</p>
           <div className="seat-actions">
-            <a className="invite-url" href={instanceUrl ?? "#"} target="_blank" rel="noreferrer">
+            <a
+              className="invite-url"
+              href={instanceUrl ?? "#"}
+              target="_blank"
+              rel="noreferrer"
+              data-testid={testIds.lobby.inviteLink}
+            >
               {instanceUrl ?? "Invite link available in browser"}
             </a>
             <button
@@ -191,6 +206,7 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
               className="btn btn-quiet"
               onClick={handleCopyInvite}
               disabled={!instanceUrl || inviteStatus === "copied"}
+              data-testid={testIds.lobby.copyInvite}
             >
               {inviteStatus === "copied" ? "Copied" : inviteStatus === "failed" ? "Copy failed" : "Copy"}
             </button>
