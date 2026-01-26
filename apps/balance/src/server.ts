@@ -3,6 +3,7 @@ if (require.main === module) {
   startObservability();
 }
 
+import { createShutdownManager } from "@specify-poker/shared";
 import express from "express";
 import { getConfig } from "./config";
 import router from "./api/http/router";
@@ -50,72 +51,106 @@ app.use(
 let httpServer: ReturnType<typeof app.listen> | null = null;
 let metricsServer: ReturnType<typeof startMetricsServer> | null = null;
 
-async function start() {
-  const config = getConfig();
-
-  // Start HTTP server
-  httpServer = app.listen(config.httpPort, () => {
-    logger.info({ port: config.httpPort }, "Balance HTTP server listening");
-  });
-
-  // Start gRPC server
-  try {
-    await startGrpcServer(config.grpcPort);
-  } catch (error) {
-    logger.error({ err: error }, "Failed to start gRPC server");
-    process.exit(1);
+const shutdownManager = createShutdownManager({ logger });
+shutdownManager.add("otel.shutdown", async () => {
+  await stopObservability();
+});
+shutdownManager.add("redis.close", async () => {
+  await closeRedisClient();
+});
+shutdownManager.add("metrics.close", async () => {
+  const server = metricsServer;
+  if (!server) {
+    return;
   }
-
-  // Start metrics server
-  metricsServer = startMetricsServer(config.metricsPort);
-
-  // Start background jobs
-  startReservationExpiryJob();
-  startLedgerVerificationJob();
-
-  logger.info("Balance service started successfully");
-}
-
-async function shutdown() {
-  logger.info("Shutting down balance service...");
-
-  // Stop background jobs
+  await new Promise<void>((resolve, reject) => {
+    server.close((err?: Error) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve();
+    });
+  });
+  metricsServer = null;
+});
+shutdownManager.add("http.close", async () => {
+  const server = httpServer;
+  if (!server) {
+    return;
+  }
+  await new Promise<void>((resolve, reject) => {
+    server.close((err?: Error) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve();
+    });
+  });
+  httpServer = null;
+});
+shutdownManager.add("grpc.stop", () => {
+  stopGrpcServer();
+});
+shutdownManager.add("jobs.stop", () => {
   stopReservationExpiryJob();
   stopLedgerVerificationJob();
+});
 
-  // Stop gRPC server
-  stopGrpcServer();
+export async function start() {
+  const config = getConfig();
 
-  // Stop HTTP server
-  if (httpServer) {
-    httpServer.close();
+  try {
+    // Start HTTP server
+    httpServer = app.listen(config.httpPort, () => {
+      logger.info({ port: config.httpPort }, "Balance HTTP server listening");
+    });
+
+    // Start gRPC server
+    await startGrpcServer(config.grpcPort);
+
+    // Start metrics server
+    metricsServer = startMetricsServer(config.metricsPort);
+
+    // Start background jobs
+    startReservationExpiryJob();
+    startLedgerVerificationJob();
+
+    logger.info("Balance service started successfully");
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Failed to start balance service");
+    await shutdownManager.run();
+    throw error;
   }
+}
 
-  if (metricsServer) {
-    metricsServer.close();
-    metricsServer = null;
-  }
-
-  // Close Redis connection
-  await closeRedisClient();
-
-  await stopObservability();
-
+export async function shutdown() {
+  logger.info("Shutting down balance service...");
+  await shutdownManager.run();
   logger.info("Balance service shut down complete");
-  process.exit(0);
 }
 
 // Only start if this is the main module
 if (require.main === module) {
+  const handleFatal = (error: unknown) => {
+    logger.error({ err: error }, "Balance service failed");
+    shutdown().finally(() => process.exit(1));
+  };
+
+  process.on("uncaughtException", handleFatal);
+  process.on("unhandledRejection", handleFatal);
+
   // Handle shutdown signals
-  process.on("SIGINT", shutdown);
-  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", () => {
+    shutdown().finally(() => process.exit(0));
+  });
+  process.on("SIGTERM", () => {
+    shutdown().finally(() => process.exit(0));
+  });
 
   // Start the service
-  start().catch((error) => {
-    logger.error({ err: error }, "Failed to start balance service");
-    process.exit(1);
-  });
+  start().catch(handleFatal);
 }
 
-export { app, start, shutdown };
+export { app };

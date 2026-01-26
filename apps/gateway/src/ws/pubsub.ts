@@ -18,6 +18,7 @@ const instanceId = randomUUID();
 let pubClient: RedisClientType | null = null;
 let subClient: RedisClientType | null = null;
 let initialized = false;
+let closePromise: Promise<void> | null = null;
 
 function parseWsPubSubMessage(raw: string): WsPubSubMessage | null {
   const record = safeJsonParseRecord(raw);
@@ -92,6 +93,35 @@ export async function initWsPubSub(handlers: {
   initialized = true;
   logger.info("WebSocket Pub/Sub initialized");
   return true;
+}
+
+export async function closeWsPubSub(): Promise<void> {
+  if (closePromise) {
+    return closePromise;
+  }
+
+  const closeClient = async (client: RedisClientType | null, label: string) => {
+    if (!client?.isOpen) {
+      return;
+    }
+    try {
+      await client.quit();
+    } catch (err: unknown) {
+      logger.warn({ err, label }, "Redis quit failed; forcing disconnect");
+      client.disconnect();
+    }
+  };
+
+  closePromise = Promise.all([closeClient(subClient, "subClient"), closeClient(pubClient, "pubClient")])
+    .then(() => undefined)
+    .finally(() => {
+      pubClient = null;
+      subClient = null;
+      initialized = false;
+      closePromise = null;
+    });
+
+  return closePromise;
 }
 
 async function publish(message: Omit<WsPubSubMessage, "sourceId">) {

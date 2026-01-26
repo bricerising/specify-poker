@@ -5,6 +5,10 @@ const server = {
   listen: vi.fn((_port: number, cb: () => void) => cb()),
   close: vi.fn((cb: () => void) => cb()),
 };
+const wss = {
+  clients: new Set(),
+  close: vi.fn((cb: () => void) => cb()),
+};
 
 vi.mock("express", () => ({
   default: vi.fn(() => app),
@@ -27,7 +31,7 @@ vi.mock("../../src/http/router", () => ({
 }));
 
 vi.mock("../../src/ws/server", () => ({
-  initWsServer: vi.fn().mockResolvedValue(undefined),
+  initWsServer: vi.fn().mockResolvedValue(wss),
 }));
 
 vi.mock("../../src/observability/otel", () => ({
@@ -35,8 +39,16 @@ vi.mock("../../src/observability/otel", () => ({
   shutdownOTEL: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("../../src/ws/pubsub", () => ({
+  closeWsPubSub: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("../../src/storage/instanceRegistry", () => ({
   registerInstance: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../../src/storage/redisClient", () => ({
+  closeRedisClient: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("prom-client", () => ({
@@ -51,36 +63,23 @@ vi.mock("../../src/observability/logger", () => ({
 }));
 
 describe("Gateway server startup", () => {
-  const originalExit = process.exit;
-  const originalOn = process.on;
-  const handlers: Record<string, () => void> = {};
-
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    process.exit = vi.fn() as unknown as typeof process.exit;
-    process.on = vi.fn((event: string, handler: () => void) => {
-      handlers[event] = handler;
-      return process;
-    }) as unknown as typeof process.on;
   });
 
-  afterEach(() => {
-    process.exit = originalExit;
-    process.on = originalOn;
-  });
+  afterEach(() => {});
 
   it("boots services and listens for shutdown", async () => {
     const logger = (await import("../../src/observability/logger")).default;
-    await import("../../src/server");
+    const { startServer, shutdown } = await import("../../src/server");
+
+    await startServer();
 
     expect(server.listen).toHaveBeenCalledWith(4000, expect.any(Function));
     expect(logger.info).toHaveBeenCalledWith({ port: 4000 }, "Gateway service started");
-    expect(handlers.SIGTERM).toBeDefined();
-    expect(handlers.SIGINT).toBeDefined();
 
-    handlers.SIGTERM();
+    await shutdown();
     expect(server.close).toHaveBeenCalled();
-    expect(process.exit).toHaveBeenCalledWith(0);
   });
 });
