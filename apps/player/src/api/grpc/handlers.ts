@@ -6,6 +6,32 @@ import { recordFriendMutation, recordGrpcRequest, recordProfileLookup, recordPro
 import { Profile, Statistics, FriendProfile, ThemePreference } from "../../domain/types";
 import logger from "../../observability/logger";
 
+type UnaryHandler<Req, Res> = (call: ServerUnaryCall<Req, Res>, callback: sendUnaryData<Res>) => Promise<void>;
+
+function createUnaryHandler<Req, Res>(
+  method: string,
+  handler: (request: Req) => Promise<Res> | Res,
+  hooks?: {
+    onSuccess?: (request: Req, response: Res) => void;
+    onError?: (request: Req, error: unknown) => void;
+  }
+): UnaryHandler<Req, Res> {
+  return async (call, callback) => {
+    const startedAt = Date.now();
+    try {
+      const response = await handler(call.request);
+      hooks?.onSuccess?.(call.request, response);
+      recordGrpcRequest(method, "ok", Date.now() - startedAt);
+      callback(null, response);
+    } catch (error: unknown) {
+      hooks?.onError?.(call.request, error);
+      logger.error({ err: error }, `${method} failed`);
+      recordGrpcRequest(method, "error", Date.now() - startedAt);
+      callback(error as Error);
+    }
+  };
+}
+
 interface GetProfileRequest {
   userId: string;
   referrerId?: string;
@@ -125,163 +151,95 @@ function toStatisticType(value: string): statisticsService.StatisticType | null 
 }
 
 export const handlers = {
-  GetProfile: async (call: ServerUnaryCall<GetProfileRequest, unknown>, callback: sendUnaryData<unknown>) => {
-    const started = Date.now();
-    try {
+  GetProfile: createUnaryHandler<GetProfileRequest, unknown>("GetProfile", async (request) => {
       const profile = await profileService.getProfile(
-        call.request.userId,
-        normalizeOptionalString(call.request.referrerId),
-        normalizeOptionalString(call.request.username)
+        request.userId,
+        normalizeOptionalString(request.referrerId),
+        normalizeOptionalString(request.username)
       );
       recordProfileLookup(profile.deletedAt ? "deleted" : "ok");
-      callback(null, { profile: mapProfile(profile) });
-      recordGrpcRequest("GetProfile", "ok", Date.now() - started);
-    } catch (error: unknown) {
-      logger.error({ err: error }, "GetProfile failed");
-      recordGrpcRequest("GetProfile", "error", Date.now() - started);
-      callback(error as Error);
-    }
-  },
+      return { profile: mapProfile(profile) };
+    }),
 
-  GetProfiles: async (call: ServerUnaryCall<GetProfilesRequest, unknown>, callback: sendUnaryData<unknown>) => {
-    const started = Date.now();
-    try {
-      const profiles = await profileService.getProfiles(call.request.userIds ?? []);
-      callback(null, { profiles: profiles.map(mapProfile) });
-      recordGrpcRequest("GetProfiles", "ok", Date.now() - started);
-    } catch (error: unknown) {
-      logger.error({ err: error }, "GetProfiles failed");
-      recordGrpcRequest("GetProfiles", "error", Date.now() - started);
-      callback(error as Error);
-    }
-  },
+  GetProfiles: createUnaryHandler<GetProfilesRequest, unknown>("GetProfiles", async (request) => {
+    const profiles = await profileService.getProfiles(request.userIds ?? []);
+    return { profiles: profiles.map(mapProfile) };
+  }),
 
-  UpdateProfile: async (call: ServerUnaryCall<UpdateProfileRequest, unknown>, callback: sendUnaryData<unknown>) => {
-    const started = Date.now();
-    try {
-      const nickname = normalizeOptionalString(call.request.nickname);
-      const avatarUrlRaw = call.request.avatarUrl;
+  UpdateProfile: createUnaryHandler<UpdateProfileRequest, unknown>(
+    "UpdateProfile",
+    async (request) => {
+      const nickname = normalizeOptionalString(request.nickname);
+      const avatarUrlRaw = request.avatarUrl;
       const avatarUrl = avatarUrlRaw === "" ? null : normalizeOptionalString(avatarUrlRaw);
-      const profile = await profileService.updateProfile(call.request.userId, {
+      const profile = await profileService.updateProfile(request.userId, {
         nickname,
         avatarUrl,
-        preferences: call.request.preferences,
+        preferences: request.preferences,
       });
-      recordProfileUpdate("ok");
-      callback(null, { profile: mapProfile(profile) });
-      recordGrpcRequest("UpdateProfile", "ok", Date.now() - started);
-    } catch (error: unknown) {
-      logger.error({ err: error }, "UpdateProfile failed");
-      recordProfileUpdate("error");
-      recordGrpcRequest("UpdateProfile", "error", Date.now() - started);
-      callback(error as Error);
+      return { profile: mapProfile(profile) };
+    },
+    {
+      onSuccess: () => recordProfileUpdate("ok"),
+      onError: () => recordProfileUpdate("error"),
     }
-  },
+  ),
 
-  DeleteProfile: async (call: ServerUnaryCall<DeleteProfileRequest, unknown>, callback: sendUnaryData<unknown>) => {
-    const started = Date.now();
-    try {
-      await profileService.deleteProfile(call.request.userId);
-      callback(null, { success: true });
-      recordGrpcRequest("DeleteProfile", "ok", Date.now() - started);
-    } catch (error: unknown) {
-      logger.error({ err: error }, "DeleteProfile failed");
-      recordGrpcRequest("DeleteProfile", "error", Date.now() - started);
-      callback(error as Error);
-    }
-  },
+  DeleteProfile: createUnaryHandler<DeleteProfileRequest, unknown>("DeleteProfile", async (request) => {
+    await profileService.deleteProfile(request.userId);
+    return { success: true };
+  }),
 
-  GetStatistics: async (call: ServerUnaryCall<GetStatisticsRequest, unknown>, callback: sendUnaryData<unknown>) => {
-    const started = Date.now();
-    try {
-      const statistics = await statisticsService.getStatistics(call.request.userId);
-      callback(null, { statistics: mapStatistics(statistics) });
-      recordGrpcRequest("GetStatistics", "ok", Date.now() - started);
-    } catch (error: unknown) {
-      logger.error({ err: error }, "GetStatistics failed");
-      recordGrpcRequest("GetStatistics", "error", Date.now() - started);
-      callback(error as Error);
-    }
-  },
+  GetStatistics: createUnaryHandler<GetStatisticsRequest, unknown>("GetStatistics", async (request) => {
+    const statistics = await statisticsService.getStatistics(request.userId);
+    return { statistics: mapStatistics(statistics) };
+  }),
 
-  IncrementStatistic: async (
-    call: ServerUnaryCall<IncrementStatisticRequest, unknown>,
-    callback: sendUnaryData<unknown>
-  ) => {
-    const started = Date.now();
-    try {
-      const type = toStatisticType(call.request.type);
+  IncrementStatistic: createUnaryHandler<IncrementStatisticRequest, unknown>("IncrementStatistic", async (request) => {
+    const type = toStatisticType(request.type);
       if (!type) {
         throw new Error("Invalid statistic type");
       }
-      const updated = await statisticsService.incrementStatistic(call.request.userId, type, call.request.amount ?? 0);
-      recordStatisticsUpdate(type);
-      callback(null, mapStatistics(updated));
-      recordGrpcRequest("IncrementStatistic", "ok", Date.now() - started);
-    } catch (error: unknown) {
-      logger.error({ err: error }, "IncrementStatistic failed");
-      recordGrpcRequest("IncrementStatistic", "error", Date.now() - started);
-      callback(error as Error);
-    }
-  },
+    const updated = await statisticsService.incrementStatistic(request.userId, type, request.amount ?? 0);
+    recordStatisticsUpdate(type);
+    return mapStatistics(updated);
+  }),
 
-  GetFriends: async (call: ServerUnaryCall<GetFriendsRequest, unknown>, callback: sendUnaryData<unknown>) => {
-    const started = Date.now();
-    try {
-      const friends = await friendsService.getFriends(call.request.userId);
-      callback(null, { friends: friends.map(mapFriendProfile) });
-      recordGrpcRequest("GetFriends", "ok", Date.now() - started);
-    } catch (error: unknown) {
-      logger.error({ err: error }, "GetFriends failed");
-      recordGrpcRequest("GetFriends", "error", Date.now() - started);
-      callback(error as Error);
-    }
-  },
+  GetFriends: createUnaryHandler<GetFriendsRequest, unknown>("GetFriends", async (request) => {
+    const friends = await friendsService.getFriends(request.userId);
+    return { friends: friends.map(mapFriendProfile) };
+  }),
 
-  AddFriend: async (call: ServerUnaryCall<AddFriendRequest, unknown>, callback: sendUnaryData<unknown>) => {
-    const started = Date.now();
-    try {
-      await friendsService.addFriend(call.request.userId, call.request.friendId);
-      recordFriendMutation("add", "ok");
-      callback(null, {});
-      recordGrpcRequest("AddFriend", "ok", Date.now() - started);
-    } catch (error: unknown) {
-      logger.error({ err: error }, "AddFriend failed");
-      recordFriendMutation("add", "error");
-      recordGrpcRequest("AddFriend", "error", Date.now() - started);
-      callback(error as Error);
+  AddFriend: createUnaryHandler<AddFriendRequest, unknown>(
+    "AddFriend",
+    async (request) => {
+      await friendsService.addFriend(request.userId, request.friendId);
+      return {};
+    },
+    {
+      onSuccess: () => recordFriendMutation("add", "ok"),
+      onError: () => recordFriendMutation("add", "error"),
     }
-  },
+  ),
 
-  RemoveFriend: async (call: ServerUnaryCall<RemoveFriendRequest, unknown>, callback: sendUnaryData<unknown>) => {
-    const started = Date.now();
-    try {
-      await friendsService.removeFriend(call.request.userId, call.request.friendId);
-      recordFriendMutation("remove", "ok");
-      callback(null, {});
-      recordGrpcRequest("RemoveFriend", "ok", Date.now() - started);
-    } catch (error: unknown) {
-      logger.error({ err: error }, "RemoveFriend failed");
-      recordFriendMutation("remove", "error");
-      recordGrpcRequest("RemoveFriend", "error", Date.now() - started);
-      callback(error as Error);
+  RemoveFriend: createUnaryHandler<RemoveFriendRequest, unknown>(
+    "RemoveFriend",
+    async (request) => {
+      await friendsService.removeFriend(request.userId, request.friendId);
+      return {};
+    },
+    {
+      onSuccess: () => recordFriendMutation("remove", "ok"),
+      onError: () => recordFriendMutation("remove", "error"),
     }
-  },
+  ),
 
-  GetNicknames: async (call: ServerUnaryCall<GetNicknamesRequest, unknown>, callback: sendUnaryData<unknown>) => {
-    const started = Date.now();
-    try {
-      const profiles = await profileService.getProfiles(call.request.userIds ?? []);
-      const nicknames = profiles.map((profile) => ({
-        userId: profile.userId,
-        nickname: profile.nickname,
-      }));
-      callback(null, { nicknames });
-      recordGrpcRequest("GetNicknames", "ok", Date.now() - started);
-    } catch (error: unknown) {
-      logger.error({ err: error }, "GetNicknames failed");
-      recordGrpcRequest("GetNicknames", "error", Date.now() - started);
-      callback(error as Error);
-    }
-  },
+  GetNicknames: createUnaryHandler<GetNicknamesRequest, unknown>("GetNicknames", async (request) => {
+    const profiles = await profileService.getProfiles(request.userIds ?? []);
+    const nicknames = profiles.map((profile) => ({
+      userId: profile.userId,
+      nickname: profile.nickname,
+    }));
+    return { nicknames };
+  }),
 };

@@ -4,8 +4,35 @@ import { NotificationPayload, NotificationType, PushSubscription } from "../../d
 import logger from "../../observability/logger";
 import { recordGrpcRequest, recordNotificationRequested } from "../../observability/metrics";
 
-function recordDuration(method: string, startedAt: number, status: "ok" | "error") {
-  recordGrpcRequest(method, status, Date.now() - startedAt);
+type UnaryCall<Req> = { request: Req };
+type UnaryCallback<Res> = (error: Error | null, response?: Res) => void;
+
+function createUnaryHandler<Req, Res>(
+  params: {
+    method: string;
+    handler: (request: Req) => Promise<Res> | Res;
+    statusFromResponse?: (response: Res) => "ok" | "error";
+    errorResponse?: (error: unknown) => Res;
+    errorLogMessage?: string;
+  }
+) {
+  return async (call: UnaryCall<Req>, callback: UnaryCallback<Res>) => {
+    const startedAt = Date.now();
+    try {
+      const response = await params.handler(call.request);
+      const status = params.statusFromResponse?.(response) ?? "ok";
+      recordGrpcRequest(params.method, status, Date.now() - startedAt);
+      callback(null, response);
+    } catch (error: unknown) {
+      logger.error({ err: error }, params.errorLogMessage ?? `${params.method} failed`);
+      recordGrpcRequest(params.method, "error", Date.now() - startedAt);
+      if (params.errorResponse) {
+        callback(null, params.errorResponse(error));
+        return;
+      }
+      callback(error as Error);
+    }
+  };
 }
 
 function resolveNotificationData(
@@ -26,14 +53,19 @@ function resolveNotificationData(
 
 export function createHandlers(subscriptionService: SubscriptionService, pushService: PushSenderService) {
   return {
-    registerSubscription: async (call: { request: { userId?: string; subscription?: { endpoint?: string; keys?: { p256dh?: string; auth?: string } } } }, callback: (error: Error | null, response?: unknown) => void) => {
-      const startedAt = Date.now();
-      try {
-        const userId = call.request.userId;
-        const subscription = call.request.subscription;
+    registerSubscription: createUnaryHandler({
+      method: "RegisterSubscription",
+      statusFromResponse: (response: { ok: boolean }) => (response.ok ? "ok" : "error"),
+      errorResponse: (error: unknown) => ({ ok: false, error: (error as Error).message }),
+      errorLogMessage: "Failed to register subscription",
+      handler: async (request: {
+        userId?: string;
+        subscription?: { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
+      }) => {
+        const userId = request.userId;
+        const subscription = request.subscription;
         if (!userId || !subscription || !subscription.endpoint || !subscription.keys) {
-          recordDuration("RegisterSubscription", startedAt, "error");
-          return callback(null, { ok: false, error: "MISSING_FIELDS" });
+          return { ok: false, error: "MISSING_FIELDS" };
         }
 
         const sub: PushSubscription = {
@@ -45,47 +77,39 @@ export function createHandlers(subscriptionService: SubscriptionService, pushSer
         };
 
         await subscriptionService.register(userId, sub);
-        recordDuration("RegisterSubscription", startedAt, "ok");
-        callback(null, { ok: true });
-      } catch (error: unknown) {
-        logger.error({ err: error }, "Failed to register subscription");
-        recordDuration("RegisterSubscription", startedAt, "error");
-        callback(null, { ok: false, error: (error as Error).message });
-      }
-    },
+        return { ok: true };
+      },
+    }),
 
-    unregisterSubscription: async (call: { request: { userId?: string; endpoint?: string } }, callback: (error: Error | null, response?: unknown) => void) => {
-      const startedAt = Date.now();
-      try {
-        const userId = call.request.userId;
-        const endpoint = call.request.endpoint;
+    unregisterSubscription: createUnaryHandler({
+      method: "UnregisterSubscription",
+      statusFromResponse: (response: { ok: boolean }) => (response.ok ? "ok" : "error"),
+      errorResponse: (error: unknown) => ({ ok: false, error: (error as Error).message }),
+      errorLogMessage: "Failed to unregister subscription",
+      handler: async (request: { userId?: string; endpoint?: string }) => {
+        const userId = request.userId;
+        const endpoint = request.endpoint;
         if (!userId || !endpoint) {
-          recordDuration("UnregisterSubscription", startedAt, "error");
-          return callback(null, { ok: false, error: "MISSING_FIELDS" });
+          return { ok: false, error: "MISSING_FIELDS" };
         }
 
         await subscriptionService.unregister(userId, endpoint);
-        recordDuration("UnregisterSubscription", startedAt, "ok");
-        callback(null, { ok: true });
-      } catch (error: unknown) {
-        logger.error({ err: error }, "Failed to unregister subscription");
-        recordDuration("UnregisterSubscription", startedAt, "error");
-        callback(null, { ok: false, error: (error as Error).message });
-      }
-    },
+        return { ok: true };
+      },
+    }),
 
-    listSubscriptions: async (call: { request: { userId?: string } }, callback: (error: Error | null, response?: unknown) => void) => {
-      const startedAt = Date.now();
-      try {
-        const userId = call.request.userId;
+    listSubscriptions: createUnaryHandler({
+      method: "ListSubscriptions",
+      statusFromResponse: () => "ok",
+      errorLogMessage: "Failed to list subscriptions",
+      handler: async (request: { userId?: string }) => {
+        const userId = request.userId;
         if (!userId) {
-          recordDuration("ListSubscriptions", startedAt, "ok");
-          return callback(null, { subscriptions: [] });
+          return { subscriptions: [] };
         }
 
         const subscriptions = await subscriptionService.getSubscriptions(userId);
-        recordDuration("ListSubscriptions", startedAt, "ok");
-        callback(null, {
+        return {
           subscriptions: subscriptions.map((s) => ({
             endpoint: s.endpoint,
             keys: {
@@ -93,21 +117,27 @@ export function createHandlers(subscriptionService: SubscriptionService, pushSer
               auth: s.keys.auth,
             },
           })),
-        });
-      } catch (error: unknown) {
-        logger.error({ err: error }, "Failed to list subscriptions");
-        recordDuration("ListSubscriptions", startedAt, "error");
-        callback(error as Error);
-      }
-    },
+        };
+      },
+    }),
 
-    sendNotification: async (call: { request: { userId?: string; title?: string; body?: string; url?: string; icon?: string; tag?: string; data?: Record<string, string> } }, callback: (error: Error | null, response?: unknown) => void) => {
-      const startedAt = Date.now();
-      try {
-        const { userId, title, body, url, icon, tag, data } = call.request;
+    sendNotification: createUnaryHandler({
+      method: "SendNotification",
+      statusFromResponse: (response: { ok: boolean }) => (response.ok ? "ok" : "error"),
+      errorResponse: (error: unknown) => ({ ok: false, error: (error as Error).message }),
+      errorLogMessage: "Failed to send notification",
+      handler: async (request: {
+        userId?: string;
+        title?: string;
+        body?: string;
+        url?: string;
+        icon?: string;
+        tag?: string;
+        data?: Record<string, string>;
+      }) => {
+        const { userId, title, body, url, icon, tag, data } = request;
         if (!userId || !title || !body) {
-          recordDuration("SendNotification", startedAt, "error");
-          return callback(null, { ok: false, error: "MISSING_FIELDS" });
+          return { ok: false, error: "MISSING_FIELDS" };
         }
 
         const payload: NotificationPayload = {
@@ -121,17 +151,12 @@ export function createHandlers(subscriptionService: SubscriptionService, pushSer
 
         recordNotificationRequested(payload.data?.type ?? "system");
         const result = await pushService.sendToUser(userId as string, payload);
-        recordDuration("SendNotification", startedAt, "ok");
-        callback(null, {
+        return {
           ok: true,
           successCount: result.success,
           failureCount: result.failure,
-        });
-      } catch (error: unknown) {
-        logger.error({ err: error }, "Failed to send notification");
-        recordDuration("SendNotification", startedAt, "error");
-        callback(null, { ok: false, error: (error as Error).message });
-      }
-    },
+        };
+      },
+    }),
   };
 }
