@@ -104,6 +104,43 @@ describe("Tables Routes", () => {
       expect(response.statusCode).toBe(201);
       expect(response.body).toEqual(mockTable);
     });
+
+    it("defaults bigBlind to 2 * smallBlind when omitted", async () => {
+      const mockTable = { table_id: "t1", name: "New Table" };
+
+      vi.mocked(gameClient.CreateTable).mockImplementation(
+        (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
+          callback(null, mockTable);
+        }
+      );
+
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "POST",
+        url: "/",
+        auth,
+        body: { name: "New Table", config: { smallBlind: 5 } },
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(gameClient.CreateTable).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({ small_blind: 5, big_blind: 10 }),
+        }),
+        expect.any(Function)
+      );
+    });
+
+    it("rejects an invalid table config", async () => {
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "POST",
+        url: "/",
+        auth,
+        body: { name: "New Table", config: { smallBlind: 5, bigBlind: 6 } },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.body).toEqual(expect.objectContaining({ error: "Invalid request" }));
+    });
   });
 
   describe("GET /api/tables/:tableId", () => {

@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buyInAmountSchema,
   moderationRequestSchema,
+  seatIdSchema,
   tableConfigSchema,
+  tableConfigInputSchema,
+  tableCreateRequestInputSchema,
+  tableJoinSeatRequestSchema,
   tableJoinResponseSchema,
   tableSummarySchema,
   userProfileSchema,
@@ -59,5 +64,38 @@ describe("shared schemas", () => {
     };
 
     expect(tableJoinResponseSchema.parse(payload)).toEqual(payload);
+  });
+
+  it("coerces common gateway request inputs", () => {
+    expect(seatIdSchema.parse("3")).toBe(3);
+    expect(buyInAmountSchema.parse("200")).toBe(200);
+
+    expect(tableJoinSeatRequestSchema.parse({ seatId: "1", buyInAmount: "50" })).toEqual({
+      seatId: 1,
+      buyInAmount: 50,
+    });
+
+    expect(tableConfigInputSchema.parse({ smallBlind: 5 })).toEqual({
+      smallBlind: 5,
+      bigBlind: 10,
+      ante: 0,
+      maxPlayers: 9,
+      startingStack: 200,
+      bettingStructure: "NoLimit",
+      turnTimerSeconds: 20,
+    });
+
+    expect(tableCreateRequestInputSchema.parse({ name: "Test Table" })).toEqual({
+      name: "Test Table",
+      config: {
+        smallBlind: 1,
+        bigBlind: 2,
+        ante: 0,
+        maxPlayers: 9,
+        startingStack: 200,
+        bettingStructure: "NoLimit",
+        turnTimerSeconds: 20,
+      },
+    });
   });
 });

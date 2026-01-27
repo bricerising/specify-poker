@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { seatIdSchema, tableCreateRequestInputSchema, tableJoinSeatRequestSchema } from "@specify-poker/shared";
 import { gameClient } from "../../grpc/clients";
 import { grpcCall } from "../../grpc/grpcCall";
 import logger from "../../observability/logger";
@@ -64,14 +65,6 @@ async function ensureDailyLoginBonus(userId: string): Promise<void> {
   }
 }
 
-function parseSeatId(value: unknown): number | null {
-  const parsed = typeof value === "number" ? value : parseInt(String(value), 10);
-  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 8) {
-    return null;
-  }
-  return parsed;
-}
-
 function seatUserId(seat: unknown): string | null {
   if (!seat || typeof seat !== "object") {
     return null;
@@ -79,6 +72,44 @@ function seatUserId(seat: unknown): string | null {
   const record = seat as Record<string, unknown>;
   const userId = record.user_id ?? record.userId;
   return typeof userId === "string" && userId.trim().length > 0 ? userId : null;
+}
+
+type JoinSeatResponse = { ok: boolean; error?: string };
+
+const DAILY_LOGIN_BONUS_ERRORS = new Set(["ACCOUNT_NOT_FOUND", "INSUFFICIENT_BALANCE"]);
+
+async function joinSeatWithDailyBonus(request: {
+  table_id: string;
+  user_id: string;
+  seat_id: number;
+  buy_in_amount: number;
+}): Promise<JoinSeatResponse> {
+  let response = (await grpcCall(gameClient.JoinSeat.bind(gameClient), request)) as JoinSeatResponse;
+  if (!response.ok && DAILY_LOGIN_BONUS_ERRORS.has(response.error ?? "")) {
+    await ensureDailyLoginBonus(request.user_id);
+    response = (await grpcCall(gameClient.JoinSeat.bind(gameClient), request)) as JoinSeatResponse;
+  }
+  return response;
+}
+
+async function resolveTargetUserIdBySeatId(params: {
+  tableId: string;
+  ownerId: string;
+  seatId: number;
+}): Promise<string | null> {
+  const stateResponse = await grpcCall(gameClient.GetTableState.bind(gameClient), {
+    table_id: params.tableId,
+    user_id: params.ownerId,
+  });
+  const seats = (stateResponse.state?.seats ?? []) as unknown[];
+  const targetSeat = seats.find((seat) => {
+    if (!seat || typeof seat !== "object") return false;
+    const record = seat as Record<string, unknown>;
+    const id = record.seat_id ?? record.seatId;
+    return Number(id) === params.seatId;
+  });
+
+  return seatUserId(targetSeat);
 }
 
 // GET /api/tables - List all tables
@@ -95,7 +126,12 @@ router.get("/", async (_req: Request, res: Response) => {
 // POST /api/tables - Create a new table
 router.post("/", async (req: Request, res: Response) => {
   try {
-    const { name, config } = req.body;
+    const parsed = tableCreateRequestInputSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid request" });
+    }
+
+    const { name, config } = parsed.data;
     const ownerId = requireUserId(req, res);
     if (!ownerId) return;
 
@@ -103,12 +139,12 @@ router.post("/", async (req: Request, res: Response) => {
       name,
       owner_id: ownerId,
       config: {
-        small_blind: config?.smallBlind || 1,
-        big_blind: config?.bigBlind || 2,
-        ante: config?.ante || 0,
-        max_players: config?.maxPlayers || 9,
-        starting_stack: config?.startingStack || 200,
-        turn_timer_seconds: config?.turnTimerSeconds || 20,
+        small_blind: config.smallBlind,
+        big_blind: config.bigBlind,
+        ante: config.ante ?? 0,
+        max_players: config.maxPlayers,
+        starting_stack: config.startingStack,
+        turn_timer_seconds: config.turnTimerSeconds ?? 20,
       },
     });
     return res.status(201).json(response);
@@ -162,32 +198,28 @@ router.get("/:tableId/state", async (req: Request, res: Response) => {
 router.post("/:tableId/join", async (req: Request, res: Response) => {
   try {
     const { tableId } = req.params;
-    const { seatId, buyInAmount } = req.body;
-    const userId = requireUserId(req, res);
-    if (!userId) return;
-
-    const parsedSeatId = typeof seatId === "number" ? seatId : parseInt(seatId, 10);
-    if (!Number.isInteger(parsedSeatId)) {
+    const parsed = tableJoinSeatRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
       return res.status(400).json({ error: "seatId is required" });
     }
 
-    const joinRequest = {
+    const { seatId, buyInAmount } = parsed.data;
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    const joinRequest: Parameters<typeof joinSeatWithDailyBonus>[0] = {
       table_id: tableId,
       user_id: userId,
-      seat_id: parsedSeatId,
-      buy_in_amount: buyInAmount,
+      seat_id: seatId,
+      buy_in_amount: buyInAmount ?? 0,
     };
 
-    let response = await grpcCall(gameClient.JoinSeat.bind(gameClient), joinRequest);
-    if (!response.ok && ["ACCOUNT_NOT_FOUND", "INSUFFICIENT_BALANCE"].includes(response.error ?? "")) {
-      await ensureDailyLoginBonus(userId);
-      response = await grpcCall(gameClient.JoinSeat.bind(gameClient), joinRequest);
-    }
+    const response = await joinSeatWithDailyBonus(joinRequest);
 
     if (!response.ok) {
       return res.status(400).json({ error: response.error || "Failed to join seat" });
     }
-    return res.json({ tableId, seatId: parsedSeatId, wsUrl: buildWsUrl(req) });
+    return res.json({ tableId, seatId, wsUrl: buildWsUrl(req) });
   } catch (err) {
     logger.error({ err }, "Failed to join seat");
     return res.status(500).json({ error: "Failed to join seat" });
@@ -198,27 +230,31 @@ router.post("/:tableId/join", async (req: Request, res: Response) => {
 router.post("/:tableId/seats/:seatId/join", async (req: Request, res: Response) => {
   try {
     const { tableId, seatId } = req.params;
-    const { buyInAmount } = req.body;
+    const parsed = tableJoinSeatRequestSchema.safeParse({
+      seatId,
+      buyInAmount: req.body?.buyInAmount,
+    });
+    if (!parsed.success) {
+      return res.status(400).json({ error: "seatId is required" });
+    }
+
+    const { seatId: parsedSeatId, buyInAmount } = parsed.data;
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const joinRequest = {
+    const joinRequest: Parameters<typeof joinSeatWithDailyBonus>[0] = {
       table_id: tableId,
       user_id: userId,
-      seat_id: parseInt(seatId, 10),
-      buy_in_amount: buyInAmount,
+      seat_id: parsedSeatId,
+      buy_in_amount: buyInAmount ?? 0,
     };
 
-    let response = await grpcCall(gameClient.JoinSeat.bind(gameClient), joinRequest);
-    if (!response.ok && ["ACCOUNT_NOT_FOUND", "INSUFFICIENT_BALANCE"].includes(response.error ?? "")) {
-      await ensureDailyLoginBonus(userId);
-      response = await grpcCall(gameClient.JoinSeat.bind(gameClient), joinRequest);
-    }
+    const response = await joinSeatWithDailyBonus(joinRequest);
 
     if (!response.ok) {
       return res.status(400).json({ error: response.error || "Failed to join seat" });
     }
-    return res.json({ tableId, seatId: parseInt(seatId, 10), wsUrl: buildWsUrl(req) });
+    return res.json({ tableId, seatId: parsedSeatId, wsUrl: buildWsUrl(req) });
   } catch (err) {
     logger.error({ err }, "Failed to join seat");
     return res.status(500).json({ error: "Failed to join seat" });
@@ -323,24 +359,13 @@ router.post("/:tableId/moderation/kick", async (req: Request, res: Response) => 
     const ownerId = requireUserId(req, res);
     if (!ownerId) return;
 
-    const seatId = parseSeatId(req.body?.seatId);
-    if (seatId === null) {
+    const seatIdParsed = seatIdSchema.safeParse(req.body?.seatId);
+    if (!seatIdParsed.success) {
       return res.status(400).json({ error: "seatId is required" });
     }
+    const seatId = seatIdParsed.data;
 
-    const stateResponse = await grpcCall(gameClient.GetTableState.bind(gameClient), {
-      table_id: tableId,
-      user_id: ownerId,
-    });
-    const seats = (stateResponse.state?.seats ?? []) as unknown[];
-    const targetSeat = seats.find((seat) => {
-      if (!seat || typeof seat !== "object") return false;
-      const record = seat as Record<string, unknown>;
-      const id = record.seat_id ?? record.seatId;
-      return Number(id) === seatId;
-    });
-
-    const targetUserId = seatUserId(targetSeat);
+    const targetUserId = await resolveTargetUserIdBySeatId({ tableId, ownerId, seatId });
     if (!targetUserId) {
       return res.status(404).json({ error: "Seat not occupied" });
     }
@@ -376,24 +401,13 @@ router.post("/:tableId/moderation/mute", async (req: Request, res: Response) => 
     const ownerId = requireUserId(req, res);
     if (!ownerId) return;
 
-    const seatId = parseSeatId(req.body?.seatId);
-    if (seatId === null) {
+    const seatIdParsed = seatIdSchema.safeParse(req.body?.seatId);
+    if (!seatIdParsed.success) {
       return res.status(400).json({ error: "seatId is required" });
     }
+    const seatId = seatIdParsed.data;
 
-    const stateResponse = await grpcCall(gameClient.GetTableState.bind(gameClient), {
-      table_id: tableId,
-      user_id: ownerId,
-    });
-    const seats = (stateResponse.state?.seats ?? []) as unknown[];
-    const targetSeat = seats.find((seat) => {
-      if (!seat || typeof seat !== "object") return false;
-      const record = seat as Record<string, unknown>;
-      const id = record.seat_id ?? record.seatId;
-      return Number(id) === seatId;
-    });
-
-    const targetUserId = seatUserId(targetSeat);
+    const targetUserId = await resolveTargetUserIdBySeatId({ tableId, ownerId, seatId });
     if (!targetUserId) {
       return res.status(404).json({ error: "Seat not occupied" });
     }
@@ -424,6 +438,10 @@ router.post("/:tableId/kick", async (req: Request, res: Response) => {
     const ownerId = requireUserId(req, res);
     if (!ownerId) return;
 
+    if (typeof targetUserId !== "string" || targetUserId.trim().length === 0) {
+      return res.status(400).json({ error: "targetUserId is required" });
+    }
+
     await grpcCall(gameClient.KickPlayer.bind(gameClient), {
       table_id: tableId,
       owner_id: ownerId,
@@ -444,6 +462,10 @@ router.post("/:tableId/mute", async (req: Request, res: Response) => {
     const ownerId = requireUserId(req, res);
     if (!ownerId) return;
 
+    if (typeof targetUserId !== "string" || targetUserId.trim().length === 0) {
+      return res.status(400).json({ error: "targetUserId is required" });
+    }
+
     await grpcCall(gameClient.MutePlayer.bind(gameClient), {
       table_id: tableId,
       owner_id: ownerId,
@@ -463,6 +485,10 @@ router.post("/:tableId/unmute", async (req: Request, res: Response) => {
     const { targetUserId } = req.body;
     const ownerId = requireUserId(req, res);
     if (!ownerId) return;
+
+    if (typeof targetUserId !== "string" || targetUserId.trim().length === 0) {
+      return res.status(400).json({ error: "targetUserId is required" });
+    }
 
     await grpcCall(gameClient.UnmutePlayer.bind(gameClient), {
       table_id: tableId,

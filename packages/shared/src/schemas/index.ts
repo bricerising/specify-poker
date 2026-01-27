@@ -23,6 +23,74 @@ export const tableConfigSchema = z
     path: ["ante"],
   });
 
+export const defaultTableConfig = {
+  smallBlind: 1,
+  bigBlind: 2,
+  ante: 0,
+  maxPlayers: 9,
+  startingStack: 200,
+  bettingStructure: "NoLimit" as const,
+  turnTimerSeconds: 20,
+} as const;
+
+export const seatIdSchema = z.preprocess(
+  (value) => {
+    if (typeof value === "string" && value.trim().length > 0) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : value;
+    }
+    return value;
+  },
+  z.number().int().min(0).max(8),
+);
+
+export const buyInAmountSchema = z.preprocess(
+  (value) => {
+    if (typeof value === "string" && value.trim().length > 0) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : value;
+    }
+    return value;
+  },
+  z.number().int().nonnegative(),
+);
+
+export const tableConfigInputSchema = z
+  .object({
+    smallBlind: z.number().int().positive().optional(),
+    bigBlind: z.number().int().positive().optional(),
+    ante: z.number().int().nonnegative().nullable().optional(),
+    maxPlayers: z.number().int().min(2).max(9).optional(),
+    startingStack: z.number().int().positive().optional(),
+    bettingStructure: bettingStructureSchema.optional(),
+    turnTimerSeconds: z.number().int().positive().optional(),
+  })
+  .transform((config) => {
+    const smallBlind = config.smallBlind ?? defaultTableConfig.smallBlind;
+    const bigBlind = config.bigBlind ?? smallBlind * 2;
+
+    return {
+      smallBlind,
+      bigBlind,
+      ante: config.ante ?? defaultTableConfig.ante,
+      maxPlayers: config.maxPlayers ?? defaultTableConfig.maxPlayers,
+      startingStack: config.startingStack ?? defaultTableConfig.startingStack,
+      bettingStructure: config.bettingStructure ?? defaultTableConfig.bettingStructure,
+      turnTimerSeconds: config.turnTimerSeconds ?? defaultTableConfig.turnTimerSeconds,
+    };
+  })
+  .pipe(tableConfigSchema);
+
+export const tableCreateRequestInputSchema = z.object({
+  name: z.string().min(1),
+  config: tableConfigInputSchema.default({}),
+});
+
+export const tableJoinSeatRequestSchema = z.object({
+  seatId: seatIdSchema,
+  buyInAmount: buyInAmountSchema.optional(),
+});
+
 export const userProfileSchema = z.object({
   userId: z.string(),
   nickname: z.string().min(2).max(20),
