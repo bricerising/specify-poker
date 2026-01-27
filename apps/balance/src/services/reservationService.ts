@@ -17,6 +17,9 @@ import {
 import logger from "../observability/logger";
 import { withIdempotentResponse } from "../utils/idempotency";
 
+/** Default timeout for reservations in seconds */
+const DEFAULT_RESERVATION_TIMEOUT_SECONDS = 30;
+
 export async function reserveForBuyIn(
   accountId: string,
   tableId: string,
@@ -45,7 +48,7 @@ export async function reserveForBuyIn(
     }
 
     // Create reservation
-    const timeoutMs = (timeoutSeconds ?? 30) * 1000;
+    const timeoutMs = (timeoutSeconds ?? DEFAULT_RESERVATION_TIMEOUT_SECONDS) * 1000;
     const expiresAt = new Date(Date.now() + timeoutMs).toISOString();
 
     const reservation: Reservation = {

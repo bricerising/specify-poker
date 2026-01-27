@@ -1,19 +1,21 @@
-import { balanceClient } from "../../api/grpc/clients";
+import {
+  balanceClient,
+  BalanceCashOutResponse,
+  BalanceCommitResponse,
+  BalanceReservationResponse,
+  BalanceSettleResponse,
+} from "../../api/grpc/clients";
 import { unaryCall } from "./grpcUnary";
 
 export type BalanceCall<TResponse> =
   | { type: "available"; response: TResponse }
   | { type: "unavailable"; error: unknown };
 
-export type BalanceReservation = {
-  ok: boolean;
-  reservation_id?: string;
-  error?: string;
-  available_balance?: number;
-};
-export type BalanceCommit = { ok: boolean; error?: string; transaction_id?: string; new_balance?: number };
-export type BalanceCashOut = { ok: boolean; error?: string; transaction_id?: string; new_balance?: number };
-export type BalanceSettle = { ok: boolean; error?: string };
+// Re-export response types for consumers
+export type BalanceReservation = BalanceReservationResponse;
+export type BalanceCommit = BalanceCommitResponse;
+export type BalanceCashOut = BalanceCashOutResponse;
+export type BalanceSettle = BalanceSettleResponse;
 
 async function callWithAvailability<TResponse>(promise: Promise<TResponse>): Promise<BalanceCall<TResponse>> {
   try {

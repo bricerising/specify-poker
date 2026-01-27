@@ -1,6 +1,14 @@
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
 
-import { ActionInput, Seat, Table, TableConfig, TableState, TableSummary } from "../domain/types";
+import {
+  ActionInput,
+  isInHandStatus,
+  Seat,
+  Table,
+  TableConfig,
+  TableState,
+  TableSummary,
+} from "../domain/types";
 import { applyAction, startHand } from "../engine/handEngine";
 import { deriveLegalActions } from "../engine/actionRules";
 import { calculatePots } from "../engine/potCalculator";
@@ -25,13 +33,43 @@ import { gatewayWsPublisher } from "./table/gatewayWsPublisher";
 import { gameEventPublisher } from "./table/gameEventPublisher";
 import { redactTableState } from "./table/tableViewBuilder";
 
-type TurnStartMeta = { handId: string; seatId: number; street: string; startedAt: number };
-type HandTimeoutMeta = { handId: string; hadTimeout: boolean };
+// ============================================================================
+// Constants
+// ============================================================================
 
+/** Default stack size when not specified in table config */
+const DEFAULT_STARTING_STACK = 200;
+
+/** Default turn timer in seconds */
+const DEFAULT_TURN_TIMER_SECONDS = 20;
+
+/** Delay before starting next hand after one completes (ms) */
+const NEXT_HAND_DELAY_MS = 3000;
+
+/** Minimum players required to start a hand */
+const MIN_PLAYERS_FOR_HAND = 2;
+
+// ============================================================================
+// Types
+// ============================================================================
+
+type TurnStartMeta = {
+  readonly handId: string;
+  readonly seatId: number;
+  readonly street: string;
+  readonly startedAt: number;
+};
+
+type HandTimeoutMeta = {
+  readonly handId: string;
+  hadTimeout: boolean;
+};
+
+/** Result of finalizing a reserved seat join operation */
 type FinalizeReservedSeatJoinResult =
-  | { type: "ok" }
-  | { type: "error"; error: string }
-  | { type: "balance_unavailable"; error: unknown };
+  | { readonly type: "ok" }
+  | { readonly type: "error"; readonly error: string }
+  | { readonly type: "balance_unavailable"; readonly error: unknown };
 
 export class TableService {
   private turnTimers = new Map<string, NodeJS.Timeout>();
@@ -57,7 +95,7 @@ export class TableService {
   }
 
   private newIdempotencyKey(prefix: string) {
-    return `${prefix}:${uuidv4()}`;
+    return `${prefix}:${randomUUID()}`;
   }
 
   private settlePotIdempotencyKey(tableId: string, handId: string, potIndex: number) {
@@ -180,7 +218,7 @@ export class TableService {
   }
 
   async createTable(name: string, ownerId: string, configInput: TableConfig): Promise<Table> {
-    const tableId = uuidv4();
+    const tableId = randomUUID();
     const createdAt = this.now();
     const table: Table = {
       tableId,
@@ -301,9 +339,9 @@ export class TableService {
     }
     const { table, state } = loaded;
 
-    const startingStack = coerceNumber(table.config.startingStack, 200);
+    const startingStack = coerceNumber(table.config.startingStack, DEFAULT_STARTING_STACK);
     const normalizedBuyIn = buyInAmount > 0 ? buyInAmount : startingStack;
-    const finalBuyIn = normalizedBuyIn > 0 ? normalizedBuyIn : 200;
+    const finalBuyIn = normalizedBuyIn > 0 ? normalizedBuyIn : DEFAULT_STARTING_STACK;
 
     const existingSeat = state.seats.find((entry) => entry.userId === userId && entry.status !== "EMPTY");
     if (existingSeat) {
@@ -559,11 +597,7 @@ export class TableService {
 
     if (state.hand) {
       const wasTurnSeat = state.hand.turn === seat.seatId;
-      const wasInHand =
-        seat.status === "ACTIVE" ||
-        seat.status === "ALL_IN" ||
-        seat.status === "FOLDED" ||
-        seat.status === "DISCONNECTED";
+      const wasInHand = isInHandStatus(seat.status);
 
       if (wasInHand && seat.status !== "FOLDED") {
         seat.status = "FOLDED";
@@ -702,7 +736,7 @@ export class TableService {
     if (table.status === "PLAYING" || state.hand) return;
 
     const activePlayers = state.seats.filter((seat) => seat.userId && seat.status === "SEATED");
-    if (activePlayers.length < 2) return;
+    if (activePlayers.length < MIN_PLAYERS_FOR_HAND) return;
 
     const updatedState = startHand(state, table.config);
     table.status = "PLAYING";
@@ -812,7 +846,7 @@ export class TableService {
 
     this.clearTurnTimer(state.tableId);
     const repairedState = await this.repairTurnIfNeeded(table, state);
-    const timeoutMs = (table.config.turnTimerSeconds || 20) * 1000;
+    const timeoutMs = (table.config.turnTimerSeconds || DEFAULT_TURN_TIMER_SECONDS) * 1000;
 
     const repairedHand = repairedState.hand;
     if (!repairedHand) {
@@ -940,7 +974,7 @@ export class TableService {
     await tableStateStore.save(state);
     await this.publishTableAndLobby(table, state);
 
-    this.scheduleNextHandStart(state.tableId, 3000);
+    this.scheduleNextHandStart(state.tableId, NEXT_HAND_DELAY_MS);
   }
 
   private async emitGameEvent(

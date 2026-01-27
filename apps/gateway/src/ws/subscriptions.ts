@@ -12,7 +12,8 @@ function connectionKey(connectionId: string): string {
   return `${CONNECTION_SUBS_PREFIX}:${connectionId}`;
 }
 
-type RedisOperation<T> = (redis: Awaited<ReturnType<typeof getRedisClient>>) => Promise<T>;
+type RedisClient = NonNullable<Awaited<ReturnType<typeof getRedisClient>>>;
+type RedisOperation<T> = (redis: RedisClient) => Promise<T>;
 
 async function withRedis<T>(
   operation: RedisOperation<T>,

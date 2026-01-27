@@ -20,6 +20,50 @@ function loadProto(protoPath: string) {
 
 type UnaryCallback<TResponse> = (err: grpc.ServiceError | null, response: TResponse) => void;
 
+// ============================================================================
+// Response Types
+// ============================================================================
+
+export interface BalanceReservationResponse {
+  ok: boolean;
+  reservation_id?: string;
+  error?: string;
+  available_balance?: number;
+}
+
+export interface BalanceCommitResponse {
+  ok: boolean;
+  error?: string;
+  transaction_id?: string;
+  new_balance?: number;
+}
+
+export interface BalanceReleaseResponse {
+  ok: boolean;
+  error?: string;
+}
+
+export interface BalanceCashOutResponse {
+  ok: boolean;
+  error?: string;
+  transaction_id?: string;
+  new_balance?: number;
+}
+
+export interface BalanceSettleResponse {
+  ok: boolean;
+  error?: string;
+}
+
+export interface EventPublishResponse {
+  success: boolean;
+  event_id?: string;
+}
+
+// ============================================================================
+// Client Interfaces
+// ============================================================================
+
 export interface BalanceServiceClient {
   ReserveForBuyIn(
     request: {
@@ -29,15 +73,15 @@ export interface BalanceServiceClient {
       idempotency_key: string;
       timeout_seconds: number;
     },
-    callback: UnaryCallback<unknown>,
+    callback: UnaryCallback<BalanceReservationResponse>,
   ): void;
   CommitReservation(
     request: { reservation_id: string },
-    callback: UnaryCallback<unknown>,
+    callback: UnaryCallback<BalanceCommitResponse>,
   ): void;
   ReleaseReservation(
     request: { reservation_id: string; reason?: string },
-    callback: UnaryCallback<unknown>,
+    callback: UnaryCallback<BalanceReleaseResponse>,
   ): void;
   ProcessCashOut(
     request: {
@@ -48,7 +92,7 @@ export interface BalanceServiceClient {
       idempotency_key: string;
       hand_id?: string;
     },
-    callback: UnaryCallback<unknown>,
+    callback: UnaryCallback<BalanceCashOutResponse>,
   ): void;
   SettlePot(
     request: {
@@ -57,7 +101,7 @@ export interface BalanceServiceClient {
       winners: Array<{ seat_id: number; account_id: string; amount: number }>;
       idempotency_key: string;
     },
-    callback: UnaryCallback<unknown>,
+    callback: UnaryCallback<BalanceSettleResponse>,
   ): void;
 }
 
@@ -72,7 +116,7 @@ export interface EventServiceClient {
       payload: unknown;
       idempotency_key: string;
     },
-    callback: UnaryCallback<unknown>,
+    callback: UnaryCallback<EventPublishResponse>,
   ): void;
 }
 

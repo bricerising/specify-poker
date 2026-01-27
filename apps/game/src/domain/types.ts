@@ -163,3 +163,25 @@ export type ActionSubmitError =
   | "NO_HAND_IN_PROGRESS"
   | "PLAYER_NOT_AT_TABLE"
   | "INVALID_ACTION";
+
+// ============================================================================
+// Seat Status Guards
+// ============================================================================
+
+/** Seat statuses that indicate the seat is participating in the current hand */
+export const IN_HAND_STATUSES = ["ACTIVE", "FOLDED", "ALL_IN", "DISCONNECTED"] as const;
+export type InHandStatus = (typeof IN_HAND_STATUSES)[number];
+
+/** Type guard for checking if a seat status indicates participation in hand */
+export function isInHandStatus(status: SeatStatus): status is InHandStatus {
+  return IN_HAND_STATUSES.includes(status as InHandStatus);
+}
+
+/** Seat statuses that can still act in the current betting round */
+export const ACTIONABLE_STATUSES = ["ACTIVE"] as const;
+export type ActionableStatus = (typeof ACTIONABLE_STATUSES)[number];
+
+/** Type guard for checking if a seat can take actions */
+export function isActionableStatus(status: SeatStatus): status is ActionableStatus {
+  return status === "ACTIVE";
+}

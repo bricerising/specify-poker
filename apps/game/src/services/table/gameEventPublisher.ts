@@ -1,11 +1,9 @@
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
 import { toStruct } from "@specify-poker/shared";
 
-import { eventClient } from "../../api/grpc/clients";
+import { eventClient, EventPublishResponse } from "../../api/grpc/clients";
 import logger from "../../observability/logger";
 import { unaryCall } from "./grpcUnary";
-
-type EventPublish = { success: boolean };
 
 export class GameEventPublisher {
   async publish(params: {
@@ -28,7 +26,7 @@ export class GameEventPublisher {
           payload: unknown;
           idempotency_key: string;
         },
-        EventPublish
+        EventPublishResponse
       >(eventClient.PublishEvent.bind(eventClient), {
         type: params.type,
         table_id: params.tableId,
@@ -36,7 +34,7 @@ export class GameEventPublisher {
         user_id: params.userId,
         seat_id: params.seatId,
         payload: toStruct(params.payload),
-        idempotency_key: params.idempotencyKey ?? uuidv4(),
+        idempotency_key: params.idempotencyKey ?? randomUUID(),
       });
       if (!response.success) {
         logger.error(
