@@ -4,10 +4,8 @@ import { NotificationPayload, NotificationType, PushSubscription } from "../../d
 import logger from "../../observability/logger";
 import { recordGrpcRequest, recordNotificationRequested } from "../../observability/metrics";
 import { createUnaryHandler, withUnaryErrorHandling, withUnaryErrorResponse, withUnaryTiming } from "@specify-poker/shared";
+import type { UnaryCall, UnaryCallback } from "@specify-poker/shared";
 import { getErrorMessage, toError } from "../../shared/errors";
-
-type UnaryCall<Req> = { request: Req };
-type UnaryCallback<Res> = (error: Error | null, response?: Res) => void;
 
 function createNotifyUnaryHandler<Req, Res>(params: {
   method: string;
@@ -22,32 +20,25 @@ function createNotifyUnaryHandler<Req, Res>(params: {
     statusFromResponse: params.statusFromResponse,
   });
 
-  if (params.errorResponse) {
-    return createUnaryHandler<Req, Res, UnaryCall<Req>>({
-      handler: ({ request }) => params.handler(request),
-      interceptors: [
-        timing,
-        withUnaryErrorResponse({
-          onError: (_context, error) => {
-            logger.error({ err: error }, params.errorLogMessage ?? `${params.method} failed`);
-          },
-          errorResponse: (_context, error) => params.errorResponse!(error),
-        }),
-      ],
-    });
-  }
+  const errorLogMessage = params.errorLogMessage ?? `${params.method} failed`;
+
+  const errorInterceptor = params.errorResponse
+    ? withUnaryErrorResponse<Req, Res, UnaryCall<Req>>({
+        onError: (_context, error) => {
+          logger.error({ err: error }, errorLogMessage);
+        },
+        errorResponse: (_context, error) => params.errorResponse!(error),
+      })
+    : withUnaryErrorHandling<Req, Res, UnaryCall<Req>>({
+        method: params.method,
+        logger,
+        message: errorLogMessage,
+        toServiceError: toError,
+      });
 
   return createUnaryHandler<Req, Res, UnaryCall<Req>>({
     handler: ({ request }) => params.handler(request),
-    interceptors: [
-      timing,
-      withUnaryErrorHandling({
-        method: params.method,
-        logger,
-        message: params.errorLogMessage ?? `${params.method} failed`,
-        toServiceError: toError,
-      }),
-    ],
+    interceptors: [timing, errorInterceptor],
   });
 }
 
