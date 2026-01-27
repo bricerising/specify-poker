@@ -1,3 +1,5 @@
+import { ensureError } from "../errors/ensureError";
+
 export type UnaryCall<Req> = { request: Req };
 
 export type UnaryCallback<Res, CallbackError extends Error = Error> = (
@@ -120,12 +122,4 @@ export function createUnaryHandler<
       callback(toCallbackError(error));
     }
   };
-}
-
-function ensureError(error: unknown): Error {
-  if (error instanceof Error) {
-    return error;
-  }
-  const message = typeof error === "string" ? error : "Unknown error";
-  return new Error(message, { cause: error });
 }

@@ -1,5 +1,12 @@
 import * as grpc from "@grpc/grpc-js";
-import { createUnaryHandler, withUnaryErrorHandling, withUnaryTiming } from "@specify-poker/shared";
+import {
+  asGrpcServiceError,
+  createGrpcServiceError,
+  createUnaryHandler,
+  isGrpcServiceErrorLike,
+  withUnaryErrorHandling,
+  withUnaryTiming,
+} from "@specify-poker/shared";
 import {
   getBalance,
   ensureAccount,
@@ -27,39 +34,17 @@ function invalidArgument(message: string): never {
   throw new InvalidArgumentError(message);
 }
 
-function isServiceError(error: unknown): error is grpc.ServiceError {
-  return Boolean(
-    error &&
-      typeof error === "object" &&
-      "code" in error &&
-      typeof (error as { code?: unknown }).code === "number"
-  );
-}
-
 function asServiceError(error: unknown): grpc.ServiceError {
-  if (isServiceError(error)) {
-    if (error instanceof Error) {
-      return error;
-    }
-    const message =
-      typeof (error as { message?: unknown }).message === "string"
-        ? (error as { message: string }).message
-        : "Unknown error";
-    const serviceError = new Error(message, { cause: error }) as grpc.ServiceError;
-    serviceError.code = (error as grpc.ServiceError).code;
-    return serviceError;
+  if (error instanceof InvalidArgumentError) {
+    return createGrpcServiceError(grpc.status.INVALID_ARGUMENT, error.message, error) as grpc.ServiceError;
   }
 
-  if (error instanceof InvalidArgumentError) {
-    const serviceError = new Error(error.message) as grpc.ServiceError;
-    serviceError.code = grpc.status.INVALID_ARGUMENT;
-    return serviceError;
+  if (isGrpcServiceErrorLike(error)) {
+    return asGrpcServiceError(error, { code: grpc.status.INTERNAL, message: "Unknown error" }) as grpc.ServiceError;
   }
 
   const message = error instanceof Error ? error.message : "Unknown error";
-  const serviceError = new Error(message) as grpc.ServiceError;
-  serviceError.code = grpc.status.INTERNAL;
-  return serviceError;
+  return createGrpcServiceError(grpc.status.INTERNAL, message, error) as grpc.ServiceError;
 }
 
 function createBalanceUnaryHandler<Req, Res>(
@@ -74,7 +59,7 @@ function createBalanceUnaryHandler<Req, Res>(
         method,
         logger,
         toServiceError: asServiceError,
-        shouldLog: (error) => !(error instanceof InvalidArgumentError) && !isServiceError(error),
+        shouldLog: (error) => !(error instanceof InvalidArgumentError) && !isGrpcServiceErrorLike(error),
       }),
     ],
   });
