@@ -21,7 +21,7 @@ import { getConfig } from "./config";
 import { createRouter } from "./http/router";
 import { initWsServer } from "./ws/server";
 import { closeWsPubSub } from "./ws/pubsub";
-import { registerInstance } from "./storage/instanceRegistry";
+import { registerInstance, unregisterInstance } from "./storage/instanceRegistry";
 import { closeRedisClient } from "./storage/redisClient";
 import logger from "./observability/logger";
 import { collectDefaultMetrics } from "prom-client";
@@ -62,6 +62,9 @@ export async function startServer(): Promise<void> {
 
   // Instance Registry
   await registerInstance();
+  shutdown.add("instanceRegistry.unregister", async () => {
+    await unregisterInstance();
+  });
 
   // Observability
   collectDefaultMetrics();

@@ -3,7 +3,7 @@ import * as protoLoader from "@grpc/proto-loader";
 import * as path from "path";
 import { config } from "../config";
 import logger from "../observability/logger";
-import { StructFields, toStructFields } from "@specify-poker/shared";
+import { StructFields, toStructFields, unaryCallResult } from "@specify-poker/shared";
 
 const PROTO_PATH = path.resolve(__dirname, "../../proto/event.proto");
 
@@ -83,53 +83,45 @@ export interface PublishResult {
 }
 
 export async function publishEvent(event: GameEvent): Promise<PublishResult> {
-  return new Promise((resolve) => {
-    client.PublishEvent(
-      {
-        type: event.type,
-        table_id: event.tableId,
-        hand_id: event.handId,
-        user_id: event.userId,
-        seat_id: event.seatId,
-        payload: { fields: toStructFields(event.payload) },
-        idempotency_key: event.idempotencyKey,
-      },
-      (err: grpc.ServiceError | null, response: PublishEventResponse) => {
-        if (err) {
-          logger.error({ err, event }, "Event publish failed");
-          resolve({ success: false });
-          return;
-        }
-        resolve({ success: response.success, eventId: response.event_id });
-      }
-    );
+  const call = await unaryCallResult(client.PublishEvent.bind(client), {
+    type: event.type,
+    table_id: event.tableId,
+    hand_id: event.handId,
+    user_id: event.userId,
+    seat_id: event.seatId,
+    payload: { fields: toStructFields(event.payload) },
+    idempotency_key: event.idempotencyKey,
   });
+
+  if (!call.ok) {
+    logger.error({ err: call.error, event }, "Event publish failed");
+    return { success: false };
+  }
+
+  const response = call.value;
+  return { success: response.success, eventId: response.event_id };
 }
 
 export async function publishEvents(events: GameEvent[]): Promise<{ success: boolean; eventIds?: string[] }> {
-  return new Promise((resolve) => {
-    client.PublishEvents(
-      {
-        events: events.map((e) => ({
-          type: e.type,
-          table_id: e.tableId,
-          hand_id: e.handId,
-          user_id: e.userId,
-          seat_id: e.seatId,
-          payload: { fields: toStructFields(e.payload) },
-          idempotency_key: e.idempotencyKey,
-        })),
-      },
-      (err: grpc.ServiceError | null, response: PublishEventsResponse) => {
-        if (err) {
-          logger.error({ err }, "Batch event publish failed");
-          resolve({ success: false });
-          return;
-        }
-        resolve({ success: response.success, eventIds: response.event_ids });
-      }
-    );
+  const call = await unaryCallResult(client.PublishEvents.bind(client), {
+    events: events.map((e) => ({
+      type: e.type,
+      table_id: e.tableId,
+      hand_id: e.handId,
+      user_id: e.userId,
+      seat_id: e.seatId,
+      payload: { fields: toStructFields(e.payload) },
+      idempotency_key: e.idempotencyKey,
+    })),
   });
+
+  if (!call.ok) {
+    logger.error({ err: call.error }, "Batch event publish failed");
+    return { success: false };
+  }
+
+  const response = call.value;
+  return { success: response.success, eventIds: response.event_ids };
 }
 
 // Event type constants

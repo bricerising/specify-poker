@@ -1,4 +1,5 @@
-import { sendUnaryData, ServerUnaryCall } from "@grpc/grpc-js";
+import { sendUnaryData, ServerUnaryCall, ServiceError } from "@grpc/grpc-js";
+import { createUnaryHandler, withUnaryErrorHandling, withUnaryTiming } from "@specify-poker/shared";
 import { tableService } from "../../../services/tableService";
 import { moderationService } from "../../../services/moderationService";
 import { recordGrpcRequest } from "../../../observability/metrics";
@@ -131,7 +132,7 @@ function toProtoConfig(config: TableConfig) {
   };
 }
 
-function toProtoTable(table: Table) {
+function toProtoTable(table: Table): ProtoTable {
   return {
     table_id: table.tableId,
     name: table.name,
@@ -215,142 +216,138 @@ function toProtoState(state: TableState) {
   };
 }
 
-function handleUnary<Req, Res>(
+function createGameUnaryHandler<Req, Res>(
   method: string,
-  call: ServerUnaryCall<Req, Res>,
-  callback: sendUnaryData<Res>,
-  handler: (request: Req) => Promise<Res> | Res,
-) {
-  const startedAt = Date.now();
-  Promise.resolve(handler(call.request))
-    .then((response) => {
-      recordGrpcRequest(method, "ok", Date.now() - startedAt);
-      callback(null, response);
-    })
-    .catch((err) => {
-      recordGrpcRequest(method, "error", Date.now() - startedAt);
-      callback(toServiceError(err));
-    });
+  handler: (request: Req) => Promise<Res> | Res
+): (call: ServerUnaryCall<Req, Res>, callback: sendUnaryData<Res>) => Promise<void> {
+  return createUnaryHandler<Req, Res, ServerUnaryCall<Req, Res>, ServiceError>({
+    handler: ({ request }) => handler(request),
+    interceptors: [
+      withUnaryTiming({ method, record: recordGrpcRequest }),
+      withUnaryErrorHandling({ method, toServiceError }),
+    ],
+  });
 }
 
 export function createHandlers() {
   return {
-    CreateTable: (call: ServerUnaryCall<CreateTableRequest, ProtoTable>, callback: sendUnaryData<ProtoTable>) =>
-      handleUnary("CreateTable", call, callback, async ({ name, owner_id, config }) => {
-        const table = await tableService.createTable(name, owner_id, {
-          smallBlind: coerceNumber(config.small_blind, 1),
-          bigBlind: coerceNumber(config.big_blind, 2),
-          ante: coerceNumber(config.ante ?? 0, 0),
-          maxPlayers: coerceNumber(config.max_players, 6),
-          startingStack: coerceNumber(config.starting_stack, 200),
-          turnTimerSeconds: coerceNumber(config.turn_timer_seconds ?? 20, 20),
-        });
-        return toProtoTable(table);
-      }),
+    CreateTable: createGameUnaryHandler("CreateTable", async ({ name, owner_id, config }: CreateTableRequest) => {
+      const table = await tableService.createTable(name, owner_id, {
+        smallBlind: coerceNumber(config.small_blind, 1),
+        bigBlind: coerceNumber(config.big_blind, 2),
+        ante: coerceNumber(config.ante ?? 0, 0),
+        maxPlayers: coerceNumber(config.max_players, 6),
+        startingStack: coerceNumber(config.starting_stack, 200),
+        turnTimerSeconds: coerceNumber(config.turn_timer_seconds ?? 20, 20),
+      });
+      return toProtoTable(table);
+    }),
 
-    GetTable: (call: ServerUnaryCall<GetTableRequest, ProtoTable>, callback: sendUnaryData<ProtoTable>) =>
-      handleUnary("GetTable", call, callback, async ({ table_id }) => {
-        const table = await tableService.getTable(table_id);
-        if (!table) {
-          throw new Error("TABLE_NOT_FOUND");
-        }
-        return toProtoTable(table);
-      }),
+    GetTable: createGameUnaryHandler("GetTable", async ({ table_id }: GetTableRequest) => {
+      const table = await tableService.getTable(table_id);
+      if (!table) {
+        throw new Error("TABLE_NOT_FOUND");
+      }
+      return toProtoTable(table);
+    }),
 
-    ListTables: (call: ServerUnaryCall<ListTablesRequest, ListTablesResponse>, callback: sendUnaryData<ListTablesResponse>) =>
-      handleUnary("ListTables", call, callback, async () => {
-        await tableService.ensureMainTable();
-        const tables = await tableService.listTableSummaries();
-        return {
-          tables: tables.map((summary) => ({
-            table_id: summary.tableId,
-            name: summary.name,
-            owner_id: summary.ownerId,
-            config: toProtoConfig(summary.config),
-            seats_taken: summary.seatsTaken,
-            occupied_seat_ids: summary.occupiedSeatIds,
-            in_progress: summary.inProgress,
-            spectator_count: summary.spectatorCount,
-          })),
-        };
-      }),
+    ListTables: createGameUnaryHandler<ListTablesRequest, ListTablesResponse>("ListTables", async (_request) => {
+      await tableService.ensureMainTable();
+      const tables = await tableService.listTableSummaries();
+      return {
+        tables: tables.map((summary) => ({
+          table_id: summary.tableId,
+          name: summary.name,
+          owner_id: summary.ownerId,
+          config: toProtoConfig(summary.config),
+          seats_taken: summary.seatsTaken,
+          occupied_seat_ids: summary.occupiedSeatIds,
+          in_progress: summary.inProgress,
+          spectator_count: summary.spectatorCount,
+        })),
+      };
+    }),
 
-    DeleteTable: (call: ServerUnaryCall<DeleteTableRequest, Empty>, callback: sendUnaryData<Empty>) =>
-      handleUnary("DeleteTable", call, callback, async ({ table_id }) => {
-        const deleted = await tableService.deleteTable(table_id);
-        if (!deleted) {
-          throw new Error("TABLE_NOT_FOUND");
-        }
-        return {};
-      }),
+    DeleteTable: createGameUnaryHandler("DeleteTable", async ({ table_id }: DeleteTableRequest) => {
+      const deleted = await tableService.deleteTable(table_id);
+      if (!deleted) {
+        throw new Error("TABLE_NOT_FOUND");
+      }
+      return {};
+    }),
 
-    GetTableState: (call: ServerUnaryCall<GetTableStateRequest, GetTableStateResponse>, callback: sendUnaryData<GetTableStateResponse>) =>
-      handleUnary("GetTableState", call, callback, async ({ table_id, user_id }) => {
-        const result = await tableService.getTableState(table_id, user_id);
-        if (!result) {
-          throw new Error("TABLE_NOT_FOUND");
-        }
-        return {
-          state: toProtoState(result.state),
-          hole_cards: result.holeCards.map(toProtoCard),
-        };
-      }),
+    GetTableState: createGameUnaryHandler<GetTableStateRequest, GetTableStateResponse>(
+      "GetTableState",
+      async ({ table_id, user_id }) => {
+      const result = await tableService.getTableState(table_id, user_id);
+      if (!result) {
+        throw new Error("TABLE_NOT_FOUND");
+      }
+      return {
+        state: toProtoState(result.state),
+        hole_cards: result.holeCards.map(toProtoCard),
+      };
+      },
+    ),
 
-    JoinSeat: (call: ServerUnaryCall<JoinSeatRequest, ActionResult>, callback: sendUnaryData<ActionResult>) =>
-      handleUnary("JoinSeat", call, callback, ({ table_id, user_id, seat_id, buy_in_amount }) => {
-        const buyInAmount = coerceNumber(buy_in_amount, 0);
-        return tableService.joinSeat(table_id, user_id, seat_id, buyInAmount);
-      }),
+    JoinSeat: createGameUnaryHandler("JoinSeat", ({ table_id, user_id, seat_id, buy_in_amount }: JoinSeatRequest) => {
+      const buyInAmount = coerceNumber(buy_in_amount, 0);
+      return tableService.joinSeat(table_id, user_id, seat_id, buyInAmount);
+    }),
 
-    LeaveSeat: (call: ServerUnaryCall<LeaveSeatRequest, ActionResult>, callback: sendUnaryData<ActionResult>) =>
-      handleUnary("LeaveSeat", call, callback, ({ table_id, user_id }) => tableService.leaveSeat(table_id, user_id)),
+    LeaveSeat: createGameUnaryHandler("LeaveSeat", ({ table_id, user_id }: LeaveSeatRequest) =>
+      tableService.leaveSeat(table_id, user_id)
+    ),
 
-    JoinSpectator: (call: ServerUnaryCall<JoinSpectatorRequest, ActionResult>, callback: sendUnaryData<ActionResult>) =>
-      handleUnary("JoinSpectator", call, callback, ({ table_id, user_id }) => tableService.joinSpectator(table_id, user_id)),
+    JoinSpectator: createGameUnaryHandler("JoinSpectator", ({ table_id, user_id }: JoinSpectatorRequest) =>
+      tableService.joinSpectator(table_id, user_id)
+    ),
 
-    LeaveSpectator: (call: ServerUnaryCall<LeaveSpectatorRequest, ActionResult>, callback: sendUnaryData<ActionResult>) =>
-      handleUnary("LeaveSpectator", call, callback, ({ table_id, user_id }) => tableService.leaveSpectator(table_id, user_id)),
+    LeaveSpectator: createGameUnaryHandler("LeaveSpectator", ({ table_id, user_id }: LeaveSpectatorRequest) =>
+      tableService.leaveSpectator(table_id, user_id)
+    ),
 
-    SubmitAction: (call: ServerUnaryCall<SubmitActionRequest, ActionResult>, callback: sendUnaryData<ActionResult>) =>
-      handleUnary("SubmitAction", call, callback, ({ table_id, user_id, action_type, amount }) => {
-        const normalizedAction = action_type.toUpperCase() as ActionInput["type"];
-        return tableService.submitAction(table_id, user_id, {
-          type: normalizedAction,
-          amount: amount === undefined ? undefined : coerceNumber(amount, 0),
-        });
-      }),
+    SubmitAction: createGameUnaryHandler<SubmitActionRequest, ActionResult>(
+      "SubmitAction",
+      ({ table_id, user_id, action_type, amount }) => {
+      const normalizedAction = action_type.toUpperCase() as ActionInput["type"];
+      return tableService.submitAction(table_id, user_id, {
+        type: normalizedAction,
+        amount: amount === undefined ? undefined : coerceNumber(amount, 0),
+      });
+      },
+    ),
 
-    KickPlayer: (call: ServerUnaryCall<KickPlayerRequest, Empty>, callback: sendUnaryData<Empty>) =>
-      handleUnary("KickPlayer", call, callback, async ({ table_id, owner_id, target_user_id }) => {
-        const result = await moderationService.kickPlayer(table_id, owner_id, target_user_id);
-        if (!result.ok) {
-          throw new Error(result.error || "KICK_FAILED");
-        }
-        return {};
-      }),
+    KickPlayer: createGameUnaryHandler("KickPlayer", async ({ table_id, owner_id, target_user_id }: KickPlayerRequest) => {
+      const result = await moderationService.kickPlayer(table_id, owner_id, target_user_id);
+      if (!result.ok) {
+        throw new Error(result.error || "KICK_FAILED");
+      }
+      return {};
+    }),
 
-    MutePlayer: (call: ServerUnaryCall<MutePlayerRequest, Empty>, callback: sendUnaryData<Empty>) =>
-      handleUnary("MutePlayer", call, callback, async ({ table_id, owner_id, target_user_id }) => {
-        const result = await moderationService.mutePlayer(table_id, owner_id, target_user_id, true);
-        if (!result.ok) {
-          throw new Error(result.error || "MUTE_FAILED");
-        }
-        return {};
-      }),
+    MutePlayer: createGameUnaryHandler("MutePlayer", async ({ table_id, owner_id, target_user_id }: MutePlayerRequest) => {
+      const result = await moderationService.mutePlayer(table_id, owner_id, target_user_id, true);
+      if (!result.ok) {
+        throw new Error(result.error || "MUTE_FAILED");
+      }
+      return {};
+    }),
 
-    UnmutePlayer: (call: ServerUnaryCall<UnmutePlayerRequest, Empty>, callback: sendUnaryData<Empty>) =>
-      handleUnary("UnmutePlayer", call, callback, async ({ table_id, owner_id, target_user_id }) => {
+    UnmutePlayer: createGameUnaryHandler(
+      "UnmutePlayer",
+      async ({ table_id, owner_id, target_user_id }: UnmutePlayerRequest) => {
         const result = await moderationService.mutePlayer(table_id, owner_id, target_user_id, false);
         if (!result.ok) {
           throw new Error(result.error || "UNMUTE_FAILED");
         }
         return {};
-      }),
+      }
+    ),
 
-    IsMuted: (call: ServerUnaryCall<IsMutedRequest, { is_muted: boolean }>, callback: sendUnaryData<{ is_muted: boolean }>) =>
-      handleUnary("IsMuted", call, callback, async ({ table_id, user_id }) => {
-        const is_muted = await moderationService.isMuted(table_id, user_id);
-        return { is_muted };
-      }),
+    IsMuted: createGameUnaryHandler("IsMuted", async ({ table_id, user_id }: IsMutedRequest) => {
+      const is_muted = await moderationService.isMuted(table_id, user_id);
+      return { is_muted };
+    }),
   };
 }

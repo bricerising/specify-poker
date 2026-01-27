@@ -1,17 +1,10 @@
+import { unaryCall } from "@specify-poker/shared";
+
 type UnaryCallback<T> = (err: Error | null, response: T) => void;
 
 export function grpcCall<TRequest, TResponse>(
-  method: (request: TRequest, callback: UnaryCallback<TResponse>) => void,
+  method: (request: TRequest, callback: UnaryCallback<TResponse>) => unknown,
   request: TRequest,
 ): Promise<TResponse> {
-  return new Promise((resolve, reject) => {
-    method(request, (err, response) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve(response);
-    });
-  });
+  return unaryCall(method, request);
 }
-

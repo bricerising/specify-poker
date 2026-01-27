@@ -3,37 +3,52 @@ import { PushSenderService } from "../../services/pushSenderService";
 import { NotificationPayload, NotificationType, PushSubscription } from "../../domain/types";
 import logger from "../../observability/logger";
 import { recordGrpcRequest, recordNotificationRequested } from "../../observability/metrics";
+import { createUnaryHandler, withUnaryErrorHandling, withUnaryErrorResponse, withUnaryTiming } from "@specify-poker/shared";
 import { getErrorMessage, toError } from "../../shared/errors";
 
 type UnaryCall<Req> = { request: Req };
 type UnaryCallback<Res> = (error: Error | null, response?: Res) => void;
 
-function createUnaryHandler<Req, Res>(
-  params: {
-    method: string;
-    handler: (request: Req) => Promise<Res> | Res;
-    statusFromResponse?: (response: Res) => "ok" | "error";
-    errorResponse?: (error: unknown) => Res;
-    errorLogMessage?: string;
+function createNotifyUnaryHandler<Req, Res>(params: {
+  method: string;
+  handler: (request: Req) => Promise<Res> | Res;
+  statusFromResponse?: (response: Res) => "ok" | "error";
+  errorResponse?: (error: unknown) => Res;
+  errorLogMessage?: string;
+}): (call: UnaryCall<Req>, callback: UnaryCallback<Res>) => Promise<void> {
+  const timing = withUnaryTiming<Req, Res, UnaryCall<Req>>({
+    method: params.method,
+    record: recordGrpcRequest,
+    statusFromResponse: params.statusFromResponse,
+  });
+
+  if (params.errorResponse) {
+    return createUnaryHandler<Req, Res, UnaryCall<Req>>({
+      handler: ({ request }) => params.handler(request),
+      interceptors: [
+        timing,
+        withUnaryErrorResponse({
+          onError: (_context, error) => {
+            logger.error({ err: error }, params.errorLogMessage ?? `${params.method} failed`);
+          },
+          errorResponse: (_context, error) => params.errorResponse!(error),
+        }),
+      ],
+    });
   }
-) {
-  return async (call: UnaryCall<Req>, callback: UnaryCallback<Res>) => {
-    const startedAt = Date.now();
-    try {
-      const response = await params.handler(call.request);
-      const status = params.statusFromResponse?.(response) ?? "ok";
-      recordGrpcRequest(params.method, status, Date.now() - startedAt);
-      callback(null, response);
-    } catch (error: unknown) {
-      logger.error({ err: error }, params.errorLogMessage ?? `${params.method} failed`);
-      recordGrpcRequest(params.method, "error", Date.now() - startedAt);
-      if (params.errorResponse) {
-        callback(null, params.errorResponse(error));
-        return;
-      }
-      callback(toError(error));
-    }
-  };
+
+  return createUnaryHandler<Req, Res, UnaryCall<Req>>({
+    handler: ({ request }) => params.handler(request),
+    interceptors: [
+      timing,
+      withUnaryErrorHandling({
+        method: params.method,
+        logger,
+        message: params.errorLogMessage ?? `${params.method} failed`,
+        toServiceError: toError,
+      }),
+    ],
+  });
 }
 
 function isNotificationType(value: string): value is NotificationType {
@@ -57,7 +72,7 @@ function resolveNotificationData(
 
 export function createHandlers(subscriptionService: SubscriptionService, pushService: PushSenderService) {
   return {
-    registerSubscription: createUnaryHandler({
+    registerSubscription: createNotifyUnaryHandler({
       method: "RegisterSubscription",
       statusFromResponse: (response: { ok: boolean }) => (response.ok ? "ok" : "error"),
       errorResponse: (error: unknown) => ({ ok: false, error: getErrorMessage(error) }),
@@ -88,7 +103,7 @@ export function createHandlers(subscriptionService: SubscriptionService, pushSer
       },
     }),
 
-    unregisterSubscription: createUnaryHandler({
+    unregisterSubscription: createNotifyUnaryHandler({
       method: "UnregisterSubscription",
       statusFromResponse: (response: { ok: boolean }) => (response.ok ? "ok" : "error"),
       errorResponse: (error: unknown) => ({ ok: false, error: getErrorMessage(error) }),
@@ -105,7 +120,7 @@ export function createHandlers(subscriptionService: SubscriptionService, pushSer
       },
     }),
 
-    listSubscriptions: createUnaryHandler({
+    listSubscriptions: createNotifyUnaryHandler({
       method: "ListSubscriptions",
       statusFromResponse: () => "ok",
       errorLogMessage: "Failed to list subscriptions",
@@ -128,7 +143,7 @@ export function createHandlers(subscriptionService: SubscriptionService, pushSer
       },
     }),
 
-    sendNotification: createUnaryHandler({
+    sendNotification: createNotifyUnaryHandler({
       method: "SendNotification",
       statusFromResponse: (response: { ok: boolean }) => (response.ok ? "ok" : "error"),
       errorResponse: (error: unknown) => ({ ok: false, error: getErrorMessage(error) }),

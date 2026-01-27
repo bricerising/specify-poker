@@ -1,6 +1,10 @@
 import { balanceClient } from "../../api/grpc/clients";
 import { unaryCall } from "./grpcUnary";
 
+export type BalanceCall<TResponse> =
+  | { type: "available"; response: TResponse }
+  | { type: "unavailable"; error: unknown };
+
 export type BalanceReservation = {
   ok: boolean;
   reservation_id?: string;
@@ -11,6 +15,15 @@ export type BalanceCommit = { ok: boolean; error?: string; transaction_id?: stri
 export type BalanceCashOut = { ok: boolean; error?: string; transaction_id?: string; new_balance?: number };
 export type BalanceSettle = { ok: boolean; error?: string };
 
+async function callWithAvailability<TResponse>(promise: Promise<TResponse>): Promise<BalanceCall<TResponse>> {
+  try {
+    const response = await promise;
+    return { type: "available", response };
+  } catch (error: unknown) {
+    return { type: "unavailable", error };
+  }
+}
+
 export class BalanceClientAdapter {
   reserveForBuyIn(request: {
     account_id: string;
@@ -19,11 +32,15 @@ export class BalanceClientAdapter {
     idempotency_key: string;
     timeout_seconds: number;
   }) {
-    return unaryCall<typeof request, BalanceReservation>(balanceClient.ReserveForBuyIn.bind(balanceClient), request);
+    return callWithAvailability(
+      unaryCall<typeof request, BalanceReservation>(balanceClient.ReserveForBuyIn.bind(balanceClient), request),
+    );
   }
 
   commitReservation(request: { reservation_id: string }) {
-    return unaryCall<typeof request, BalanceCommit>(balanceClient.CommitReservation.bind(balanceClient), request);
+    return callWithAvailability(
+      unaryCall<typeof request, BalanceCommit>(balanceClient.CommitReservation.bind(balanceClient), request),
+    );
   }
 
   releaseReservation(request: { reservation_id: string; reason?: string }) {
@@ -38,7 +55,9 @@ export class BalanceClientAdapter {
     idempotency_key: string;
     hand_id?: string;
   }) {
-    return unaryCall<typeof request, BalanceCashOut>(balanceClient.ProcessCashOut.bind(balanceClient), request);
+    return callWithAvailability(
+      unaryCall<typeof request, BalanceCashOut>(balanceClient.ProcessCashOut.bind(balanceClient), request),
+    );
   }
 
   settlePot(request: {
@@ -47,9 +66,10 @@ export class BalanceClientAdapter {
     winners: Array<{ seat_id: number; account_id: string; amount: number }>;
     idempotency_key: string;
   }) {
-    return unaryCall<typeof request, BalanceSettle>(balanceClient.SettlePot.bind(balanceClient), request);
+    return callWithAvailability(
+      unaryCall<typeof request, BalanceSettle>(balanceClient.SettlePot.bind(balanceClient), request),
+    );
   }
 }
 
 export const balanceClientAdapter = new BalanceClientAdapter();
-

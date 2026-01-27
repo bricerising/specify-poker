@@ -1,4 +1,5 @@
 import * as grpc from "@grpc/grpc-js";
+import { createUnaryHandler, withUnaryErrorHandling, withUnaryTiming } from "@specify-poker/shared";
 import {
   getBalance,
   ensureAccount,
@@ -17,13 +18,6 @@ import {
 import { recordGrpcRequest } from "../../observability/metrics";
 import logger from "../../observability/logger";
 import { toNonEmptyString, toNumber } from "../validation";
-
-function recordDuration(method: string, startedAt: number, status: "ok" | "error") {
-  recordGrpcRequest(method, status, Date.now() - startedAt);
-}
-
-type UnaryCall<Req> = { request: Req };
-type UnaryCallback<Res> = grpc.sendUnaryData<Res>;
 
 class InvalidArgumentError extends Error {
   override name = "InvalidArgumentError";
@@ -44,7 +38,16 @@ function isServiceError(error: unknown): error is grpc.ServiceError {
 
 function asServiceError(error: unknown): grpc.ServiceError {
   if (isServiceError(error)) {
-    return error;
+    if (error instanceof Error) {
+      return error;
+    }
+    const message =
+      typeof (error as { message?: unknown }).message === "string"
+        ? (error as { message: string }).message
+        : "Unknown error";
+    const serviceError = new Error(message, { cause: error }) as grpc.ServiceError;
+    serviceError.code = (error as grpc.ServiceError).code;
+    return serviceError;
   }
 
   if (error instanceof InvalidArgumentError) {
@@ -59,59 +62,49 @@ function asServiceError(error: unknown): grpc.ServiceError {
   return serviceError;
 }
 
-function handleUnary<Req, Res>(
+function createBalanceUnaryHandler<Req, Res>(
   method: string,
-  call: UnaryCall<Req>,
-  callback: UnaryCallback<Res>,
-  handler: (request: Req) => Promise<Res> | Res,
-) {
-  const startedAt = Date.now();
-  return Promise.resolve(handler(call.request))
-    .then((response) => {
-      recordDuration(method, startedAt, "ok");
-      callback(null, response);
-    })
-    .catch((error: unknown) => {
-      recordDuration(method, startedAt, "error");
-      if (!(error instanceof InvalidArgumentError) && !isServiceError(error)) {
-        logger.error({ err: error }, `${method} failed`);
-      }
-      callback(asServiceError(error));
-    });
+  handler: (request: Req) => Promise<Res> | Res
+): grpc.handleUnaryCall<Req, Res> {
+  return createUnaryHandler<Req, Res, grpc.ServerUnaryCall<Req, Res>, grpc.ServiceError>({
+    handler: ({ request }) => handler(request),
+    interceptors: [
+      withUnaryTiming({ method, record: recordGrpcRequest }),
+      withUnaryErrorHandling({
+        method,
+        logger,
+        toServiceError: asServiceError,
+        shouldLog: (error) => !(error instanceof InvalidArgumentError) && !isServiceError(error),
+      }),
+    ],
+  });
 }
 
 // gRPC handler implementations
 export const handlers = {
-  GetBalance(
-    call: { request: { account_id: string } },
-    callback: UnaryCallback<unknown>
-  ) {
-    return handleUnary("GetBalance", call, callback, async ({ account_id }) => {
-      const balance = await getBalance(account_id);
-      if (!balance) {
-        return {
-          account_id,
-          balance: 0,
-          available_balance: 0,
-          currency: "CHIPS",
-          version: 0,
-        };
-      }
+  GetBalance: createBalanceUnaryHandler("GetBalance", async ({ account_id }: { account_id: string }) => {
+    const balance = await getBalance(account_id);
+    if (!balance) {
       return {
-        account_id: balance.accountId,
-        balance: balance.balance,
-        available_balance: balance.availableBalance,
-        currency: balance.currency,
-        version: balance.version,
+        account_id,
+        balance: 0,
+        available_balance: 0,
+        currency: "CHIPS",
+        version: 0,
       };
-    });
-  },
+    }
+    return {
+      account_id: balance.accountId,
+      balance: balance.balance,
+      available_balance: balance.availableBalance,
+      currency: balance.currency,
+      version: balance.version,
+    };
+  }),
 
-  EnsureAccount(
-    call: { request: { account_id: string; initial_balance?: number } },
-    callback: UnaryCallback<unknown>
-  ) {
-    return handleUnary("EnsureAccount", call, callback, async ({ account_id, initial_balance }) => {
+  EnsureAccount: createBalanceUnaryHandler(
+    "EnsureAccount",
+    async ({ account_id, initial_balance }: { account_id: string; initial_balance?: number }) => {
       const accountId = toNonEmptyString(account_id);
       if (!accountId) {
         invalidArgument("account_id is required");
@@ -123,22 +116,18 @@ export const handlers = {
         balance: result.account.balance,
         created: result.created,
       };
-    });
-  },
+    }
+  ),
 
-  ReserveForBuyIn(
-    call: {
-      request: {
-        account_id: string;
-        table_id: string;
-        amount: number;
-        idempotency_key: string;
-        timeout_seconds?: number;
-      };
-    },
-    callback: UnaryCallback<unknown>
-  ) {
-    return handleUnary("ReserveForBuyIn", call, callback, async (request) => {
+  ReserveForBuyIn: createBalanceUnaryHandler(
+    "ReserveForBuyIn",
+    async (request: {
+      account_id: string;
+      table_id: string;
+      amount: number;
+      idempotency_key: string;
+      timeout_seconds?: number;
+    }) => {
       const accountId = toNonEmptyString(request.account_id);
       const tableId = toNonEmptyString(request.table_id);
       const idempotencyKey = toNonEmptyString(request.idempotency_key);
@@ -163,14 +152,12 @@ export const handlers = {
         error: result.ok ? "" : result.error,
         available_balance: result.availableBalance ?? 0,
       };
-    });
-  },
+    }
+  ),
 
-  CommitReservation(
-    call: { request: { reservation_id: string } },
-    callback: UnaryCallback<unknown>
-  ) {
-    return handleUnary("CommitReservation", call, callback, async ({ reservation_id }) => {
+  CommitReservation: createBalanceUnaryHandler(
+    "CommitReservation",
+    async ({ reservation_id }: { reservation_id: string }) => {
       const reservationId = toNonEmptyString(reservation_id);
       if (!reservationId) {
         invalidArgument("reservation_id is required");
@@ -182,14 +169,12 @@ export const handlers = {
         error: result.ok ? "" : result.error,
         new_balance: result.ok ? (result.newBalance ?? 0) : 0,
       };
-    });
-  },
+    }
+  ),
 
-  ReleaseReservation(
-    call: { request: { reservation_id: string; reason?: string } },
-    callback: UnaryCallback<unknown>
-  ) {
-    return handleUnary("ReleaseReservation", call, callback, async ({ reservation_id, reason }) => {
+  ReleaseReservation: createBalanceUnaryHandler(
+    "ReleaseReservation",
+    async ({ reservation_id, reason }: { reservation_id: string; reason?: string }) => {
       const reservationId = toNonEmptyString(reservation_id);
       if (!reservationId) {
         invalidArgument("reservation_id is required");
@@ -200,23 +185,19 @@ export const handlers = {
         error: result.ok ? "" : result.error,
         available_balance: result.ok ? (result.availableBalance ?? 0) : 0,
       };
-    });
-  },
+    }
+  ),
 
-  ProcessCashOut(
-    call: {
-      request: {
-        account_id: string;
-        table_id: string;
-        seat_id: number;
-        amount: number;
-        idempotency_key: string;
-        hand_id?: string;
-      };
-    },
-    callback: UnaryCallback<unknown>
-  ) {
-    return handleUnary("ProcessCashOut", call, callback, async (request) => {
+  ProcessCashOut: createBalanceUnaryHandler(
+    "ProcessCashOut",
+    async (request: {
+      account_id: string;
+      table_id: string;
+      seat_id: number;
+      amount: number;
+      idempotency_key: string;
+      hand_id?: string;
+    }) => {
       const accountId = toNonEmptyString(request.account_id);
       const tableId = toNonEmptyString(request.table_id);
       const idempotencyKey = toNonEmptyString(request.idempotency_key);
@@ -242,24 +223,20 @@ export const handlers = {
         error: result.ok ? "" : result.error,
         new_balance: result.ok ? result.newBalance : 0,
       };
-    });
-  },
+    }
+  ),
 
-  RecordContribution(
-    call: {
-      request: {
-        table_id: string;
-        hand_id: string;
-        seat_id: number;
-        account_id: string;
-        amount: number;
-        contribution_type: string;
-        idempotency_key: string;
-      };
-    },
-    callback: UnaryCallback<unknown>
-  ) {
-    return handleUnary("RecordContribution", call, callback, async (request) => {
+  RecordContribution: createBalanceUnaryHandler(
+    "RecordContribution",
+    async (request: {
+      table_id: string;
+      hand_id: string;
+      seat_id: number;
+      account_id: string;
+      amount: number;
+      contribution_type: string;
+      idempotency_key: string;
+    }) => {
       const tableId = toNonEmptyString(request.table_id);
       const handId = toNonEmptyString(request.hand_id);
       const accountId = toNonEmptyString(request.account_id);
@@ -295,21 +272,22 @@ export const handlers = {
         total_pot: result.ok ? result.totalPot : 0,
         seat_contribution: result.ok ? result.seatContribution : 0,
       };
-    });
-  },
+    }
+  ),
 
-  SettlePot(
-    call: {
-      request: {
-        table_id: string;
-        hand_id: string;
-        winners: Array<{ seat_id: number; account_id: string; amount: number }>;
-        idempotency_key: string;
-      };
-    },
-    callback: UnaryCallback<unknown>
-  ) {
-    return handleUnary("SettlePot", call, callback, async ({ table_id, hand_id, winners, idempotency_key }) => {
+  SettlePot: createBalanceUnaryHandler(
+    "SettlePot",
+    async ({
+      table_id,
+      hand_id,
+      winners,
+      idempotency_key,
+    }: {
+      table_id: string;
+      hand_id: string;
+      winners: Array<{ seat_id: number; account_id: string; amount: number }>;
+      idempotency_key: string;
+    }) => {
       const tableId = toNonEmptyString(table_id);
       const handId = toNonEmptyString(hand_id);
       const idempotencyKey = toNonEmptyString(idempotency_key);
@@ -347,14 +325,12 @@ export const handlers = {
               }))
             : [],
       };
-    });
-  },
+    }
+  ),
 
-  CancelPot(
-    call: { request: { table_id: string; hand_id: string; reason: string } },
-    callback: UnaryCallback<unknown>
-  ) {
-    return handleUnary("CancelPot", call, callback, async ({ table_id, hand_id, reason }) => {
+  CancelPot: createBalanceUnaryHandler(
+    "CancelPot",
+    async ({ table_id, hand_id, reason }: { table_id: string; hand_id: string; reason: string }) => {
       const tableId = toNonEmptyString(table_id);
       const handId = toNonEmptyString(hand_id);
       const cancelReason = toNonEmptyString(reason);
@@ -367,6 +343,6 @@ export const handlers = {
         ok: result.ok,
         error: result.error ?? "",
       };
-    });
-  },
+    }
+  ),
 };

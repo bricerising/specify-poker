@@ -28,6 +28,11 @@ import { redactTableState } from "./table/tableViewBuilder";
 type TurnStartMeta = { handId: string; seatId: number; street: string; startedAt: number };
 type HandTimeoutMeta = { handId: string; hadTimeout: boolean };
 
+type FinalizeReservedSeatJoinResult =
+  | { type: "ok" }
+  | { type: "error"; error: string }
+  | { type: "balance_unavailable"; error: unknown };
+
 export class TableService {
   private turnTimers = new Map<string, NodeJS.Timeout>();
   private turnStartMeta = new Map<string, TurnStartMeta>();
@@ -42,6 +47,15 @@ export class TableService {
     state.updatedAt = this.now();
   }
 
+  private clearSeatOwnership(seat: Seat) {
+    seat.userId = null;
+    seat.stack = 0;
+    seat.holeCards = null;
+    seat.reservationId = undefined;
+    seat.pendingBuyInAmount = undefined;
+    seat.buyInIdempotencyKey = undefined;
+  }
+
   private newIdempotencyKey(prefix: string) {
     return `${prefix}:${uuidv4()}`;
   }
@@ -52,6 +66,35 @@ export class TableService {
 
   private cashOutIdempotencyKey(tableId: string, userId: string, seatId: number) {
     return this.newIdempotencyKey(`cashout:${tableId}:${userId}:${seatId}`);
+  }
+
+  private async cashOutSeatStack({
+    tableId,
+    userId,
+    seatId,
+    amount,
+  }: {
+    tableId: string;
+    userId: string;
+    seatId: number;
+    amount: number;
+  }) {
+    const cashOutCall = await balanceClientAdapter.processCashOut({
+      account_id: userId,
+      table_id: tableId,
+      seat_id: seatId,
+      amount,
+      idempotency_key: this.cashOutIdempotencyKey(tableId, userId, seatId),
+    });
+
+    if (cashOutCall.type === "unavailable") {
+      void this.emitGameEvent(tableId, undefined, userId, seatId, "BALANCE_UNAVAILABLE", { action: "CASH_OUT" });
+      return;
+    }
+
+    if (!cashOutCall.response.ok) {
+      void this.emitGameEvent(tableId, undefined, userId, seatId, "CASHOUT_FAILED", { amount });
+    }
   }
 
   private resolveSeatForUser(state: TableState, userId: string): Seat | undefined {
@@ -116,8 +159,7 @@ export class TableService {
     }
 
     state.hand.turn = nextTurn;
-    state.version += 1;
-    state.updatedAt = this.now();
+    this.touchState(state);
     await tableStateStore.save(state);
     await gatewayWsPublisher.publishTableState(table, state);
     return state;
@@ -280,15 +322,33 @@ export class TableService {
         return { ok: false, error: "ALREADY_SEATED" };
       }
 
-      try {
-        const result = await this.finalizeReservedSeatJoin(table, tableId, seatId, userId, finalBuyIn);
-        recordSeatJoin(result.ok ? "ok" : "error", result.ok ? "RESUMED" : (result.error ?? "UNKNOWN"));
-        return result;
-      } catch (err) {
-        await this.handleBalanceUnavailable(tableId, seatId, userId, finalBuyIn, err);
+      const result = await this.finalizeReservedSeatJoin({
+        table,
+        tableId,
+        seatId,
+        userId,
+        fallbackBuyInAmount: finalBuyIn,
+      });
+
+      if (result.type === "balance_unavailable") {
+        await this.handleBalanceUnavailable({
+          tableId,
+          seatId,
+          userId,
+          buyInAmount: finalBuyIn,
+          error: result.error,
+        });
         recordSeatJoin("ok", "BALANCE_UNAVAILABLE");
         return { ok: true };
       }
+
+      if (result.type === "error") {
+        recordSeatJoin("error", result.error);
+        return { ok: false, error: result.error };
+      }
+
+      recordSeatJoin("ok", "RESUMED");
+      return { ok: true };
     }
 
     const seat = state.seats.find((entry) => entry.seatId === seatId);
@@ -305,32 +365,56 @@ export class TableService {
     await tableStateStore.save(state);
     await this.publishTableAndLobby(table, state);
 
-    try {
-      const result = await this.finalizeReservedSeatJoin(table, tableId, seatId, userId, finalBuyIn);
-      recordSeatJoin(result.ok ? "ok" : "error", result.ok ? "OK" : (result.error ?? "UNKNOWN"));
-      return result;
-    } catch (err) {
-      await this.handleBalanceUnavailable(tableId, seatId, userId, finalBuyIn, err);
+    const result = await this.finalizeReservedSeatJoin({
+      table,
+      tableId,
+      seatId,
+      userId,
+      fallbackBuyInAmount: finalBuyIn,
+    });
+
+    if (result.type === "balance_unavailable") {
+      await this.handleBalanceUnavailable({
+        tableId,
+        seatId,
+        userId,
+        buyInAmount: finalBuyIn,
+        error: result.error,
+      });
       recordSeatJoin("ok", "BALANCE_UNAVAILABLE");
       return { ok: true };
     }
+
+    if (result.type === "error") {
+      recordSeatJoin("error", result.error);
+      return { ok: false, error: result.error };
+    }
+
+    recordSeatJoin("ok", "OK");
+    return { ok: true };
   }
 
-  private async finalizeReservedSeatJoin(
-    table: Table,
-    tableId: string,
-    seatId: number,
-    userId: string,
-    fallbackBuyInAmount: number,
-  ): Promise<{ ok: boolean; error?: string }> {
+  private async finalizeReservedSeatJoin({
+    table,
+    tableId,
+    seatId,
+    userId,
+    fallbackBuyInAmount,
+  }: {
+    table: Table;
+    tableId: string;
+    seatId: number;
+    userId: string;
+    fallbackBuyInAmount: number;
+  }): Promise<FinalizeReservedSeatJoinResult> {
     const reservedState = await tableStateStore.get(tableId);
     if (!reservedState) {
-      return { ok: false, error: "TABLE_LOST" };
+      return { type: "error", error: "TABLE_LOST" };
     }
 
     const reservedSeat = reservedState.seats.find((entry) => entry.seatId === seatId);
     if (!reservedSeat || reservedSeat.userId !== userId || reservedSeat.status !== "RESERVED") {
-      return { ok: false, error: "SEAT_LOST" };
+      return { type: "error", error: "SEAT_LOST" };
     }
 
     const pendingBuyInAmount = coerceNumber(reservedSeat.pendingBuyInAmount, fallbackBuyInAmount);
@@ -345,7 +429,7 @@ export class TableService {
 
     let reservationId = reservedSeat.reservationId;
     if (!reservationId) {
-      const reservation = await balanceClientAdapter.reserveForBuyIn({
+      const reservationCall = await balanceClientAdapter.reserveForBuyIn({
         account_id: userId,
         table_id: tableId,
         amount: buyInAmount,
@@ -353,10 +437,15 @@ export class TableService {
         timeout_seconds: 30,
       });
 
+      if (reservationCall.type === "unavailable") {
+        return { type: "balance_unavailable", error: reservationCall.error };
+      }
+
+      const reservation = reservationCall.response;
       reservationId = reservation.reservation_id;
       if (!reservation.ok || !reservationId) {
         await this.rollbackSeat(tableId, seatId, userId);
-        return { ok: false, error: reservation.error || "INSUFFICIENT_BALANCE" };
+        return { type: "error", error: reservation.error || "INSUFFICIENT_BALANCE" };
       }
 
       reservedSeat.reservationId = reservationId;
@@ -364,19 +453,24 @@ export class TableService {
       await tableStateStore.save(reservedState);
     }
 
-    const commit = await balanceClientAdapter.commitReservation({ reservation_id: reservationId });
+    const commitCall = await balanceClientAdapter.commitReservation({ reservation_id: reservationId });
+    if (commitCall.type === "unavailable") {
+      return { type: "balance_unavailable", error: commitCall.error };
+    }
+
+    const commit = commitCall.response;
     if (!commit.ok) {
       await this.rollbackSeat(tableId, seatId, userId, reservationId);
-      return { ok: false, error: commit.error || "COMMIT_FAILED" };
+      return { type: "error", error: commit.error || "COMMIT_FAILED" };
     }
 
     const finalState = await tableStateStore.get(tableId);
     if (!finalState) {
-      return { ok: false, error: "TABLE_LOST" };
+      return { type: "error", error: "TABLE_LOST" };
     }
     const finalSeat = finalState.seats.find((entry) => entry.seatId === seatId);
     if (!finalSeat || finalSeat.userId !== userId) {
-      return { ok: false, error: "SEAT_LOST" };
+      return { type: "error", error: "SEAT_LOST" };
     }
 
     finalSeat.stack = buyInAmount;
@@ -393,17 +487,23 @@ export class TableService {
 
     await this.checkStartHand(table, finalState);
 
-    return { ok: true };
+    return { type: "ok" };
   }
 
-  private async handleBalanceUnavailable(
-    tableId: string,
-    seatId: number,
-    userId: string,
-    buyInAmount: number,
-    err: unknown,
-  ) {
-    logger.error({ err, tableId, seatId, userId }, "Balance service unavailable");
+  private async handleBalanceUnavailable({
+    tableId,
+    seatId,
+    userId,
+    buyInAmount,
+    error,
+  }: {
+    tableId: string;
+    seatId: number;
+    userId: string;
+    buyInAmount: number;
+    error: unknown;
+  }) {
+    logger.error({ err: error, tableId, seatId, userId }, "Balance service unavailable");
     const state = await tableStateStore.get(tableId);
     if (!state) return;
     const seat = state.seats.find((entry) => entry.seatId === seatId);
@@ -430,13 +530,8 @@ export class TableService {
     if (state) {
       const seat = state.seats.find((entry) => entry.seatId === seatId);
       if (seat && seat.userId === userId && seat.status === "RESERVED") {
-        seat.userId = null;
+        this.clearSeatOwnership(seat);
         seat.status = "EMPTY";
-        seat.stack = 0;
-        seat.holeCards = null;
-        seat.reservationId = undefined;
-        seat.pendingBuyInAmount = undefined;
-        seat.buyInIdempotencyKey = undefined;
         this.touchState(state);
         await tableStateStore.save(state);
         const table = await tableStore.get(tableId);
@@ -474,12 +569,7 @@ export class TableService {
         seat.status = "FOLDED";
       }
 
-      seat.userId = null;
-      seat.stack = 0;
-      seat.holeCards = null;
-      seat.reservationId = undefined;
-      seat.pendingBuyInAmount = undefined;
-      seat.buyInIdempotencyKey = undefined;
+      this.clearSeatOwnership(seat);
 
       if (!wasInHand) {
         seat.status = "EMPTY";
@@ -503,20 +593,7 @@ export class TableService {
       void this.emitGameEvent(tableId, state.hand.handId, userId, seat.seatId, "PLAYER_LEFT", { stack: remainingStack });
 
       if (shouldCashOut) {
-        try {
-          const cashOut = await balanceClientAdapter.processCashOut({
-            account_id: userId,
-            table_id: tableId,
-            seat_id: seat.seatId,
-            amount: remainingStack,
-            idempotency_key: this.cashOutIdempotencyKey(tableId, userId, seat.seatId),
-          });
-          if (!cashOut.ok) {
-            void this.emitGameEvent(tableId, undefined, userId, seat.seatId, "CASHOUT_FAILED", { amount: remainingStack });
-          }
-        } catch {
-          void this.emitGameEvent(tableId, undefined, userId, seat.seatId, "BALANCE_UNAVAILABLE", { action: "CASH_OUT" });
-        }
+        await this.cashOutSeatStack({ tableId, userId, seatId: seat.seatId, amount: remainingStack });
       }
 
       if (wasTurnSeat) {
@@ -525,30 +602,12 @@ export class TableService {
       return { ok: true };
     }
 
-    if (remainingStack > 0) {
-      try {
-        const cashOut = await balanceClientAdapter.processCashOut({
-          account_id: userId,
-          table_id: tableId,
-          seat_id: seat.seatId,
-          amount: remainingStack,
-          idempotency_key: this.cashOutIdempotencyKey(tableId, userId, seat.seatId),
-        });
-        if (!cashOut.ok) {
-          void this.emitGameEvent(tableId, undefined, userId, seat.seatId, "CASHOUT_FAILED", { amount: remainingStack });
-        }
-      } catch {
-        void this.emitGameEvent(tableId, undefined, userId, seat.seatId, "BALANCE_UNAVAILABLE", { action: "CASH_OUT" });
-      }
+    if (shouldCashOut) {
+      await this.cashOutSeatStack({ tableId, userId, seatId: seat.seatId, amount: remainingStack });
     }
 
-    seat.userId = null;
-    seat.stack = 0;
+    this.clearSeatOwnership(seat);
     seat.status = "EMPTY";
-    seat.holeCards = null;
-    seat.reservationId = undefined;
-    seat.pendingBuyInAmount = undefined;
-    seat.buyInIdempotencyKey = undefined;
     this.touchState(state);
 
     await tableStateStore.save(state);
@@ -568,8 +627,7 @@ export class TableService {
       return { ok: true };
     }
     state.spectators.push({ userId, status: "ACTIVE", joinedAt: this.now() });
-    state.version += 1;
-    state.updatedAt = this.now();
+    this.touchState(state);
     await tableStateStore.save(state);
     await this.publishTableAndLobby(table, state);
     return { ok: true };
@@ -580,8 +638,7 @@ export class TableService {
     if (!loaded) return { ok: false, error: "TABLE_NOT_FOUND" };
     const { table, state } = loaded;
     state.spectators = state.spectators.filter((spectator) => spectator.userId !== userId);
-    state.version += 1;
-    state.updatedAt = this.now();
+    this.touchState(state);
     await tableStateStore.save(state);
     await this.publishTableAndLobby(table, state);
     return { ok: true };
@@ -671,6 +728,81 @@ export class TableService {
     void this.startTurnTimer(table, updatedState);
   }
 
+  private markHandTimedOut(tableId: string, handId: string) {
+    const existing = this.handTimeoutMeta.get(tableId);
+    if (existing && existing.handId === handId) {
+      existing.hadTimeout = true;
+      return;
+    }
+    this.handTimeoutMeta.set(tableId, { handId, hadTimeout: true });
+  }
+
+  private timeoutActionForTurn(hand: NonNullable<TableState["hand"]>, seat: Seat): ActionInput {
+    const legalActions = deriveLegalActions(hand, seat);
+    const canCheck = legalActions.some((entry) => entry.type === "CHECK");
+    return canCheck ? { type: "CHECK" } : { type: "FOLD" };
+  }
+
+  private async handleTurnTimeout({
+    table,
+    tableId,
+    handId,
+    turnSeatId,
+  }: {
+    table: Table;
+    tableId: string;
+    handId: string;
+    turnSeatId: number;
+  }) {
+    try {
+      this.turnTimers.delete(tableId);
+
+      const currentState = await tableStateStore.get(tableId);
+      if (!currentState?.hand || currentState.hand.handId !== handId) {
+        return;
+      }
+      if (currentState.hand.turn !== turnSeatId) {
+        return;
+      }
+
+      const expectedTurnSeatId = currentState.hand.turn;
+      const fixedState = await this.repairTurnIfNeeded(table, currentState);
+      if (!fixedState.hand) {
+        return;
+      }
+      if (fixedState.hand.turn !== expectedTurnSeatId) {
+        void this.startTurnTimer(table, fixedState);
+        return;
+      }
+
+      const seat = fixedState.seats[fixedState.hand.turn];
+      if (!seat?.userId) {
+        void this.startTurnTimer(table, fixedState);
+        return;
+      }
+
+      const actionInput = this.timeoutActionForTurn(fixedState.hand, seat);
+      recordTurnTimeout(fixedState.hand.street, actionInput.type);
+      this.markHandTimedOut(fixedState.tableId, fixedState.hand.handId);
+
+      const result = await this.submitAction(fixedState.tableId, seat.userId, actionInput);
+      if (!result.ok) {
+        const freshState = (await tableStateStore.get(fixedState.tableId)) ?? fixedState;
+        void this.startTurnTimer(table, freshState);
+      }
+    } catch (error) {
+      logger.error({ err: error, tableId, handId, turnSeatId }, "turn.timeout.failed");
+      try {
+        const freshState = await tableStateStore.get(tableId);
+        if (freshState) {
+          void this.startTurnTimer(table, freshState);
+        }
+      } catch (restartError) {
+        logger.error({ err: restartError, tableId, handId, turnSeatId }, "turn.timeout.recovery_failed");
+      }
+    }
+  }
+
   private async startTurnTimer(table: Table, state: TableState) {
     if (!state.hand) {
       this.clearTurnTimer(state.tableId);
@@ -682,56 +814,31 @@ export class TableService {
     const repairedState = await this.repairTurnIfNeeded(table, state);
     const timeoutMs = (table.config.turnTimerSeconds || 20) * 1000;
 
-    if (repairedState.hand) {
-      this.turnStartMeta.set(repairedState.tableId, {
-        handId: repairedState.hand.handId,
-        seatId: repairedState.hand.turn,
-        street: repairedState.hand.street,
-        startedAt: Date.now(),
-      });
-
-      const previousTimeout = this.handTimeoutMeta.get(repairedState.tableId);
-      if (!previousTimeout || previousTimeout.handId !== repairedState.hand.handId) {
-        this.handTimeoutMeta.set(repairedState.tableId, { handId: repairedState.hand.handId, hadTimeout: false });
-      }
+    const repairedHand = repairedState.hand;
+    if (!repairedHand) {
+      this.turnStartMeta.delete(repairedState.tableId);
+      return;
     }
 
-    const timer = setTimeout(async () => {
-      this.turnTimers.delete(repairedState.tableId);
-      const currentState = await tableStateStore.get(repairedState.tableId);
-      if (!currentState || !currentState.hand || currentState.hand.handId !== repairedState.hand?.handId) return;
-      if (currentState.hand.turn !== repairedState.hand.turn) return;
+    this.turnStartMeta.set(repairedState.tableId, {
+      handId: repairedHand.handId,
+      seatId: repairedHand.turn,
+      street: repairedHand.street,
+      startedAt: Date.now(),
+    });
 
-      const expectedTurnSeatId = currentState.hand.turn;
-      const fixedState = await this.repairTurnIfNeeded(table, currentState);
-      if (!fixedState.hand) return;
-      if (fixedState.hand.turn !== expectedTurnSeatId) {
-        void this.startTurnTimer(table, fixedState);
-        return;
-      }
+    const previousTimeout = this.handTimeoutMeta.get(repairedState.tableId);
+    if (!previousTimeout || previousTimeout.handId !== repairedHand.handId) {
+      this.handTimeoutMeta.set(repairedState.tableId, { handId: repairedHand.handId, hadTimeout: false });
+    }
 
-      const seat = fixedState.seats[fixedState.hand?.turn ?? -1];
-      if (!seat || !seat.userId) {
-        void this.startTurnTimer(table, fixedState);
-        return;
-      }
-
-      const legalActions = deriveLegalActions(fixedState.hand, seat);
-      const canCheck = legalActions.some((entry) => entry.type === "CHECK");
-      const actionInput: ActionInput = canCheck ? { type: "CHECK" } : { type: "FOLD" };
-
-      recordTurnTimeout(fixedState.hand.street, actionInput.type);
-      const timeoutMeta = this.handTimeoutMeta.get(fixedState.tableId);
-      if (timeoutMeta && timeoutMeta.handId === fixedState.hand.handId) {
-        timeoutMeta.hadTimeout = true;
-      } else {
-        this.handTimeoutMeta.set(fixedState.tableId, { handId: fixedState.hand.handId, hadTimeout: true });
-      }
-
-      const result = await this.submitAction(fixedState.tableId, seat.userId, actionInput);
-      if (!result.ok) {
-        void this.startTurnTimer(table, await tableStateStore.get(fixedState.tableId).then((fresh) => fresh ?? fixedState));
-      }
+    const timer = setTimeout(() => {
+      void this.handleTurnTimeout({
+        table,
+        tableId: repairedState.tableId,
+        handId: repairedHand.handId,
+        turnSeatId: repairedHand.turn,
+      });
     }, timeoutMs);
 
     this.turnTimers.set(repairedState.tableId, timer);
@@ -742,6 +849,23 @@ export class TableService {
     if (existing) {
       clearTimeout(existing);
       this.turnTimers.delete(tableId);
+    }
+  }
+
+  private scheduleNextHandStart(tableId: string, delayMs: number) {
+    setTimeout(() => {
+      void this.startNextHandIfPossible(tableId);
+    }, delayMs);
+  }
+
+  private async startNextHandIfPossible(tableId: string) {
+    try {
+      const [freshState, freshTable] = await Promise.all([tableStateStore.get(tableId), tableStore.get(tableId)]);
+      if (freshState && freshTable) {
+        await this.checkStartHand(freshTable, freshState);
+      }
+    } catch (error) {
+      logger.error({ err: error, tableId }, "hand.restart.failed");
     }
   }
 
@@ -787,21 +911,23 @@ export class TableService {
           };
         });
 
-        try {
-          const settle = await balanceClientAdapter.settlePot({
-            table_id: table.tableId,
-            hand_id: hand.handId,
-            winners: winnersToSettle,
-            idempotency_key: this.settlePotIdempotencyKey(table.tableId, hand.handId, potIndex),
-          });
-          if (!settle.ok) {
-            void this.emitGameEvent(table.tableId, hand.handId, undefined, undefined, "SETTLEMENT_FAILED", {
-              error: settle.error || "UNKNOWN",
-            });
-          }
-        } catch {
+        const settleCall = await balanceClientAdapter.settlePot({
+          table_id: table.tableId,
+          hand_id: hand.handId,
+          winners: winnersToSettle,
+          idempotency_key: this.settlePotIdempotencyKey(table.tableId, hand.handId, potIndex),
+        });
+
+        if (settleCall.type === "unavailable") {
           void this.emitGameEvent(table.tableId, hand.handId, undefined, undefined, "BALANCE_UNAVAILABLE", {
             action: "SETTLE_POT",
+          });
+          continue;
+        }
+
+        if (!settleCall.response.ok) {
+          void this.emitGameEvent(table.tableId, hand.handId, undefined, undefined, "SETTLEMENT_FAILED", {
+            error: settleCall.response.error || "UNKNOWN",
           });
         }
       }
@@ -814,13 +940,7 @@ export class TableService {
     await tableStateStore.save(state);
     await this.publishTableAndLobby(table, state);
 
-    setTimeout(async () => {
-      const freshState = await tableStateStore.get(state.tableId);
-      const freshTable = await tableStore.get(state.tableId);
-      if (freshState && freshTable) {
-        await this.checkStartHand(freshTable, freshState);
-      }
-    }, 3000);
+    this.scheduleNextHandStart(state.tableId, 3000);
   }
 
   private async emitGameEvent(

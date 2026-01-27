@@ -45,6 +45,7 @@ vi.mock("../../src/ws/pubsub", () => ({
 
 vi.mock("../../src/storage/instanceRegistry", () => ({
   registerInstance: vi.fn().mockResolvedValue(undefined),
+  unregisterInstance: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../../src/storage/redisClient", () => ({

@@ -8,11 +8,12 @@ import {
   recordProfileUpdate,
   recordStatisticsUpdate,
 } from "../../observability/metrics";
+import type { ServerUnaryCall, ServiceError } from "@grpc/grpc-js";
 import type { FriendProfile, Profile, Statistics, ThemePreference } from "../../domain/types";
 import logger from "../../observability/logger";
 import { ValidationError } from "../../domain/errors";
 import { toGrpcServiceError } from "./errors";
-import { createUnaryHandler, withUnaryErrorHandling, withUnaryHooks, withUnaryTiming } from "./unary";
+import { createUnaryHandler, withUnaryErrorHandling, withUnaryHooks, withUnaryTiming } from "@specify-poker/shared";
 
 function createPlayerUnaryHandler<Req, Res>(
   method: string,
@@ -22,13 +23,19 @@ function createPlayerUnaryHandler<Req, Res>(
     onError?: (request: Req, error: unknown) => void;
   }
 ) {
-  return createUnaryHandler<Req, Res>({
-    method,
-    handler,
+  return createUnaryHandler<Req, Res, ServerUnaryCall<Req, Res>, ServiceError>({
+    handler: ({ request }) => handler(request),
     interceptors: [
-      withUnaryTiming({ method, recordGrpcRequest }),
+      withUnaryTiming({ method, record: recordGrpcRequest }),
       withUnaryErrorHandling({ method, logger, toServiceError: toGrpcServiceError }),
-      withUnaryHooks(hooks),
+      withUnaryHooks(
+        hooks
+          ? {
+              onSuccess: ({ request }, response) => hooks.onSuccess?.(request, response),
+              onError: ({ request }, error) => hooks.onError?.(request, error),
+            }
+          : undefined
+      ),
     ],
   });
 }
