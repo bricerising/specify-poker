@@ -23,6 +23,7 @@ vi.mock("../../src/storage/friendsCache");
 describe("Player service consumer architecture", () => {
   const baseProfile = {
     userId: "user-1",
+    username: "user-1",
     nickname: "PlayerOne",
     avatarUrl: "https://example.com/avatar.png",
     preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: "auto" },
@@ -152,9 +153,8 @@ describe("Player service consumer architecture", () => {
 
   it("updates statistics based on hand events", async () => {
     const consumer = new EventConsumer();
-    const handleEvent = consumer as unknown as { handleEvent: (event: unknown) => Promise<void> };
 
-    await handleEvent.handleEvent({
+    await consumer.handleEvent({
       type: "HAND_STARTED",
       payload: {
         fields: {

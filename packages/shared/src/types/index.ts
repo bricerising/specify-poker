@@ -21,6 +21,7 @@ export interface TableConfig {
   maxPlayers: number;
   startingStack: number;
   bettingStructure: BettingStructure;
+  turnTimerSeconds?: number;
 }
 
 export interface TableSummary {
@@ -31,6 +32,7 @@ export interface TableSummary {
   seatsTaken: number;
   occupiedSeatIds: number[];
   inProgress: boolean;
+  spectatorCount?: number;
 }
 
 export interface TableCreateRequest {

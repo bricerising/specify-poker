@@ -42,4 +42,23 @@ describe("config", () => {
 
     process.env = originalEnv;
   });
+
+  it("falls back to defaults when numeric env vars are invalid", async () => {
+    const originalEnv = process.env;
+    process.env = {
+      ...originalEnv,
+      GRPC_PORT: "not-a-number",
+      METRICS_PORT: "",
+      TURN_TIMEOUT: "NaN",
+    };
+
+    const { getConfig } = await loadConfig();
+    const config = getConfig();
+
+    expect(config.port).toBe(50053);
+    expect(config.metricsPort).toBe(9105);
+    expect(config.turnTimeout).toBe(20000);
+
+    process.env = originalEnv;
+  });
 });

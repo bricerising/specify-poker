@@ -24,13 +24,20 @@ export function getLocalConnectionMeta(connectionId: string) {
   return localConnections.get(connectionId);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function sendToLocal(connectionId: string, message: unknown) {
+export function sendToLocalText(connectionId: string, text: string) {
   const entry = localConnections.get(connectionId);
   const socket = entry?.socket;
   if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify(message));
+    socket.send(text);
     return true;
   }
   return false;
+}
+
+export function sendToLocal(connectionId: string, message: unknown) {
+  try {
+    return sendToLocalText(connectionId, JSON.stringify(message));
+  } catch {
+    return false;
+  }
 }

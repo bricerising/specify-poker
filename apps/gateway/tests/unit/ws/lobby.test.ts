@@ -17,6 +17,7 @@ vi.mock("../../../src/ws/subscriptions", () => ({
 
 vi.mock("../../../src/ws/localRegistry", () => ({
   sendToLocal: vi.fn(),
+  sendToLocalText: vi.fn(),
 }));
 
 vi.mock("../../../src/services/broadcastService", () => ({
@@ -25,7 +26,7 @@ vi.mock("../../../src/services/broadcastService", () => ({
 
 import { gameClient } from "../../../src/grpc/clients";
 import { subscribeToChannel, getSubscribers } from "../../../src/ws/subscriptions";
-import { sendToLocal } from "../../../src/ws/localRegistry";
+import { sendToLocal, sendToLocalText } from "../../../src/ws/localRegistry";
 
 class MockSocket extends EventEmitter {
   readyState = WebSocket.OPEN;
@@ -49,7 +50,10 @@ describe("Lobby WS handler", () => {
     expect(subscribeToChannel).toHaveBeenCalledWith("conn-1", "lobby");
     expect(sendToLocal).toHaveBeenCalledWith(
       "conn-1",
-      expect.objectContaining({ type: "LobbyTablesUpdated", tables: [{ table_id: "t1" }] })
+      expect.objectContaining({
+        type: "LobbyTablesUpdated",
+        tables: [expect.objectContaining({ tableId: "t1", spectatorCount: 0 })],
+      })
     );
   });
 
@@ -62,13 +66,16 @@ describe("Lobby WS handler", () => {
       sourceId: "other",
     });
 
-    expect(sendToLocal).toHaveBeenCalledWith(
-      "conn-1",
-      expect.objectContaining({ type: "LobbyTablesUpdated", tables: [{ table_id: "t1" }] })
-    );
-    expect(sendToLocal).toHaveBeenCalledWith(
-      "conn-2",
-      expect.objectContaining({ type: "LobbyTablesUpdated", tables: [{ table_id: "t1" }] })
-    );
+    for (const connectionId of ["conn-1", "conn-2"]) {
+      const call = vi.mocked(sendToLocalText).mock.calls.find(([conn]) => conn === connectionId);
+      expect(call).toBeDefined();
+      const payloadText = call?.[1] ?? "";
+      expect(JSON.parse(payloadText)).toEqual(
+        expect.objectContaining({
+          type: "LobbyTablesUpdated",
+          tables: [expect.objectContaining({ tableId: "t1", spectatorCount: 0 })],
+        }),
+      );
+    }
   });
 });

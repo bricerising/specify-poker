@@ -1,35 +1,107 @@
-import { getRedisClient } from './redisClient';
-import { UserPushSubscription, PushSubscription } from '../domain/types';
+import { getRedisClient } from "./redisClient";
+import { UserPushSubscription, PushSubscription } from "../domain/types";
+import logger from "../observability/logger";
+import { toError } from "../shared/errors";
 
-const KEY_PREFIX = 'notify:push:';
+const KEY_PREFIX = "notify:push:";
+const STATS_KEY = "notify:stats";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isPushKeys(value: unknown): value is PushSubscription["keys"] {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return typeof value.p256dh === "string" && typeof value.auth === "string";
+}
+
+function isUserPushSubscription(value: unknown): value is UserPushSubscription {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.userId === "string" &&
+    typeof value.endpoint === "string" &&
+    typeof value.createdAt === "string" &&
+    isPushKeys(value.keys)
+  );
+}
+
+function parseUserPushSubscription(serialized: string): UserPushSubscription | null {
+  try {
+    const parsed: unknown = JSON.parse(serialized);
+    if (!isUserPushSubscription(parsed)) {
+      return null;
+    }
+    return parsed;
+  } catch (error: unknown) {
+    logger.warn({ err: toError(error) }, "Failed to parse stored subscription JSON");
+    return null;
+  }
+}
+
+export type SubscriptionStoreRedisClient = {
+  hSet(key: string, field: string, value: string): Promise<unknown>;
+  hDel(key: string, field: string): Promise<unknown>;
+  hGetAll(key: string): Promise<Record<string, string>>;
+  hIncrBy(key: string, field: string, increment: number): Promise<unknown>;
+};
+
+export type SubscriptionStoreDeps = {
+  getClient?: () => Promise<SubscriptionStoreRedisClient>;
+  now?: () => Date;
+};
 
 export class SubscriptionStore {
+  constructor(private readonly deps: SubscriptionStoreDeps = {}) {}
+
+  private async getClient(): Promise<SubscriptionStoreRedisClient> {
+    return (this.deps.getClient ?? getRedisClient)();
+  }
+
+  private now(): Date {
+    return (this.deps.now ?? (() => new Date()))();
+  }
+
   async saveSubscription(userId: string, subscription: PushSubscription): Promise<void> {
-    const client = await getRedisClient();
+    const client = await this.getClient();
     const key = `${KEY_PREFIX}${userId}`;
     const data: UserPushSubscription = {
       ...subscription,
       userId,
-      createdAt: new Date().toISOString(),
+      createdAt: this.now().toISOString(),
     };
     await client.hSet(key, subscription.endpoint, JSON.stringify(data));
   }
 
   async deleteSubscription(userId: string, endpoint: string): Promise<void> {
-    const client = await getRedisClient();
+    const client = await this.getClient();
     const key = `${KEY_PREFIX}${userId}`;
     await client.hDel(key, endpoint);
   }
 
   async getSubscriptions(userId: string): Promise<UserPushSubscription[]> {
-    const client = await getRedisClient();
+    const client = await this.getClient();
     const key = `${KEY_PREFIX}${userId}`;
     const all = await client.hGetAll(key);
-    return Object.values(all).map((val) => JSON.parse(val));
+    const subscriptions: UserPushSubscription[] = [];
+
+    for (const serialized of Object.values(all)) {
+      const parsed = parseUserPushSubscription(serialized);
+      if (!parsed) {
+        continue;
+      }
+      subscriptions.push(parsed);
+    }
+
+    return subscriptions;
   }
 
-  async incrementStat(field: 'success' | 'failure' | 'cleanup'): Promise<void> {
-    const client = await getRedisClient();
-    await client.hIncrBy('notify:stats', field, 1);
+  async incrementStat(field: "success" | "failure" | "cleanup"): Promise<void> {
+    const client = await this.getClient();
+    await client.hIncrBy(STATS_KEY, field, 1);
   }
 }

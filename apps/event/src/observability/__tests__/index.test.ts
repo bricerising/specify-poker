@@ -41,8 +41,8 @@ vi.mock("../../config", () => ({
 import { startObservability, stopObservability } from "../index";
 
 describe("observability", () => {
-  it("starts and logs", () => {
-    startObservability();
+  it("starts and logs", async () => {
+    await startObservability();
 
     expect(start).toHaveBeenCalledTimes(1);
     expect(loggerInfo).toHaveBeenCalledWith("OpenTelemetry SDK started");

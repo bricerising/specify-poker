@@ -9,6 +9,7 @@ export interface UserPreferences {
 
 export interface Profile {
   userId: string;
+  username: string;
   nickname: string;
   avatarUrl: string | null;
   preferences: UserPreferences;

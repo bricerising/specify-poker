@@ -15,11 +15,11 @@ function sign(data: string, secret: string): string {
   return base64Url(hmac.digest());
 }
 
-export function generateToken(userId: string, nickname: string, secret = "default-secret"): string {
+export function generateToken(userId: string, username: string, secret = "default-secret"): string {
   const header = { alg: "HS256", typ: "JWT" };
   const payload = {
     sub: userId,
-    nickname,
+    preferred_username: username,
     iss: "poker-gateway",
     aud: "poker-ui",
     iat: Math.floor(Date.now() / 1000),
@@ -31,16 +31,16 @@ export function generateToken(userId: string, nickname: string, secret = "defaul
   return `${encodedHeader}.${encodedPayload}.${signature}`;
 }
 
-export async function loginAs(page: Page, userId: string, nickname: string) {
-  const token = generateToken(userId, nickname);
+export async function loginAs(page: Page, userId: string, username: string) {
+  const token = generateToken(userId, username);
   await page.addInitScript((val) => {
     window.sessionStorage.setItem("poker.auth.token", val);
   }, token);
   await page.goto("/");
 }
 
-export async function setNickname(userId: string, nickname: string) {
-  const token = generateToken(userId, nickname);
+export async function setNickname(userId: string, username: string, nickname: string) {
+  const token = generateToken(userId, username);
   const res = await fetch("http://localhost:4000/api/me", {
     method: "PUT",
     headers: {

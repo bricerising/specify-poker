@@ -1,4 +1,8 @@
 import { Account } from "../domain/types";
+import logger from "../observability/logger";
+import { createKeyedLock } from "../utils/keyedLock";
+import { tryJsonParse } from "../utils/json";
+import { nowIso } from "../utils/time";
 import { getRedisClient } from "./redisClient";
 
 const ACCOUNTS_KEY = "balance:accounts";
@@ -6,34 +10,7 @@ const ACCOUNTS_IDS_KEY = "balance:accounts:ids";
 
 // In-memory cache
 const accounts = new Map<string, Account>();
-const accountLocks = new Map<string, Promise<void>>();
-
-function now(): string {
-  return new Date().toISOString();
-}
-
-async function withAccountLock<T>(accountId: string, work: () => Promise<T>): Promise<T> {
-  const previous = accountLocks.get(accountId) ?? Promise.resolve();
-  let release: () => void;
-  const current = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-
-  const chain = previous.then(() => current);
-  accountLocks.set(accountId, chain);
-
-  await previous;
-  try {
-    return await work();
-  } finally {
-    release!();
-    void chain.finally(() => {
-      if (accountLocks.get(accountId) === chain) {
-        accountLocks.delete(accountId);
-      }
-    });
-  }
-}
+const accountLock = createKeyedLock();
 
 export async function getAccount(accountId: string): Promise<Account | null> {
   // Check cache first
@@ -47,7 +24,12 @@ export async function getAccount(accountId: string): Promise<Account | null> {
   if (redis) {
     const payload = await redis.hGet(ACCOUNTS_KEY, accountId);
     if (payload) {
-      const account = JSON.parse(payload) as Account;
+      const parsed = tryJsonParse<Account>(payload);
+      if (!parsed.ok) {
+        logger.warn({ err: parsed.error, accountId }, "accountStore.parse.failed");
+        return null;
+      }
+      const account = parsed.value;
       accounts.set(accountId, account);
       return account;
     }
@@ -70,8 +52,8 @@ export async function ensureAccount(
     balance: initialBalance,
     currency: "CHIPS",
     version: 0,
-    createdAt: now(),
-    updatedAt: now(),
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
   };
 
   accounts.set(accountId, account);
@@ -96,7 +78,7 @@ export async function updateAccount(
 
   const updated = updater(current);
   updated.version = current.version + 1;
-  updated.updatedAt = now();
+  updated.updatedAt = nowIso();
 
   accounts.set(accountId, updated);
 
@@ -113,7 +95,7 @@ export async function updateAccountWithVersion(
   expectedVersion: number,
   updater: (current: Account) => Account
 ): Promise<{ ok: boolean; account?: Account; error?: string }> {
-  return withAccountLock(accountId, async () => {
+  return accountLock.withLock(accountId, async () => {
     const current = await getAccount(accountId);
     if (!current) {
       return { ok: false, error: "ACCOUNT_NOT_FOUND" };
@@ -150,6 +132,7 @@ export async function listAccounts(): Promise<Account[]> {
 
 export async function resetAccounts(): Promise<void> {
   accounts.clear();
+  accountLock.reset();
   const redis = await getRedisClient();
   if (redis) {
     await redis.del(ACCOUNTS_KEY);

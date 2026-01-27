@@ -16,12 +16,25 @@ const sdk = new NodeSDK({
   instrumentations: [getNodeAutoInstrumentations()],
 });
 
-export function startObservability() {
-  sdk.start();
+let startPromise: Promise<void> | null = null;
+let shutdownPromise: Promise<void> | null = null;
+
+export async function startObservability(): Promise<void> {
+  if (startPromise) {
+    await startPromise;
+    return;
+  }
+  startPromise = Promise.resolve(sdk.start());
+  await startPromise;
   logger.info("OpenTelemetry SDK started");
 }
 
-export async function stopObservability() {
-  await sdk.shutdown();
+export async function stopObservability(): Promise<void> {
+  if (shutdownPromise) {
+    await shutdownPromise;
+    return;
+  }
+  shutdownPromise = Promise.resolve(sdk.shutdown());
+  await shutdownPromise;
   logger.info("OpenTelemetry SDK shut down");
 }

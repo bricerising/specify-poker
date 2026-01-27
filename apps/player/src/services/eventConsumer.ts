@@ -2,6 +2,21 @@ import { createClient } from "redis";
 import { getRedisUrl } from "../storage/redisClient";
 import { incrementHandsPlayed, incrementWins } from "./statisticsService";
 import logger from "../observability/logger";
+import { decodeStructLike } from "@specify-poker/shared";
+
+type UnknownRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function safeJsonParse(value: string): unknown | null {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
 
 export class EventConsumer {
   private isRunning: boolean = false;
@@ -53,7 +68,7 @@ export class EventConsumer {
     }
 
     logger.info("Player EventConsumer started");
-    this.poll();
+    void this.poll();
   }
 
   private async poll(): Promise<void> {
@@ -74,9 +89,7 @@ export class EventConsumer {
         if (streams) {
           for (const stream of streams) {
             for (const message of stream.messages) {
-              const event = JSON.parse(message.message.data as string) as { type?: string; payload?: unknown };
-              await this.handleEvent(event);
-              await client.xAck(this.streamKey, this.groupName, message.id);
+              await this.processMessage(client, message);
             }
           }
         }
@@ -88,59 +101,58 @@ export class EventConsumer {
     }
   }
 
-  private async handleEvent(event: { type?: string; payload?: unknown }): Promise<void> {
+  private async processMessage(
+    client: ReturnType<typeof createClient>,
+    message: { id: string; message: Record<string, unknown> }
+  ): Promise<void> {
     try {
-      const { type, payload } = event;
-      const handler = type ? this.handlers[type] : undefined;
+      const rawData = message.message.data;
+      if (typeof rawData !== "string") {
+        logger.warn({ messageId: message.id }, "eventConsumer.invalidMessage");
+        return;
+      }
+
+      const parsed = safeJsonParse(rawData);
+      if (!parsed) {
+        logger.warn({ messageId: message.id }, "eventConsumer.invalidJson");
+        return;
+      }
+
+      await this.handleEvent(parsed);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "unknown";
+      logger.error({ message }, "Error processing event message");
+    } finally {
+      try {
+        await client.xAck(this.streamKey, this.groupName, message.id);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "unknown";
+        logger.error({ message }, "Error acknowledging event message");
+      }
+    }
+  }
+
+  async handleEvent(event: unknown): Promise<void> {
+    try {
+      if (!isRecord(event)) {
+        return;
+      }
+      const type = typeof event.type === "string" ? event.type : null;
+      if (!type) {
+        return;
+      }
+      const handler = this.handlers[type];
       if (!handler) {
         return;
       }
-      const data = this.decodePayload(payload);
+
+      const data = decodeStructLike(event.payload);
 
       await handler(data);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "unknown";
       logger.error({ message }, "Error handling event");
     }
-  }
-
-  private decodePayload(payload: unknown): Record<string, unknown> {
-    if (payload && typeof payload === "object") {
-      const record = payload as Record<string, unknown>;
-      if ("fields" in record && record.fields && typeof record.fields === "object") {
-        return this.fromStruct(record as { fields: Record<string, unknown> });
-      }
-      return record;
-    }
-    return {};
-  }
-
-  private fromStruct(struct: { fields: Record<string, unknown> }): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(struct.fields)) {
-      result[key] = this.fromValue(value);
-    }
-    return result;
-  }
-
-  private fromValue(value: unknown): unknown {
-    if (!value || typeof value !== "object") {
-      return value;
-    }
-    const record = value as Record<string, unknown>;
-    if ("stringValue" in record) return record.stringValue as string;
-    if ("numberValue" in record) return record.numberValue as number;
-    if ("boolValue" in record) return record.boolValue as boolean;
-    if ("listValue" in record && record.listValue && typeof record.listValue === "object") {
-      const list = record.listValue as { values?: unknown[] };
-      return (list.values ?? []).map((v) => this.fromValue(v));
-    }
-    if ("structValue" in record && record.structValue && typeof record.structValue === "object") {
-      const struct = record.structValue as { fields: Record<string, unknown> };
-      return this.fromStruct(struct);
-    }
-    if ("nullValue" in record) return null;
-    return value;
   }
 
   stop(): void {

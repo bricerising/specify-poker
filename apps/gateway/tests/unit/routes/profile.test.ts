@@ -28,7 +28,7 @@ vi.mock("../../../src/observability/logger", () => ({
 import { playerClient } from "../../../src/grpc/clients";
 
 describe("Profile Routes", () => {
-  const auth = { userId: "user-123", claims: {} };
+  const auth = { userId: "user-123", claims: { preferred_username: "TestUser" } };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -55,6 +55,7 @@ describe("Profile Routes", () => {
     it("should return current user profile", async () => {
       const mockProfile = {
         user_id: "user-123",
+        username: "TestUser",
         nickname: "TestUser",
         avatar_url: "https://example.com/avatar.png",
       };
@@ -74,6 +75,7 @@ describe("Profile Routes", () => {
       expect(response.statusCode).toBe(200);
       expect(response.body).toEqual({
         userId: "user-123",
+        username: "TestUser",
         nickname: "TestUser",
         avatarUrl: "https://example.com/avatar.png",
         stats: { handsPlayed: 0, wins: 0 },
@@ -103,6 +105,7 @@ describe("Profile Routes", () => {
     it("should update current user profile", async () => {
       const updatedProfile = {
         user_id: "user-123",
+        username: "TestUser",
         nickname: "NewNickname",
         avatar_url: "https://example.com/new-avatar.png",
       };
@@ -123,6 +126,7 @@ describe("Profile Routes", () => {
       expect(response.statusCode).toBe(200);
       expect(response.body).toEqual({
         userId: "user-123",
+        username: "TestUser",
         nickname: "NewNickname",
         avatarUrl: "https://example.com/new-avatar.png",
         stats: { handsPlayed: 0, wins: 0 },

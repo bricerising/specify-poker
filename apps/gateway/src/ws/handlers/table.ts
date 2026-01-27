@@ -1,30 +1,18 @@
 import WebSocket from "ws";
-import { context, trace, SpanStatusCode, ROOT_CONTEXT } from "@opentelemetry/api";
+import type { z } from "zod";
+import { wsClientMessageSchema } from "@specify-poker/shared";
+
 import { gameClient } from "../../grpc/clients";
+import { grpcCall } from "../../grpc/grpcCall";
 import { WsPubSubMessage } from "../pubsub";
 import { parseActionType, parseSeatId, parseTableId, checkWsRateLimit } from "../validators";
-import { subscribeToChannel, unsubscribeFromChannel, unsubscribeAll, getSubscribers } from "../subscriptions";
+import { subscribeToChannel, unsubscribeFromChannel, unsubscribeAll } from "../subscriptions";
 import { sendToLocal, getLocalConnectionMeta } from "../localRegistry";
+import { deliverToSubscribers } from "../delivery";
 import logger from "../../observability/logger";
-
-function rawDataToString(data: WebSocket.RawData): string {
-  if (typeof data === "string") return data;
-  if (Buffer.isBuffer(data)) return data.toString("utf8");
-  if (Array.isArray(data)) return Buffer.concat(data).toString("utf8");
-  return Buffer.from(data).toString("utf8");
-}
-
-function parseJsonObject(data: WebSocket.RawData): Record<string, unknown> | null {
-  try {
-    const parsed: unknown = JSON.parse(rawDataToString(data));
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return null;
-    }
-    return parsed as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
+import { parseJsonWithSchema } from "../messageParsing";
+import { attachWsRouter } from "../router";
+import { toWireTableStateView } from "../transforms/gameWire";
 
 function parseAmount(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -37,16 +25,18 @@ function parseAmount(value: unknown): number | null {
   return null;
 }
 
+type WsClientMessage = z.infer<typeof wsClientMessageSchema>;
+
+function parseClientMessage(data: WebSocket.RawData): WsClientMessage | null {
+  return parseJsonWithSchema(data, wsClientMessageSchema);
+}
+
 export async function handleTablePubSubEvent(message: WsPubSubMessage) {
   if (message.channel !== "table" && message.channel !== "timer") {
     return;
   }
 
-  const channel = `table:${message.tableId}`;
-  const subscribers = await getSubscribers(channel);
-  for (const connId of subscribers) {
-    sendToLocal(connId, message.payload);
-  }
+  await deliverToSubscribers(`table:${message.tableId}`, message.payload);
 }
 
 async function handleSubscribe(connectionId: string, userId: string, tableId: string) {
@@ -54,23 +44,30 @@ async function handleSubscribe(connectionId: string, userId: string, tableId: st
   await subscribeToChannel(connectionId, channel);
 
   gameClient.JoinSpectator({ table_id: tableId, user_id: userId }, (_err) => undefined);
-  gameClient.GetTableState({ table_id: tableId, user_id: userId }, (err, response) => {
-    if (err) {
-      logger.error({ err, tableId }, "Failed to get table state from game service");
-      return;
-    }
-    if (response?.state) {
-      sendToLocal(connectionId, { type: "TableSnapshot", tableState: response.state });
-    }
-    if (response?.hole_cards && response.hole_cards.length > 0) {
-      sendToLocal(connectionId, {
-        type: "HoleCards",
-        tableId,
-        handId: response.state?.hand?.hand_id,
-        cards: response.hole_cards,
-      });
-    }
-  });
+
+  const [tableResult, stateResult] = await Promise.allSettled([
+    grpcCall(gameClient.GetTable.bind(gameClient), { table_id: tableId }),
+    grpcCall(gameClient.GetTableState.bind(gameClient), { table_id: tableId, user_id: userId }),
+  ]);
+
+  if (stateResult.status !== "fulfilled") {
+    logger.error({ err: stateResult.reason, tableId }, "Failed to get table state from game service");
+    return;
+  }
+
+  const table = tableResult.status === "fulfilled" ? tableResult.value : null;
+  const tableStateWire = toWireTableStateView(table, (stateResult.value as { state?: unknown }).state);
+  sendToLocal(connectionId, { type: "TableSnapshot", tableState: tableStateWire });
+
+  const holeCards = (stateResult.value as { hole_cards?: unknown[] }).hole_cards;
+  if (Array.isArray(holeCards) && holeCards.length > 0) {
+    sendToLocal(connectionId, {
+      type: "HoleCards",
+      tableId,
+      handId: tableStateWire.hand?.handId,
+      cards: holeCards,
+    });
+  }
 }
 
 async function handleUnsubscribe(connectionId: string, tableId: string) {
@@ -104,23 +101,22 @@ async function handleAction(
     request.amount = payload.amount;
   }
 
-  gameClient.SubmitAction(request, (err, response) => {
-    if (err) {
-      sendToLocal(connectionId, {
-        type: "ActionResult",
-        tableId: payload.tableId,
-        accepted: false,
-        reason: "internal_error",
-      });
-      return;
-    }
+  try {
+    const response = await grpcCall(gameClient.SubmitAction.bind(gameClient), request);
     sendToLocal(connectionId, {
       type: "ActionResult",
       tableId: payload.tableId,
       accepted: response.ok,
-      reason: response.error
+      reason: response.error,
     });
-  });
+  } catch {
+    sendToLocal(connectionId, {
+      type: "ActionResult",
+      tableId: payload.tableId,
+      accepted: false,
+      reason: "internal_error",
+    });
+  }
 }
 
 async function handleJoinSeat(
@@ -128,132 +124,102 @@ async function handleJoinSeat(
   userId: string,
   payload: { tableId: string; seatId: number; buyInAmount?: number },
 ) {
-  gameClient.JoinSeat({
-    table_id: payload.tableId,
-    user_id: userId,
-    seat_id: payload.seatId,
-    buy_in_amount: payload.buyInAmount && payload.buyInAmount > 0 ? payload.buyInAmount : 200
-  }, (err, response) => {
-    if (err) {
-      sendToLocal(connectionId, { type: "Error", message: "Internal error" });
-      return;
-    }
+  const buyInAmount = payload.buyInAmount && payload.buyInAmount > 0 ? payload.buyInAmount : 200;
+  try {
+    const response = await grpcCall(gameClient.JoinSeat.bind(gameClient), {
+      table_id: payload.tableId,
+      user_id: userId,
+      seat_id: payload.seatId,
+      buy_in_amount: buyInAmount,
+    });
     if (!response.ok) {
       sendToLocal(connectionId, { type: "Error", message: response.error });
     }
-  });
+  } catch {
+    sendToLocal(connectionId, { type: "Error", message: "Internal error" });
+  }
 }
 
 async function handleLeaveTable(userId: string, tableId: string) {
-  gameClient.LeaveSeat({
-    table_id: tableId,
-    user_id: userId
-  }, (err, _response) => {
-    if (err) return;
-  });
+  try {
+    await grpcCall(gameClient.LeaveSeat.bind(gameClient), {
+      table_id: tableId,
+      user_id: userId,
+    });
+  } catch {
+    // Best-effort.
+  }
 }
 
 export function attachTableHub(socket: WebSocket, userId: string, connectionId: string) {
-  socket.on("message", async (data) => {
-    const message = parseJsonObject(data);
-    if (!message) {
-      return;
-    }
-
-    const type = typeof message.type === "string" ? message.type : null;
-    const tableId = parseTableId(message.tableId);
-
-    const tracer = trace.getTracer("gateway-ws");
-    const attributes: Record<string, string> = {};
-    if (type) {
-      attributes["ws.message_type"] = type;
-    }
-    if (tableId) {
-      attributes["poker.table_id"] = tableId;
-    }
-
-    const span = tracer.startSpan("ws.table", { attributes }, ROOT_CONTEXT);
-    try {
-      await context.with(trace.setSpan(ROOT_CONTEXT, span), async () => {
-        switch (type) {
-          case "SubscribeTable": {
-            if (!tableId) return;
-            await handleSubscribe(connectionId, userId, tableId);
-            return;
-          }
-          case "UnsubscribeTable": {
-            if (!tableId) return;
-            gameClient.LeaveSpectator({ table_id: tableId, user_id: userId }, (_err: unknown) => undefined);
-            await handleUnsubscribe(connectionId, tableId);
-            return;
-          }
-          case "JoinSeat": {
-            if (!tableId) return;
-            const seatId = parseSeatId(message.seatId);
-            if (seatId === null) return;
-            const buyInAmount = parseAmount(message.buyInAmount) ?? undefined;
-            await handleJoinSeat(connectionId, userId, { tableId, seatId, buyInAmount });
-            return;
-          }
-          case "LeaveTable": {
-            if (!tableId) return;
-            await handleLeaveTable(userId, tableId);
-            return;
-          }
-          case "Action": {
-            if (!tableId) return;
-            const actionType = parseActionType(message.action);
-            if (!actionType) {
-              sendToLocal(connectionId, {
-                type: "ActionResult",
-                tableId,
-                accepted: false,
-                reason: "invalid_action",
-              });
-              return;
-            }
-
-            const requiresAmount = actionType === "BET" || actionType === "RAISE" || actionType === "ALL_IN";
-            const amount = parseAmount(message.amount);
-            if (requiresAmount && amount === null) {
-              sendToLocal(connectionId, {
-                type: "ActionResult",
-                tableId,
-                accepted: false,
-                reason: "missing_amount",
-              });
-              return;
-            }
-
-            await handleAction(connectionId, userId, {
-              tableId,
-              actionType,
-              ...(amount !== null ? { amount } : {}),
-            });
-            return;
-          }
-          case "ResyncTable": {
-            if (!tableId) return;
-            await handleSubscribe(connectionId, userId, tableId);
-            return;
-          }
-          default:
-            return;
+  attachWsRouter(socket, {
+    hubName: "table",
+    parseMessage: parseClientMessage,
+    getAttributes: (message): Record<string, string> => {
+      if ("tableId" in message && typeof message.tableId === "string") {
+        return { "poker.table_id": message.tableId };
+      }
+      return {};
+    },
+    handlers: {
+      SubscribeTable: async (message) => {
+        await handleSubscribe(connectionId, userId, message.tableId);
+      },
+      UnsubscribeTable: async (message) => {
+        gameClient.LeaveSpectator({ table_id: message.tableId, user_id: userId }, (_err: unknown) => undefined);
+        await handleUnsubscribe(connectionId, message.tableId);
+      },
+      JoinSeat: async (message) => {
+        const seatId = parseSeatId(message.seatId);
+        if (seatId === null) {
+          return;
         }
-      });
-    } catch (err: unknown) {
-      span.recordException(err as Error);
-      const message = err instanceof Error ? err.message : "unknown_error";
-      span.setStatus({ code: SpanStatusCode.ERROR, message });
-      context.with(trace.setSpan(ROOT_CONTEXT, span), () => {
-        logger.error({ err, type, tableId }, "ws.table.failed");
-      });
-    } finally {
-      span.end();
-    }
-  });
+        const buyInAmount = parseAmount(message.buyInAmount) ?? undefined;
+        await handleJoinSeat(connectionId, userId, { tableId: message.tableId, seatId, buyInAmount });
+      },
+      LeaveTable: async (message) => {
+        await handleLeaveTable(userId, message.tableId);
+      },
+      Action: async (message) => {
+        const tableId = parseTableId(message.tableId);
+        if (!tableId) {
+          return;
+        }
+        const actionType = parseActionType(message.action);
+        if (!actionType) {
+          sendToLocal(connectionId, {
+            type: "ActionResult",
+            tableId,
+            accepted: false,
+            reason: "invalid_action",
+          });
+          return;
+        }
 
-  socket.on("close", async () => {
-    await unsubscribeAll(connectionId);
+        const requiresAmount = actionType === "BET" || actionType === "RAISE";
+        const amount = parseAmount(message.amount);
+        if (requiresAmount && amount === null) {
+          sendToLocal(connectionId, {
+            type: "ActionResult",
+            tableId,
+            accepted: false,
+            reason: "missing_amount",
+          });
+          return;
+        }
+
+        await handleAction(connectionId, userId, {
+          tableId,
+          actionType,
+          ...(amount !== null ? { amount } : {}),
+        });
+      },
+      ResyncTable: async (message) => {
+        await handleSubscribe(connectionId, userId, message.tableId);
+      },
+    },
+    onClose: async () => {
+      await unsubscribeAll(connectionId);
+    },
   });
 }

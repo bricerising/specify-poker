@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { isRedisEnabled, getRedisClient } from "../../../storage/redisClient";
 import logger from "../../../observability/logger";
+import { nowIso } from "../../../utils/time";
 
 const router = Router();
 
@@ -24,7 +25,7 @@ router.get("/health", async (req: Request, res: Response) => {
 
   res.json({
     status,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
     redis: redisConnected,
   });
 });

@@ -1,23 +1,30 @@
-export type EventType =
-  | "HAND_STARTED"
-  | "CARDS_DEALT"
-  | "BLIND_POSTED"
-  | "ACTION_TAKEN"
-  | "STREET_ADVANCED"
-  | "CARDS_REVEALED"
-  | "SHOWDOWN"
-  | "POT_AWARDED"
-  | "HAND_COMPLETED"
-  | "PLAYER_JOINED"
-  | "PLAYER_LEFT"
-  | "PLAYER_SAT_OUT"
-  | "PLAYER_SAT_IN"
-  | "TABLE_CREATED"
-  | "TABLE_CLOSED"
-  | "TURN_STARTED"
-  | "RAKE_DEDUCTED"
-  | "BONUS_ISSUED"
-  | "REFERRAL_ISSUED";
+export const EVENT_TYPES = [
+  "HAND_STARTED",
+  "CARDS_DEALT",
+  "BLIND_POSTED",
+  "ACTION_TAKEN",
+  "STREET_ADVANCED",
+  "CARDS_REVEALED",
+  "SHOWDOWN",
+  "POT_AWARDED",
+  "HAND_COMPLETED",
+  "PLAYER_JOINED",
+  "PLAYER_LEFT",
+  "PLAYER_SAT_OUT",
+  "PLAYER_SAT_IN",
+  "TABLE_CREATED",
+  "TABLE_CLOSED",
+  "TURN_STARTED",
+  "RAKE_DEDUCTED",
+  "BONUS_ISSUED",
+  "REFERRAL_ISSUED",
+] as const;
+
+export type EventType = (typeof EVENT_TYPES)[number];
+
+export function isEventType(value: unknown): value is EventType {
+  return typeof value === "string" && (EVENT_TYPES as readonly string[]).includes(value);
+}
 
 export type Street = string;
 export type ActionType = string;

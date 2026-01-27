@@ -1,5 +1,6 @@
 import { Profile } from "../domain/types";
 import { getRedisClient } from "./redisClient";
+import { decodeProfile } from "../domain/decoders";
 
 const PROFILE_TTL_SECONDS = 300;
 const NICKNAME_TTL_SECONDS = 300;
@@ -21,7 +22,11 @@ export async function get(userId: string): Promise<Profile | null> {
   if (!data) {
     return null;
   }
-  return JSON.parse(data) as Profile;
+  try {
+    return decodeProfile(JSON.parse(data));
+  } catch {
+    return null;
+  }
 }
 
 export async function getMulti(userIds: string[]): Promise<Map<string, Profile>> {
@@ -37,7 +42,14 @@ export async function getMulti(userIds: string[]): Promise<Map<string, Profile>>
     if (!value) {
       return;
     }
-    result.set(userIds[index], JSON.parse(value) as Profile);
+    try {
+      const decoded = decodeProfile(JSON.parse(value));
+      if (decoded) {
+        result.set(userIds[index], decoded);
+      }
+    } catch {
+      // Ignore invalid cache entries
+    }
   });
 
   return result;

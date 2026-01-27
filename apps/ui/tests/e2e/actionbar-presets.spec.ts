@@ -19,20 +19,20 @@ test.describe("Action Bar Presets", () => {
     const pageAlice = await contextAlice.newPage();
     await loginAs(pageAlice, aliceId, `Alice${runId}`);
 
-    await pageAlice.getByLabel("Name").fill(tableName);
-    await pageAlice.getByRole("button", { name: "Create Table" }).click();
-    const tableCardAlice = pageAlice.locator(".table-card", { hasText: tableName });
+    await pageAlice.getByTestId("create-table-name").fill(tableName);
+    await pageAlice.getByTestId("create-table-submit").click();
+    const tableCardAlice = pageAlice.getByTestId("lobby-table-card").filter({ hasText: tableName });
     await expect(tableCardAlice).toBeVisible({ timeout: 15_000 });
-    await tableCardAlice.getByRole("button", { name: "Join Seat 1" }).click();
+    await tableCardAlice.locator('[data-testid="lobby-join-seat"][data-seat-number="1"]').click();
     await expect(pageAlice.getByText("Table ID:")).toBeVisible({ timeout: 15_000 });
 
     const contextBob = await browser.newContext();
     const pageBob = await contextBob.newPage();
     await loginAs(pageBob, bobId, `Bob${runId}`);
 
-    const tableCardBob = pageBob.locator(".table-card", { hasText: tableName });
+    const tableCardBob = pageBob.getByTestId("lobby-table-card").filter({ hasText: tableName });
     await expect(tableCardBob).toBeVisible({ timeout: 15_000 });
-    await tableCardBob.getByRole("button", { name: "Join Seat 2" }).click();
+    await tableCardBob.locator('[data-testid="lobby-join-seat"][data-seat-number="2"]').click();
     await expect(pageBob.getByText("Table ID:")).toBeVisible({ timeout: 15_000 });
 
     const aliceAction = pageAlice.getByRole("heading", { name: "Action" });
@@ -55,11 +55,11 @@ test.describe("Action Bar Presets", () => {
     actionPage = actionPage as typeof pageAlice;
 
     await expect(actionPage.getByRole("heading", { name: "Action" })).toBeVisible();
-    await expect(actionPage.getByRole("button", { name: "1/2 Pot" })).toBeVisible();
-    await expect(actionPage.getByRole("button", { name: "3/4 Pot" })).toBeVisible();
-    await expect(actionPage.getByRole("button", { name: "Pot", exact: true })).toBeVisible();
-    await expect(actionPage.getByRole("button", { name: "All-in" })).toBeVisible();
-    await expect(actionPage.getByLabel("Bet sizing")).toBeVisible();
+    await expect(actionPage.getByTestId("action-preset-half-pot")).toBeVisible();
+    await expect(actionPage.getByTestId("action-preset-three-quarter-pot")).toBeVisible();
+    await expect(actionPage.getByTestId("action-preset-pot")).toBeVisible();
+    await expect(actionPage.getByTestId("action-preset-all-in")).toBeVisible();
+    await expect(actionPage.getByTestId("action-bet-sizing")).toBeVisible();
 
     await contextAlice.close();
     await contextBob.close();

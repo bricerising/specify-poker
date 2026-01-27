@@ -1,3 +1,5 @@
+import { readIntEnv, readStringEnv } from "./utils/env";
+
 export interface Config {
   port: number;
   jwtSecret: string;
@@ -14,17 +16,17 @@ export interface Config {
 
 export function loadConfig(): Config {
   return {
-    port: parseInt(process.env.PORT ?? "4000", 10),
-    jwtSecret: process.env.JWT_SECRET ?? "default-secret",
-    redisUrl: process.env.REDIS_URL ?? "redis://localhost:6379",
-    gameServiceUrl: process.env.GAME_SERVICE_URL ?? "localhost:50053",
-    playerServiceUrl: process.env.PLAYER_SERVICE_URL ?? "localhost:50052",
-    balanceServiceUrl: process.env.BALANCE_SERVICE_URL ?? "localhost:50051",
-    balanceServiceHttpUrl: process.env.BALANCE_SERVICE_HTTP_URL ?? "localhost:3002",
-    eventServiceUrl: process.env.EVENT_SERVICE_URL ?? "localhost:50054",
-    notifyServiceUrl: process.env.NOTIFY_SERVICE_URL ?? "localhost:50055",
-    metricsPort: parseInt(process.env.METRICS_PORT ?? "9100", 10),
-    corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:3000",
+    port: readIntEnv("PORT", 4000, { min: 1, max: 65535 }),
+    jwtSecret: readStringEnv("JWT_SECRET", "default-secret"),
+    redisUrl: readStringEnv("REDIS_URL", "redis://localhost:6379"),
+    gameServiceUrl: readStringEnv("GAME_SERVICE_URL", "localhost:50053"),
+    playerServiceUrl: readStringEnv("PLAYER_SERVICE_URL", "localhost:50052"),
+    balanceServiceUrl: readStringEnv("BALANCE_SERVICE_URL", "localhost:50051"),
+    balanceServiceHttpUrl: readStringEnv("BALANCE_SERVICE_HTTP_URL", "localhost:3002"),
+    eventServiceUrl: readStringEnv("EVENT_SERVICE_URL", "localhost:50054"),
+    notifyServiceUrl: readStringEnv("NOTIFY_SERVICE_URL", "localhost:50055"),
+    metricsPort: readIntEnv("METRICS_PORT", 9100, { min: 1, max: 65535 }),
+    corsOrigin: readStringEnv("CORS_ORIGIN", "http://localhost:3000"),
   };
 }
 

@@ -1,7 +1,7 @@
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
 import * as path from "path";
-import { getConfig } from "../config";
+import { getConfig, type Config } from "../config";
 import type { BalanceServiceClient, EventServiceClient, GameServiceClient, NotifyServiceClient, PlayerServiceClient } from "../types";
 
 function loadProto(protoName: string) {
@@ -30,29 +30,43 @@ const balanceProto = loadProto("balance") as unknown as BalanceProto;
 const eventProto = loadProto("event") as unknown as EventProto;
 const notifyProto = loadProto("notify") as unknown as NotifyProto;
 
+type GrpcClientsConfig = Pick<
+  Config,
+  "gameServiceUrl" | "playerServiceUrl" | "balanceServiceUrl" | "eventServiceUrl" | "notifyServiceUrl"
+>;
+
+export interface GrpcClients {
+  gameClient: GameServiceClient;
+  playerClient: PlayerServiceClient;
+  balanceClient: BalanceServiceClient;
+  eventClient: EventServiceClient;
+  notifyClient: NotifyServiceClient;
+}
+
+export function createGrpcClients(config: GrpcClientsConfig): GrpcClients {
+  return {
+    gameClient: new gameProto.game.GameService(
+      config.gameServiceUrl,
+      grpc.credentials.createInsecure()
+    ) as GameServiceClient,
+    playerClient: new playerProto.player.PlayerService(
+      config.playerServiceUrl,
+      grpc.credentials.createInsecure()
+    ) as PlayerServiceClient,
+    balanceClient: new balanceProto.balance.BalanceService(
+      config.balanceServiceUrl,
+      grpc.credentials.createInsecure()
+    ) as BalanceServiceClient,
+    eventClient: new eventProto.event.EventService(
+      config.eventServiceUrl,
+      grpc.credentials.createInsecure()
+    ) as EventServiceClient,
+    notifyClient: new notifyProto.notify.NotifyService(
+      config.notifyServiceUrl,
+      grpc.credentials.createInsecure()
+    ) as NotifyServiceClient,
+  };
+}
+
 const config = getConfig();
-
-export const gameClient = new gameProto.game.GameService(
-  config.gameServiceUrl,
-  grpc.credentials.createInsecure()
-) as GameServiceClient;
-
-export const playerClient = new playerProto.player.PlayerService(
-  config.playerServiceUrl,
-  grpc.credentials.createInsecure()
-) as PlayerServiceClient;
-
-export const balanceClient = new balanceProto.balance.BalanceService(
-  config.balanceServiceUrl,
-  grpc.credentials.createInsecure()
-) as BalanceServiceClient;
-
-export const eventClient = new eventProto.event.EventService(
-  config.eventServiceUrl,
-  grpc.credentials.createInsecure()
-) as EventServiceClient;
-
-export const notifyClient = new notifyProto.notify.NotifyService(
-  config.notifyServiceUrl,
-  grpc.credentials.createInsecure()
-) as NotifyServiceClient;
+export const { gameClient, playerClient, balanceClient, eventClient, notifyClient } = createGrpcClients(config);

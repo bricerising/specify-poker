@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 
 import { CreateTableInput } from "../services/lobbyApi";
+import { testIds } from "../utils/testIds";
 
 interface CreateTableFormProps {
   onCreate: (input: CreateTableInput) => Promise<void> | void;
@@ -68,6 +69,7 @@ export function CreateTableForm({ onCreate }: CreateTableFormProps) {
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="Friday Night No Limit"
+            data-testid={testIds.createTable.name}
           />
         </label>
         <label className="field">
@@ -77,6 +79,7 @@ export function CreateTableForm({ onCreate }: CreateTableFormProps) {
             min={1}
             value={smallBlind}
             onChange={(event) => setSmallBlind(event.target.value)}
+            data-testid={testIds.createTable.smallBlind}
           />
         </label>
         <label className="field">
@@ -86,6 +89,7 @@ export function CreateTableForm({ onCreate }: CreateTableFormProps) {
             min={1}
             value={bigBlind}
             onChange={(event) => setBigBlind(event.target.value)}
+            data-testid={testIds.createTable.bigBlind}
           />
         </label>
         <label className="field">
@@ -96,6 +100,7 @@ export function CreateTableForm({ onCreate }: CreateTableFormProps) {
             max={9}
             value={maxPlayers}
             onChange={(event) => setMaxPlayers(event.target.value)}
+            data-testid={testIds.createTable.maxPlayers}
           />
         </label>
         <label className="field">
@@ -105,10 +110,16 @@ export function CreateTableForm({ onCreate }: CreateTableFormProps) {
             min={1}
             value={startingStack}
             onChange={(event) => setStartingStack(event.target.value)}
+            data-testid={testIds.createTable.startingStack}
           />
         </label>
       </div>
-      <button type="submit" className="btn btn-primary" disabled={!isValid}>
+      <button
+        type="submit"
+        className="btn btn-primary"
+        disabled={!isValid}
+        data-testid={testIds.createTable.submit}
+      >
         Create Table
       </button>
       {error ? (

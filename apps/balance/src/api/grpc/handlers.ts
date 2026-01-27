@@ -1,3 +1,12 @@
+import * as grpc from "@grpc/grpc-js";
+import {
+  asGrpcServiceError,
+  createGrpcServiceError,
+  createUnaryHandler,
+  isGrpcServiceErrorLike,
+  withUnaryErrorHandling,
+  withUnaryTiming,
+} from "@specify-poker/shared";
 import {
   getBalance,
   ensureAccount,
@@ -15,125 +24,103 @@ import {
 } from "../../services/tablePotService";
 import { recordGrpcRequest } from "../../observability/metrics";
 import logger from "../../observability/logger";
+import { toNonEmptyString, toNumber } from "../validation";
 
-function recordDuration(method: string, startedAt: number, status: "ok" | "error") {
-  recordGrpcRequest(method, status, Date.now() - startedAt);
+class InvalidArgumentError extends Error {
+  override name = "InvalidArgumentError";
 }
 
-function toNumber(value: unknown, fallback = 0) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  }
-  return fallback;
+function invalidArgument(message: string): never {
+  throw new InvalidArgumentError(message);
 }
 
-function toNonEmptyString(value: unknown): string | null {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : null;
+function asServiceError(error: unknown): grpc.ServiceError {
+  if (error instanceof InvalidArgumentError) {
+    return createGrpcServiceError(grpc.status.INVALID_ARGUMENT, error.message, error) as grpc.ServiceError;
   }
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return String(value);
+
+  if (isGrpcServiceErrorLike(error)) {
+    return asGrpcServiceError(error, { code: grpc.status.INTERNAL, message: "Unknown error" }) as grpc.ServiceError;
   }
-  return null;
+
+  const message = error instanceof Error ? error.message : "Unknown error";
+  return createGrpcServiceError(grpc.status.INTERNAL, message, error) as grpc.ServiceError;
 }
 
-function invalidArgument(callback: (error: Error | null, response?: unknown) => void, message: string) {
-  callback(new Error(message));
+function createBalanceUnaryHandler<Req, Res>(
+  method: string,
+  handler: (request: Req) => Promise<Res> | Res
+): grpc.handleUnaryCall<Req, Res> {
+  return createUnaryHandler<Req, Res, grpc.ServerUnaryCall<Req, Res>, grpc.ServiceError>({
+    handler: ({ request }) => handler(request),
+    interceptors: [
+      withUnaryTiming({ method, record: recordGrpcRequest }),
+      withUnaryErrorHandling({
+        method,
+        logger,
+        toServiceError: asServiceError,
+        shouldLog: (error) => !(error instanceof InvalidArgumentError) && !isGrpcServiceErrorLike(error),
+      }),
+    ],
+  });
 }
 
 // gRPC handler implementations
 export const handlers = {
-  async GetBalance(
-    call: { request: { account_id: string } },
-    callback: (error: Error | null, response?: unknown) => void
-  ) {
-    const startedAt = Date.now();
-    try {
-      const { account_id } = call.request;
-      const balance = await getBalance(account_id);
-
-      if (!balance) {
-        recordDuration("GetBalance", startedAt, "ok");
-        callback(null, {
-          account_id,
-          balance: 0,
-          available_balance: 0,
-          currency: "CHIPS",
-          version: 0,
-        });
-        return;
-      }
-
-      recordDuration("GetBalance", startedAt, "ok");
-      callback(null, {
-        account_id: balance.accountId,
-        balance: balance.balance,
-        available_balance: balance.availableBalance,
-        currency: balance.currency,
-        version: balance.version,
-      });
-    } catch (error) {
-      recordDuration("GetBalance", startedAt, "error");
-      logger.error({ err: error }, "GetBalance failed");
-      callback(error as Error);
+  GetBalance: createBalanceUnaryHandler("GetBalance", async ({ account_id }: { account_id: string }) => {
+    const balance = await getBalance(account_id);
+    if (!balance) {
+      return {
+        account_id,
+        balance: 0,
+        available_balance: 0,
+        currency: "CHIPS",
+        version: 0,
+      };
     }
-  },
+    return {
+      account_id: balance.accountId,
+      balance: balance.balance,
+      available_balance: balance.availableBalance,
+      currency: balance.currency,
+      version: balance.version,
+    };
+  }),
 
-  async EnsureAccount(
-    call: { request: { account_id: string; initial_balance?: number } },
-    callback: (error: Error | null, response?: unknown) => void
-  ) {
-    const startedAt = Date.now();
-    try {
-      const accountId = toNonEmptyString(call.request.account_id);
+  EnsureAccount: createBalanceUnaryHandler(
+    "EnsureAccount",
+    async ({ account_id, initial_balance }: { account_id: string; initial_balance?: number }) => {
+      const accountId = toNonEmptyString(account_id);
       if (!accountId) {
-        recordDuration("EnsureAccount", startedAt, "error");
-        return invalidArgument(callback, "account_id is required");
+        invalidArgument("account_id is required");
       }
-      const initialBalance = toNumber(call.request.initial_balance ?? 0, 0);
+      const initialBalance = toNumber(initial_balance ?? 0, 0);
       const result = await ensureAccount(accountId, initialBalance);
-
-      recordDuration("EnsureAccount", startedAt, "ok");
-      callback(null, {
+      return {
         account_id: result.account.accountId,
         balance: result.account.balance,
         created: result.created,
-      });
-    } catch (error) {
-      recordDuration("EnsureAccount", startedAt, "error");
-      logger.error({ err: error }, "EnsureAccount failed");
-      callback(error as Error);
-    }
-  },
-
-  async ReserveForBuyIn(
-    call: {
-      request: {
-        account_id: string;
-        table_id: string;
-        amount: number;
-        idempotency_key: string;
-        timeout_seconds?: number;
       };
-    },
-    callback: (error: Error | null, response?: unknown) => void
-  ) {
-    const startedAt = Date.now();
-    try {
-      const accountId = toNonEmptyString(call.request.account_id);
-      const tableId = toNonEmptyString(call.request.table_id);
-      const idempotencyKey = toNonEmptyString(call.request.idempotency_key);
-      const amount = toNumber(call.request.amount, 0);
-      const timeoutCandidate = toNumber(call.request.timeout_seconds, 0);
+    }
+  ),
+
+  ReserveForBuyIn: createBalanceUnaryHandler(
+    "ReserveForBuyIn",
+    async (request: {
+      account_id: string;
+      table_id: string;
+      amount: number;
+      idempotency_key: string;
+      timeout_seconds?: number;
+    }) => {
+      const accountId = toNonEmptyString(request.account_id);
+      const tableId = toNonEmptyString(request.table_id);
+      const idempotencyKey = toNonEmptyString(request.idempotency_key);
+      const amount = toNumber(request.amount, 0);
+      const timeoutCandidate = toNumber(request.timeout_seconds, 0);
       const timeoutSeconds = timeoutCandidate > 0 ? timeoutCandidate : 30;
       if (!accountId || !tableId || !idempotencyKey || amount <= 0) {
-        recordDuration("ReserveForBuyIn", startedAt, "error");
-        return invalidArgument(callback, "invalid ReserveForBuyIn request");
+        invalidArgument("invalid ReserveForBuyIn request");
       }
 
       const result = await reserveForBuyIn(
@@ -144,97 +131,66 @@ export const handlers = {
         timeoutSeconds
       );
 
-      recordDuration("ReserveForBuyIn", startedAt, "ok");
-      callback(null, {
+      return {
         ok: result.ok,
-        reservation_id: result.reservationId ?? "",
-        error: result.error ?? "",
+        reservation_id: result.ok ? result.reservationId : "",
+        error: result.ok ? "" : result.error,
         available_balance: result.availableBalance ?? 0,
-      });
-    } catch (error) {
-      recordDuration("ReserveForBuyIn", startedAt, "error");
-      logger.error({ err: error }, "ReserveForBuyIn failed");
-      callback(error as Error);
+      };
     }
-  },
+  ),
 
-  async CommitReservation(
-    call: { request: { reservation_id: string } },
-    callback: (error: Error | null, response?: unknown) => void
-  ) {
-    const startedAt = Date.now();
-    try {
-      const reservationId = toNonEmptyString(call.request.reservation_id);
+  CommitReservation: createBalanceUnaryHandler(
+    "CommitReservation",
+    async ({ reservation_id }: { reservation_id: string }) => {
+      const reservationId = toNonEmptyString(reservation_id);
       if (!reservationId) {
-        recordDuration("CommitReservation", startedAt, "error");
-        return invalidArgument(callback, "reservation_id is required");
+        invalidArgument("reservation_id is required");
       }
       const result = await commitReservation(reservationId);
-
-      recordDuration("CommitReservation", startedAt, "ok");
-      callback(null, {
+      return {
         ok: result.ok,
-        transaction_id: result.transactionId ?? "",
-        error: result.error ?? "",
-        new_balance: result.newBalance ?? 0,
-      });
-    } catch (error) {
-      recordDuration("CommitReservation", startedAt, "error");
-      logger.error({ err: error }, "CommitReservation failed");
-      callback(error as Error);
-    }
-  },
-
-  async ReleaseReservation(
-    call: { request: { reservation_id: string; reason?: string } },
-    callback: (error: Error | null, response?: unknown) => void
-  ) {
-    const startedAt = Date.now();
-    try {
-      const reservationId = toNonEmptyString(call.request.reservation_id);
-      if (!reservationId) {
-        recordDuration("ReleaseReservation", startedAt, "error");
-        return invalidArgument(callback, "reservation_id is required");
-      }
-      const result = await releaseReservation(reservationId, call.request.reason);
-
-      recordDuration("ReleaseReservation", startedAt, "ok");
-      callback(null, {
-        ok: result.ok,
-        error: result.error ?? "",
-        available_balance: result.availableBalance ?? 0,
-      });
-    } catch (error) {
-      recordDuration("ReleaseReservation", startedAt, "error");
-      logger.error({ err: error }, "ReleaseReservation failed");
-      callback(error as Error);
-    }
-  },
-
-  async ProcessCashOut(
-    call: {
-      request: {
-        account_id: string;
-        table_id: string;
-        seat_id: number;
-        amount: number;
-        idempotency_key: string;
-        hand_id?: string;
+        transaction_id: result.ok ? result.transactionId : "",
+        error: result.ok ? "" : result.error,
+        new_balance: result.ok ? (result.newBalance ?? 0) : 0,
       };
-    },
-    callback: (error: Error | null, response?: unknown) => void
-  ) {
-    const startedAt = Date.now();
-    try {
-      const accountId = toNonEmptyString(call.request.account_id);
-      const tableId = toNonEmptyString(call.request.table_id);
-      const idempotencyKey = toNonEmptyString(call.request.idempotency_key);
-      const seatId = toNumber(call.request.seat_id, -1);
-      const amount = toNumber(call.request.amount, 0);
-      const handId = toNonEmptyString(call.request.hand_id);
+    }
+  ),
+
+  ReleaseReservation: createBalanceUnaryHandler(
+    "ReleaseReservation",
+    async ({ reservation_id, reason }: { reservation_id: string; reason?: string }) => {
+      const reservationId = toNonEmptyString(reservation_id);
+      if (!reservationId) {
+        invalidArgument("reservation_id is required");
+      }
+      const result = await releaseReservation(reservationId, reason);
+      return {
+        ok: result.ok,
+        error: result.ok ? "" : result.error,
+        available_balance: result.ok ? (result.availableBalance ?? 0) : 0,
+      };
+    }
+  ),
+
+  ProcessCashOut: createBalanceUnaryHandler(
+    "ProcessCashOut",
+    async (request: {
+      account_id: string;
+      table_id: string;
+      seat_id: number;
+      amount: number;
+      idempotency_key: string;
+      hand_id?: string;
+    }) => {
+      const accountId = toNonEmptyString(request.account_id);
+      const tableId = toNonEmptyString(request.table_id);
+      const idempotencyKey = toNonEmptyString(request.idempotency_key);
+      const seatId = toNumber(request.seat_id, -1);
+      const amount = toNumber(request.amount, 0);
+      const handId = toNonEmptyString(request.hand_id);
       if (!accountId || !tableId || !idempotencyKey || seatId < 0 || amount <= 0) {
-        recordDuration("ProcessCashOut", startedAt, "error");
-        return invalidArgument(callback, "invalid ProcessCashOut request");
+        invalidArgument("invalid ProcessCashOut request");
       }
 
       const result = await processCashOut(
@@ -246,133 +202,132 @@ export const handlers = {
         handId ?? undefined
       );
 
-      recordDuration("ProcessCashOut", startedAt, "ok");
-      callback(null, {
+      return {
         ok: result.ok,
-        transaction_id: result.transactionId ?? "",
-        error: result.error ?? "",
-        new_balance: result.newBalance ?? 0,
-      });
-    } catch (error) {
-      recordDuration("ProcessCashOut", startedAt, "error");
-      logger.error({ err: error }, "ProcessCashOut failed");
-      callback(error as Error);
-    }
-  },
-
-  async RecordContribution(
-    call: {
-      request: {
-        table_id: string;
-        hand_id: string;
-        seat_id: number;
-        account_id: string;
-        amount: number;
-        contribution_type: string;
-        idempotency_key: string;
+        transaction_id: result.ok ? result.transactionId : "",
+        error: result.ok ? "" : result.error,
+        new_balance: result.ok ? result.newBalance : 0,
       };
-    },
-    callback: (error: Error | null, response?: unknown) => void
-  ) {
-    const startedAt = Date.now();
-    try {
-      const {
-        table_id,
-        hand_id,
-        seat_id,
-        account_id,
-        amount,
-        contribution_type,
-        idempotency_key,
-      } = call.request;
+    }
+  ),
+
+  RecordContribution: createBalanceUnaryHandler(
+    "RecordContribution",
+    async (request: {
+      table_id: string;
+      hand_id: string;
+      seat_id: number;
+      account_id: string;
+      amount: number;
+      contribution_type: string;
+      idempotency_key: string;
+    }) => {
+      const tableId = toNonEmptyString(request.table_id);
+      const handId = toNonEmptyString(request.hand_id);
+      const accountId = toNonEmptyString(request.account_id);
+      const contributionType = toNonEmptyString(request.contribution_type);
+      const idempotencyKey = toNonEmptyString(request.idempotency_key);
+      const seatId = toNumber(request.seat_id, -1);
+      const amount = toNumber(request.amount, 0);
+      if (
+        !tableId ||
+        !handId ||
+        !accountId ||
+        !contributionType ||
+        !idempotencyKey ||
+        seatId < 0 ||
+        amount <= 0
+      ) {
+        invalidArgument("invalid RecordContribution request");
+      }
 
       const result = await recordContribution(
-        table_id,
-        hand_id,
-        seat_id,
-        account_id,
+        tableId,
+        handId,
+        seatId,
+        accountId,
         amount,
-        contribution_type,
-        idempotency_key
+        contributionType,
+        idempotencyKey
       );
 
-      recordDuration("RecordContribution", startedAt, "ok");
-      callback(null, {
+      return {
         ok: result.ok,
-        error: result.error ?? "",
-        total_pot: result.totalPot ?? 0,
-        seat_contribution: result.seatContribution ?? 0,
-      });
-    } catch (error) {
-      recordDuration("RecordContribution", startedAt, "error");
-      logger.error({ err: error }, "RecordContribution failed");
-      callback(error as Error);
-    }
-  },
-
-  async SettlePot(
-    call: {
-      request: {
-        table_id: string;
-        hand_id: string;
-        winners: Array<{ seat_id: number; account_id: string; amount: number }>;
-        idempotency_key: string;
+        error: result.ok ? "" : result.error,
+        total_pot: result.ok ? result.totalPot : 0,
+        seat_contribution: result.ok ? result.seatContribution : 0,
       };
-    },
-    callback: (error: Error | null, response?: unknown) => void
-  ) {
-    const startedAt = Date.now();
-    try {
-      const { table_id, hand_id, winners, idempotency_key } = call.request;
+    }
+  ),
+
+  SettlePot: createBalanceUnaryHandler(
+    "SettlePot",
+    async ({
+      table_id,
+      hand_id,
+      winners,
+      idempotency_key,
+    }: {
+      table_id: string;
+      hand_id: string;
+      winners: Array<{ seat_id: number; account_id: string; amount: number }>;
+      idempotency_key: string;
+    }) => {
+      const tableId = toNonEmptyString(table_id);
+      const handId = toNonEmptyString(hand_id);
+      const idempotencyKey = toNonEmptyString(idempotency_key);
+      if (!tableId || !handId || !idempotencyKey) {
+        invalidArgument("invalid SettlePot request");
+      }
+
+      const parsedWinners = winners.map((winner) => {
+        const accountId = toNonEmptyString(winner.account_id);
+        const seatId = toNumber(winner.seat_id, -1);
+        const amount = toNumber(winner.amount, -1);
+        if (!accountId || seatId < 0 || amount < 0) {
+          invalidArgument("invalid SettlePot winner");
+        }
+        return { seatId, accountId, amount };
+      });
 
       const result = await settlePot(
-        table_id,
-        hand_id,
-        winners.map((w) => ({
-          seatId: w.seat_id,
-          accountId: w.account_id,
-          amount: w.amount,
-        })),
-        idempotency_key
+        tableId,
+        handId,
+        parsedWinners,
+        idempotencyKey
       );
 
-      recordDuration("SettlePot", startedAt, "ok");
-      callback(null, {
+      return {
         ok: result.ok,
-        error: result.error ?? "",
+        error: result.ok ? "" : result.error,
         results:
-          result.results?.map((r) => ({
-            account_id: r.accountId,
-            transaction_id: r.transactionId,
-            amount: r.amount,
-            new_balance: r.newBalance,
-          })) ?? [],
-      });
-    } catch (error) {
-      recordDuration("SettlePot", startedAt, "error");
-      logger.error({ err: error }, "SettlePot failed");
-      callback(error as Error);
+          result.ok
+            ? result.results.map((r) => ({
+                account_id: r.accountId,
+                transaction_id: r.transactionId,
+                amount: r.amount,
+                new_balance: r.newBalance,
+              }))
+            : [],
+      };
     }
-  },
+  ),
 
-  async CancelPot(
-    call: { request: { table_id: string; hand_id: string; reason: string } },
-    callback: (error: Error | null, response?: unknown) => void
-  ) {
-    const startedAt = Date.now();
-    try {
-      const { table_id, hand_id, reason } = call.request;
-      const result = await cancelPot(table_id, hand_id, reason);
+  CancelPot: createBalanceUnaryHandler(
+    "CancelPot",
+    async ({ table_id, hand_id, reason }: { table_id: string; hand_id: string; reason: string }) => {
+      const tableId = toNonEmptyString(table_id);
+      const handId = toNonEmptyString(hand_id);
+      const cancelReason = toNonEmptyString(reason);
+      if (!tableId || !handId || !cancelReason) {
+        invalidArgument("invalid CancelPot request");
+      }
 
-      recordDuration("CancelPot", startedAt, "ok");
-      callback(null, {
+      const result = await cancelPot(tableId, handId, cancelReason);
+      return {
         ok: result.ok,
         error: result.error ?? "",
-      });
-    } catch (error) {
-      recordDuration("CancelPot", startedAt, "error");
-      logger.error({ err: error }, "CancelPot failed");
-      callback(error as Error);
+      };
     }
-  },
+  ),
 };

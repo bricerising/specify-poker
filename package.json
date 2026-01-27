@@ -7,7 +7,10 @@
   ],
   "scripts": {
     "build": "npm run -ws --if-present build",
+    "pretest": "npm -w @specify-poker/shared run build",
     "env:local": "node scripts/generate-local-env.mjs",
+    "grafana": "node scripts/grafana.mjs",
+    "redis": "node scripts/redis.mjs",
     "lint": "eslint .",
     "test": "vitest run"
   },

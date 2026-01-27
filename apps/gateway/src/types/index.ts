@@ -105,7 +105,7 @@ export interface GameServiceClient {
 }
 
 export interface PlayerServiceClient {
-    GetProfile(request: { user_id: string }, callback: UnaryCallback<{ profile: Record<string, unknown> }>): void;
+    GetProfile(request: { user_id: string; referrer_id?: string; username?: string }, callback: UnaryCallback<{ profile: Record<string, unknown> }>): void;
     UpdateProfile(
         request: {
             user_id: string;
@@ -136,7 +136,7 @@ export interface EventServiceClient {
             hand_id?: string;
             user_id?: string;
             seat_id?: number;
-            payload: Record<string, unknown>;
+            payload: unknown;
             idempotency_key: string;
         },
         callback: UnaryCallback<{ success: boolean; event_id?: string }>
@@ -149,7 +149,7 @@ export interface EventServiceClient {
                 hand_id?: string;
                 user_id?: string;
                 seat_id?: number;
-                payload: Record<string, unknown>;
+                payload: unknown;
                 idempotency_key: string;
             }>;
         },

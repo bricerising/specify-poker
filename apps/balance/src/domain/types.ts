@@ -99,12 +99,10 @@ export interface LedgerEntry {
   checksum: string;
 }
 
-// Service operation results
-export interface OperationResult<T> {
-  ok: boolean;
-  data?: T;
-  error?: string;
-}
+// Service operation results - discriminated union for type-safe error handling
+export type OperationResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: string };
 
 export interface BalanceInfo {
   accountId: string;
@@ -114,39 +112,25 @@ export interface BalanceInfo {
   version: number;
 }
 
-export interface ReservationResult {
-  ok: boolean;
-  reservationId?: string;
-  error?: string;
-  availableBalance?: number;
-}
+export type ReservationResult =
+  | { ok: true; reservationId: string; availableBalance: number }
+  | { ok: false; error: string; availableBalance?: number };
 
-export interface CommitResult {
-  ok: boolean;
-  transactionId?: string;
-  error?: string;
-  newBalance?: number;
-}
+export type CommitResult =
+  | { ok: true; transactionId: string; newBalance?: number }
+  | { ok: false; error: string };
 
-export interface ReleaseResult {
-  ok: boolean;
-  error?: string;
-  availableBalance?: number;
-}
+export type ReleaseResult =
+  | { ok: true; availableBalance?: number }
+  | { ok: false; error: string };
 
-export interface CashOutResult {
-  ok: boolean;
-  transactionId?: string;
-  error?: string;
-  newBalance?: number;
-}
+export type CashOutResult =
+  | { ok: true; transactionId: string; newBalance: number }
+  | { ok: false; error: string };
 
-export interface ContributionResult {
-  ok: boolean;
-  error?: string;
-  totalPot?: number;
-  seatContribution?: number;
-}
+export type ContributionResult =
+  | { ok: true; totalPot: number; seatContribution: number }
+  | { ok: false; error: string };
 
 export interface SettlementWinner {
   seatId: number;
@@ -161,8 +145,6 @@ export interface SettlementResultItem {
   newBalance: number;
 }
 
-export interface SettlePotResult {
-  ok: boolean;
-  error?: string;
-  results?: SettlementResultItem[];
-}
+export type SettlePotResult =
+  | { ok: true; results: SettlementResultItem[] }
+  | { ok: false; error: string };

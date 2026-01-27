@@ -6,6 +6,7 @@ vi.mock('@grpc/grpc-js', () => {
   const Server = vi.fn().mockImplementation(() => ({
     addService: vi.fn(),
     bindAsync: vi.fn((addr, creds, cb) => cb(null, 50055)),
+    start: vi.fn(),
     forceShutdown: vi.fn(),
   }));
   return {

@@ -4,6 +4,7 @@ dotenv.config();
 import { startObservability, stopObservability } from "./observability";
 startObservability();
 
+import { createShutdownManager } from "@specify-poker/shared";
 import { startGrpcServer, stopGrpcServer } from "./api/grpc/server";
 import { EventConsumer } from "./services/eventConsumer";
 import { startDeletionProcessor, stopDeletionProcessor } from "./jobs/deletionProcessor";
@@ -16,6 +17,33 @@ import { runMigrations } from "./storage/migrations";
 
 let metricsServer: ReturnType<typeof startMetricsServer> | null = null;
 let eventConsumerInstance: EventConsumer | null = null;
+
+const shutdownManager = createShutdownManager({ logger });
+shutdownManager.add("otel.shutdown", async () => {
+  await stopObservability();
+});
+shutdownManager.add("redis.close", async () => {
+  await closeRedisClient();
+});
+shutdownManager.add("db.close", async () => {
+  await pool.end();
+});
+shutdownManager.add("grpc.stop", () => {
+  stopGrpcServer();
+});
+shutdownManager.add("metrics.close", () => {
+  if (metricsServer) {
+    metricsServer.close();
+    metricsServer = null;
+  }
+});
+shutdownManager.add("eventConsumer.stop", () => {
+  eventConsumerInstance?.stop();
+  eventConsumerInstance = null;
+});
+shutdownManager.add("deletionProcessor.stop", () => {
+  stopDeletionProcessor();
+});
 
 export async function main() {
   const config = getConfig();
@@ -35,32 +63,29 @@ export async function main() {
     logger.info({ port: config.grpcPort }, "Player Service is running");
   } catch (error: unknown) {
     logger.error({ err: error }, "Failed to start Player Service");
+    await shutdownManager.run();
     throw error;
   }
 }
 
 export async function shutdown() {
   logger.info("Shutting down Player Service");
-  stopGrpcServer();
-  stopDeletionProcessor();
-  if (eventConsumerInstance) {
-    eventConsumerInstance.stop();
-    eventConsumerInstance = null;
-  }
-  if (metricsServer) {
-    metricsServer.close();
-    metricsServer = null;
-  }
-  await closeRedisClient();
-  await pool.end();
-  await stopObservability();
+  await shutdownManager.run();
 }
 
-if (process.env.NODE_ENV !== "test") {
+const isDirectRun =
+  typeof require !== "undefined" &&
+  typeof module !== "undefined" &&
+  require.main === module;
+
+if (isDirectRun && process.env.NODE_ENV !== "test") {
   const handleFatal = (error: unknown) => {
     logger.error({ err: error }, "Player Service failed");
-    process.exit(1);
+    shutdown().finally(() => process.exit(1));
   };
+
+  process.on("uncaughtException", handleFatal);
+  process.on("unhandledRejection", handleFatal);
 
   process.on("SIGINT", () => {
     shutdown().finally(() => process.exit(0));

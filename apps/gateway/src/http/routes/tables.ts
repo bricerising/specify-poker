@@ -1,20 +1,15 @@
 import { Router, Request, Response } from "express";
+import { seatIdSchema, tableCreateRequestInputSchema, tableJoinSeatRequestSchema } from "@specify-poker/shared";
 import { gameClient } from "../../grpc/clients";
+import { grpcCall } from "../../grpc/grpcCall";
 import logger from "../../observability/logger";
 import { getConfig } from "../../config";
+import { requireUserId } from "../utils/requireUserId";
+import { isRecord } from "../../utils/json";
 
 const router = Router();
 
 const DAILY_LOGIN_BONUS_CHIPS = 1000;
-
-function requireUserId(req: Request, res: Response) {
-  const userId = req.auth?.userId;
-  if (!userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return null;
-  }
-  return userId;
-}
 
 function buildWsUrl(req: Request) {
   const host = req.get("host");
@@ -71,35 +66,133 @@ async function ensureDailyLoginBonus(userId: string): Promise<void> {
   }
 }
 
-// Helper to convert gRPC callback to promise
-function grpcCall<TRequest, TResponse>(
-  method: (request: TRequest, callback: (err: Error | null, response: TResponse) => void) => void,
-  request: TRequest
-): Promise<TResponse> {
-  return new Promise((resolve, reject) => {
-    method(request, (err: Error | null, response: TResponse) => {
-      if (err) reject(err);
-      else resolve(response);
-    });
+function readNonEmptyString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function readSeatId(seat: unknown): number | null {
+  if (!isRecord(seat)) {
+    return null;
+  }
+
+  const raw = seat.seat_id ?? seat.seatId;
+  const parsed = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function readSeatUserId(seat: unknown): string | null {
+  if (!isRecord(seat)) {
+    return null;
+  }
+
+  return readNonEmptyString(seat.user_id ?? seat.userId);
+}
+
+type JoinSeatResponse = { ok: boolean; error?: string };
+
+const DAILY_LOGIN_BONUS_ERRORS = new Set(["ACCOUNT_NOT_FOUND", "INSUFFICIENT_BALANCE"]);
+
+async function joinSeatWithDailyBonus(request: {
+  table_id: string;
+  user_id: string;
+  seat_id: number;
+  buy_in_amount: number;
+}): Promise<JoinSeatResponse> {
+  let response = (await grpcCall(gameClient.JoinSeat.bind(gameClient), request)) as JoinSeatResponse;
+  if (!response.ok && DAILY_LOGIN_BONUS_ERRORS.has(response.error ?? "")) {
+    await ensureDailyLoginBonus(request.user_id);
+    response = (await grpcCall(gameClient.JoinSeat.bind(gameClient), request)) as JoinSeatResponse;
+  }
+  return response;
+}
+
+async function resolveTargetUserIdBySeatId(params: {
+  tableId: string;
+  ownerId: string;
+  seatId: number;
+}): Promise<string | null> {
+  const stateResponse = await grpcCall(gameClient.GetTableState.bind(gameClient), {
+    table_id: params.tableId,
+    user_id: params.ownerId,
   });
+
+  const seats = Array.isArray(stateResponse.state?.seats) ? (stateResponse.state.seats as unknown[]) : [];
+  const seat = seats.find((candidate) => readSeatId(candidate) === params.seatId);
+  return readSeatUserId(seat);
 }
 
-function parseSeatId(value: unknown): number | null {
-  const parsed = typeof value === "number" ? value : parseInt(String(value), 10);
-  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 8) {
-    return null;
+async function handleJoinSeatRequest(req: Request, res: Response, params: { tableId: string; seatId: number; buyInAmount?: number }) {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+
+  const joinRequest: Parameters<typeof joinSeatWithDailyBonus>[0] = {
+    table_id: params.tableId,
+    user_id: userId,
+    seat_id: params.seatId,
+    buy_in_amount: params.buyInAmount ?? 0,
+  };
+
+  const response = await joinSeatWithDailyBonus(joinRequest);
+
+  if (!response.ok) {
+    return res.status(400).json({ error: response.error || "Failed to join seat" });
   }
-  return parsed;
+
+  return res.json({ tableId: params.tableId, seatId: params.seatId, wsUrl: buildWsUrl(req) });
 }
 
-function seatUserId(seat: unknown): string | null {
-  if (!seat || typeof seat !== "object") {
-    return null;
+type GrpcOkResponse = { ok: boolean; error?: string };
+
+async function handleOkGrpcResponse(res: Response, response: GrpcOkResponse, fallbackError: string) {
+  if (!response.ok) {
+    return res.status(400).json({ error: response.error || fallbackError });
   }
-  const record = seat as Record<string, unknown>;
-  const userId = record.user_id ?? record.userId;
-  return typeof userId === "string" && userId.trim().length > 0 ? userId : null;
+  return res.json({ ok: true });
 }
+
+function createModerationHandler(options: {
+  action: "kick" | "mute" | "unmute";
+  method: (request: { table_id: string; owner_id: string; target_user_id: string }, callback: (err: Error | null, response: unknown) => void) => unknown;
+}) {
+  return async (req: Request, res: Response) => {
+    try {
+      const { tableId } = req.params;
+      const ownerId = requireUserId(req, res);
+      if (!ownerId) return;
+
+      const targetUserId = readNonEmptyString((req.body as { targetUserId?: unknown } | undefined)?.targetUserId);
+      if (!targetUserId) {
+        return res.status(400).json({ error: "targetUserId is required" });
+      }
+
+      await grpcCall(options.method, {
+        table_id: tableId,
+        owner_id: ownerId,
+        target_user_id: targetUserId,
+      });
+
+      return res.json({ ok: true });
+    } catch (err) {
+      logger.error({ err }, `Failed to ${options.action} player`);
+      return res.status(500).json({ error: `Failed to ${options.action} player` });
+    }
+  };
+}
+
+const handleKickByTargetUserId = createModerationHandler({
+  action: "kick",
+  method: gameClient.KickPlayer.bind(gameClient),
+});
+
+const handleMuteByTargetUserId = createModerationHandler({
+  action: "mute",
+  method: gameClient.MutePlayer.bind(gameClient),
+});
+
+const handleUnmuteByTargetUserId = createModerationHandler({
+  action: "unmute",
+  method: gameClient.UnmutePlayer.bind(gameClient),
+});
 
 // GET /api/tables - List all tables
 router.get("/", async (_req: Request, res: Response) => {
@@ -115,7 +208,12 @@ router.get("/", async (_req: Request, res: Response) => {
 // POST /api/tables - Create a new table
 router.post("/", async (req: Request, res: Response) => {
   try {
-    const { name, config } = req.body;
+    const parsed = tableCreateRequestInputSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid request" });
+    }
+
+    const { name, config } = parsed.data;
     const ownerId = requireUserId(req, res);
     if (!ownerId) return;
 
@@ -123,12 +221,12 @@ router.post("/", async (req: Request, res: Response) => {
       name,
       owner_id: ownerId,
       config: {
-        small_blind: config?.smallBlind || 1,
-        big_blind: config?.bigBlind || 2,
-        ante: config?.ante || 0,
-        max_players: config?.maxPlayers || 9,
-        starting_stack: config?.startingStack || 200,
-        turn_timer_seconds: config?.turnTimerSeconds || 20,
+        small_blind: config.smallBlind,
+        big_blind: config.bigBlind,
+        ante: config.ante ?? 0,
+        max_players: config.maxPlayers,
+        starting_stack: config.startingStack,
+        turn_timer_seconds: config.turnTimerSeconds ?? 20,
       },
     });
     return res.status(201).json(response);
@@ -182,32 +280,13 @@ router.get("/:tableId/state", async (req: Request, res: Response) => {
 router.post("/:tableId/join", async (req: Request, res: Response) => {
   try {
     const { tableId } = req.params;
-    const { seatId, buyInAmount } = req.body;
-    const userId = requireUserId(req, res);
-    if (!userId) return;
-
-    const parsedSeatId = typeof seatId === "number" ? seatId : parseInt(seatId, 10);
-    if (!Number.isInteger(parsedSeatId)) {
+    const parsed = tableJoinSeatRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
       return res.status(400).json({ error: "seatId is required" });
     }
 
-    const joinRequest = {
-      table_id: tableId,
-      user_id: userId,
-      seat_id: parsedSeatId,
-      buy_in_amount: buyInAmount,
-    };
-
-    let response = await grpcCall(gameClient.JoinSeat.bind(gameClient), joinRequest);
-    if (!response.ok && ["ACCOUNT_NOT_FOUND", "INSUFFICIENT_BALANCE"].includes(response.error ?? "")) {
-      await ensureDailyLoginBonus(userId);
-      response = await grpcCall(gameClient.JoinSeat.bind(gameClient), joinRequest);
-    }
-
-    if (!response.ok) {
-      return res.status(400).json({ error: response.error || "Failed to join seat" });
-    }
-    return res.json({ tableId, seatId: parsedSeatId, wsUrl: buildWsUrl(req) });
+    const { seatId, buyInAmount } = parsed.data;
+    return await handleJoinSeatRequest(req, res, { tableId, seatId, buyInAmount });
   } catch (err) {
     logger.error({ err }, "Failed to join seat");
     return res.status(500).json({ error: "Failed to join seat" });
@@ -218,27 +297,16 @@ router.post("/:tableId/join", async (req: Request, res: Response) => {
 router.post("/:tableId/seats/:seatId/join", async (req: Request, res: Response) => {
   try {
     const { tableId, seatId } = req.params;
-    const { buyInAmount } = req.body;
-    const userId = requireUserId(req, res);
-    if (!userId) return;
-
-    const joinRequest = {
-      table_id: tableId,
-      user_id: userId,
-      seat_id: parseInt(seatId, 10),
-      buy_in_amount: buyInAmount,
-    };
-
-    let response = await grpcCall(gameClient.JoinSeat.bind(gameClient), joinRequest);
-    if (!response.ok && ["ACCOUNT_NOT_FOUND", "INSUFFICIENT_BALANCE"].includes(response.error ?? "")) {
-      await ensureDailyLoginBonus(userId);
-      response = await grpcCall(gameClient.JoinSeat.bind(gameClient), joinRequest);
+    const parsed = tableJoinSeatRequestSchema.safeParse({
+      seatId,
+      buyInAmount: req.body?.buyInAmount,
+    });
+    if (!parsed.success) {
+      return res.status(400).json({ error: "seatId is required" });
     }
 
-    if (!response.ok) {
-      return res.status(400).json({ error: response.error || "Failed to join seat" });
-    }
-    return res.json({ tableId, seatId: parseInt(seatId, 10), wsUrl: buildWsUrl(req) });
+    const { seatId: parsedSeatId, buyInAmount } = parsed.data;
+    return await handleJoinSeatRequest(req, res, { tableId, seatId: parsedSeatId, buyInAmount });
   } catch (err) {
     logger.error({ err }, "Failed to join seat");
     return res.status(500).json({ error: "Failed to join seat" });
@@ -252,15 +320,12 @@ router.post("/:tableId/leave", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const response = await grpcCall(gameClient.LeaveSeat.bind(gameClient), {
+    const response = (await grpcCall(gameClient.LeaveSeat.bind(gameClient), {
       table_id: tableId,
       user_id: userId,
-    });
+    })) as GrpcOkResponse;
 
-    if (!response.ok) {
-      return res.status(400).json({ error: response.error || "Failed to leave seat" });
-    }
-    return res.json({ ok: true });
+    return await handleOkGrpcResponse(res, response, "Failed to leave seat");
   } catch (err) {
     logger.error({ err }, "Failed to leave seat");
     return res.status(500).json({ error: "Failed to leave seat" });
@@ -274,15 +339,12 @@ router.post("/:tableId/spectate", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const response = await grpcCall(gameClient.JoinSpectator.bind(gameClient), {
+    const response = (await grpcCall(gameClient.JoinSpectator.bind(gameClient), {
       table_id: tableId,
       user_id: userId,
-    });
+    })) as GrpcOkResponse;
 
-    if (!response.ok) {
-      return res.status(400).json({ error: response.error || "Failed to join as spectator" });
-    }
-    return res.json({ ok: true });
+    return await handleOkGrpcResponse(res, response, "Failed to join as spectator");
   } catch (err) {
     logger.error({ err }, "Failed to join as spectator");
     return res.status(500).json({ error: "Failed to join as spectator" });
@@ -296,15 +358,12 @@ router.post("/:tableId/spectate/leave", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const response = await grpcCall(gameClient.LeaveSpectator.bind(gameClient), {
+    const response = (await grpcCall(gameClient.LeaveSpectator.bind(gameClient), {
       table_id: tableId,
       user_id: userId,
-    });
+    })) as GrpcOkResponse;
 
-    if (!response.ok) {
-      return res.status(400).json({ error: response.error || "Failed to leave spectating" });
-    }
-    return res.json({ ok: true });
+    return await handleOkGrpcResponse(res, response, "Failed to leave spectating");
   } catch (err) {
     logger.error({ err }, "Failed to leave spectating");
     return res.status(500).json({ error: "Failed to leave spectating" });
@@ -319,17 +378,14 @@ router.post("/:tableId/action", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const response = await grpcCall(gameClient.SubmitAction.bind(gameClient), {
+    const response = (await grpcCall(gameClient.SubmitAction.bind(gameClient), {
       table_id: tableId,
       user_id: userId,
       action_type: actionType,
       amount: amount,
-    });
+    })) as GrpcOkResponse;
 
-    if (!response.ok) {
-      return res.status(400).json({ error: response.error || "Invalid action" });
-    }
-    return res.json({ ok: true });
+    return await handleOkGrpcResponse(res, response, "Invalid action");
   } catch (err) {
     logger.error({ err }, "Failed to submit action");
     return res.status(500).json({ error: "Failed to submit action" });
@@ -343,24 +399,13 @@ router.post("/:tableId/moderation/kick", async (req: Request, res: Response) => 
     const ownerId = requireUserId(req, res);
     if (!ownerId) return;
 
-    const seatId = parseSeatId(req.body?.seatId);
-    if (seatId === null) {
+    const seatIdParsed = seatIdSchema.safeParse(req.body?.seatId);
+    if (!seatIdParsed.success) {
       return res.status(400).json({ error: "seatId is required" });
     }
+    const seatId = seatIdParsed.data;
 
-    const stateResponse = await grpcCall(gameClient.GetTableState.bind(gameClient), {
-      table_id: tableId,
-      user_id: ownerId,
-    });
-    const seats = (stateResponse.state?.seats ?? []) as unknown[];
-    const targetSeat = seats.find((seat) => {
-      if (!seat || typeof seat !== "object") return false;
-      const record = seat as Record<string, unknown>;
-      const id = record.seat_id ?? record.seatId;
-      return Number(id) === seatId;
-    });
-
-    const targetUserId = seatUserId(targetSeat);
+    const targetUserId = await resolveTargetUserIdBySeatId({ tableId, ownerId, seatId });
     if (!targetUserId) {
       return res.status(404).json({ error: "Seat not occupied" });
     }
@@ -396,24 +441,13 @@ router.post("/:tableId/moderation/mute", async (req: Request, res: Response) => 
     const ownerId = requireUserId(req, res);
     if (!ownerId) return;
 
-    const seatId = parseSeatId(req.body?.seatId);
-    if (seatId === null) {
+    const seatIdParsed = seatIdSchema.safeParse(req.body?.seatId);
+    if (!seatIdParsed.success) {
       return res.status(400).json({ error: "seatId is required" });
     }
+    const seatId = seatIdParsed.data;
 
-    const stateResponse = await grpcCall(gameClient.GetTableState.bind(gameClient), {
-      table_id: tableId,
-      user_id: ownerId,
-    });
-    const seats = (stateResponse.state?.seats ?? []) as unknown[];
-    const targetSeat = seats.find((seat) => {
-      if (!seat || typeof seat !== "object") return false;
-      const record = seat as Record<string, unknown>;
-      const id = record.seat_id ?? record.seatId;
-      return Number(id) === seatId;
-    });
-
-    const targetUserId = seatUserId(targetSeat);
+    const targetUserId = await resolveTargetUserIdBySeatId({ tableId, ownerId, seatId });
     if (!targetUserId) {
       return res.status(404).json({ error: "Seat not occupied" });
     }
@@ -437,63 +471,12 @@ router.post("/:tableId/moderation/mute", async (req: Request, res: Response) => 
 });
 
 // POST /api/tables/:tableId/kick - Kick a player (owner only)
-router.post("/:tableId/kick", async (req: Request, res: Response) => {
-  try {
-    const { tableId } = req.params;
-    const { targetUserId } = req.body;
-    const ownerId = requireUserId(req, res);
-    if (!ownerId) return;
-
-    await grpcCall(gameClient.KickPlayer.bind(gameClient), {
-      table_id: tableId,
-      owner_id: ownerId,
-      target_user_id: targetUserId,
-    });
-    return res.json({ ok: true });
-  } catch (err) {
-    logger.error({ err }, "Failed to kick player");
-    return res.status(500).json({ error: "Failed to kick player" });
-  }
-});
+router.post("/:tableId/kick", handleKickByTargetUserId);
 
 // POST /api/tables/:tableId/mute - Mute a player (owner only)
-router.post("/:tableId/mute", async (req: Request, res: Response) => {
-  try {
-    const { tableId } = req.params;
-    const { targetUserId } = req.body;
-    const ownerId = requireUserId(req, res);
-    if (!ownerId) return;
-
-    await grpcCall(gameClient.MutePlayer.bind(gameClient), {
-      table_id: tableId,
-      owner_id: ownerId,
-      target_user_id: targetUserId,
-    });
-    return res.json({ ok: true });
-  } catch (err) {
-    logger.error({ err }, "Failed to mute player");
-    return res.status(500).json({ error: "Failed to mute player" });
-  }
-});
+router.post("/:tableId/mute", handleMuteByTargetUserId);
 
 // POST /api/tables/:tableId/unmute - Unmute a player (owner only)
-router.post("/:tableId/unmute", async (req: Request, res: Response) => {
-  try {
-    const { tableId } = req.params;
-    const { targetUserId } = req.body;
-    const ownerId = requireUserId(req, res);
-    if (!ownerId) return;
-
-    await grpcCall(gameClient.UnmutePlayer.bind(gameClient), {
-      table_id: tableId,
-      owner_id: ownerId,
-      target_user_id: targetUserId,
-    });
-    return res.json({ ok: true });
-  } catch (err) {
-    logger.error({ err }, "Failed to unmute player");
-    return res.status(500).json({ error: "Failed to unmute player" });
-  }
-});
+router.post("/:tableId/unmute", handleUnmuteByTargetUserId);
 
 export default router;

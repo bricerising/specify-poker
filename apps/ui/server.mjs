@@ -9,12 +9,14 @@ const __dirname = path.dirname(__filename);
 const port = Number(process.env.PORT ?? 3000);
 const distDir = path.join(__dirname, "dist");
 const publicDir = path.join(__dirname, "public");
+const sharedDistDir = path.resolve(__dirname, "..", "..", "packages", "shared", "dist");
 
 const contentTypes = new Map([
   [".html", "text/html; charset=utf-8"],
   [".js", "text/javascript; charset=utf-8"],
   [".css", "text/css; charset=utf-8"],
   [".json", "application/json; charset=utf-8"],
+  [".map", "application/json; charset=utf-8"],
   [".svg", "image/svg+xml"],
 ]);
 
@@ -32,33 +34,36 @@ function sendFile(res, filePath) {
   });
 }
 
-function resolveAssetPath(relativePath) {
-  const publicAsset = path.join(publicDir, relativePath);
-  if (fs.existsSync(publicAsset)) {
-    return publicAsset;
-  }
-  const direct = path.join(distDir, relativePath);
-  if (fs.existsSync(direct)) {
-    return direct;
-  }
-  if (!path.extname(relativePath)) {
-    const withJs = `${relativePath}.js`;
-    const candidate = path.join(distDir, withJs);
-    if (fs.existsSync(candidate)) {
-      return candidate;
+function resolveAssetPath(relativePath, roots) {
+  for (const root of roots) {
+    const direct = path.join(root, relativePath);
+    if (fs.existsSync(direct)) {
+      return direct;
+    }
+    if (!path.extname(relativePath)) {
+      const withJs = `${relativePath}.js`;
+      const candidate = path.join(root, withJs);
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
     }
   }
-  return direct;
+  return path.join(roots[roots.length - 1], relativePath);
 }
 
 const server = http.createServer((req, res) => {
     const urlPath = (req.url ?? "/").split("?")[0] ?? "/";
+    if (urlPath.startsWith("/shared/")) {
+      const relativePath = urlPath.replace(/^\/shared\/+/, "");
+      const candidate = resolveAssetPath(relativePath, [sharedDistDir]);
+      return sendFile(res, candidate);
+    }
     if (urlPath === "/" || urlPath === "/index.html") {
       return sendFile(res, path.join(publicDir, "index.html"));
     }
 
     const relativePath = urlPath.replace(/^\/+/, "");
-    const candidate = resolveAssetPath(relativePath);
+    const candidate = resolveAssetPath(relativePath, [publicDir, distDir]);
     const hasExtension = Boolean(path.extname(relativePath));
     if (!hasExtension && !fs.existsSync(candidate)) {
       return sendFile(res, path.join(publicDir, "index.html"));

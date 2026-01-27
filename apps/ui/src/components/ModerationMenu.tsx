@@ -2,6 +2,7 @@ import React, { useState } from "react";
 
 import { apiFetch } from "../services/apiClient";
 import { TableSeat } from "../state/tableStore";
+import { testIds } from "../utils/testIds";
 
 interface ModerationMenuProps {
   tableId: string;
@@ -37,15 +38,29 @@ export function ModerationMenu({ tableId, seats, onModeration }: ModerationMenuP
         seated.map((seat) => (
           <div key={seat.seatId} className="moderation-seat">
             <div>
-              <strong>Seat {seat.seatId + 1}</strong>: {seat.nickname ?? `Player ${seat.seatId + 1}`}
+              <strong>Seat {seat.seatId + 1}</strong>: {seat.username ?? `Player ${seat.seatId + 1}`}
             </div>
             <div className="action-buttons">
-              <button type="button" className="btn btn-quiet" onClick={() => request("kick", seat.seatId)}>
-              Kick
-            </button>
-              <button type="button" className="btn" onClick={() => request("mute", seat.seatId)}>
-              Mute
-            </button>
+              <button
+                type="button"
+                className="btn btn-quiet"
+                onClick={() => request("kick", seat.seatId)}
+                data-testid={testIds.moderation.kick}
+                data-seat-id={seat.seatId}
+                data-seat-number={seat.seatId + 1}
+              >
+                Kick
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => request("mute", seat.seatId)}
+                data-testid={testIds.moderation.mute}
+                data-seat-id={seat.seatId}
+                data-seat-number={seat.seatId + 1}
+              >
+                Mute
+              </button>
             </div>
           </div>
         ))

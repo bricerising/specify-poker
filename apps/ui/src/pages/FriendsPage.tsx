@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 
 import { fetchFriends, updateFriends } from "../services/friendsApi";
+import { testIds } from "../utils/testIds";
 
 export function FriendsPage() {
   const [friends, setFriends] = useState<string[]>([]);
@@ -62,11 +63,17 @@ export function FriendsPage() {
               value={newFriend}
               onChange={(event) => setNewFriend(event.target.value)}
               placeholder="Enter a player name"
+              data-testid={testIds.friends.addInput}
             />
           </label>
           <div className="field">
             <span className="field-label">&nbsp;</span>
-            <button type="button" className="btn btn-primary" onClick={handleAdd}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleAdd}
+              data-testid={testIds.friends.add}
+            >
               Add
             </button>
           </div>
@@ -78,7 +85,13 @@ export function FriendsPage() {
             friends.map((friend) => (
               <div key={friend} className="friend-row">
                 <div>{friend}</div>
-                <button type="button" className="btn btn-quiet" onClick={() => handleRemove(friend)}>
+                <button
+                  type="button"
+                  className="btn btn-quiet"
+                  onClick={() => handleRemove(friend)}
+                  data-testid={testIds.friends.remove}
+                  data-friend={friend}
+                >
                   Remove
                 </button>
               </div>

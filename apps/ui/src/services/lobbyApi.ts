@@ -1,5 +1,7 @@
 import { apiFetch } from "./apiClient";
-import { TableSummary } from "../state/tableStore";
+import { normalizeTableSummary } from "../state/tableNormalization";
+import type { TableSummary } from "../state/tableTypes";
+import { asRecord } from "../utils/unknown";
 
 export interface CreateTableInput {
   name: string;
@@ -9,9 +11,21 @@ export interface CreateTableInput {
   startingStack: number;
 }
 
+function decodeTableSummary(payload: unknown): TableSummary {
+  const record = asRecord(payload);
+  if (!record) {
+    throw new Error("Invalid table response");
+  }
+  return normalizeTableSummary(record);
+}
+
 export async function listTables() {
   const response = await apiFetch("/api/tables");
-  return (await response.json()) as TableSummary[];
+  const payload: unknown = await response.json();
+  if (!Array.isArray(payload)) {
+    throw new Error("Invalid tables response");
+  }
+  return payload.map(decodeTableSummary);
 }
 
 export async function createTable(input: CreateTableInput) {
@@ -29,5 +43,5 @@ export async function createTable(input: CreateTableInput) {
     }),
   });
 
-  return (await response.json()) as TableSummary;
+  return decodeTableSummary(await response.json());
 }

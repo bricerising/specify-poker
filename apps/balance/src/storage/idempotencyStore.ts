@@ -1,33 +1,17 @@
 import { getConfig } from "../config";
+import logger from "../observability/logger";
+import { createKeyedLock } from "../utils/keyedLock";
+import { tryJsonParse } from "../utils/json";
 import { getRedisClient } from "./redisClient";
 
 const IDEMPOTENCY_PREFIX = "balance:transactions:idempotency:";
 
 // In-memory cache with expiry
 const idempotencyCache = new Map<string, { response: string; expiresAt: number }>();
-const idempotencyLocks = new Map<string, Promise<void>>();
+const idempotencyLock = createKeyedLock();
 
 export async function withIdempotencyLock<T>(key: string, work: () => Promise<T>): Promise<T> {
-  const previous = idempotencyLocks.get(key) ?? Promise.resolve();
-  let release: (() => void) | undefined;
-  const current = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-
-  const chain = previous.then(() => current);
-  idempotencyLocks.set(key, chain);
-
-  await previous;
-  try {
-    return await work();
-  } finally {
-    release?.();
-    void chain.finally(() => {
-      if (idempotencyLocks.get(key) === chain) {
-        idempotencyLocks.delete(key);
-      }
-    });
-  }
+  return idempotencyLock.withLock(key, work);
 }
 
 export async function getIdempotentResponse(key: string): Promise<unknown | null> {
@@ -35,7 +19,13 @@ export async function getIdempotentResponse(key: string): Promise<unknown | null
   const cached = idempotencyCache.get(key);
   if (cached) {
     if (cached.expiresAt > Date.now()) {
-      return JSON.parse(cached.response);
+      const parsed = tryJsonParse<unknown>(cached.response);
+      if (!parsed.ok) {
+        logger.warn({ err: parsed.error, key }, "idempotencyStore.parse.failed");
+        idempotencyCache.delete(key);
+        return null;
+      }
+      return parsed.value;
     }
     idempotencyCache.delete(key);
   }
@@ -44,7 +34,12 @@ export async function getIdempotentResponse(key: string): Promise<unknown | null
   if (redis) {
     const response = await redis.get(`${IDEMPOTENCY_PREFIX}${key}`);
     if (response) {
-      return JSON.parse(response);
+      const parsed = tryJsonParse<unknown>(response);
+      if (!parsed.ok) {
+        logger.warn({ err: parsed.error, key }, "idempotencyStore.parse.failed");
+        return null;
+      }
+      return parsed.value;
     }
   }
 
@@ -84,6 +79,6 @@ export function cleanExpiredIdempotencyKeys(): void {
 
 export async function resetIdempotency(): Promise<void> {
   idempotencyCache.clear();
-  idempotencyLocks.clear();
+  idempotencyLock.reset();
   // Note: Redis keys will expire naturally via TTL
 }

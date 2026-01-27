@@ -1,4 +1,6 @@
 import { Transaction } from "../domain/types";
+import logger from "../observability/logger";
+import { tryJsonParse } from "../utils/json";
 import { getRedisClient } from "./redisClient";
 
 const TRANSACTIONS_KEY = "balance:transactions";
@@ -18,7 +20,12 @@ export async function getTransaction(transactionId: string): Promise<Transaction
   if (redis) {
     const payload = await redis.hGet(TRANSACTIONS_KEY, transactionId);
     if (payload) {
-      const tx = JSON.parse(payload) as Transaction;
+      const parsed = tryJsonParse<Transaction>(payload);
+      if (!parsed.ok) {
+        logger.warn({ err: parsed.error, transactionId }, "transactionStore.parse.failed");
+        return null;
+      }
+      const tx = parsed.value;
       transactions.set(transactionId, tx);
       return tx;
     }

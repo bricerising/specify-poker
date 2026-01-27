@@ -32,7 +32,9 @@ describe("Instance registry", () => {
     vi.useFakeTimers();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    const { unregisterInstance } = await import("../../../src/storage/instanceRegistry");
+    await unregisterInstance();
     vi.useRealTimers();
   });
 

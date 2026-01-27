@@ -2,47 +2,31 @@ import { Server } from "http";
 import WebSocket, { WebSocketServer } from "ws";
 import { randomUUID } from "crypto";
 import { context, ROOT_CONTEXT } from "@opentelemetry/api";
+import { toStruct } from "@specify-poker/shared";
 import { authenticateWs, authenticateWsToken, WsAuthResult } from "./auth";
 import { registerConnection, unregisterConnection } from "./connectionRegistry";
 import { initWsPubSub } from "./pubsub";
 import { attachTableHub, handleTablePubSubEvent } from "./handlers/table";
 import { attachLobbyHub, handleLobbyPubSubEvent } from "./handlers/lobby";
 import { attachChatHub, handleChatPubSubEvent } from "./handlers/chat";
-import { eventClient } from "../grpc/clients";
+import { eventClient, playerClient } from "../grpc/clients";
 import { updatePresence } from "../storage/sessionStore";
 import { getConnectionsByUser } from "../storage/connectionStore";
 import { setupHeartbeat } from "./heartbeat";
 import logger from "../observability/logger";
 import { recordWsConnected, recordWsDisconnected } from "../observability/metrics";
 import { IncomingMessage } from "http";
+import { parseJsonObject } from "./messageParsing";
+import { safeAsyncHandler } from "../utils/safeAsyncHandler";
 
 interface AuthenticatedRequest extends IncomingMessage {
   wsAuthResult?: WsAuthResult;
 }
 
-const sessionMeta = new Map<string, { startedAt: number; clientType: string }>();
+type ClientType = "web" | "mobile";
+
+const sessionMeta = new Map<string, { startedAt: number; clientType: ClientType }>();
 const authTimeoutMs = 5000;
-
-function toStruct(obj: Record<string, unknown>) {
-  const struct: { fields: Record<string, unknown> } = { fields: {} };
-  for (const [key, value] of Object.entries(obj)) {
-    struct.fields[key] = toValue(value);
-  }
-  return struct;
-}
-
-function toValue(value: unknown): Record<string, unknown> {
-  if (typeof value === "string") return { stringValue: value };
-  if (typeof value === "number") return { numberValue: value };
-  if (typeof value === "boolean") return { boolValue: value };
-  if (Array.isArray(value)) {
-    return { listValue: { values: value.map((entry) => toValue(entry)) } };
-  }
-  if (value && typeof value === "object") {
-    return { structValue: toStruct(value as Record<string, unknown>) };
-  }
-  return { nullValue: 0 };
-}
 
 function emitSessionEvent(type: string, userId: string, payload: Record<string, unknown>) {
   eventClient.PublishEvent(
@@ -91,127 +75,179 @@ export async function initWsServer(server: Server) {
     onLobbyEvent: handleLobbyPubSubEvent,
   });
 
-  server.on("upgrade", async (request, socket, head) => {
-    const url = new URL(request.url || "", `http://${request.headers.host}`);
-    if (url.pathname !== "/ws") {
-      socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
-      socket.destroy();
-      return;
-    }
-
-    const authResult = await authenticateWs(request);
-    (request as AuthenticatedRequest).wsAuthResult = authResult;
-
-    context.with(ROOT_CONTEXT, () => {
-      wss.handleUpgrade(request, socket, head, (ws) => {
-        wss.emit("connection", ws, request);
-      });
-    });
-  });
-
-  wss.on("connection", async (ws: WebSocket, request: IncomingMessage) => {
-    const authResult = (request as AuthenticatedRequest).wsAuthResult;
-    if (!authResult) {
-      ws.close(1011, "Authentication unavailable");
-      return;
-    }
-
-    if (authResult.status === "invalid") {
-      closeWithAuthError(ws, "Unauthorized");
-      return;
-    }
-
-    const finalizeConnection = async (userId: string) => {
-      const connectionId = randomUUID();
-      const connectedAt = new Date().toISOString();
-      const ip = getClientIp(request);
-      const clientType = getClientType(request);
-
-      logger.info({ userId, connectionId }, "WS connection established");
-
-      await registerConnection({ connectionId, userId, connectedAt, ip }, ws);
-      await updatePresence(userId, "online");
-
-      sessionMeta.set(connectionId, { startedAt: Date.now(), clientType });
-      recordWsConnected(clientType);
-      emitSessionEvent("SESSION_STARTED", userId, {
-        connectionId,
-        clientType,
-        connectedAt,
-      });
-
-      ws.send(JSON.stringify({ type: "Welcome", userId, connectionId }));
-
-      // Attach hubs
-      attachTableHub(ws, userId, connectionId);
-      attachLobbyHub(ws, connectionId);
-      attachChatHub(ws, userId, connectionId);
-
-      // Heartbeat
-      setupHeartbeat(ws, () => {
-        logger.info({ userId, connectionId }, "WS connection timed out");
-      });
-
-      ws.on("close", async () => {
-        await unregisterConnection(connectionId, userId);
-        const remaining = await getConnectionsByUser(userId);
-        if (remaining.length === 0) {
-          await updatePresence(userId, "offline");
+  server.on(
+    "upgrade",
+    safeAsyncHandler<[IncomingMessage, import("net").Socket, Buffer]>(
+      async (request, socket, head) => {
+        const url = new URL(request.url || "", `http://${request.headers.host}`);
+        if (url.pathname !== "/ws") {
+          socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
+          socket.destroy();
+          return;
         }
-        const meta = sessionMeta.get(connectionId);
-        sessionMeta.delete(connectionId);
-        const durationMs = meta ? Date.now() - meta.startedAt : undefined;
-        recordWsDisconnected(meta?.clientType ?? getClientType(request), durationMs);
-        emitSessionEvent("SESSION_ENDED", userId, {
-          connectionId,
-          durationMs,
-          clientType: meta?.clientType ?? getClientType(request),
+
+        const authResult = await authenticateWs(request);
+        (request as AuthenticatedRequest).wsAuthResult = authResult;
+
+        context.with(ROOT_CONTEXT, () => {
+          wss.handleUpgrade(request, socket, head, (ws) => {
+            wss.emit("connection", ws, request);
+          });
         });
-        logger.info({ userId, connectionId }, "WS connection closed");
-      });
+      },
+      (err, request, socket) => {
+        logger.error({ err, url: request.url }, "ws.upgrade.failed");
+        try {
+          socket.write("HTTP/1.1 500 Internal Server Error\r\n\r\n");
+        } catch {
+          // Ignore.
+        }
+        socket.destroy();
+      },
+    ),
+  );
 
-      ws.on("error", (error) => {
-        logger.error({ err: error, userId, connectionId }, "WS connection error");
-      });
-    };
+  wss.on(
+    "connection",
+    safeAsyncHandler<[WebSocket, IncomingMessage]>(
+      async (ws, request) => {
+        const authResult = (request as AuthenticatedRequest).wsAuthResult;
+        if (!authResult) {
+          ws.close(1011, "Authentication unavailable");
+          return;
+        }
 
-    if (authResult.status === "ok") {
-      await finalizeConnection(authResult.userId);
-      return;
-    }
+        if (authResult.status === "invalid") {
+          closeWithAuthError(ws, "Unauthorized");
+          return;
+        }
 
-    const authTimer = setTimeout(() => {
-      closeWithAuthError(ws, "Authentication required");
-    }, authTimeoutMs);
+        const finalizeConnection = async (userId: string, username?: string) => {
+          const connectionId = randomUUID();
+          const connectedAt = new Date().toISOString();
+          const ip = getClientIp(request);
+          const clientType = getClientType(request);
 
-    const handleAuth = async (data: WebSocket.RawData) => {
-      clearTimeout(authTimer);
-      ws.off("message", handleAuth);
+          logger.info({ userId, connectionId }, "WS connection established");
 
-      let message: { type?: string; token?: string } | undefined;
-      try {
-        message = JSON.parse(data.toString()) as { type?: string; token?: string };
-      } catch {
-        closeWithAuthError(ws, "Invalid authentication payload");
-        return;
-      }
+          if (typeof username === "string" && username.trim().length > 0) {
+            playerClient.GetProfile({ user_id: userId, username }, (err) => {
+              if (err) {
+                logger.warn({ err, userId }, "Failed to sync username on websocket connect");
+              }
+            });
+          }
 
-      if (message?.type !== "Authenticate" || typeof message?.token !== "string") {
-        closeWithAuthError(ws, "Authentication required");
-        return;
-      }
+          await registerConnection({ connectionId, userId, connectedAt, ip }, ws);
+          await updatePresence(userId, "online");
 
-      const result = await authenticateWsToken(message.token);
-      if (result.status !== "ok") {
-        closeWithAuthError(ws, "Unauthorized");
-        return;
-      }
+          sessionMeta.set(connectionId, { startedAt: Date.now(), clientType });
+          recordWsConnected(clientType);
+          emitSessionEvent("SESSION_STARTED", userId, {
+            connectionId,
+            clientType,
+            connectedAt,
+          });
 
-      await finalizeConnection(result.userId);
-    };
+          ws.send(JSON.stringify({ type: "Welcome", userId, connectionId }));
 
-    ws.on("message", handleAuth);
-  });
+          // Attach hubs
+          attachTableHub(ws, userId, connectionId);
+          attachLobbyHub(ws, connectionId);
+          attachChatHub(ws, userId, connectionId);
+
+          // Heartbeat
+          setupHeartbeat(ws, () => {
+            logger.info({ userId, connectionId }, "WS connection timed out");
+          });
+
+          ws.on(
+            "close",
+            safeAsyncHandler<[number, Buffer]>(
+              async () => {
+                await unregisterConnection(connectionId, userId);
+                const remaining = await getConnectionsByUser(userId);
+                if (remaining.length === 0) {
+                  await updatePresence(userId, "offline");
+                }
+                const meta = sessionMeta.get(connectionId);
+                sessionMeta.delete(connectionId);
+                const durationMs = meta ? Date.now() - meta.startedAt : undefined;
+                recordWsDisconnected(meta?.clientType ?? getClientType(request), durationMs);
+                emitSessionEvent("SESSION_ENDED", userId, {
+                  connectionId,
+                  durationMs,
+                  clientType: meta?.clientType ?? getClientType(request),
+                });
+                logger.info({ userId, connectionId }, "WS connection closed");
+              },
+              (err) => {
+                logger.error({ err, userId, connectionId }, "ws.close.failed");
+              },
+            ),
+          );
+
+          ws.on("error", (error) => {
+            logger.error({ err: error, userId, connectionId }, "WS connection error");
+          });
+        };
+
+        if (authResult.status === "ok") {
+          await finalizeConnection(authResult.userId, authResult.username);
+          return;
+        }
+
+        const authTimer = setTimeout(() => {
+          closeWithAuthError(ws, "Authentication required");
+        }, authTimeoutMs);
+
+        ws.once("close", () => {
+          clearTimeout(authTimer);
+        });
+
+        const handleAuth = safeAsyncHandler<[WebSocket.RawData]>(
+          async (data) => {
+            clearTimeout(authTimer);
+            ws.off("message", handleAuth);
+
+            const message = parseJsonObject(data);
+            if (!message) {
+              closeWithAuthError(ws, "Invalid authentication payload");
+              return;
+            }
+
+            const token = typeof message.token === "string" ? message.token.trim() : "";
+            if (message.type !== "Authenticate" || token.length === 0) {
+              closeWithAuthError(ws, "Authentication required");
+              return;
+            }
+
+            const result = await authenticateWsToken(token);
+            if (result.status !== "ok") {
+              closeWithAuthError(ws, "Unauthorized");
+              return;
+            }
+
+            await finalizeConnection(result.userId, result.username);
+          },
+          (err) => {
+            logger.error({ err }, "ws.authenticate.failed");
+            ws.close(1011, "Internal error");
+          },
+        );
+
+        ws.on("message", handleAuth);
+      },
+      (err, ws, request) => {
+        logger.error({ err, url: request.url }, "ws.connection.failed");
+        try {
+          ws.close(1011, "Internal error");
+        } catch {
+          // Ignore.
+        }
+      },
+    ),
+  );
 
   return wss;
 }

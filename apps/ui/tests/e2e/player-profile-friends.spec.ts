@@ -11,47 +11,49 @@ test.describe("Player Service (via Gateway)", () => {
 
     test("auto-provisions a default profile and supports GDPR delete", async ({ request }) => {
       const userId = `user-prof-${crypto.randomUUID().slice(0, 10)}`;
-      const token = generateToken(userId, "ProfileUser");
+      const username = "ProfileUser";
+      const token = generateToken(userId, username);
 
       const me = await request.get(`${urls.gateway}/api/me`, { headers: authHeaders(token) });
       expect(me.ok()).toBeTruthy();
-      const mePayload = (await me.json()) as { userId?: string; nickname?: string; avatarUrl?: string | null };
+      const mePayload = (await me.json()) as { userId?: string; username?: string; avatarUrl?: string | null };
       expect(mePayload.userId).toBe(userId);
-      expect(typeof mePayload.nickname).toBe("string");
-      expect((mePayload.nickname ?? "").length).toBeGreaterThanOrEqual(2);
-      expect((mePayload.nickname ?? "").length).toBeLessThanOrEqual(20);
+      expect(mePayload.username).toBe(username);
 
       const deleteRes = await request.delete(`${urls.gateway}/api/me`, { headers: authHeaders(token) });
       expect(deleteRes.status()).toBe(204);
 
       const deleted = await request.get(`${urls.gateway}/api/profile/${userId}`, { headers: authHeaders(token) });
       expect(deleted.ok()).toBeTruthy();
-      const deletedPayload = (await deleted.json()) as { userId?: string; nickname?: string };
+      const deletedPayload = (await deleted.json()) as { userId?: string; username?: string };
       expect(deletedPayload.userId).toBe(userId);
-      expect(deletedPayload.nickname).toBe("Deleted User");
+      expect(deletedPayload.username).toBe("Deleted User");
     });
   });
 
   test.describe("UI Profile + Friends Flows", () => {
     test.setTimeout(60_000);
 
-    test("updates nickname with 2-20 character validation", async ({ page }) => {
+    test("updates avatar url with url validation", async ({ page }) => {
       const runId = crypto.randomUUID().slice(0, 8);
       const userId = `user-ui-${runId}`;
-      await loginAs(page, userId, `Player${runId}`);
+      const username = `Player${runId}`;
+      await loginAs(page, userId, username);
 
-      await page.getByRole("button", { name: "Profile" }).click();
+      await page.getByTestId("nav-profile").click();
       await expect(page.getByRole("heading", { name: "Profile & Stats" })).toBeVisible();
 
-      const nicknameInput = page.getByLabel("Nickname");
-      await nicknameInput.fill("A");
-      await expect(page.getByRole("button", { name: "Save Profile" })).toBeDisabled();
+      await expect(page.locator(".profile-summary .table-name")).toHaveText(username);
 
-      const newNickname = `E2E${runId}`;
-      await nicknameInput.fill(newNickname);
-      await expect(page.getByRole("button", { name: "Save Profile" })).toBeEnabled();
-      await page.getByRole("button", { name: "Save Profile" }).click();
-      await expect(page.locator(".profile-summary .table-name")).toHaveText(newNickname);
+      const avatarInput = page.getByTestId("profile-avatar-url");
+      await avatarInput.fill("not-a-url");
+      await expect(page.getByTestId("profile-save")).toBeDisabled();
+
+      const avatarUrl = `https://example.com/${runId}.png`;
+      await avatarInput.fill(avatarUrl);
+      await expect(page.getByTestId("profile-save")).toBeEnabled();
+      await page.getByTestId("profile-save").click();
+      await expect(page.locator(`.profile-summary img[alt="${username} avatar"]`)).toHaveAttribute("src", avatarUrl);
     });
 
     test("adds and removes friends", async ({ page }) => {
@@ -59,15 +61,15 @@ test.describe("Player Service (via Gateway)", () => {
       const userId = `user-friends-${runId}`;
       await loginAs(page, userId, `Player${runId}`);
 
-      await page.getByRole("button", { name: "Friends" }).click();
+      await page.getByTestId("nav-friends").click();
       await expect(page.getByRole("heading", { name: "Friends" })).toBeVisible();
 
       const friendId = `friend-${crypto.randomUUID().slice(0, 6)}`;
-      await page.getByLabel("Add Friend").fill(friendId);
-      await page.getByRole("button", { name: "Add" }).click();
+      await page.getByTestId("friends-add-input").fill(friendId);
+      await page.getByTestId("friends-add").click();
       await expect(page.getByText(friendId)).toBeVisible();
 
-      await page.getByRole("button", { name: "Remove" }).click();
+      await page.locator(`[data-testid="friends-remove"][data-friend="${friendId}"]`).click();
       await expect(page.getByText(friendId)).toBeHidden();
     });
   });

@@ -17,6 +17,7 @@ vi.mock("../../src/services/eventProducer");
 describe("profileService consumer flows", () => {
   const baseProfile = {
     userId: "user-1",
+    username: "user-1",
     nickname: "PlayerOne",
     avatarUrl: null,
     preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: "auto" },
@@ -103,8 +104,8 @@ describe("profileService consumer flows", () => {
     vi.mocked(profileRepository.findById).mockResolvedValue(null);
     vi.mocked(nicknameService.generateNickname).mockResolvedValue("PlayerSelf");
     vi.mocked(profileRepository.create).mockResolvedValue({
-      ...baseProfile,
-      nickname: "PlayerSelf",
+      profile: { ...baseProfile, nickname: "PlayerSelf" },
+      created: true,
     });
 
     await profileService.getProfile("user-1", "user-1");

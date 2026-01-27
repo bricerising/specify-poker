@@ -1,32 +1,13 @@
 import { Router, Request, Response } from "express";
 import { playerClient } from "../../grpc/clients";
+import { grpcCall } from "../../grpc/grpcCall";
+import { normalizeUsernameFromClaims } from "../../auth/claims";
+import { requireUserId } from "../utils/requireUserId";
 import logger from "../../observability/logger";
 
 const router = Router();
 
 type UnknownRecord = Record<string, unknown>;
-
-function requireUserId(req: Request, res: Response) {
-  const userId = req.auth?.userId;
-  if (!userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return null;
-  }
-  return userId;
-}
-
-// Helper to convert gRPC callback to promise
-function grpcCall<TRequest, TResponse>(
-  method: (request: TRequest, callback: (err: Error | null, response: TResponse) => void) => void,
-  request: TRequest
-): Promise<TResponse> {
-  return new Promise((resolve, reject) => {
-    method(request, (err: Error | null, response: TResponse) => {
-      if (err) reject(err);
-      else resolve(response);
-    });
-  });
-}
 
 function toString(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -39,10 +20,11 @@ function toNumber(value: unknown, fallback = 0): number {
 
 function normalizeProfile(profile: UnknownRecord, fallbackUserId: string) {
   const userId = toString(profile.userId ?? profile.user_id) || fallbackUserId;
+  const username = toString(profile.username);
   const nickname = toString(profile.nickname) || "Unknown";
   const avatarRaw = toString(profile.avatarUrl ?? profile.avatar_url);
   const avatarUrl = avatarRaw.length > 0 ? avatarRaw : null;
-  return { userId, nickname, avatarUrl };
+  return { userId, username, nickname, avatarUrl };
 }
 
 function normalizeStats(stats: UnknownRecord | undefined) {
@@ -72,17 +54,20 @@ router.get("/me", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
+    const username = normalizeUsernameFromClaims(req.auth?.claims ?? undefined);
+
     const [profileResponse, statsResponse, friendsResponse] = await Promise.all([
-      grpcCall(playerClient.GetProfile.bind(playerClient), { user_id: userId }),
+      grpcCall(playerClient.GetProfile.bind(playerClient), { user_id: userId, ...(username ? { username } : {}) }),
       grpcCall(playerClient.GetStatistics.bind(playerClient), { user_id: userId }),
       grpcCall(playerClient.GetFriends.bind(playerClient), { user_id: userId }),
     ]);
 
     const profile = normalizeProfile((profileResponse.profile || {}) as UnknownRecord, userId);
+    const hydratedProfile = username && !profile.username ? { ...profile, username } : profile;
     const stats = normalizeStats(statsResponse.statistics as UnknownRecord | undefined);
     const friends = normalizeFriendIds((friendsResponse as UnknownRecord).friends);
 
-    return res.json({ ...profile, stats, friends });
+    return res.json({ ...hydratedProfile, stats, friends });
   } catch (err) {
     logger.error({ err }, "Failed to get profile");
     return res.status(500).json({ error: "Failed to get profile" });
@@ -95,6 +80,7 @@ router.put("/me", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
+    const username = normalizeUsernameFromClaims(req.auth?.claims ?? undefined);
     const body = req.body as UnknownRecord;
     const nickname = body.nickname;
     const avatarUrl = body.avatarUrl;
@@ -140,10 +126,11 @@ router.put("/me", async (req: Request, res: Response) => {
     ]);
 
     const profile = normalizeProfile((updateResponse.profile || {}) as UnknownRecord, userId);
+    const hydratedProfile = username && !profile.username ? { ...profile, username } : profile;
     const stats = normalizeStats(statsResponse.statistics as UnknownRecord | undefined);
     const friends = normalizeFriendIds((friendsResponse as UnknownRecord).friends);
 
-    return res.json({ ...profile, stats, friends });
+    return res.json({ ...hydratedProfile, stats, friends });
   } catch (err) {
     logger.error({ err }, "Failed to update profile");
     return res.status(500).json({ error: "Failed to update profile" });
@@ -156,6 +143,7 @@ router.post("/profile", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
+    const username = normalizeUsernameFromClaims(req.auth?.claims ?? undefined);
     const body = req.body as UnknownRecord;
     const nickname = body.nickname;
     const avatarUrl = body.avatarUrl;
@@ -178,10 +166,11 @@ router.post("/profile", async (req: Request, res: Response) => {
     ]);
 
     const profile = normalizeProfile((updateResponse.profile || {}) as UnknownRecord, userId);
+    const hydratedProfile = username && !profile.username ? { ...profile, username } : profile;
     const stats = normalizeStats(statsResponse.statistics as UnknownRecord | undefined);
     const friends = normalizeFriendIds((friendsResponse as UnknownRecord).friends);
 
-    return res.json({ ...profile, stats, friends });
+    return res.json({ ...hydratedProfile, stats, friends });
   } catch (err) {
     logger.error({ err }, "Failed to update profile");
     return res.status(500).json({ error: "Failed to update profile" });

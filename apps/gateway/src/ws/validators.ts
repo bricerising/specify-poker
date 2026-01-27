@@ -1,18 +1,20 @@
 import { incrementRateLimit } from "../storage/rateLimitStore";
+import { readIntEnv } from "../utils/env";
 
-const allowedActions = new Map([
-  ["Fold", "FOLD"],
-  ["Check", "CHECK"],
-  ["Call", "CALL"],
-  ["Bet", "BET"],
-  ["Raise", "RAISE"],
-]);
+const allowedActions = {
+  Fold: "FOLD",
+  Check: "CHECK",
+  Call: "CALL",
+  Bet: "BET",
+  Raise: "RAISE",
+} as const;
+type AllowedActionType = (typeof allowedActions)[keyof typeof allowedActions];
 const maxChatLength = 500;
 const seatMin = 0;
 const seatMax = 8;
 
-const wsWindowMs = Number(process.env.WS_RATE_LIMIT_WINDOW_MS ?? 10000);
-const wsMax = Number(process.env.WS_RATE_LIMIT_MAX ?? 20);
+const wsWindowMs = readIntEnv("WS_RATE_LIMIT_WINDOW_MS", 10_000, { min: 1 });
+const wsMax = readIntEnv("WS_RATE_LIMIT_MAX", 20, { min: 1 });
 
 export async function checkWsRateLimit(
   userId: string,
@@ -46,7 +48,7 @@ export function parseActionType(value: unknown) {
   if (typeof value !== "string") {
     return null;
   }
-  return allowedActions.get(value) ?? null;
+  return (allowedActions as Record<string, AllowedActionType | undefined>)[value] ?? null;
 }
 
 export function parseChatMessage(value: unknown) {

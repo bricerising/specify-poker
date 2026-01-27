@@ -1,55 +1,81 @@
 import { getRedisClient } from "../storage/redisClient";
 import logger from "../observability/logger";
 
-const SUBSCRIPTIONS_KEY = "gateway:subscriptions"; // Map channel to set of connectionIds
+const SUBSCRIPTIONS_KEY = "gateway:subscriptions";
+const CONNECTION_SUBS_PREFIX = "conn_subs";
 
-export async function subscribeToChannel(connectionId: string, channel: string) {
+function channelKey(channel: string): string {
+  return `${SUBSCRIPTIONS_KEY}:${channel}`;
+}
+
+function connectionKey(connectionId: string): string {
+  return `${CONNECTION_SUBS_PREFIX}:${connectionId}`;
+}
+
+type RedisClient = NonNullable<Awaited<ReturnType<typeof getRedisClient>>>;
+type RedisOperation<T> = (redis: RedisClient) => Promise<T>;
+
+async function withRedis<T>(
+  operation: RedisOperation<T>,
+  context: Record<string, unknown>,
+  errorMessage: string,
+  fallback: T
+): Promise<T> {
   const redis = await getRedisClient();
-  if (!redis) return;
+  if (!redis) return fallback;
 
   try {
-    await redis.sAdd(`${SUBSCRIPTIONS_KEY}:${channel}`, connectionId);
-    await redis.sAdd(`conn_subs:${connectionId}`, channel);
+    return await operation(redis);
   } catch (err) {
-    logger.error({ err, connectionId, channel }, "Failed to subscribe to channel");
+    logger.error({ err, ...context }, errorMessage);
+    return fallback;
   }
 }
 
-export async function unsubscribeFromChannel(connectionId: string, channel: string) {
-  const redis = await getRedisClient();
-  if (!redis) return;
-
-  try {
-    await redis.sRem(`${SUBSCRIPTIONS_KEY}:${channel}`, connectionId);
-    await redis.sRem(`conn_subs:${connectionId}`, channel);
-  } catch (err) {
-    logger.error({ err, connectionId, channel }, "Failed to unsubscribe from channel");
-  }
+export async function subscribeToChannel(connectionId: string, channel: string): Promise<void> {
+  await withRedis(
+    async (redis) => {
+      await redis.sAdd(channelKey(channel), connectionId);
+      await redis.sAdd(connectionKey(connectionId), channel);
+    },
+    { connectionId, channel },
+    "Failed to subscribe to channel",
+    undefined
+  );
 }
 
-export async function unsubscribeAll(connectionId: string) {
-  const redis = await getRedisClient();
-  if (!redis) return;
+export async function unsubscribeFromChannel(connectionId: string, channel: string): Promise<void> {
+  await withRedis(
+    async (redis) => {
+      await redis.sRem(channelKey(channel), connectionId);
+      await redis.sRem(connectionKey(connectionId), channel);
+    },
+    { connectionId, channel },
+    "Failed to unsubscribe from channel",
+    undefined
+  );
+}
 
-  try {
-    const channels = await redis.sMembers(`conn_subs:${connectionId}`);
-    for (const channel of channels) {
-      await redis.sRem(`${SUBSCRIPTIONS_KEY}:${channel}`, connectionId);
-    }
-    await redis.del(`conn_subs:${connectionId}`);
-  } catch (err) {
-    logger.error({ err, connectionId }, "Failed to unsubscribe from all channels");
-  }
+export async function unsubscribeAll(connectionId: string): Promise<void> {
+  await withRedis(
+    async (redis) => {
+      const channels = await redis.sMembers(connectionKey(connectionId));
+      for (const channel of channels) {
+        await redis.sRem(channelKey(channel), connectionId);
+      }
+      await redis.del(connectionKey(connectionId));
+    },
+    { connectionId },
+    "Failed to unsubscribe from all channels",
+    undefined
+  );
 }
 
 export async function getSubscribers(channel: string): Promise<string[]> {
-  const redis = await getRedisClient();
-  if (!redis) return [];
-
-  try {
-    return await redis.sMembers(`${SUBSCRIPTIONS_KEY}:${channel}`);
-  } catch (err) {
-    logger.error({ err, channel }, "Failed to get subscribers for channel");
-    return [];
-  }
+  return withRedis(
+    async (redis) => redis.sMembers(channelKey(channel)),
+    { channel },
+    "Failed to get subscribers for channel",
+    []
+  );
 }

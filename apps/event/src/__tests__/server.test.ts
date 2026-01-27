@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const {
   runMigrations,
   connectRedis,
+  closeRedis,
+  closePgPool,
   startGrpcServer,
   startMetricsServer,
   handMaterializerStart,
@@ -13,6 +15,8 @@ const {
 } = vi.hoisted(() => ({
   runMigrations: vi.fn(),
   connectRedis: vi.fn(),
+  closeRedis: vi.fn(),
+  closePgPool: vi.fn(),
   startGrpcServer: vi.fn(),
   startMetricsServer: vi.fn(),
   handMaterializerStart: vi.fn(),
@@ -33,22 +37,30 @@ vi.mock("../storage/migrations", () => ({
 
 vi.mock("../storage/redisClient", () => ({
   connectRedis,
+  closeRedis,
+}));
+
+vi.mock("../storage/pgClient", () => ({
+  closePgPool,
 }));
 
 vi.mock("../jobs/handMaterializer", () => ({
   handMaterializer: {
     start: handMaterializerStart,
+    stop: vi.fn(),
   },
 }));
 
 vi.mock("../jobs/archiver", () => ({
   archiver: {
     start: archiverStart,
+    stop: vi.fn(),
   },
 }));
 
 vi.mock("../api/grpc/server", () => ({
   startGrpcServer,
+  stopGrpcServer: vi.fn(),
 }));
 
 vi.mock("../observability/metrics", () => ({
@@ -124,6 +136,6 @@ describe("event server main", () => {
     startGrpcServer.mockRejectedValue(new Error("boom"));
 
     await expect(main()).rejects.toThrow("boom");
-    expect(loggerError).toHaveBeenCalledWith({ error: expect.any(Error) }, "Failed to start Event Service");
+    expect(loggerError).toHaveBeenCalledWith({ err: expect.any(Error) }, "Failed to start Event Service");
   });
 });

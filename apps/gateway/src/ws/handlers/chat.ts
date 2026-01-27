@@ -1,94 +1,70 @@
 import { randomUUID } from "crypto";
 import WebSocket from "ws";
-import { context, trace, SpanStatusCode, ROOT_CONTEXT } from "@opentelemetry/api";
+import type { z } from "zod";
+import { wsClientMessageSchema } from "@specify-poker/shared";
+
 import { gameClient, playerClient } from "../../grpc/clients";
+import { grpcCall } from "../../grpc/grpcCall";
 import { WsPubSubMessage } from "../pubsub";
 import { checkWsRateLimit, parseChatMessage, parseTableId } from "../validators";
-import { subscribeToChannel, unsubscribeFromChannel, unsubscribeAll, getSubscribers } from "../subscriptions";
+import { subscribeToChannel, unsubscribeFromChannel, unsubscribeAll } from "../subscriptions";
 import { getLocalConnectionMeta, sendToLocal } from "../localRegistry";
+import { deliverToSubscribers } from "../delivery";
 import { broadcastToChannel } from "../../services/broadcastService";
 import { saveChatMessage, getChatHistory } from "../../storage/chatStore";
-import logger from "../../observability/logger";
+import { parseJsonWithSchema } from "../messageParsing";
+import { attachWsRouter } from "../router";
 
-function rawDataToString(data: WebSocket.RawData): string {
-  if (typeof data === "string") return data;
-  if (Buffer.isBuffer(data)) return data.toString("utf8");
-  if (Array.isArray(data)) return Buffer.concat(data).toString("utf8");
-  return Buffer.from(data).toString("utf8");
-}
+type WsClientMessage = z.infer<typeof wsClientMessageSchema>;
 
-function parseJsonObject(data: WebSocket.RawData): Record<string, unknown> | null {
-  try {
-    const parsed: unknown = JSON.parse(rawDataToString(data));
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return null;
-    }
-    return parsed as Record<string, unknown>;
-  } catch {
-    return null;
-  }
+function parseClientMessage(data: WebSocket.RawData): WsClientMessage | null {
+  return parseJsonWithSchema(data, wsClientMessageSchema);
 }
 
 export async function handleChatPubSubEvent(message: WsPubSubMessage) {
   if (message.channel !== "chat") {
     return;
   }
-  const channel = `chat:${message.tableId}`;
-  const subscribers = await getSubscribers(channel);
-  for (const connId of subscribers) {
-    sendToLocal(connId, message.payload);
+  await deliverToSubscribers(`chat:${message.tableId}`, message.payload);
+}
+
+async function getMembership(tableId: string, userId: string): Promise<{ seated: boolean; spectator: boolean }> {
+  try {
+    const response = await grpcCall(gameClient.GetTableState.bind(gameClient), {
+      table_id: tableId,
+      user_id: userId,
+    });
+    const seated = response.state?.seats?.some((s) => s.user_id === userId && s.status !== "empty") || false;
+    const spectator = response.state?.spectators?.some((s) => s.user_id === userId) || false;
+    return { seated, spectator };
+  } catch {
+    return { seated: false, spectator: false };
   }
 }
 
-async function isSeated(tableId: string, userId: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    gameClient.GetTableState({ table_id: tableId, user_id: userId }, (err, response) => {
-      if (err || !response?.state) {
-        resolve(false);
-        return;
-      }
-      const isSeated = response.state?.seats?.some((s) => s.user_id === userId && s.status !== "empty") || false;
-      resolve(isSeated);
-    });
-  });
-}
-
-async function isSpectator(tableId: string, userId: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    gameClient.GetTableState({ table_id: tableId, user_id: userId }, (err, response) => {
-      if (err || !response?.state) {
-        resolve(false);
-        return;
-      }
-      const found = response.state?.spectators?.some((s) => s.user_id === userId) || false;
-      resolve(found);
-    });
-  });
-}
-
 async function isMuted(tableId: string, userId: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    gameClient.IsMuted({ table_id: tableId, user_id: userId }, (err, response) => {
-      if (err || !response) {
-        resolve(false);
-        return;
-      }
-      resolve(response.is_muted);
+  try {
+    const response = await grpcCall(gameClient.IsMuted.bind(gameClient), {
+      table_id: tableId,
+      user_id: userId,
     });
-  });
+    return response.is_muted;
+  } catch {
+    return false;
+  }
 }
 
-async function getNickname(userId: string): Promise<string> {
-  return new Promise((resolve) => {
-    playerClient.GetProfile({ user_id: userId }, (err, response) => {
-      const nickname = response?.profile?.nickname;
-      if (err || typeof nickname !== "string" || nickname.trim().length === 0) {
-        resolve("Unknown");
-        return;
-      }
-      resolve(nickname);
-    });
-  });
+async function getUsername(userId: string): Promise<string> {
+  try {
+    const response = await grpcCall(playerClient.GetProfile.bind(playerClient), { user_id: userId });
+    const username = (response.profile as { username?: unknown } | undefined)?.username;
+    if (typeof username === "string" && username.trim().length > 0) {
+      return username;
+    }
+    return "Unknown";
+  } catch {
+    return "Unknown";
+  }
 }
 
 async function handleSubscribe(connectionId: string, tableId: string) {
@@ -123,8 +99,7 @@ async function handleChatSend(
     return;
   }
 
-  const seated = await isSeated(tableId, userId);
-  const spectator = seated ? false : await isSpectator(tableId, userId);
+  const { seated, spectator } = await getMembership(tableId, userId);
   if (!seated && !spectator) {
     sendToLocal(connectionId, { type: "ChatError", tableId, reason: "not_seated" });
     return;
@@ -135,11 +110,11 @@ async function handleChatSend(
     return;
   }
 
-  const nickname = await getNickname(userId);
+  const username = await getUsername(userId);
   const chatMessage = {
     id: randomUUID(),
     userId: userId,
-    nickname,
+    username,
     text: parsed.text,
     ts: new Date().toISOString(),
   };
@@ -153,60 +128,40 @@ async function handleChatSend(
 }
 
 export function attachChatHub(socket: WebSocket, userId: string, connectionId: string) {
-  socket.on("message", async (data) => {
-    const message = parseJsonObject(data);
-    if (!message) {
-      return;
-    }
-
-    const type = typeof message.type === "string" ? message.type : null;
-    const tableId = parseTableId(message.tableId);
-
-    const tracer = trace.getTracer("gateway-ws");
-    const attributes: Record<string, string> = {};
-    if (type) {
-      attributes["ws.message_type"] = type;
-    }
-    if (tableId) {
-      attributes["poker.table_id"] = tableId;
-    }
-
-    const span = tracer.startSpan("ws.chat", { attributes }, ROOT_CONTEXT);
-    try {
-      await context.with(trace.setSpan(ROOT_CONTEXT, span), async () => {
-        switch (type) {
-          case "SubscribeChat": {
-            if (!tableId) return;
-            await handleSubscribe(connectionId, tableId);
-            return;
-          }
-          case "UnsubscribeChat": {
-            if (!tableId) return;
-            await handleUnsubscribe(connectionId, tableId);
-            return;
-          }
-          case "ChatSend": {
-            if (!tableId) return;
-            await handleChatSend(connectionId, userId, { tableId, message: message.message });
-            return;
-          }
-          default:
-            return;
+  attachWsRouter(socket, {
+    hubName: "chat",
+    parseMessage: parseClientMessage,
+    getAttributes: (message): Record<string, string> => {
+      if ("tableId" in message && typeof message.tableId === "string") {
+        return { "poker.table_id": message.tableId };
+      }
+      return {};
+    },
+    handlers: {
+      SubscribeChat: async (message) => {
+        const tableId = parseTableId(message.tableId);
+        if (!tableId) {
+          return;
         }
-      });
-    } catch (err: unknown) {
-      span.recordException(err as Error);
-      const message = err instanceof Error ? err.message : "unknown_error";
-      span.setStatus({ code: SpanStatusCode.ERROR, message });
-      context.with(trace.setSpan(ROOT_CONTEXT, span), () => {
-        logger.error({ err, type, tableId }, "ws.chat.failed");
-      });
-    } finally {
-      span.end();
-    }
-  });
-
-  socket.on("close", async () => {
-    await unsubscribeAll(connectionId);
+        await handleSubscribe(connectionId, tableId);
+      },
+      UnsubscribeChat: async (message) => {
+        const tableId = parseTableId(message.tableId);
+        if (!tableId) {
+          return;
+        }
+        await handleUnsubscribe(connectionId, tableId);
+      },
+      ChatSend: async (message) => {
+        const tableId = parseTableId(message.tableId);
+        if (!tableId) {
+          return;
+        }
+        await handleChatSend(connectionId, userId, { tableId, message: message.message });
+      },
+    },
+    onClose: async () => {
+      await unsubscribeAll(connectionId);
+    },
   });
 }

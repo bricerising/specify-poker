@@ -13,7 +13,7 @@ export interface StreamResponse {
   messages: StreamMessage[];
 }
 
-function streamKey(streamId: string): string {
+export function streamKey(streamId: string): string {
   return `${STREAM_PREFIX}:${streamId}:events`;
 }
 

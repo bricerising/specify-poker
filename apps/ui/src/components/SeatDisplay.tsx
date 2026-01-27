@@ -59,7 +59,8 @@ export function SeatDisplay({
     );
   }
 
-  const name = seat.nickname ?? (isCurrentUser ? "You" : `Player ${seat.seatId + 1}`);
+  const username = typeof seat.username === "string" ? seat.username.trim() : "";
+  const name = username.length > 0 ? username : isCurrentUser ? "You" : `Player ${seat.seatId + 1}`;
 
   return (
     <div className={`seat-badge ${statusClass} ${turnClass} ${youClass}`}>

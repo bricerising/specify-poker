@@ -3,8 +3,7 @@ import { expect, test } from "@playwright/test";
 test("login flow redirects to Keycloak", async ({ page }) => {
   await page.goto("/");
 
-  const loginLink = page.getByRole("link", { name: "Login" });
-  await loginLink.click();
+  await page.getByTestId("auth-login").click();
 
   await expect(page).toHaveURL(/\/protocol\/openid-connect\/auth/);
 });
@@ -13,7 +12,7 @@ test("login flow completes with demo user", async ({ page }) => {
   test.setTimeout(60_000);
 
   await page.goto("/");
-  await page.getByRole("link", { name: "Login" }).click();
+  await page.getByTestId("auth-login").click();
 
   await expect(page).toHaveURL(/\/realms\/poker-local\/protocol\/openid-connect\/auth/);
 

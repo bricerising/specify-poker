@@ -50,8 +50,8 @@ test("lobby flow creates a table and updates the list", async ({ page }) => {
 
   await page.goto("/");
 
-  await page.getByLabel("Name").fill("High Stakes");
-  await page.getByRole("button", { name: "Create Table" }).click();
+  await page.getByTestId("create-table-name").fill("High Stakes");
+  await page.getByTestId("create-table-submit").click();
 
   await expect(page.getByText("High Stakes")).toBeVisible();
 });

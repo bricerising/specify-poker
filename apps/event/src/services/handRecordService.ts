@@ -1,6 +1,7 @@
 import { handStore } from "../storage/handStore";
 import { HandRecord } from "../domain/types";
 import { privacyService } from "./privacyService";
+import { PermissionDeniedError } from "../errors";
 
 export class HandRecordService {
   async getHandRecord(handId: string, requesterUserId?: string, isOperator = false): Promise<HandRecord | null> {
@@ -40,7 +41,7 @@ export class HandRecordService {
   ): Promise<{ hands: HandRecord[]; total: number }> {
     const isUnauthorized = !isOperator && requesterUserId && requesterUserId !== userId;
     if (isUnauthorized) {
-      throw new Error("Requester not authorized for user hand history");
+      throw new PermissionDeniedError("Requester not authorized for user hand history");
     }
     const result = await handStore.getHandsForUser(userId, limit, offset);
     const shouldRedact = !isOperator && requesterUserId;

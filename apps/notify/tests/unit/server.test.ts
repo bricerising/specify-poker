@@ -4,51 +4,35 @@ vi.mock('../../src/observability', () => ({
   startObservability: vi.fn(),
 }));
 
-vi.mock("../../src/api/grpc/server", () => ({
-  startGrpcServer: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock("../../src/services/eventConsumer", () => {
-  return {
-    EventConsumer: vi.fn().mockImplementation(() => ({
-      start: vi.fn().mockResolvedValue(undefined),
-    })),
-  };
-});
-
-vi.mock("../../src/storage/subscriptionStore", () => {
-  return {
-    SubscriptionStore: vi.fn(),
-  };
-});
-
-vi.mock("../../src/services/pushSenderService", () => {
-  return {
-    PushSenderService: vi.fn(),
-  };
-});
-
-vi.mock("../../src/services/subscriptionService", () => {
-  return {
-    SubscriptionService: vi.fn(),
-  };
-});
-
-vi.mock("../../src/observability/metrics", () => ({
-  startMetricsServer: vi.fn().mockReturnValue({ close: vi.fn() }),
+vi.mock("../../src/app", () => ({
+  createNotifyApp: vi.fn(),
 }));
 
 import { main } from "../../src/server";
-import { startGrpcServer } from "../../src/api/grpc/server";
+import { createNotifyApp } from "../../src/app";
 
 describe('Server main', () => {
   it('should initialize and start services', async () => {
+    const appMock = {
+      start: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn().mockResolvedValue(undefined),
+      services: {},
+    };
+    (createNotifyApp as unknown).mockReturnValue(appMock);
+
     await main();
-    expect(startGrpcServer).toHaveBeenCalled();
+    expect(appMock.start).toHaveBeenCalled();
   });
 
   it('should throw error if start fails', async () => {
-    (startGrpcServer as unknown).mockRejectedValueOnce(new Error('Start failed'));
+    const appMock = {
+      start: vi.fn().mockRejectedValue(new Error("Start failed")),
+      stop: vi.fn().mockResolvedValue(undefined),
+      services: {},
+    };
+    (createNotifyApp as unknown).mockReturnValue(appMock);
+
     await expect(main()).rejects.toThrow('Start failed');
+    expect(appMock.stop).toHaveBeenCalled();
   });
 });

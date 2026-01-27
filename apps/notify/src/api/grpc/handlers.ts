@@ -3,9 +3,56 @@ import { PushSenderService } from "../../services/pushSenderService";
 import { NotificationPayload, NotificationType, PushSubscription } from "../../domain/types";
 import logger from "../../observability/logger";
 import { recordGrpcRequest, recordNotificationRequested } from "../../observability/metrics";
+import { createUnaryHandler, withUnaryErrorHandling, withUnaryErrorResponse, withUnaryTiming } from "@specify-poker/shared";
+import { getErrorMessage, toError } from "../../shared/errors";
 
-function recordDuration(method: string, startedAt: number, status: "ok" | "error") {
-  recordGrpcRequest(method, status, Date.now() - startedAt);
+type UnaryCall<Req> = { request: Req };
+type UnaryCallback<Res> = (error: Error | null, response?: Res) => void;
+
+function createNotifyUnaryHandler<Req, Res>(params: {
+  method: string;
+  handler: (request: Req) => Promise<Res> | Res;
+  statusFromResponse?: (response: Res) => "ok" | "error";
+  errorResponse?: (error: unknown) => Res;
+  errorLogMessage?: string;
+}): (call: UnaryCall<Req>, callback: UnaryCallback<Res>) => Promise<void> {
+  const timing = withUnaryTiming<Req, Res, UnaryCall<Req>>({
+    method: params.method,
+    record: recordGrpcRequest,
+    statusFromResponse: params.statusFromResponse,
+  });
+
+  if (params.errorResponse) {
+    return createUnaryHandler<Req, Res, UnaryCall<Req>>({
+      handler: ({ request }) => params.handler(request),
+      interceptors: [
+        timing,
+        withUnaryErrorResponse({
+          onError: (_context, error) => {
+            logger.error({ err: error }, params.errorLogMessage ?? `${params.method} failed`);
+          },
+          errorResponse: (_context, error) => params.errorResponse!(error),
+        }),
+      ],
+    });
+  }
+
+  return createUnaryHandler<Req, Res, UnaryCall<Req>>({
+    handler: ({ request }) => params.handler(request),
+    interceptors: [
+      timing,
+      withUnaryErrorHandling({
+        method: params.method,
+        logger,
+        message: params.errorLogMessage ?? `${params.method} failed`,
+        toServiceError: toError,
+      }),
+    ],
+  });
+}
+
+function isNotificationType(value: string): value is NotificationType {
+  return value === "turn_alert" || value === "game_invite" || value === "system";
 }
 
 function resolveNotificationData(
@@ -14,10 +61,9 @@ function resolveNotificationData(
   if (!data || Object.keys(data).length === 0) {
     return undefined;
   }
-  const candidate = data.type as NotificationType | undefined;
-  const type = candidate && ["turn_alert", "game_invite", "system"].includes(candidate)
-    ? candidate
-    : "system";
+
+  const rawType = data.type;
+  const type = rawType && isNotificationType(rawType) ? rawType : "system";
   return {
     ...data,
     type,
@@ -26,66 +72,66 @@ function resolveNotificationData(
 
 export function createHandlers(subscriptionService: SubscriptionService, pushService: PushSenderService) {
   return {
-    registerSubscription: async (call: { request: { userId?: string; subscription?: { endpoint?: string; keys?: { p256dh?: string; auth?: string } } } }, callback: (error: Error | null, response?: unknown) => void) => {
-      const startedAt = Date.now();
-      try {
-        const userId = call.request.userId;
-        const subscription = call.request.subscription;
-        if (!userId || !subscription || !subscription.endpoint || !subscription.keys) {
-          recordDuration("RegisterSubscription", startedAt, "error");
-          return callback(null, { ok: false, error: "MISSING_FIELDS" });
+    registerSubscription: createNotifyUnaryHandler({
+      method: "RegisterSubscription",
+      statusFromResponse: (response: { ok: boolean }) => (response.ok ? "ok" : "error"),
+      errorResponse: (error: unknown) => ({ ok: false, error: getErrorMessage(error) }),
+      errorLogMessage: "Failed to register subscription",
+      handler: async (request: {
+        userId?: string;
+        subscription?: { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
+      }) => {
+        const userId = request.userId;
+        const endpoint = request.subscription?.endpoint;
+        const p256dh = request.subscription?.keys?.p256dh;
+        const auth = request.subscription?.keys?.auth;
+
+        if (!userId || !endpoint || !p256dh || !auth) {
+          return { ok: false, error: "MISSING_FIELDS" };
         }
 
         const sub: PushSubscription = {
-          endpoint: subscription.endpoint,
+          endpoint,
           keys: {
-            p256dh: subscription.keys.p256dh!,
-            auth: subscription.keys.auth!,
+            p256dh,
+            auth,
           },
         };
 
         await subscriptionService.register(userId, sub);
-        recordDuration("RegisterSubscription", startedAt, "ok");
-        callback(null, { ok: true });
-      } catch (error: unknown) {
-        logger.error({ err: error }, "Failed to register subscription");
-        recordDuration("RegisterSubscription", startedAt, "error");
-        callback(null, { ok: false, error: (error as Error).message });
-      }
-    },
+        return { ok: true };
+      },
+    }),
 
-    unregisterSubscription: async (call: { request: { userId?: string; endpoint?: string } }, callback: (error: Error | null, response?: unknown) => void) => {
-      const startedAt = Date.now();
-      try {
-        const userId = call.request.userId;
-        const endpoint = call.request.endpoint;
+    unregisterSubscription: createNotifyUnaryHandler({
+      method: "UnregisterSubscription",
+      statusFromResponse: (response: { ok: boolean }) => (response.ok ? "ok" : "error"),
+      errorResponse: (error: unknown) => ({ ok: false, error: getErrorMessage(error) }),
+      errorLogMessage: "Failed to unregister subscription",
+      handler: async (request: { userId?: string; endpoint?: string }) => {
+        const userId = request.userId;
+        const endpoint = request.endpoint;
         if (!userId || !endpoint) {
-          recordDuration("UnregisterSubscription", startedAt, "error");
-          return callback(null, { ok: false, error: "MISSING_FIELDS" });
+          return { ok: false, error: "MISSING_FIELDS" };
         }
 
         await subscriptionService.unregister(userId, endpoint);
-        recordDuration("UnregisterSubscription", startedAt, "ok");
-        callback(null, { ok: true });
-      } catch (error: unknown) {
-        logger.error({ err: error }, "Failed to unregister subscription");
-        recordDuration("UnregisterSubscription", startedAt, "error");
-        callback(null, { ok: false, error: (error as Error).message });
-      }
-    },
+        return { ok: true };
+      },
+    }),
 
-    listSubscriptions: async (call: { request: { userId?: string } }, callback: (error: Error | null, response?: unknown) => void) => {
-      const startedAt = Date.now();
-      try {
-        const userId = call.request.userId;
+    listSubscriptions: createNotifyUnaryHandler({
+      method: "ListSubscriptions",
+      statusFromResponse: () => "ok",
+      errorLogMessage: "Failed to list subscriptions",
+      handler: async (request: { userId?: string }) => {
+        const userId = request.userId;
         if (!userId) {
-          recordDuration("ListSubscriptions", startedAt, "ok");
-          return callback(null, { subscriptions: [] });
+          return { subscriptions: [] };
         }
 
         const subscriptions = await subscriptionService.getSubscriptions(userId);
-        recordDuration("ListSubscriptions", startedAt, "ok");
-        callback(null, {
+        return {
           subscriptions: subscriptions.map((s) => ({
             endpoint: s.endpoint,
             keys: {
@@ -93,45 +139,46 @@ export function createHandlers(subscriptionService: SubscriptionService, pushSer
               auth: s.keys.auth,
             },
           })),
-        });
-      } catch (error: unknown) {
-        logger.error({ err: error }, "Failed to list subscriptions");
-        recordDuration("ListSubscriptions", startedAt, "error");
-        callback(error as Error);
-      }
-    },
+        };
+      },
+    }),
 
-    sendNotification: async (call: { request: { userId?: string; title?: string; body?: string; url?: string; icon?: string; tag?: string; data?: Record<string, string> } }, callback: (error: Error | null, response?: unknown) => void) => {
-      const startedAt = Date.now();
-      try {
-        const { userId, title, body, url, icon, tag, data } = call.request;
+    sendNotification: createNotifyUnaryHandler({
+      method: "SendNotification",
+      statusFromResponse: (response: { ok: boolean }) => (response.ok ? "ok" : "error"),
+      errorResponse: (error: unknown) => ({ ok: false, error: getErrorMessage(error) }),
+      errorLogMessage: "Failed to send notification",
+      handler: async (request: {
+        userId?: string;
+        title?: string;
+        body?: string;
+        url?: string;
+        icon?: string;
+        tag?: string;
+        data?: Record<string, string>;
+      }) => {
+        const { userId, title, body, url, icon, tag, data } = request;
         if (!userId || !title || !body) {
-          recordDuration("SendNotification", startedAt, "error");
-          return callback(null, { ok: false, error: "MISSING_FIELDS" });
+          return { ok: false, error: "MISSING_FIELDS" };
         }
 
         const payload: NotificationPayload = {
-          title: title as string,
-          body: body as string,
-          url: url as string | undefined,
-          icon: icon as string | undefined,
-          tag: tag as string | undefined,
-          data: resolveNotificationData(data as Record<string, string> | undefined),
+          title,
+          body,
+          url: url || undefined,
+          icon: icon || undefined,
+          tag: tag || undefined,
+          data: resolveNotificationData(data),
         };
 
         recordNotificationRequested(payload.data?.type ?? "system");
-        const result = await pushService.sendToUser(userId as string, payload);
-        recordDuration("SendNotification", startedAt, "ok");
-        callback(null, {
+        const result = await pushService.sendToUser(userId, payload);
+        return {
           ok: true,
           successCount: result.success,
           failureCount: result.failure,
-        });
-      } catch (error: unknown) {
-        logger.error({ err: error }, "Failed to send notification");
-        recordDuration("SendNotification", startedAt, "error");
-        callback(null, { ok: false, error: (error as Error).message });
-      }
-    },
+        };
+      },
+    }),
   };
 }

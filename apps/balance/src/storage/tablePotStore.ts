@@ -1,4 +1,6 @@
 import { TablePot } from "../domain/types";
+import logger from "../observability/logger";
+import { tryJsonParse } from "../utils/json";
 import { getRedisClient } from "./redisClient";
 
 const POTS_PREFIX = "balance:pots:";
@@ -23,7 +25,12 @@ export async function getTablePot(tableId: string, handId: string): Promise<Tabl
   if (redis) {
     const payload = await redis.get(`${POTS_PREFIX}${key}`);
     if (payload) {
-      const pot = JSON.parse(payload) as TablePot;
+      const parsed = tryJsonParse<TablePot>(payload);
+      if (!parsed.ok) {
+        logger.warn({ err: parsed.error, tableId, handId }, "tablePotStore.parse.failed");
+        return null;
+      }
+      const pot = parsed.value;
       tablePots.set(key, pot);
       return pot;
     }

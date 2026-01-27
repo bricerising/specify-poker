@@ -1,30 +1,10 @@
 import { Router, Request, Response } from "express";
 import { eventClient } from "../../grpc/clients";
+import { grpcCall } from "../../grpc/grpcCall";
+import { requireUserId } from "../utils/requireUserId";
 import logger from "../../observability/logger";
 
 const router = Router();
-
-function requireUserId(req: Request, res: Response) {
-  const userId = req.auth?.userId;
-  if (!userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return null;
-  }
-  return userId;
-}
-
-// Helper to convert gRPC callback to promise
-function grpcCall<TRequest, TResponse>(
-  method: (request: TRequest, callback: (err: Error | null, response: TResponse) => void) => void,
-  request: TRequest
-): Promise<TResponse> {
-  return new Promise((resolve, reject) => {
-    method(request, (err: Error | null, response: TResponse) => {
-      if (err) reject(err);
-      else resolve(response);
-    });
-  });
-}
 
 // GET /api/audit/events - Query events
 router.get("/events", async (req: Request, res: Response) => {

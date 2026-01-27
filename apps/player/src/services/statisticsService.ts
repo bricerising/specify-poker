@@ -28,6 +28,32 @@ export enum StatisticType {
   ReferralCount = "referral_count",
 }
 
+type StatisticUpdater = (stats: Statistics, amount: number) => void;
+
+const statisticUpdaters: Record<StatisticType, StatisticUpdater> = {
+  [StatisticType.HandsPlayed]: (stats, amount) => {
+    stats.handsPlayed += Math.max(0, Math.floor(amount));
+  },
+  [StatisticType.Wins]: (stats, amount) => {
+    stats.wins += Math.max(0, Math.floor(amount));
+  },
+  [StatisticType.Vpip]: (stats, amount) => {
+    stats.vpip = Math.max(0, Math.min(100, stats.vpip + amount));
+  },
+  [StatisticType.Pfr]: (stats, amount) => {
+    stats.pfr = Math.max(0, Math.min(100, stats.pfr + amount));
+  },
+  [StatisticType.AllIn]: (stats, amount) => {
+    stats.allInCount += Math.max(0, Math.floor(amount));
+  },
+  [StatisticType.BiggestPot]: (stats, amount) => {
+    stats.biggestPot = Math.max(stats.biggestPot, Math.floor(amount));
+  },
+  [StatisticType.ReferralCount]: (stats, amount) => {
+    stats.referralCount += Math.max(0, Math.floor(amount));
+  },
+};
+
 export async function getStatistics(userId: string): Promise<Statistics> {
   const cached = await statisticsCache.get(userId);
   if (cached) {
@@ -51,31 +77,7 @@ export async function incrementStatistic(
   amount: number
 ): Promise<Statistics> {
   const stats = await getStatistics(userId);
-  switch (type) {
-    case StatisticType.HandsPlayed:
-      stats.handsPlayed += Math.max(0, Math.floor(amount));
-      break;
-    case StatisticType.Wins:
-      stats.wins += Math.max(0, Math.floor(amount));
-      break;
-    case StatisticType.Vpip:
-      stats.vpip = Math.max(0, Math.min(100, stats.vpip + amount));
-      break;
-    case StatisticType.Pfr:
-      stats.pfr = Math.max(0, Math.min(100, stats.pfr + amount));
-      break;
-    case StatisticType.AllIn:
-      stats.allInCount += Math.max(0, Math.floor(amount));
-      break;
-    case StatisticType.BiggestPot:
-      stats.biggestPot = Math.max(stats.biggestPot, Math.floor(amount));
-      break;
-    case StatisticType.ReferralCount:
-      stats.referralCount += Math.max(0, Math.floor(amount));
-      break;
-    default:
-      break;
-  }
+  statisticUpdaters[type](stats, amount);
 
   stats.lastUpdated = new Date().toISOString();
   const saved = await statisticsRepository.update(stats);

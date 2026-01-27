@@ -2,7 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 const useExternalServer = Boolean(process.env.PLAYWRIGHT_BASE_URL)
-  || process.env.PLAYWRIGHT_EXTERNAL === "1";
+  || process.env.PLAYWRIGHT_EXTERNAL === "1"
+  || Boolean(process.env.CI);
 const runAllBrowsers = process.env.PLAYWRIGHT_ALL_BROWSERS === "1";
 
 export default defineConfig({
@@ -43,6 +44,6 @@ export default defineConfig({
     : {
       command: "npm run start",
       url: baseURL,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: true,
     },
 });

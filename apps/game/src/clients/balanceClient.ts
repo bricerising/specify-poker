@@ -1,6 +1,7 @@
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
 import * as path from "path";
+import { unaryCallResult } from "@specify-poker/shared";
 import { config } from "../config";
 import logger from "../observability/logger";
 
@@ -190,70 +191,63 @@ export async function reserveForBuyIn(
   amount: number,
   idempotencyKey: string
 ): Promise<ReserveResult> {
-  return new Promise((resolve) => {
-    client.ReserveForBuyIn(
-      {
-        account_id: accountId,
-        table_id: tableId,
-        amount,
-        idempotency_key: idempotencyKey,
-        timeout_seconds: 30,
-      },
-      (err: grpc.ServiceError | null, response: ReserveForBuyInResponse) => {
-        if (err) {
-          logger.error({ err, accountId, tableId }, "Balance reserve failed");
-          resolve({ ok: false, error: "INTERNAL_ERROR" });
-          return;
-        }
-        resolve({
-          ok: response.ok,
-          reservationId: response.reservation_id,
-          error: response.error,
-          availableBalance: parseNumeric(response.available_balance),
-        });
-      }
-    );
+  const call = await unaryCallResult(client.ReserveForBuyIn.bind(client), {
+    account_id: accountId,
+    table_id: tableId,
+    amount,
+    idempotency_key: idempotencyKey,
+    timeout_seconds: 30,
   });
+
+  if (!call.ok) {
+    logger.error({ err: call.error, accountId, tableId }, "Balance reserve failed");
+    return { ok: false, error: "INTERNAL_ERROR" };
+  }
+
+  const response = call.value;
+  return {
+    ok: response.ok,
+    reservationId: response.reservation_id,
+    error: response.error,
+    availableBalance: parseNumeric(response.available_balance),
+  };
 }
 
 export async function commitReservation(reservationId: string): Promise<CommitResult> {
-  return new Promise((resolve) => {
-    client.CommitReservation(
-      { reservation_id: reservationId },
-      (err: grpc.ServiceError | null, response: CommitReservationResponse) => {
-        if (err) {
-          logger.error({ err, reservationId }, "Balance commit failed");
-          resolve({ ok: false, error: "INTERNAL_ERROR" });
-          return;
-        }
-        resolve({
-          ok: response.ok,
-          transactionId: response.transaction_id,
-          error: response.error,
-          newBalance: parseNumeric(response.new_balance),
-        });
-      }
-    );
+  const call = await unaryCallResult(client.CommitReservation.bind(client), {
+    reservation_id: reservationId,
   });
+
+  if (!call.ok) {
+    logger.error({ err: call.error, reservationId }, "Balance commit failed");
+    return { ok: false, error: "INTERNAL_ERROR" };
+  }
+
+  const response = call.value;
+  return {
+    ok: response.ok,
+    transactionId: response.transaction_id,
+    error: response.error,
+    newBalance: parseNumeric(response.new_balance),
+  };
 }
 
 export async function releaseReservation(
   reservationId: string,
   reason?: string
 ): Promise<{ ok: boolean; error?: string }> {
-  return new Promise((resolve) => {
-    client.ReleaseReservation(
-      { reservation_id: reservationId, reason },
-      (err: grpc.ServiceError | null, response: ReleaseReservationResponse) => {
-        if (err) {
-          logger.error({ err, reservationId }, "Balance release failed");
-          resolve({ ok: false, error: "INTERNAL_ERROR" });
-          return;
-        }
-        resolve({ ok: response.ok, error: response.error });
-      }
-    );
+  const call = await unaryCallResult(client.ReleaseReservation.bind(client), {
+    reservation_id: reservationId,
+    reason,
   });
+
+  if (!call.ok) {
+    logger.error({ err: call.error, reservationId }, "Balance release failed");
+    return { ok: false, error: "INTERNAL_ERROR" };
+  }
+
+  const response = call.value;
+  return { ok: response.ok, error: response.error };
 }
 
 export async function processCashOut(
@@ -264,31 +258,27 @@ export async function processCashOut(
   idempotencyKey: string,
   handId?: string
 ): Promise<CashOutResult> {
-  return new Promise((resolve) => {
-    client.ProcessCashOut(
-      {
-        account_id: accountId,
-        table_id: tableId,
-        seat_id: seatId,
-        amount,
-        idempotency_key: idempotencyKey,
-        hand_id: handId,
-      },
-      (err: grpc.ServiceError | null, response: ProcessCashOutResponse) => {
-        if (err) {
-          logger.error({ err, accountId, tableId }, "Balance cash out failed");
-          resolve({ ok: false, error: "INTERNAL_ERROR" });
-          return;
-        }
-        resolve({
-          ok: response.ok,
-          transactionId: response.transaction_id,
-          error: response.error,
-          newBalance: parseNumeric(response.new_balance),
-        });
-      }
-    );
+  const call = await unaryCallResult(client.ProcessCashOut.bind(client), {
+    account_id: accountId,
+    table_id: tableId,
+    seat_id: seatId,
+    amount,
+    idempotency_key: idempotencyKey,
+    hand_id: handId,
   });
+
+  if (!call.ok) {
+    logger.error({ err: call.error, accountId, tableId }, "Balance cash out failed");
+    return { ok: false, error: "INTERNAL_ERROR" };
+  }
+
+  const response = call.value;
+  return {
+    ok: response.ok,
+    transactionId: response.transaction_id,
+    error: response.error,
+    newBalance: parseNumeric(response.new_balance),
+  };
 }
 
 export async function recordContribution(
@@ -300,32 +290,28 @@ export async function recordContribution(
   contributionType: string,
   idempotencyKey: string
 ): Promise<ContributionResult> {
-  return new Promise((resolve) => {
-    client.RecordContribution(
-      {
-        table_id: tableId,
-        hand_id: handId,
-        seat_id: seatId,
-        account_id: accountId,
-        amount,
-        contribution_type: contributionType,
-        idempotency_key: idempotencyKey,
-      },
-      (err: grpc.ServiceError | null, response: RecordContributionResponse) => {
-        if (err) {
-          logger.error({ err, tableId, handId }, "Balance contribution failed");
-          resolve({ ok: false, error: "INTERNAL_ERROR" });
-          return;
-        }
-        resolve({
-          ok: response.ok,
-          error: response.error,
-          totalPot: parseNumeric(response.total_pot),
-          seatContribution: parseNumeric(response.seat_contribution),
-        });
-      }
-    );
+  const call = await unaryCallResult(client.RecordContribution.bind(client), {
+    table_id: tableId,
+    hand_id: handId,
+    seat_id: seatId,
+    account_id: accountId,
+    amount,
+    contribution_type: contributionType,
+    idempotency_key: idempotencyKey,
   });
+
+  if (!call.ok) {
+    logger.error({ err: call.error, tableId, handId }, "Balance contribution failed");
+    return { ok: false, error: "INTERNAL_ERROR" };
+  }
+
+  const response = call.value;
+  return {
+    ok: response.ok,
+    error: response.error,
+    totalPot: parseNumeric(response.total_pot),
+    seatContribution: parseNumeric(response.seat_contribution),
+  };
 }
 
 export async function settlePot(
@@ -334,37 +320,33 @@ export async function settlePot(
   winners: Array<{ seatId: number; accountId: string; amount: number }>,
   idempotencyKey: string
 ): Promise<SettlementResult> {
-  return new Promise((resolve) => {
-    client.SettlePot(
-      {
-        table_id: tableId,
-        hand_id: handId,
-        winners: winners.map((w) => ({
-          seat_id: w.seatId,
-          account_id: w.accountId,
-          amount: w.amount,
-        })),
-        idempotency_key: idempotencyKey,
-      },
-      (err: grpc.ServiceError | null, response: SettlePotResponse) => {
-        if (err) {
-          logger.error({ err, tableId, handId }, "Balance settle failed");
-          resolve({ ok: false, error: "INTERNAL_ERROR" });
-          return;
-        }
-        resolve({
-          ok: response.ok,
-          error: response.error,
-          results: response.results?.map((r) => ({
-            accountId: r.account_id,
-            transactionId: r.transaction_id,
-            amount: parseNumeric(r.amount),
-            newBalance: parseNumeric(r.new_balance),
-          })),
-        });
-      }
-    );
+  const call = await unaryCallResult(client.SettlePot.bind(client), {
+    table_id: tableId,
+    hand_id: handId,
+    winners: winners.map((w) => ({
+      seat_id: w.seatId,
+      account_id: w.accountId,
+      amount: w.amount,
+    })),
+    idempotency_key: idempotencyKey,
   });
+
+  if (!call.ok) {
+    logger.error({ err: call.error, tableId, handId }, "Balance settle failed");
+    return { ok: false, error: "INTERNAL_ERROR" };
+  }
+
+  const response = call.value;
+  return {
+    ok: response.ok,
+    error: response.error,
+    results: response.results?.map((r) => ({
+      accountId: r.account_id,
+      transactionId: r.transaction_id,
+      amount: parseNumeric(r.amount),
+      newBalance: parseNumeric(r.new_balance),
+    })),
+  };
 }
 
 export async function cancelPot(
@@ -372,17 +354,17 @@ export async function cancelPot(
   handId: string,
   reason: string
 ): Promise<{ ok: boolean; error?: string }> {
-  return new Promise((resolve) => {
-    client.CancelPot(
-      { table_id: tableId, hand_id: handId, reason },
-      (err: grpc.ServiceError | null, response: CancelPotResponse) => {
-        if (err) {
-          logger.error({ err, tableId, handId }, "Balance cancel pot failed");
-          resolve({ ok: false, error: "INTERNAL_ERROR" });
-          return;
-        }
-        resolve({ ok: response.ok, error: response.error });
-      }
-    );
+  const call = await unaryCallResult(client.CancelPot.bind(client), {
+    table_id: tableId,
+    hand_id: handId,
+    reason,
   });
+
+  if (!call.ok) {
+    logger.error({ err: call.error, tableId, handId }, "Balance cancel pot failed");
+    return { ok: false, error: "INTERNAL_ERROR" };
+  }
+
+  const response = call.value;
+  return { ok: response.ok, error: response.error };
 }

@@ -1,6 +1,7 @@
 import { blockingRedisClient } from "../storage/redisClient";
 import { eventStore } from "../storage/eventStore";
 import { handStore } from "../storage/handStore";
+import { streamKey } from "../storage/streamStore";
 import {
   ActionTakenPayload,
   Card,
@@ -13,36 +14,178 @@ import {
   StreetAdvancedPayload,
 } from "../domain/types";
 import { recordMaterializationLag } from "../observability/metrics";
+import logger from "../observability/logger";
+import { getErrorMessage, isRecord } from "../errors";
+
+export interface HandMaterializerDependencies {
+  redisClient: typeof blockingRedisClient;
+  eventStore: typeof eventStore;
+  handStore: typeof handStore;
+  recordMaterializationLag: typeof recordMaterializationLag;
+}
+
+type ParticipantRecord = {
+  seatId: number;
+  userId: string;
+  nickname: string;
+  startingStack: number;
+  endingStack: number;
+  holeCards: Card[] | null;
+  actions: { street: string; action: string; amount: number; timestamp: string }[];
+  result: "WON" | "LOST" | "FOLDED" | "SPLIT";
+};
+
+type AggregationContext = {
+  participants: Map<string, ParticipantRecord>;
+  participantsBySeat: Map<number, string>;
+  communityCards: Card[];
+  pots: { amount: number; winners: string[] }[];
+  winners: { userId: string; amount: number }[];
+};
+
+type MaterializableEventType =
+  | "HAND_STARTED"
+  | "CARDS_DEALT"
+  | "ACTION_TAKEN"
+  | "STREET_ADVANCED"
+  | "SHOWDOWN"
+  | "POT_AWARDED"
+  | "HAND_COMPLETED";
+
+type MaterializerEventHandler = (ctx: AggregationContext, event: GameEvent) => void;
+
+const materializerEventHandlers = {
+  HAND_STARTED: (ctx: AggregationContext, event: GameEvent) => {
+    const payload = event.payload as HandStartedPayload;
+    const seats = getSeats(payload, event.payload);
+    seats.forEach((seat) => {
+      ctx.participants.set(seat.userId, {
+        seatId: seat.seatId,
+        userId: seat.userId,
+        nickname: seat.nickname || `Player ${seat.seatId}`,
+        startingStack: seat.stack,
+        endingStack: seat.stack,
+        holeCards: null,
+        actions: [],
+        result: "LOST",
+      });
+      ctx.participantsBySeat.set(seat.seatId, seat.userId);
+    });
+  },
+  CARDS_DEALT: (ctx: AggregationContext, event: GameEvent) => {
+    if (!event.userId) {
+      return;
+    }
+    const payload = event.payload as { cards?: Card[] };
+    const participant = ctx.participants.get(event.userId);
+    if (participant) {
+      participant.holeCards = payload.cards || null;
+    }
+  },
+  ACTION_TAKEN: (ctx: AggregationContext, event: GameEvent) => {
+    if (!event.userId) {
+      return;
+    }
+    const payload = event.payload as ActionTakenPayload;
+    const participant = ctx.participants.get(event.userId);
+    if (!participant) {
+      return;
+    }
+    participant.actions.push({
+      street: payload.street || "unknown",
+      action: payload.action,
+      amount: payload.amount || 0,
+      timestamp: event.timestamp.toISOString(),
+    });
+    if (payload.action === "FOLD") {
+      participant.result = "FOLDED";
+    }
+  },
+  STREET_ADVANCED: (ctx: AggregationContext, event: GameEvent) => {
+    const payload = event.payload as StreetAdvancedPayload;
+    if (payload.communityCards) {
+      ctx.communityCards.push(...payload.communityCards);
+    }
+  },
+  SHOWDOWN: (ctx: AggregationContext, event: GameEvent) => {
+    const payload = event.payload as ShowdownPayload;
+    payload.reveals.forEach((reveal) => {
+      const userId = ctx.participantsBySeat.get(reveal.seatId);
+      const participant = userId ? ctx.participants.get(userId) : undefined;
+      if (participant) {
+        participant.holeCards = reveal.cards;
+      }
+    });
+  },
+  POT_AWARDED: (ctx: AggregationContext, event: GameEvent) => {
+    const payload = event.payload as PotAwardedPayload;
+    ctx.pots.push({
+      amount: payload.amount,
+      winners: payload.winners
+        .map((winner) => resolveUserId(winner.userId, winner.seatId, ctx.participantsBySeat))
+        .filter((winnerId): winnerId is string => Boolean(winnerId)),
+    });
+    payload.winners.forEach((winner) => {
+      const userId = resolveUserId(winner.userId, winner.seatId, ctx.participantsBySeat);
+      if (!userId) {
+        return;
+      }
+      ctx.winners.push({ userId, amount: winner.share });
+      const participant = ctx.participants.get(userId);
+      if (participant) {
+        participant.result = "WON";
+      }
+    });
+  },
+  HAND_COMPLETED: (ctx: AggregationContext, event: GameEvent) => {
+    const payload = event.payload as HandCompletedPayload;
+    const endStacks =
+      payload.playerEndStacks ||
+      ((event.payload as { player_end_stacks?: Record<string, number> }).player_end_stacks ?? null);
+    if (!endStacks) {
+      return;
+    }
+    Object.entries(endStacks).forEach(([userId, stack]) => {
+      const participant = ctx.participants.get(userId);
+      if (participant) {
+        participant.endingStack = stack;
+      }
+    });
+  },
+} satisfies Record<MaterializableEventType, MaterializerEventHandler>;
 
 export class HandMaterializer {
+  constructor(private readonly deps: HandMaterializerDependencies) {}
+
   private isRunning = false;
-  private streamKey = 'events:all';
-  private groupName = 'hand-materializer';
+  private streamRedisKey = streamKey("all");
+  private groupName = "hand-materializer";
   private consumerName = `materializer-${process.pid}`;
 
   async start() {
     this.isRunning = true;
 
     try {
-      await blockingRedisClient.xGroupCreate(this.streamKey, this.groupName, '$', { MKSTREAM: true });
+      await this.deps.redisClient.xGroupCreate(this.streamRedisKey, this.groupName, "$", { MKSTREAM: true });
     } catch (err: unknown) {
-      if ((err as Error).message.includes('BUSYGROUP')) {
-        return;
+      if (getErrorMessage(err).includes("BUSYGROUP")) {
+        logger.info({ streamKey: this.streamRedisKey, group: this.groupName }, "HandMaterializer consumer group exists");
+      } else {
+        logger.error({ error: err, streamKey: this.streamRedisKey, group: this.groupName }, "Error creating consumer group");
       }
-      console.error('Error creating consumer group:', err);
     }
 
-    console.log(`HandMaterializer started, listening on ${this.streamKey}`);
-    this.poll();
+    logger.info({ streamKey: this.streamRedisKey, group: this.groupName }, "HandMaterializer started");
+    void this.poll();
   }
 
   private async poll() {
     while (this.isRunning) {
       try {
-        const streams = await blockingRedisClient.xReadGroup(
+        const streams = await this.deps.redisClient.xReadGroup(
           this.groupName,
           this.consumerName,
-          [{ key: this.streamKey, id: '>' }],
+          [{ key: this.streamRedisKey, id: ">" }],
           { COUNT: 1, BLOCK: 5000 }
         );
 
@@ -51,30 +194,40 @@ export class HandMaterializer {
         }
         for (const stream of streams) {
           for (const message of stream.messages) {
-            const event = JSON.parse(message.message.data);
-            await this.handleEvent(event);
-            await blockingRedisClient.xAck(this.streamKey, this.groupName, message.id);
+            const parsed = safeJsonParse(message.message.data);
+            if (!parsed) {
+              logger.error(
+                { streamKey: this.streamRedisKey, group: this.groupName, messageId: message.id },
+                "Invalid JSON in HandMaterializer stream message"
+              );
+              await this.deps.redisClient.xAck(this.streamRedisKey, this.groupName, message.id);
+              continue;
+            }
+
+            await this.handleEvent(parsed);
+            await this.deps.redisClient.xAck(this.streamRedisKey, this.groupName, message.id);
           }
         }
       } catch (err) {
-        console.error('Error polling events in HandMaterializer:', err);
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        logger.error({ error: err }, "Error polling events in HandMaterializer");
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
   }
 
   private async handleEvent(event: Record<string, unknown>) {
-    if (event.type !== 'HAND_COMPLETED') {
+    const handCompleted = parseHandCompletedEvent(event);
+    if (!handCompleted) {
       return;
     }
-    console.log(`Hand completed: ${event.handId}. Materializing record...`);
-    await this.materializeHand(event.handId as string, event.tableId as string);
+    logger.info({ handId: handCompleted.handId, tableId: handCompleted.tableId }, "Materializing hand record");
+    await this.materializeHand(handCompleted.handId, handCompleted.tableId);
   }
 
   private async materializeHand(handId: string, tableId: string) {
     try {
       // 1. Query all events for this hand
-      const { events } = await eventStore.queryEvents({ handId, limit: 1000 });
+      const { events } = await this.deps.eventStore.queryEvents({ handId, limit: 1000 });
 
       if (events.length === 0) return;
 
@@ -82,11 +235,11 @@ export class HandMaterializer {
       const record = this.aggregateEvents(handId, tableId, events);
 
       // 3. Save HandRecord
-      await handStore.saveHandRecord(record);
-      recordMaterializationLag(Date.now() - record.completedAt.getTime());
-      console.log(`Hand record saved for hand ${handId}`);
+      await this.deps.handStore.saveHandRecord(record);
+      this.deps.recordMaterializationLag(Date.now() - record.completedAt.getTime());
+      logger.info({ handId }, "Hand record saved");
     } catch (err) {
-      console.error(`Failed to materialize hand ${handId}:`, err);
+      logger.error({ error: err, handId }, "Failed to materialize hand");
     }
   }
 
@@ -94,162 +247,37 @@ export class HandMaterializer {
     const startedEvent = events.find((event) => event.type === "HAND_STARTED");
     const completedEvent = events.find((event) => event.type === "HAND_COMPLETED");
 
-    const participants = new Map<
-      string,
-      {
-        seatId: number;
-        userId: string;
-        nickname: string;
-        startingStack: number;
-        endingStack: number;
-        holeCards: Card[] | null;
-        actions: { street: string; action: string; amount: number; timestamp: string }[];
-        result: "WON" | "LOST" | "FOLDED" | "SPLIT";
-      }
-    >();
-    const participantsBySeat = new Map<number, string>();
-    const communityCards: Card[] = [];
-    const pots: { amount: number; winners: string[] }[] = [];
-    const winners: { userId: string; amount: number }[] = [];
+    const ctx: AggregationContext = {
+      participants: new Map(),
+      participantsBySeat: new Map(),
+      communityCards: [],
+      pots: [],
+      winners: [],
+    };
 
     events.forEach((event) => {
-      switch (event.type) {
-        case "HAND_STARTED": {
-          const payload = event.payload as HandStartedPayload;
-          const seats = getSeats(payload, event.payload);
-          seats.forEach((seat) => {
-            participants.set(seat.userId, {
-              seatId: seat.seatId,
-              userId: seat.userId,
-              nickname: seat.nickname || `Player ${seat.seatId}`,
-              startingStack: seat.stack,
-              endingStack: seat.stack,
-              holeCards: null,
-              actions: [],
-              result: "LOST",
-            });
-            participantsBySeat.set(seat.seatId, seat.userId);
-          });
-          break;
-        }
-        case "CARDS_DEALT": {
-          if (!event.userId) {
-            break;
-          }
-          const payload = event.payload as { cards?: Card[] };
-          const participant = participants.get(event.userId);
-          if (participant) {
-            participant.holeCards = payload.cards || null;
-          }
-          break;
-        }
-        case "ACTION_TAKEN": {
-          if (!event.userId) {
-            break;
-          }
-          const payload = event.payload as ActionTakenPayload;
-          const participant = participants.get(event.userId);
-          if (!participant) {
-            break;
-          }
-          participant.actions.push({
-            street: payload.street || "unknown",
-            action: payload.action,
-            amount: payload.amount || 0,
-            timestamp: event.timestamp.toISOString(),
-          });
-          if (payload.action === "FOLD") {
-            participant.result = "FOLDED";
-          }
-          break;
-        }
-        case "STREET_ADVANCED": {
-          const payload = event.payload as StreetAdvancedPayload;
-          if (payload.communityCards) {
-            communityCards.push(...payload.communityCards);
-          }
-          break;
-        }
-        case "SHOWDOWN": {
-          const payload = event.payload as ShowdownPayload;
-          payload.reveals.forEach((reveal) => {
-            const userId = participantsBySeat.get(reveal.seatId);
-            const participant = userId ? participants.get(userId) : undefined;
-            if (participant) {
-              participant.holeCards = reveal.cards;
-            }
-          });
-          break;
-        }
-        case "POT_AWARDED": {
-          const payload = event.payload as PotAwardedPayload;
-          pots.push({
-            amount: payload.amount,
-            winners: payload.winners
-              .map((winner) => resolveUserId(winner.userId, winner.seatId, participantsBySeat))
-              .filter((winnerId): winnerId is string => Boolean(winnerId)),
-          });
-          payload.winners.forEach((winner) => {
-            const userId = resolveUserId(winner.userId, winner.seatId, participantsBySeat);
-            if (!userId) {
-              return;
-            }
-            winners.push({ userId, amount: winner.share });
-            const participant = participants.get(userId);
-            if (participant) {
-              participant.result = "WON";
-            }
-          });
-          break;
-        }
-        case "HAND_COMPLETED": {
-          const payload = event.payload as HandCompletedPayload;
-          const endStacks =
-            payload.playerEndStacks ||
-            ((event.payload as { player_end_stacks?: Record<string, number> }).player_end_stacks ?? null);
-          if (endStacks) {
-            Object.entries(endStacks).forEach(([userId, stack]) => {
-              const participant = participants.get(userId);
-              if (participant) {
-                participant.endingStack = stack;
-              }
-            });
-          }
-          break;
-        }
-        default:
-          break;
+      const handler = materializerEventHandlers[event.type as MaterializableEventType];
+      if (!handler) {
+        return;
       }
+      handler(ctx, event);
     });
 
-    const configPayload = startedEvent?.payload as
-      | (HandStartedPayload & {
-          small_blind?: number;
-          big_blind?: number;
-          ante?: number;
-          tableName?: string;
-          table_name?: string;
-        })
-      | undefined;
-
-    const smallBlind = configPayload?.smallBlind ?? configPayload?.small_blind ?? 0;
-    const bigBlind = configPayload?.bigBlind ?? configPayload?.big_blind ?? 0;
-    const ante = configPayload?.ante ?? 0;
-    const tableName = configPayload?.tableName ?? configPayload?.table_name ?? "Unknown Table";
+    const config = adaptHandStartedConfig(startedEvent?.payload);
 
     return {
       handId,
       tableId,
-      tableName,
+      tableName: config.tableName,
       config: {
-        smallBlind,
-        bigBlind,
-        ante,
+        smallBlind: config.smallBlind,
+        bigBlind: config.bigBlind,
+        ante: config.ante,
       },
-      participants: Array.from(participants.values()),
-      communityCards,
-      pots,
-      winners,
+      participants: Array.from(ctx.participants.values()),
+      communityCards: ctx.communityCards,
+      pots: ctx.pots,
+      winners: ctx.winners,
       startedAt: startedEvent?.timestamp || new Date(),
       completedAt: completedEvent?.timestamp || new Date(),
       duration:
@@ -264,7 +292,44 @@ export class HandMaterializer {
   }
 }
 
-export const handMaterializer = new HandMaterializer();
+export function createHandMaterializer(
+  deps: HandMaterializerDependencies = {
+    redisClient: blockingRedisClient,
+    eventStore,
+    handStore,
+    recordMaterializationLag,
+  }
+) {
+  return new HandMaterializer(deps);
+}
+
+export const handMaterializer = createHandMaterializer();
+
+type HandCompletedEvent = { type: "HAND_COMPLETED"; handId: string; tableId: string };
+
+function parseHandCompletedEvent(event: Record<string, unknown>): HandCompletedEvent | null {
+  if (event.type !== "HAND_COMPLETED") {
+    return null;
+  }
+  const handId = event.handId;
+  const tableId = event.tableId;
+  if (typeof handId !== "string" || handId.trim().length === 0) {
+    return null;
+  }
+  if (typeof tableId !== "string" || tableId.trim().length === 0) {
+    return null;
+  }
+  return { type: "HAND_COMPLETED", handId, tableId };
+}
+
+function safeJsonParse(raw: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 function getSeats(
   payload: HandStartedPayload,
@@ -279,4 +344,40 @@ function resolveUserId(
   participantsBySeat: Map<number, string>
 ): string | undefined {
   return userId || participantsBySeat.get(seatId);
+}
+
+type HandStartedPayloadCompat = HandStartedPayload & {
+  small_blind?: unknown;
+  big_blind?: unknown;
+  ante?: unknown;
+  tableName?: unknown;
+  table_name?: unknown;
+};
+
+function adaptHandStartedConfig(
+  payload: unknown,
+): { tableName: string; smallBlind: number; bigBlind: number; ante: number } {
+  const compat = (payload ?? {}) as Partial<HandStartedPayloadCompat>;
+
+  const numberValue = (value: unknown, fallback: number) => {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === "string" && value.trim().length > 0) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+    return fallback;
+  };
+
+  const stringValue = (value: unknown, fallback: string) => (typeof value === "string" ? value : fallback);
+
+  const smallBlind = numberValue(compat.smallBlind ?? compat.small_blind, 0);
+  const bigBlind = numberValue(compat.bigBlind ?? compat.big_blind, 0);
+  const ante = numberValue(compat.ante, 0);
+  const tableName = stringValue(compat.tableName ?? compat.table_name, "Unknown Table");
+
+  return { tableName, smallBlind, bigBlind, ante };
 }

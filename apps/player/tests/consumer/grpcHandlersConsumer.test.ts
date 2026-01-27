@@ -33,6 +33,7 @@ describe("gRPC handlers consumer flows", () => {
     vi.mocked(profileService.getProfiles).mockResolvedValue([
       {
         userId: "user-1",
+        username: "user-1",
         nickname: "Alpha",
         avatarUrl: null,
         preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: "auto" },
@@ -60,6 +61,7 @@ describe("gRPC handlers consumer flows", () => {
   it("records deleted profile lookups", async () => {
     vi.mocked(profileService.getProfile).mockResolvedValue({
       userId: "user-9",
+      username: "Deleted User",
       nickname: "Deleted User",
       avatarUrl: null,
       preferences: { soundEnabled: false, chatEnabled: false, showHandStrength: false, theme: "auto" },
@@ -83,6 +85,7 @@ describe("gRPC handlers consumer flows", () => {
     vi.mocked(profileService.getProfiles).mockResolvedValue([
       {
         userId: "user-1",
+        username: "user-1",
         nickname: "Alpha",
         avatarUrl: null,
         preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: "auto" },
@@ -94,6 +97,7 @@ describe("gRPC handlers consumer flows", () => {
       },
       {
         userId: "user-2",
+        username: "user-2",
         nickname: "Beta",
         avatarUrl: null,
         preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: "auto" },
@@ -123,6 +127,7 @@ describe("gRPC handlers consumer flows", () => {
   it("normalizes empty avatar URLs on profile updates", async () => {
     vi.mocked(profileService.updateProfile).mockResolvedValue({
       userId: "user-1",
+      username: "user-1",
       nickname: "Alpha",
       avatarUrl: null,
       preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: "auto" },
