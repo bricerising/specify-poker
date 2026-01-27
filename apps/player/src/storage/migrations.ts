@@ -3,8 +3,43 @@ import path from "path";
 import pool from "./db";
 import logger from "../observability/logger";
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function connectWithRetry() {
+  const timeoutMs = Number(process.env.PLAYER_DB_CONNECT_TIMEOUT_MS ?? 120_000);
+  const baseDelayMs = Number(process.env.PLAYER_DB_CONNECT_RETRY_MS ?? 500);
+  const maxDelayMs = Number(process.env.PLAYER_DB_CONNECT_MAX_RETRY_MS ?? 5_000);
+
+  const startedAt = Date.now();
+  let attempt = 0;
+  let lastError: unknown = null;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    attempt += 1;
+    try {
+      const client = await pool.connect();
+      if (attempt > 1) {
+        logger.info({ attempt }, "Database connection established");
+      }
+      return client;
+    } catch (err) {
+      lastError = err;
+      const elapsedMs = Date.now() - startedAt;
+      const delayMs = Math.min(maxDelayMs, baseDelayMs * attempt, timeoutMs - elapsedMs);
+      logger.info({ err, attempt, delayMs }, "Database not ready; retrying");
+      await sleep(delayMs);
+    }
+  }
+
+  const elapsedMs = Date.now() - startedAt;
+  logger.error({ err: lastError, attempt, elapsedMs }, "Database connection timed out");
+  throw lastError instanceof Error ? lastError : new Error("Database connection timed out");
+}
+
 export async function runMigrations() {
-  const client = await pool.connect();
+  const client = await connectWithRetry();
   try {
     logger.info("Running database migrations...");
 

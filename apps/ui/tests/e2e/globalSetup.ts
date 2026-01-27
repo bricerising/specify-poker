@@ -39,7 +39,8 @@ async function isStackReady(): Promise<boolean> {
 
 export default async function globalSetup(_config: FullConfig) {
   const useExternalServer = Boolean(process.env.PLAYWRIGHT_BASE_URL)
-    || process.env.PLAYWRIGHT_EXTERNAL === "1";
+    || process.env.PLAYWRIGHT_EXTERNAL === "1"
+    || Boolean(process.env.CI);
 
   if (!useExternalServer || process.env.PLAYWRIGHT_SKIP_STACK_WAIT === "1") {
     return;
