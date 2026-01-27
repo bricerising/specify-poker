@@ -397,4 +397,101 @@ describe("Tables Routes", () => {
       expect(unmuteResponse.statusCode).toBe(200);
     });
   });
+
+  describe("Moderation by seatId routes", () => {
+    it("rejects an invalid seatId", async () => {
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "POST",
+        url: "/t1/moderation/kick",
+        auth,
+        body: { seatId: "not-a-number" },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.body).toEqual(expect.objectContaining({ error: "seatId is required" }));
+    });
+
+    it("returns 404 when the seat is not occupied", async () => {
+      vi.mocked(gameClient.GetTableState).mockImplementation(
+        (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
+          callback(null, { state: { seats: [{ seat_id: 0, user_id: null }] } });
+        },
+      );
+
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "POST",
+        url: "/t1/moderation/mute",
+        auth,
+        body: { seatId: 0 },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.body).toEqual(expect.objectContaining({ error: "Seat not occupied" }));
+    });
+
+    it("kicks a player by seatId and returns the updated table state", async () => {
+      vi.mocked(gameClient.GetTableState)
+        .mockImplementationOnce((_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
+          callback(null, { state: { seats: [{ seat_id: 0, user_id: "user-2" }] } });
+        })
+        .mockImplementationOnce((_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
+          callback(null, { state: { seats: [{ seat_id: 0, user_id: null }], version: 2 } });
+        });
+
+      vi.mocked(gameClient.KickPlayer).mockImplementation(
+        (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
+          callback(null, {});
+        },
+      );
+
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "POST",
+        url: "/t1/moderation/kick",
+        auth,
+        body: { seatId: 0 },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          tableId: "t1",
+          seatId: 0,
+          userId: "user-2",
+          action: "kick",
+          tableState: expect.objectContaining({ version: 2 }),
+        }),
+      );
+    });
+
+    it("mutes a player by seatId", async () => {
+      vi.mocked(gameClient.GetTableState).mockImplementation(
+        (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
+          callback(null, { state: { seats: [{ seat_id: 1, user_id: "user-2" }] } });
+        },
+      );
+
+      vi.mocked(gameClient.MutePlayer).mockImplementation(
+        (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
+          callback(null, {});
+        },
+      );
+
+      const response = await dispatchToRouter(tablesRouter, {
+        method: "POST",
+        url: "/t1/moderation/mute",
+        auth,
+        body: { seatId: 1 },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          tableId: "t1",
+          seatId: 1,
+          userId: "user-2",
+          action: "mute",
+        }),
+      );
+    });
+  });
 });
