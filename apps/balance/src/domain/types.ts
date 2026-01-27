@@ -99,12 +99,10 @@ export interface LedgerEntry {
   checksum: string;
 }
 
-// Service operation results
-export interface OperationResult<T> {
-  ok: boolean;
-  data?: T;
-  error?: string;
-}
+// Service operation results - discriminated union for type-safe error handling
+export type OperationResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: string };
 
 export interface BalanceInfo {
   accountId: string;

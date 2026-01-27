@@ -134,37 +134,6 @@ export interface LegalAction {
 }
 
 // ============================================================================
-// Result Types (Discriminated Unions)
-// ============================================================================
-
-/** Generic success/failure result with typed error codes */
-export type Result<T, E extends string = string> =
-  | { ok: true; value: T }
-  | { ok: false; error: E };
-
-/** Service operation result for table operations */
-export type TableOperationResult<E extends string = string> =
-  | { ok: true }
-  | { ok: false; error: E };
-
-/** Common error codes for seat operations */
-export type SeatJoinError =
-  | "TABLE_NOT_FOUND"
-  | "SEAT_NOT_AVAILABLE"
-  | "ALREADY_SEATED"
-  | "INSUFFICIENT_BALANCE"
-  | "COMMIT_FAILED"
-  | "TABLE_LOST"
-  | "SEAT_LOST";
-
-/** Common error codes for action submission */
-export type ActionSubmitError =
-  | "TABLE_NOT_FOUND"
-  | "NO_HAND_IN_PROGRESS"
-  | "PLAYER_NOT_AT_TABLE"
-  | "INVALID_ACTION";
-
-// ============================================================================
 // Seat Status Guards
 // ============================================================================
 

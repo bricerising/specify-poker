@@ -124,42 +124,12 @@ export async function publishEvents(events: GameEvent[]): Promise<{ success: boo
   return { success: response.success, eventIds: response.event_ids };
 }
 
-// Event type constants
-export const EventTypes = {
-  // Table lifecycle
-  TABLE_CREATED: "TABLE_CREATED",
-  TABLE_DELETED: "TABLE_DELETED",
+// Import and re-export event types from the centralized domain constants
+import { GameEventType } from "../domain/events";
+export { GameEventType as EventTypes } from "../domain/events";
 
-  // Seat events
-  PLAYER_JOINED: "PLAYER_JOINED",
-  PLAYER_LEFT: "PLAYER_LEFT",
-  SPECTATOR_JOINED: "SPECTATOR_JOINED",
-  SPECTATOR_LEFT: "SPECTATOR_LEFT",
-
-  // Hand lifecycle
-  HAND_STARTED: "HAND_STARTED",
-  HAND_COMPLETED: "HAND_COMPLETED",
-
-  // Street events
-  PREFLOP_DEALT: "PREFLOP_DEALT",
-  FLOP_DEALT: "FLOP_DEALT",
-  TURN_DEALT: "TURN_DEALT",
-  RIVER_DEALT: "RIVER_DEALT",
-
-  // Action events
-  ACTION_TAKEN: "ACTION_TAKEN",
-  TURN_STARTED: "TURN_STARTED",
-  TURN_TIMEOUT: "TURN_TIMEOUT",
-
-  // Showdown events
-  CARDS_SHOWN: "CARDS_SHOWN",
-  POT_AWARDED: "POT_AWARDED",
-
-  // Moderation events
-  PLAYER_KICKED: "PLAYER_KICKED",
-  PLAYER_MUTED: "PLAYER_MUTED",
-  PLAYER_UNMUTED: "PLAYER_UNMUTED",
-} as const;
+// Use the imported constant for internal functions
+const EventTypes = GameEventType;
 
 // Convenience functions for common events
 export async function emitTableCreated(
