@@ -1,6 +1,20 @@
-import { ActionInput, HandState, LegalAction, Seat } from "../domain/types";
+import { ActionInput, ActionType, HandState, LegalAction, Seat } from "../domain/types";
 
-export function getCallAmount(hand: HandState, seat: Seat) {
+type ValidationResult =
+  | { ok: true }
+  | { ok: false; reason: ValidationReason };
+
+type ValidationReason =
+  | "HAND_COMPLETE"
+  | "SEAT_INACTIVE"
+  | "ILLEGAL_ACTION"
+  | "MISSING_AMOUNT"
+  | "AMOUNT_TOO_SMALL"
+  | "AMOUNT_TOO_LARGE";
+
+const AMOUNT_REQUIRED_ACTIONS: ReadonlySet<ActionType> = new Set(["BET", "RAISE", "ALL_IN"]);
+
+export function getCallAmount(hand: HandState, seat: Seat): number {
   const contributed = hand.roundContributions[seat.seatId] ?? 0;
   return Math.max(0, hand.currentBet - contributed);
 }
@@ -54,11 +68,38 @@ export function deriveLegalActions(hand: HandState, seat: Seat): LegalAction[] {
   return actions;
 }
 
+function isValidAmount(amount: unknown): amount is number {
+  return typeof amount === "number" && !Number.isNaN(amount);
+}
+
+function validateAmountBounds(
+  action: ActionInput,
+  legal: LegalAction
+): ValidationResult {
+  if (!AMOUNT_REQUIRED_ACTIONS.has(action.type)) {
+    return { ok: true };
+  }
+
+  if (!isValidAmount(action.amount)) {
+    return { ok: false, reason: "MISSING_AMOUNT" };
+  }
+
+  if (legal.minAmount !== undefined && action.amount < legal.minAmount) {
+    return { ok: false, reason: "AMOUNT_TOO_SMALL" };
+  }
+
+  if (legal.maxAmount !== undefined && action.amount > legal.maxAmount) {
+    return { ok: false, reason: "AMOUNT_TOO_LARGE" };
+  }
+
+  return { ok: true };
+}
+
 export function validateAction(
   hand: HandState,
   seat: Seat,
   action: ActionInput,
-): { ok: boolean; reason?: string } {
+): ValidationResult {
   if (hand.street === "SHOWDOWN") {
     return { ok: false, reason: "HAND_COMPLETE" };
   }
@@ -67,22 +108,12 @@ export function validateAction(
     return { ok: false, reason: "SEAT_INACTIVE" };
   }
 
-  const legal = deriveLegalActions(hand, seat).find((entry) => entry.type === action.type);
-  if (!legal) {
+  const legalActions = deriveLegalActions(hand, seat);
+  const matchingAction = legalActions.find((entry) => entry.type === action.type);
+
+  if (!matchingAction) {
     return { ok: false, reason: "ILLEGAL_ACTION" };
   }
 
-  if (action.type === "BET" || action.type === "RAISE" || action.type === "ALL_IN") {
-    if (typeof action.amount !== "number" || Number.isNaN(action.amount)) {
-      return { ok: false, reason: "MISSING_AMOUNT" };
-    }
-    if (legal.minAmount && action.amount < legal.minAmount) {
-      return { ok: false, reason: "AMOUNT_TOO_SMALL" };
-    }
-    if (legal.maxAmount && action.amount > legal.maxAmount) {
-      return { ok: false, reason: "AMOUNT_TOO_LARGE" };
-    }
-  }
-
-  return { ok: true };
+  return validateAmountBounds(action, matchingAction);
 }

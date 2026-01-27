@@ -14,12 +14,66 @@ import { getCallAmount, validateAction } from "./actionRules";
 import { evaluateWinners } from "./rankings";
 import { calculatePots, calculateRake } from "./potCalculator";
 
+// ============================================================================
+// Result Types (Discriminated Unions)
+// ============================================================================
+
+type ActionRejectionReason =
+  | "NO_HAND"
+  | "NOT_YOUR_TURN"
+  | "SEAT_MISSING"
+  | "SEAT_INACTIVE"
+  | "ILLEGAL_ACTION";
+
+export type ApplyActionResult =
+  | {
+      accepted: false;
+      state: TableState;
+      reason: ActionRejectionReason | string;
+    }
+  | {
+      accepted: true;
+      state: TableState;
+      action: Action;
+      handComplete: boolean;
+    };
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const SUITS = ["hearts", "diamonds", "clubs", "spades"] as const;
+const RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"] as const;
+const MAX_RAKE = 5;
+
+// ============================================================================
+// Street Progression
+// ============================================================================
+
+const STREET_PROGRESSION: Readonly<Record<HandStreet, HandStreet>> = {
+  PREFLOP: "FLOP",
+  FLOP: "TURN",
+  TURN: "RIVER",
+  RIVER: "SHOWDOWN",
+  SHOWDOWN: "SHOWDOWN",
+};
+
+const COMMUNITY_CARDS_TO_DEAL: Readonly<Record<HandStreet, number>> = {
+  PREFLOP: 3,
+  FLOP: 1,
+  TURN: 1,
+  RIVER: 0,
+  SHOWDOWN: 0,
+};
+
+// ============================================================================
+// Deck & Shuffle
+// ============================================================================
+
 function createDeck(): Card[] {
-  const suits = ["hearts", "diamonds", "clubs", "spades"];
-  const ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"];
   const deck: Card[] = [];
-  for (const suit of suits) {
-    for (const rank of ranks) {
+  for (const suit of SUITS) {
+    for (const rank of RANKS) {
       deck.push({ rank, suit });
     }
   }
@@ -35,7 +89,7 @@ function hashSeed(seed: string) {
   return Math.abs(hash);
 }
 
-function seededShuffle(deck: Card[], seed: string) {
+function seededShuffle(deck: Card[], seed: string): Card[] {
   const result = [...deck];
   let state = hashSeed(seed) || 1;
   for (let i = result.length - 1; i > 0; i -= 1) {
@@ -46,7 +100,11 @@ function seededShuffle(deck: Card[], seed: string) {
   return result;
 }
 
-function nextActiveSeat(seats: Seat[], startSeat: number) {
+// ============================================================================
+// Seat Navigation
+// ============================================================================
+
+function nextActiveSeat(seats: Seat[], startSeat: number): number {
   const total = seats.length;
   for (let offset = 1; offset <= total; offset += 1) {
     const seat = seats[(startSeat + offset) % total];
@@ -57,7 +115,7 @@ function nextActiveSeat(seats: Seat[], startSeat: number) {
   return startSeat;
 }
 
-function nextEligibleSeat(seats: Seat[], startSeat: number) {
+function nextEligibleSeat(seats: Seat[], startSeat: number): number {
   const total = seats.length;
   for (let offset = 1; offset <= total; offset += 1) {
     const seat = seats[(startSeat + offset) % total];
@@ -68,11 +126,15 @@ function nextEligibleSeat(seats: Seat[], startSeat: number) {
   return startSeat;
 }
 
-function findEligibleSeats(seats: Seat[]) {
+function findEligibleSeats(seats: Seat[]): Seat[] {
   return seats.filter((seat) => seat.userId && seat.status === "SEATED" && seat.stack > 0);
 }
 
-function resetRoundContributions(seats: Seat[]) {
+// ============================================================================
+// Contributions & Cards
+// ============================================================================
+
+function resetRoundContributions(seats: Seat[]): Record<number, number> {
   const contributions: Record<number, number> = {};
   for (const seat of seats) {
     contributions[seat.seatId] = 0;
@@ -80,23 +142,27 @@ function resetRoundContributions(seats: Seat[]) {
   return contributions;
 }
 
-function dealCards(deck: Card[], count: number) {
+function dealCards(deck: Card[], count: number): Card[] {
   return deck.splice(0, count);
 }
 
-function getFoldedSeatIds(seats: Seat[]) {
+function getFoldedSeatIds(seats: Seat[]): Set<number> {
   return new Set(seats.filter((seat) => seat.status === "FOLDED").map((seat) => seat.seatId));
 }
 
-function activeSeatsRemaining(seats: Seat[]) {
+// ============================================================================
+// Seat State Queries
+// ============================================================================
+
+function activeSeatsRemaining(seats: Seat[]): Seat[] {
   return seats.filter((seat) => seat.status === "ACTIVE" || seat.status === "ALL_IN");
 }
 
-function activeSeats(seats: Seat[]) {
+function activeSeats(seats: Seat[]): Seat[] {
   return seats.filter((seat) => seat.status === "ACTIVE");
 }
 
-function resetHandSeats(seats: Seat[]) {
+function resetHandSeats(seats: Seat[]): void {
   for (const seat of seats) {
     if (seat.userId) {
       if (seat.status === "ACTIVE" || seat.status === "FOLDED" || seat.status === "ALL_IN") {
@@ -109,19 +175,24 @@ function resetHandSeats(seats: Seat[]) {
   }
 }
 
-function dealRemainingCommunityCards(hand: HandState) {
-  if (hand.communityCards.length === 0) {
-    hand.communityCards.push(...dealCards(hand.deck, 3));
+function dealRemainingCommunityCards(hand: HandState): void {
+  const communityCount = hand.communityCards.length;
+  if (communityCount === 0) {
+    hand.communityCards.push(...dealCards(hand.deck, 3)); // Flop
   }
-  if (hand.communityCards.length === 3) {
-    hand.communityCards.push(...dealCards(hand.deck, 1));
+  if (communityCount === 3) {
+    hand.communityCards.push(...dealCards(hand.deck, 1)); // Turn
   }
-  if (hand.communityCards.length === 4) {
-    hand.communityCards.push(...dealCards(hand.deck, 1));
+  if (communityCount === 4) {
+    hand.communityCards.push(...dealCards(hand.deck, 1)); // River
   }
 }
 
-function isBettingRoundComplete(hand: HandState, seats: Seat[]) {
+// ============================================================================
+// Betting Round Logic
+// ============================================================================
+
+function isBettingRoundComplete(hand: HandState, seats: Seat[]): boolean {
   if (hand.currentBet === 0) {
     for (const seat of seats) {
       if (seat.status !== "ACTIVE") {
@@ -145,25 +216,16 @@ function isBettingRoundComplete(hand: HandState, seats: Seat[]) {
   return true;
 }
 
-function advanceStreet(hand: HandState, seats: Seat[], buttonSeat: number) {
-  const nextStreetMap: Record<HandStreet, HandStreet> = {
-    PREFLOP: "FLOP",
-    FLOP: "TURN",
-    TURN: "RIVER",
-    RIVER: "SHOWDOWN",
-    SHOWDOWN: "SHOWDOWN",
-  };
-
-  const nextStreet = nextStreetMap[hand.street];
+function advanceStreet(hand: HandState, seats: Seat[], buttonSeat: number): HandState {
+  const nextStreet = STREET_PROGRESSION[hand.street];
   if (nextStreet === "SHOWDOWN") {
     hand.street = "SHOWDOWN";
     return hand;
   }
 
-  if (hand.street === "PREFLOP") {
-    hand.communityCards.push(...dealCards(hand.deck, 3));
-  } else if (hand.street === "FLOP" || hand.street === "TURN") {
-    hand.communityCards.push(...dealCards(hand.deck, 1));
+  const cardsToDeal = COMMUNITY_CARDS_TO_DEAL[hand.street];
+  if (cardsToDeal > 0) {
+    hand.communityCards.push(...dealCards(hand.deck, cardsToDeal));
   }
 
   hand.street = nextStreet;
@@ -177,14 +239,18 @@ function advanceStreet(hand: HandState, seats: Seat[], buttonSeat: number) {
   return hand;
 }
 
+// ============================================================================
+// Settlement
+// ============================================================================
+
 function settleWinners(
   hand: HandState,
   seats: Seat[],
   buttonSeat: number,
   potWinners?: Record<number, number[]>,
-) {
+): void {
   const winnersSet = new Set<number>();
-  let remainingRake = 5;
+  let remainingRake = MAX_RAKE;
 
   for (let i = 0; i < hand.pots.length; i += 1) {
     const pot = hand.pots[i];
@@ -232,7 +298,7 @@ function settleWinners(
   hand.winners = Array.from(winnersSet);
 }
 
-function settleShowdown(hand: HandState, seats: Seat[], buttonSeat: number) {
+function settleShowdown(hand: HandState, seats: Seat[], buttonSeat: number): void {
   const potWinnersMap: Record<number, number[]> = {};
 
   for (let i = 0; i < hand.pots.length; i += 1) {
@@ -267,13 +333,17 @@ function createAction(handId: string, seat: Seat, input: ActionInput, timestamp:
   };
 }
 
-function markAllInIfEmpty(seat: Seat) {
+// ============================================================================
+// Action Handlers
+// ============================================================================
+
+function markAllInIfEmpty(seat: Seat): void {
   if (seat.stack === 0) {
     seat.status = "ALL_IN";
   }
 }
 
-function applyCall(hand: HandState, seat: Seat, seatId: number) {
+function applyCall(hand: HandState, seat: Seat, seatId: number): void {
   const toCall = getCallAmount(hand, seat);
   const amount = Math.min(toCall, seat.stack);
   seat.stack -= amount;
@@ -387,23 +457,29 @@ const playerActionHandlers = {
   ) => applyAllIn(hand, seat, seatId, ctx.previousMinRaise),
 } satisfies Record<PlayerActionType, PlayerActionHandler>;
 
-function canPerformInactiveAction(seat: Seat, action: ActionInput, allowInactive: boolean | undefined) {
+const ALLOWED_INACTIVE_ACTIONS: ReadonlySet<ActionInput["type"]> = new Set(["FOLD", "CHECK"]);
+
+function canPerformInactiveAction(seat: Seat, action: ActionInput, allowInactive: boolean | undefined): boolean {
   if (!allowInactive) {
     return false;
   }
   if (seat.status !== "DISCONNECTED") {
     return false;
   }
-  return action.type === "FOLD" || action.type === "CHECK";
+  return ALLOWED_INACTIVE_ACTIONS.has(action.type);
 }
 
-function endHandByFold(hand: HandState, seats: Seat[], buttonSeat: number, endedAt: string) {
+// ============================================================================
+// Hand Ending
+// ============================================================================
+
+function endHandByFold(hand: HandState, seats: Seat[], buttonSeat: number, endedAt: string): void {
   settleWinners(hand, seats, buttonSeat);
   resetHandSeats(seats);
   hand.endedAt = endedAt;
 }
 
-function endHandByShowdown(hand: HandState, seats: Seat[], buttonSeat: number, endedAt: string) {
+function endHandByShowdown(hand: HandState, seats: Seat[], buttonSeat: number, endedAt: string): void {
   dealRemainingCommunityCards(hand);
   hand.street = "SHOWDOWN";
   settleShowdown(hand, seats, buttonSeat);
@@ -411,11 +487,15 @@ function endHandByShowdown(hand: HandState, seats: Seat[], buttonSeat: number, e
   hand.endedAt = endedAt;
 }
 
-function endHandAtRiver(hand: HandState, seats: Seat[], buttonSeat: number, endedAt: string) {
+function endHandAtRiver(hand: HandState, seats: Seat[], buttonSeat: number, endedAt: string): void {
   settleShowdown(hand, seats, buttonSeat);
   resetHandSeats(seats);
   hand.endedAt = endedAt;
 }
+
+// ============================================================================
+// Exported Functions
+// ============================================================================
 
 export function startHand(
   tableState: TableState,
@@ -549,7 +629,7 @@ export function applyAction(
   seatId: number,
   action: ActionInput,
   options: { now?: () => string; allowInactive?: boolean } = {},
-) {
+): ApplyActionResult {
   const hand = tableState.hand;
   if (!hand) {
     return { state: tableState, accepted: false, reason: "NO_HAND" };

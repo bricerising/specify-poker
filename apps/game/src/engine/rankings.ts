@@ -1,6 +1,19 @@
 import { Card } from "../domain/types";
 
-const rankMap: Record<string, number> = {
+/** Hand strength categories from lowest (0) to highest (8) */
+export enum HandCategory {
+  HighCard = 0,
+  Pair = 1,
+  TwoPair = 2,
+  ThreeOfAKind = 3,
+  Straight = 4,
+  Flush = 5,
+  FullHouse = 6,
+  FourOfAKind = 7,
+  StraightFlush = 8,
+}
+
+const RANK_VALUES: Readonly<Record<string, number>> = {
   "2": 2,
   "3": 3,
   "4": 4,
@@ -19,8 +32,8 @@ const rankMap: Record<string, number> = {
 
 function normalizeRank(rank: string): number {
   const normalized = rank.toUpperCase();
-  const mapped = rankMap[normalized];
-  if (mapped) {
+  const mapped = RANK_VALUES[normalized];
+  if (mapped !== undefined) {
     return mapped;
   }
   throw new Error(`Unknown rank: ${rank}`);
@@ -102,42 +115,42 @@ export function evaluateFiveCardHand(cards: Card[]): HandRank {
   });
 
   if (straightHigh && flush) {
-    return { category: 8, tiebreaker: [straightHigh] };
+    return { category: HandCategory.StraightFlush, tiebreaker: [straightHigh] };
   }
 
   if (groups[0][1] === 4) {
     const kicker = groups.find(([, count]) => count === 1)?.[0] ?? 0;
-    return { category: 7, tiebreaker: [groups[0][0], kicker] };
+    return { category: HandCategory.FourOfAKind, tiebreaker: [groups[0][0], kicker] };
   }
 
   if (groups[0][1] === 3 && groups[1][1] === 2) {
-    return { category: 6, tiebreaker: [groups[0][0], groups[1][0]] };
+    return { category: HandCategory.FullHouse, tiebreaker: [groups[0][0], groups[1][0]] };
   }
 
   if (flush) {
-    return { category: 5, tiebreaker: ranks };
+    return { category: HandCategory.Flush, tiebreaker: ranks };
   }
 
   if (straightHigh) {
-    return { category: 4, tiebreaker: [straightHigh] };
+    return { category: HandCategory.Straight, tiebreaker: [straightHigh] };
   }
 
   if (groups[0][1] === 3) {
     const kickers = groups.filter(([, count]) => count === 1).map(([rank]) => rank);
-    return { category: 3, tiebreaker: [groups[0][0], ...kickers] };
+    return { category: HandCategory.ThreeOfAKind, tiebreaker: [groups[0][0], ...kickers] };
   }
 
   if (groups[0][1] === 2 && groups[1][1] === 2) {
     const kicker = groups.find(([, count]) => count === 1)?.[0] ?? 0;
-    return { category: 2, tiebreaker: [groups[0][0], groups[1][0], kicker] };
+    return { category: HandCategory.TwoPair, tiebreaker: [groups[0][0], groups[1][0], kicker] };
   }
 
   if (groups[0][1] === 2) {
     const kickers = groups.filter(([, count]) => count === 1).map(([rank]) => rank);
-    return { category: 1, tiebreaker: [groups[0][0], ...kickers] };
+    return { category: HandCategory.Pair, tiebreaker: [groups[0][0], ...kickers] };
   }
 
-  return { category: 0, tiebreaker: ranks };
+  return { category: HandCategory.HighCard, tiebreaker: ranks };
 }
 
 function* combinations<T>(items: T[], choose: number): Generator<T[]> {
