@@ -13,6 +13,7 @@ import { GameEventType } from "../domain/events";
 import { applyAction, startHand } from "../engine/handEngine";
 import { deriveLegalActions } from "../engine/actionRules";
 import { calculatePots } from "../engine/potCalculator";
+import { calculatePotPayouts } from "../engine/potSettlement";
 import { tableStore } from "../storage/tableStore";
 import { tableStateStore } from "../storage/tableStateStore";
 import logger from "../observability/logger";
@@ -33,6 +34,7 @@ import { balanceClientAdapter } from "./table/balanceClientAdapter";
 import { gatewayWsPublisher } from "./table/gatewayWsPublisher";
 import { gameEventPublisher } from "./table/gameEventPublisher";
 import { redactTableState } from "./table/tableViewBuilder";
+import { resolveSeatForUser as resolveSeatForUserInState } from "./table/seatResolver";
 
 // ============================================================================
 // Constants
@@ -74,8 +76,24 @@ type FinalizeReservedSeatJoinResult =
 
 export class TableService {
   private turnTimers = new Map<string, NodeJS.Timeout>();
+  private nextHandTimers = new Map<string, NodeJS.Timeout>();
   private turnStartMeta = new Map<string, TurnStartMeta>();
   private handTimeoutMeta = new Map<string, HandTimeoutMeta>();
+
+  shutdown(): void {
+    for (const timer of this.turnTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.turnTimers.clear();
+
+    for (const timer of this.nextHandTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.nextHandTimers.clear();
+
+    this.turnStartMeta.clear();
+    this.handTimeoutMeta.clear();
+  }
 
   private now() {
     return new Date().toISOString();
@@ -137,31 +155,7 @@ export class TableService {
   }
 
   private resolveSeatForUser(state: TableState, userId: string): Seat | undefined {
-    const matching = state.seats.filter((entry) => entry.userId === userId);
-    if (matching.length === 0) {
-      return undefined;
-    }
-    if (matching.length === 1) {
-      return matching[0];
-    }
-
-    const turnSeatId = state.hand?.turn;
-    if (typeof turnSeatId === "number") {
-      const turnMatch = matching.find((seat) => seat.seatId === turnSeatId);
-      if (turnMatch) {
-        return turnMatch;
-      }
-    }
-
-    const withHoleCards = matching.find((seat) => (seat.holeCards?.length ?? 0) === 2);
-    if (withHoleCards) {
-      return withHoleCards;
-    }
-
-    const inHandSeat =
-      matching.find((seat) => seat.status === "ACTIVE" || seat.status === "ALL_IN" || seat.status === "FOLDED") ??
-      matching[0];
-    return inHandSeat;
+    return resolveSeatForUserInState(state, userId);
   }
 
   private findNextActiveTurn(seats: Seat[], startSeatId: number) {
@@ -887,10 +881,21 @@ export class TableService {
     }
   }
 
+  private clearNextHandTimer(tableId: string) {
+    const existing = this.nextHandTimers.get(tableId);
+    if (existing) {
+      clearTimeout(existing);
+      this.nextHandTimers.delete(tableId);
+    }
+  }
+
   private scheduleNextHandStart(tableId: string, delayMs: number) {
-    setTimeout(() => {
+    this.clearNextHandTimer(tableId);
+    const timer = setTimeout(() => {
+      this.nextHandTimers.delete(tableId);
       void this.startNextHandIfPossible(tableId);
     }, delayMs);
+    this.nextHandTimers.set(tableId, timer);
   }
 
   private async startNextHandIfPossible(tableId: string) {
@@ -928,23 +933,18 @@ export class TableService {
     for (let potIndex = 0; potIndex < hand.pots.length; potIndex += 1) {
       const pot = hand.pots[potIndex];
       if (pot.amount > 0 && pot.winners && pot.winners.length > 0) {
-        const share = Math.floor(pot.amount / pot.winners.length);
-        let remainder = pot.amount - share * pot.winners.length;
-        const sortedWinners = [...pot.winners].sort((a, b) => {
-          const distA = (a - state.button + state.seats.length) % state.seats.length;
-          const distB = (b - state.button + state.seats.length) % state.seats.length;
-          return distA - distB;
+        const payouts = calculatePotPayouts({
+          amount: pot.amount,
+          winnerSeatIds: pot.winners,
+          buttonSeat: state.button,
+          seatCount: state.seats.length,
         });
 
-        const winnersToSettle = sortedWinners.map((seatId) => {
-          const winAmount = share + (remainder > 0 ? 1 : 0);
-          remainder = Math.max(0, remainder - 1);
-          return {
-            seat_id: seatId,
-            account_id: state.seats[seatId]?.userId ?? "",
-            amount: winAmount,
-          };
-        });
+        const winnersToSettle = payouts.map((payout) => ({
+          seat_id: payout.seatId,
+          account_id: state.seats[payout.seatId]?.userId ?? "",
+          amount: payout.amount,
+        }));
 
         const settleCall = await balanceClientAdapter.settlePot({
           table_id: table.tableId,

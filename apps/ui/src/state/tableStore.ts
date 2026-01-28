@@ -2,9 +2,10 @@ import { apiFetch, getApiBaseUrl } from "../services/apiClient";
 import { getToken } from "../services/auth";
 import { isStaleVersion, requestResync, shouldResync } from "../services/wsClient";
 import { recordWebSocketMessage } from "../observability/otel";
+import { decodeJwtUserId } from "../utils/jwt";
 import { asRecord, readTrimmedString } from "../utils/unknown";
 import type { z } from "zod";
-import { wsServerMessageSchema } from "@specify-poker/shared";
+import { wsServerMessageSchema } from "@specify-poker/shared/schemas";
 
 import { applyTablePatch } from "./tablePatching";
 import {
@@ -15,6 +16,7 @@ import {
   normalizeTableSummary,
   type UnknownRecord,
 } from "./tableNormalization";
+import { inferSeatIdForUserId } from "./seatResolver";
 import type {
   ChatMessage,
   SpectatorView,
@@ -37,29 +39,6 @@ export type {
 } from "./tableTypes";
 
 type WsServerMessage = z.infer<typeof wsServerMessageSchema>;
-
-function decodeJwtUserId(token: string): string | null {
-  const parts = token.split(".");
-  if (parts.length < 2) {
-    return null;
-  }
-
-  const payloadBase64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-  const padded = payloadBase64.padEnd(Math.ceil(payloadBase64.length / 4) * 4, "=");
-
-  try {
-    const decoded = typeof globalThis.atob === "function" ? globalThis.atob(padded) : null;
-    if (!decoded) {
-      return null;
-    }
-
-    const parsed: unknown = JSON.parse(decoded);
-    const record = asRecord(parsed);
-    return record ? readTrimmedString(record.sub) : null;
-  } catch {
-    return null;
-  }
-}
 
 function currentUserIdFromToken(): string | null {
   const token = getToken();
@@ -372,12 +351,12 @@ export function createTableStore(): TableStore {
     message: Extract<WsServerMessage, { type: "TableSnapshot" | "TablePatch" }>,
   ) => {
     const activeTableState = state.tableState;
-    const activeTableId = state.tableState?.tableId ?? null;
     const tableId = message.type === "TablePatch" ? message.tableId : message.tableState.tableId;
-    if (!activeTableState || !activeTableId || !tableId || tableId !== activeTableId) {
+    if (!activeTableState || !tableId || tableId !== activeTableState.tableId) {
       return;
     }
-    const currentVersion = state.tableState?.version ?? null;
+
+    const currentVersion = activeTableState.version;
     const incomingVersion = toIncomingVersion(message);
     if (incomingVersion !== null) {
       if (isStaleVersion(currentVersion, incomingVersion)) {
@@ -393,27 +372,29 @@ export function createTableStore(): TableStore {
       message.type === "TablePatch"
         ? applyCachedProfiles(applyTablePatch(activeTableState, message.patch, fallback))
         : applyCachedProfiles(normalizeTableState(message.tableState as UnknownRecord, fallback));
+
     const tokenUserId = currentUserIdFromToken();
-    const inferredSeatId =
-      tokenUserId && normalized.seats.some((seat) => seat.userId === tokenUserId)
-        ? normalized.seats.find((seat) => seat.userId === tokenUserId)?.seatId ?? null
-        : null;
+    const inferredSeatId = inferSeatIdForUserId(normalized, tokenUserId);
+
     const shouldAdoptSeat =
       inferredSeatId !== null && (state.seatId === null || state.isSpectating || state.seatId !== inferredSeatId);
     const effectiveSeatId = shouldAdoptSeat ? inferredSeatId : state.seatId;
     const effectiveIsSpectating = shouldAdoptSeat ? false : state.isSpectating;
+
     const incomingHandId = normalized.hand?.handId ?? null;
     const shouldRequestHoleCards =
       Boolean(incomingHandId)
       && effectiveSeatId !== null
       && !effectiveIsSpectating
       && (shouldAdoptSeat || state.privateHoleCards === null || state.privateHandId !== incomingHandId);
-    const clearPrivate = !incomingHandId || (state.privateHandId && state.privateHandId !== incomingHandId);
+    const clearPrivate = !incomingHandId || (state.privateHandId !== null && state.privateHandId !== incomingHandId);
+
     setState({
       tableState: normalized,
       ...(shouldAdoptSeat ? { seatId: inferredSeatId, isSpectating: false } : {}),
       ...(clearPrivate ? { privateHoleCards: null, privateHandId: null } : {}),
     });
+
     requestMissingProfiles(normalized);
     if (incomingHandId && shouldRequestHoleCards) {
       requestPrivateHoleCards(tableId, incomingHandId);
@@ -501,37 +482,33 @@ export function createTableStore(): TableStore {
     });
   };
 
+  const handleServerErrorMessage = (message: Extract<WsServerMessage, { type: "Error" }>) => {
+    setState({ status: "error", error: message.message });
+  };
+
+  type WsHandlerMap = {
+    [Type in WsServerMessage["type"]]: (message: Extract<WsServerMessage, { type: Type }>) => void;
+  };
+
+  const wsHandlers = {
+    Welcome: () => undefined,
+    Error: handleServerErrorMessage,
+    LobbyTablesUpdated: handleLobbyTablesUpdated,
+    TableSnapshot: (message) => handleTableStateMessage(message),
+    TablePatch: (message) => handleTableStateMessage(message),
+    HoleCards: handleHoleCardsMessage,
+    ActionResult: () => undefined,
+    ChatSubscribed: handleChatSubscribed,
+    ChatError: handleChatError,
+    ChatMessage: handleChatMessage,
+    TimerUpdate: handleTimerUpdate,
+    SpectatorJoined: (message) => handleSpectatorMessage(message),
+    SpectatorLeft: (message) => handleSpectatorMessage(message),
+  } satisfies WsHandlerMap;
+
   const handleWsServerMessage = (message: WsServerMessage) => {
-    switch (message.type) {
-      case "TableSnapshot":
-      case "TablePatch":
-        handleTableStateMessage(message);
-        return;
-      case "HoleCards":
-        handleHoleCardsMessage(message);
-        return;
-      case "ChatMessage":
-        handleChatMessage(message);
-        return;
-      case "ChatSubscribed":
-        handleChatSubscribed(message);
-        return;
-      case "ChatError":
-        handleChatError(message);
-        return;
-      case "LobbyTablesUpdated":
-        handleLobbyTablesUpdated(message);
-        return;
-      case "TimerUpdate":
-        handleTimerUpdate(message);
-        return;
-      case "SpectatorJoined":
-      case "SpectatorLeft":
-        handleSpectatorMessage(message);
-        return;
-      default:
-        return;
-    }
+    const handler = wsHandlers[message.type] as (message: WsServerMessage) => void;
+    handler(message);
   };
 
   const tableIdForMessage = (message: WsServerMessage): string | undefined => {

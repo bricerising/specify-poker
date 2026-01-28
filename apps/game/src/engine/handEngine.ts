@@ -13,6 +13,7 @@ import {
 import { getCallAmount, validateAction } from "./actionRules";
 import { evaluateWinners } from "./rankings";
 import { calculatePots, calculateRake } from "./potCalculator";
+import { calculatePotPayouts } from "./potSettlement";
 
 // ============================================================================
 // Result Types (Discriminated Unions)
@@ -37,6 +38,24 @@ export type ApplyActionResult =
       action: Action;
       handComplete: boolean;
     };
+
+function rejectAction(tableState: TableState, reason: ActionRejectionReason | string): ApplyActionResult {
+  return { accepted: false, state: tableState, reason };
+}
+
+function acceptAction(
+  tableState: TableState,
+  action: Action,
+  timestamp: string,
+  handComplete: boolean,
+): ApplyActionResult {
+  return {
+    accepted: true,
+    state: { ...tableState, version: tableState.version + 1, updatedAt: timestamp },
+    action,
+    handComplete,
+  };
+}
 
 // ============================================================================
 // Constants
@@ -176,14 +195,13 @@ function resetHandSeats(seats: Seat[]): void {
 }
 
 function dealRemainingCommunityCards(hand: HandState): void {
-  const communityCount = hand.communityCards.length;
-  if (communityCount === 0) {
-    hand.communityCards.push(...dealCards(hand.deck, 3)); // Flop
+  if (hand.communityCards.length < 3) {
+    hand.communityCards.push(...dealCards(hand.deck, 3 - hand.communityCards.length)); // Flop (or remainder)
   }
-  if (communityCount === 3) {
+  if (hand.communityCards.length === 3) {
     hand.communityCards.push(...dealCards(hand.deck, 1)); // Turn
   }
-  if (communityCount === 4) {
+  if (hand.communityCards.length === 4) {
     hand.communityCards.push(...dealCards(hand.deck, 1)); // River
   }
 }
@@ -276,21 +294,17 @@ function settleWinners(
       hand.rakeAmount += rake;
       pot.amount = amountToDistribute;
     }
-
-    const sortedWinners = [...currentPotWinners].sort((a, b) => {
-      const distA = (a - buttonSeat + seats.length) % seats.length;
-      const distB = (b - buttonSeat + seats.length) % seats.length;
-      return distA - distB;
+    const payouts = calculatePotPayouts({
+      amount: amountToDistribute,
+      winnerSeatIds: currentPotWinners,
+      buttonSeat,
+      seatCount: seats.length,
     });
 
-    const share = Math.floor(amountToDistribute / sortedWinners.length);
-    let remainder = amountToDistribute - share * sortedWinners.length;
-
-    for (const winnerSeatId of sortedWinners) {
-      const seat = seats.find((entry) => entry.seatId === winnerSeatId);
+    for (const payout of payouts) {
+      const seat = seats.find((entry) => entry.seatId === payout.seatId);
       if (seat) {
-        seat.stack += share + (remainder > 0 ? 1 : 0);
-        remainder = Math.max(0, remainder - 1);
+        seat.stack += payout.amount;
       }
     }
   }
@@ -494,6 +508,94 @@ function endHandAtRiver(hand: HandState, seats: Seat[], buttonSeat: number, ende
 }
 
 // ============================================================================
+// Post-Action Resolution (Chain of Responsibility)
+// ============================================================================
+
+type PostActionContext = {
+  readonly tableState: TableState;
+  readonly hand: HandState;
+  readonly seats: Seat[];
+  readonly buttonSeat: number;
+  readonly actingSeatId: number;
+  readonly timestamp: string;
+  readonly remainingSeats: Seat[];
+  readonly activeSeats: Seat[];
+};
+
+type PostActionHandlerResult =
+  | { readonly kind: "pass" }
+  | { readonly kind: "handled"; readonly handComplete: boolean };
+
+type PostActionHandler = (ctx: PostActionContext) => PostActionHandlerResult;
+
+function pass(): PostActionHandlerResult {
+  return { kind: "pass" };
+}
+
+function handled(handComplete: boolean): PostActionHandlerResult {
+  return { kind: "handled", handComplete };
+}
+
+function handleEndHandByFold(ctx: PostActionContext): PostActionHandlerResult {
+  if (ctx.remainingSeats.length !== 1) {
+    return pass();
+  }
+  endHandByFold(ctx.hand, ctx.seats, ctx.buttonSeat, ctx.timestamp);
+  return handled(true);
+}
+
+function handleEndHandByShowdown(ctx: PostActionContext): PostActionHandlerResult {
+  const shouldShowdown =
+    ctx.activeSeats.length === 0 || (ctx.activeSeats.length === 1 && ctx.remainingSeats.length > 1);
+  if (!shouldShowdown) {
+    return pass();
+  }
+  endHandByShowdown(ctx.hand, ctx.seats, ctx.buttonSeat, ctx.timestamp);
+  return handled(true);
+}
+
+function handleContinueBettingRound(ctx: PostActionContext): PostActionHandlerResult {
+  const roundComplete = isBettingRoundComplete(ctx.hand, ctx.seats);
+  if (roundComplete) {
+    return pass();
+  }
+
+  ctx.hand.turn = nextActiveSeat(ctx.seats, ctx.actingSeatId);
+  return handled(false);
+}
+
+function handleEndHandAtRiver(ctx: PostActionContext): PostActionHandlerResult {
+  if (ctx.hand.street !== "RIVER") {
+    return pass();
+  }
+  endHandAtRiver(ctx.hand, ctx.seats, ctx.buttonSeat, ctx.timestamp);
+  return handled(true);
+}
+
+function handleAdvanceStreet(ctx: PostActionContext): PostActionHandlerResult {
+  advanceStreet(ctx.hand, ctx.seats, ctx.buttonSeat);
+  return handled(false);
+}
+
+const postActionHandlers: readonly PostActionHandler[] = [
+  handleEndHandByFold,
+  handleEndHandByShowdown,
+  handleContinueBettingRound,
+  handleEndHandAtRiver,
+  handleAdvanceStreet,
+];
+
+function resolvePostAction(ctx: PostActionContext): { readonly handComplete: boolean } {
+  for (const handler of postActionHandlers) {
+    const result = handler(ctx);
+    if (result.kind === "handled") {
+      return result;
+    }
+  }
+  return { handComplete: false };
+}
+
+// ============================================================================
 // Exported Functions
 // ============================================================================
 
@@ -632,34 +734,34 @@ export function applyAction(
 ): ApplyActionResult {
   const hand = tableState.hand;
   if (!hand) {
-    return { state: tableState, accepted: false, reason: "NO_HAND" };
+    return rejectAction(tableState, "NO_HAND");
   }
 
   if (hand.turn !== seatId) {
-    return { state: tableState, accepted: false, reason: "NOT_YOUR_TURN" };
+    return rejectAction(tableState, "NOT_YOUR_TURN");
   }
 
   const seat = tableState.seats.find((entry) => entry.seatId === seatId);
   if (!seat) {
-    return { state: tableState, accepted: false, reason: "SEAT_MISSING" };
+    return rejectAction(tableState, "SEAT_MISSING");
   }
 
   const allowInactiveAction = canPerformInactiveAction(seat, action, options.allowInactive);
   if (seat.status !== "ACTIVE" && !allowInactiveAction) {
-    return { state: tableState, accepted: false, reason: "SEAT_INACTIVE" };
+    return rejectAction(tableState, "SEAT_INACTIVE");
   }
 
   const validationSeat = allowInactiveAction ? { ...seat, status: "ACTIVE" as const } : seat;
   const validation = validateAction(hand, validationSeat, action);
   if (!validation.ok) {
-    return { state: tableState, accepted: false, reason: validation.reason };
+    return rejectAction(tableState, validation.reason);
   }
 
   const now = options.now ?? (() => new Date().toISOString());
   const timestamp = now();
   const previousMinRaise = hand.minRaise;
   if (!(action.type in playerActionHandlers)) {
-    return { state: tableState, accepted: false, reason: "ILLEGAL_ACTION" };
+    return rejectAction(tableState, "ILLEGAL_ACTION");
   }
 
   const update = playerActionHandlers[action.type as PlayerActionType](hand, seat, seatId, action, {
@@ -684,54 +786,16 @@ export function applyAction(
   const seats = tableState.seats;
   const buttonSeat = tableState.button;
 
-  if (remaining.length === 1) {
-    endHandByFold(hand, seats, buttonSeat, timestamp);
-    return {
-      state: { ...tableState, version: tableState.version + 1, updatedAt: timestamp },
-      accepted: true,
-      action: actionRecord,
-      handComplete: true,
-    };
-  }
+  const postAction = resolvePostAction({
+    tableState,
+    hand,
+    seats,
+    buttonSeat,
+    actingSeatId: seatId,
+    timestamp,
+    remainingSeats: remaining,
+    activeSeats: active,
+  });
 
-  const shouldShowdown = active.length === 0 || (active.length === 1 && remaining.length > 1);
-  if (shouldShowdown) {
-    endHandByShowdown(hand, seats, buttonSeat, timestamp);
-    return {
-      state: { ...tableState, version: tableState.version + 1, updatedAt: timestamp },
-      accepted: true,
-      action: actionRecord,
-      handComplete: true,
-    };
-  }
-
-  const roundComplete = isBettingRoundComplete(hand, seats);
-  if (!roundComplete) {
-    hand.turn = nextActiveSeat(seats, seatId);
-    return {
-      state: { ...tableState, version: tableState.version + 1, updatedAt: timestamp },
-      accepted: true,
-      action: actionRecord,
-      handComplete: false,
-    };
-  }
-
-  if (hand.street === "RIVER") {
-    endHandAtRiver(hand, seats, buttonSeat, timestamp);
-    return {
-      state: { ...tableState, version: tableState.version + 1, updatedAt: timestamp },
-      accepted: true,
-      action: actionRecord,
-      handComplete: true,
-    };
-  }
-
-  advanceStreet(hand, seats, buttonSeat);
-
-  return {
-    state: { ...tableState, version: tableState.version + 1, updatedAt: timestamp },
-    accepted: true,
-    action: actionRecord,
-    handComplete: false,
-  };
+  return acceptAction(tableState, actionRecord, timestamp, postAction.handComplete);
 }

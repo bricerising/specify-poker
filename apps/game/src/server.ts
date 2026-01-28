@@ -51,6 +51,11 @@ export async function main() {
 
     metricsServer = startMetricsServer(config.metricsPort);
 
+    const { tableService } = await import("./services/tableService");
+    shutdownManager.add("tableService.shutdown", () => {
+      tableService.shutdown();
+    });
+
     logger.info("Game Service is running");
   } catch (err: unknown) {
     logger.error({ err }, "Failed to start Game Service");

@@ -1,9 +1,11 @@
+import { createPeriodicTask, type PeriodicTask } from "@specify-poker/shared";
+
 import { query } from "../storage/db";
 import * as deletionService from "../services/deletionService";
 import logger from "../observability/logger";
 import { getConfig } from "../config";
 
-let intervalId: NodeJS.Timeout | null = null;
+let task: PeriodicTask | null = null;
 
 const DELETION_GRACE_DAYS = 30;
 
@@ -60,27 +62,41 @@ export function startDeletionProcessor(): void {
 
   logger.info({ intervalMs }, "Starting deletion processor job");
 
-  // Run immediately on startup
-  processExpiredDeletions().catch((error) => {
-    logger.error({ err: error }, "Deletion processor initial run failed");
+  task?.stop();
+
+  let isFirstRun = true;
+
+  task = createPeriodicTask({
+    name: "player.deletion_processor",
+    intervalMs,
+    runOnStart: true,
+    logger,
+    run: async () => {
+      try {
+        const deletedCount = await processExpiredDeletions();
+        if (deletedCount > 0) {
+          logger.info({ deletedCount }, "Processed expired profile deletions");
+        }
+      } catch (error) {
+        logger.error(
+          { err: error },
+          isFirstRun ? "Deletion processor initial run failed" : "Deletion processor job error",
+        );
+      } finally {
+        isFirstRun = false;
+      }
+    },
   });
 
-  intervalId = setInterval(async () => {
-    try {
-      const deletedCount = await processExpiredDeletions();
-      if (deletedCount > 0) {
-        logger.info({ deletedCount }, "Processed expired profile deletions");
-      }
-    } catch (error) {
-      logger.error({ err: error }, "Deletion processor job error");
-    }
-  }, intervalMs);
+  task.start();
 }
 
 export function stopDeletionProcessor(): void {
-  if (intervalId) {
-    clearInterval(intervalId);
-    intervalId = null;
-    logger.info("Stopped deletion processor job");
+  if (!task) {
+    return;
   }
+
+  task.stop();
+  task = null;
+  logger.info("Stopped deletion processor job");
 }

@@ -87,4 +87,24 @@ describe("handEngine applyAction", () => {
     expect(result.handComplete).toBe(true);
     expect(result.state.seats[seatId].status).toBe("SEATED");
   });
+
+  it("deals remaining community cards when all players are all-in", () => {
+    const tableState = createTableState();
+    tableState.seats[0].stack = 2;
+    tableState.seats[1].stack = 2;
+
+    const started = startHand(tableState, config, {
+      deck: makeDeck(),
+      now: () => "2026-01-01T00:00:00.000Z",
+    });
+
+    const seatId = started.hand?.turn ?? 0;
+    const result = applyAction(started, seatId, { type: "CALL" }, { now: () => "2026-01-01T00:00:01.000Z" });
+
+    expect(result.accepted).toBe(true);
+    expect(result.handComplete).toBe(true);
+    expect(result.state.hand?.street).toBe("SHOWDOWN");
+    expect(result.state.hand?.communityCards.length).toBe(5);
+    expect(result.state.hand?.endedAt).toBe("2026-01-01T00:00:01.000Z");
+  });
 });

@@ -1,14 +1,31 @@
+import { createPeriodicTask, type PeriodicTask } from "@specify-poker/shared";
+
 import logger from "../observability/logger";
+
+const ONE_HOUR_MS = 3600 * 1000;
 
 export class Archiver {
   private isRunning = false;
-  private interval: NodeJS.Timeout | null = null;
+  private task: PeriodicTask | null = null;
 
   async start() {
+    if (this.isRunning) {
+      return;
+    }
+
     this.isRunning = true;
     logger.info("Archiver started");
     // Periodically check for old data to archive
-    this.interval = setInterval(() => this.run(), 3600 * 1000); // Once per hour
+    this.task?.stop();
+    this.task = createPeriodicTask({
+      name: "event.archiver",
+      intervalMs: ONE_HOUR_MS,
+      logger,
+      run: async () => {
+        await this.run();
+      },
+    });
+    this.task.start();
   }
 
   async run() {
@@ -20,7 +37,8 @@ export class Archiver {
 
   stop() {
     this.isRunning = false;
-    if (this.interval) clearInterval(this.interval);
+    this.task?.stop();
+    this.task = null;
   }
 }
 
