@@ -2,7 +2,7 @@
   "name": "@specify-poker/ui",
   "private": true,
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/bundle.mjs",
     "start": "node server.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -17,6 +17,7 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "esbuild": "^0.21.5",
     "@playwright/test": "^1.41.0",
     "@testing-library/react": "^14.1.0",
     "@types/react": "^18.2.0",

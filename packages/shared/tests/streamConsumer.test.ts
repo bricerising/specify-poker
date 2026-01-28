@@ -7,10 +7,11 @@ describe("runRedisStreamConsumer", () => {
     const controller = new AbortController();
 
     const client: RedisStreamConsumerClient = {
-      xGroupCreate: vi.fn(async () => undefined),
-      xReadGroup: vi.fn(async () => [{ messages: [{ id: "1-0", message: { data: "hello" } }] }]),
+      xGroupCreate: vi.fn(async () => "OK"),
+      xReadGroup: vi.fn(async () => [{ name: "events:all", messages: [{ id: "1-0", message: { data: "hello" } }] }]),
       xAck: vi.fn(async () => {
         controller.abort();
+        return 1;
       }),
     };
 
@@ -36,10 +37,11 @@ describe("runRedisStreamConsumer", () => {
     const controller = new AbortController();
 
     const client: RedisStreamConsumerClient = {
-      xGroupCreate: vi.fn(async () => undefined),
-      xReadGroup: vi.fn(async () => [{ messages: [{ id: "1-0", message: { data: "boom" } }] }]),
+      xGroupCreate: vi.fn(async () => "OK"),
+      xReadGroup: vi.fn(async () => [{ name: "events:all", messages: [{ id: "1-0", message: { data: "boom" } }] }]),
       xAck: vi.fn(async () => {
         controller.abort();
+        return 1;
       }),
     };
 
@@ -69,9 +71,10 @@ describe("runRedisStreamConsumer", () => {
       xGroupCreate: vi.fn(async () => {
         throw new Error("BUSYGROUP Consumer Group name already exists");
       }),
-      xReadGroup: vi.fn(async () => [{ messages: [{ id: "1-0", message: { data: "ok" } }] }]),
+      xReadGroup: vi.fn(async () => [{ name: "events:all", messages: [{ id: "1-0", message: { data: "ok" } }] }]),
       xAck: vi.fn(async () => {
         controller.abort();
+        return 1;
       }),
     };
 
@@ -89,4 +92,3 @@ describe("runRedisStreamConsumer", () => {
     expect(client.xReadGroup).toHaveBeenCalled();
   });
 });
-

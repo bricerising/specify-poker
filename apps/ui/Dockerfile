@@ -13,13 +13,14 @@ RUN npm ci --omit=dev -w @specify-poker/shared -w @specify-poker/ui
 RUN mkdir -p /app/build-deps \
   && cd /app/build-deps \
   && npm init -y \
-  && npm install --no-package-lock typescript@5.9.3 @types/node@20.19.27 @types/react@18.3.27 @types/react-dom@18.3.7 redis@4.7.1 \
+  && npm install --no-package-lock typescript@5.9.3 esbuild@0.21.5 @types/node@20.19.27 @types/react@18.3.27 @types/react-dom@18.3.7 redis@4.7.1 \
   && cp -R node_modules/* /app/node_modules/ \
   && rm -rf /app/build-deps
 
 COPY packages/shared/src ./packages/shared/src
 COPY apps/ui/src ./apps/ui/src
 COPY apps/ui/public ./apps/ui/public
+COPY apps/ui/scripts ./apps/ui/scripts
 COPY apps/ui/server.mjs ./apps/ui/server.mjs
 
 RUN cd packages/shared \
@@ -27,7 +28,8 @@ RUN cd packages/shared \
   && node ../../node_modules/typescript/bin/tsc -p tsconfig.cjs.json \
   && node -e "const fs=require('node:fs'); fs.mkdirSync('dist/cjs',{recursive:true}); fs.writeFileSync('dist/cjs/package.json', JSON.stringify({type:'commonjs'}, null, 2));" \
   && cd /app \
-  && node node_modules/typescript/bin/tsc -p apps/ui/tsconfig.json
+  && node node_modules/typescript/bin/tsc -p apps/ui/tsconfig.json \
+  && node apps/ui/scripts/bundle.mjs
 
 FROM node:20-alpine
 

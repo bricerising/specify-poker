@@ -9,7 +9,7 @@ export type ProcessLike = {
 };
 
 export type RunServiceMainOptions = {
-  main: () => Promise<void>;
+  main: () => Promise<unknown>;
   shutdown: () => Promise<void>;
   logger?: ServiceRunnerLogger;
   process?: ProcessLike;

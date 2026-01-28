@@ -1,22 +1,9 @@
-export type RedisStreamConsumerClient = {
-  xGroupCreate: (
-    streamKey: string,
-    groupName: string,
-    id: string,
-    options: { MKSTREAM: boolean },
-  ) => Promise<unknown>;
-  xReadGroup: (
-    groupName: string,
-    consumerName: string,
-    streams: Array<{ key: string; id: string }>,
-    options: { COUNT: number; BLOCK: number },
-  ) => Promise<RedisStreamReadGroupResponse | null>;
-  xAck: (streamKey: string, groupName: string, messageId: string) => Promise<unknown>;
-};
+import type { RedisClient } from "./redisClientManager";
 
-export type RedisStreamReadGroupResponse = Array<{
-  messages: Array<{ id: string; message: Record<string, unknown> }>;
-}>;
+export type RedisStreamConsumerClient = Pick<RedisClient, "xGroupCreate" | "xReadGroup" | "xAck">;
+
+type RedisStreamReadGroupReply = Awaited<ReturnType<RedisStreamConsumerClient["xReadGroup"]>>;
+type RedisStreamReadGroupResponse = Exclude<RedisStreamReadGroupReply, null>;
 
 export type RedisStreamConsumerMessage = {
   id: string;
@@ -81,6 +68,16 @@ export async function runRedisStreamConsumer(signal: AbortSignal, options: Redis
     await sleep(ms);
   };
 
+  const toStringMessageId = (id: unknown): string => {
+    if (typeof id === "string") {
+      return id;
+    }
+    if (typeof Buffer !== "undefined" && Buffer.isBuffer(id)) {
+      return id.toString("utf8");
+    }
+    return String(id);
+  };
+
   while (!signal.aborted) {
     let client: RedisStreamConsumerClient;
     try {
@@ -92,7 +89,12 @@ export async function runRedisStreamConsumer(signal: AbortSignal, options: Redis
     }
 
     try {
-      await client.xGroupCreate(options.streamKey, options.groupName, groupStartId, { MKSTREAM: mkStream });
+      await client.xGroupCreate(
+        options.streamKey,
+        options.groupName,
+        groupStartId,
+        mkStream ? { MKSTREAM: true } : undefined,
+      );
     } catch (error: unknown) {
       if (!isBusyGroupError(error)) {
         logWarn({ err: error, streamKey: options.streamKey }, "redis_stream_consumer.group_create.failed");
@@ -101,7 +103,7 @@ export async function runRedisStreamConsumer(signal: AbortSignal, options: Redis
       }
     }
 
-    let streams: RedisStreamReadGroupResponse | null;
+    let streams: RedisStreamReadGroupReply;
     try {
       streams = await client.xReadGroup(
         options.groupName,
@@ -119,9 +121,9 @@ export async function runRedisStreamConsumer(signal: AbortSignal, options: Redis
       continue;
     }
 
-    for (const stream of streams) {
+    for (const stream of streams as RedisStreamReadGroupResponse) {
       for (const message of stream.messages) {
-        const messageId = message.id;
+        const messageId = toStringMessageId(message.id);
 
         try {
           await options.onMessage({ id: messageId, fields: message.message });
@@ -145,4 +147,3 @@ export async function runRedisStreamConsumer(signal: AbortSignal, options: Redis
     }
   }
 }
-
