@@ -1,8 +1,6 @@
-import type { ActionInput, ActionType, HandState, LegalAction, Seat } from '../domain/types';
+import type { ActionInput, HandState, LegalAction, Seat } from '../domain/types';
 
-type ValidationResult = { ok: true } | { ok: false; reason: ValidationReason };
-
-type ValidationReason =
+export type ValidationReason =
   | 'HAND_COMPLETE'
   | 'SEAT_INACTIVE'
   | 'ILLEGAL_ACTION'
@@ -10,7 +8,13 @@ type ValidationReason =
   | 'AMOUNT_TOO_SMALL'
   | 'AMOUNT_TOO_LARGE';
 
-const AMOUNT_REQUIRED_ACTIONS: ReadonlySet<ActionType> = new Set(['BET', 'RAISE', 'ALL_IN']);
+export type ValidationResult = { ok: true } | { ok: false; reason: ValidationReason };
+
+type AmountRequiredActionInput = Extract<ActionInput, { type: 'BET' | 'RAISE' }>;
+
+function isAmountRequiredAction(action: ActionInput): action is AmountRequiredActionInput {
+  return action.type === 'BET' || action.type === 'RAISE';
+}
 
 export function getCallAmount(hand: HandState, seat: Seat): number {
   const contributed = hand.roundContributions[seat.seatId] ?? 0;
@@ -71,7 +75,7 @@ function isValidAmount(amount: unknown): amount is number {
 }
 
 function validateAmountBounds(action: ActionInput, legal: LegalAction): ValidationResult {
-  if (!AMOUNT_REQUIRED_ACTIONS.has(action.type)) {
+  if (!isAmountRequiredAction(action)) {
     return { ok: true };
   }
 

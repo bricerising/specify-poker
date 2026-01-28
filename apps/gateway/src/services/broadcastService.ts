@@ -23,12 +23,34 @@ function parseBroadcastChannel(channel: string): BroadcastChannel | null {
   return null;
 }
 
+type BroadcastPublisherMap = {
+  readonly [K in BroadcastChannel['kind']]: (
+    channel: Extract<BroadcastChannel, { kind: K }>,
+    payload: Record<string, unknown>,
+  ) => Promise<void>;
+};
+
+const publishToRedisByKind = {
+  table: async (channel: Extract<BroadcastChannel, { kind: 'table' }>, payload) => {
+    await pubsub.publishTableEvent(channel.tableId, payload);
+  },
+  chat: async (channel: Extract<BroadcastChannel, { kind: 'chat' }>, payload) => {
+    await pubsub.publishChatEvent(channel.tableId, payload);
+  },
+  lobby: async (_channel: Extract<BroadcastChannel, { kind: 'lobby' }>, payload) => {
+    const tables = payload.tables;
+    if (Array.isArray(tables)) {
+      await pubsub.publishLobbyEvent(tables);
+    }
+  },
+} satisfies BroadcastPublisherMap;
+
 export async function broadcastToChannel(channel: string, payload: Record<string, unknown>) {
   try {
     // 1. Deliver to local subscribers (from Redis index).
     await deliverToSubscribers(channel, payload);
 
-    // 3. Publish to Redis for other instances
+    // 2. Publish to Redis for other instances
     // Note: The channel here might be "table:123" or "lobby" or "chat:123"
     // Our pubsub implementation currently uses specific methods.
     const parsedChannel = parseBroadcastChannel(channel);
@@ -37,21 +59,7 @@ export async function broadcastToChannel(channel: string, payload: Record<string
       return;
     }
 
-    switch (parsedChannel.kind) {
-      case 'table':
-        await pubsub.publishTableEvent(parsedChannel.tableId, payload);
-        break;
-      case 'chat':
-        await pubsub.publishChatEvent(parsedChannel.tableId, payload);
-        break;
-      case 'lobby': {
-        const tables = payload.tables;
-        if (Array.isArray(tables)) {
-          await pubsub.publishLobbyEvent(tables);
-        }
-        break;
-      }
-    }
+    await publishToRedisByKind[parsedChannel.kind](parsedChannel, payload);
   } catch (err) {
     logger.error({ err, channel }, 'Failed to broadcast to channel');
   }

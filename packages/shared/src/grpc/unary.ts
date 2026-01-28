@@ -1,4 +1,5 @@
 import { ensureError } from '../errors/ensureError';
+import { chainAsyncInterceptors } from '../pipeline';
 
 export type UnaryCall<Req> = { request: Req };
 
@@ -25,10 +26,7 @@ export function chainUnaryInterceptors<Req, Res, Call extends UnaryCall<Req>>(
   handler: RequestHandler<Req, Res, Call>,
   interceptors: ReadonlyArray<UnaryInterceptor<Req, Res, Call>>,
 ): RequestHandler<Req, Res, Call> {
-  return interceptors.reduceRight<RequestHandler<Req, Res, Call>>(
-    (next, interceptor) => (context) => interceptor(context, next),
-    handler,
-  );
+  return chainAsyncInterceptors(handler, interceptors);
 }
 
 export function withUnaryHooks<Req, Res, Call extends UnaryCall<Req>>(hooks?: {

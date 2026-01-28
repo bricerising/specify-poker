@@ -4,6 +4,7 @@ export * from './protobuf/struct';
 export * from './lifecycle/shutdown';
 export * from './lifecycle/serviceRunner';
 export * from './lifecycle/periodicTask';
+export * from './pipeline/index';
 export * from './errors/index';
 export * from './result/index';
 export * from './grpc/call';

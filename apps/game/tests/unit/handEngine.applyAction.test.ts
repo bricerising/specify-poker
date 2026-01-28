@@ -124,4 +124,34 @@ describe('handEngine applyAction', () => {
     expect(result.state.hand?.communityCards.length).toBe(5);
     expect(result.state.hand?.endedAt).toBe('2026-01-01T00:00:01.000Z');
   });
+
+  it('allows ALL_IN without amount and records the computed total', () => {
+    const started = startHand(createTableState(), config, {
+      deck: makeDeck(),
+      now: () => '2026-01-01T00:00:00.000Z',
+    });
+
+    const seatId = started.hand?.turn ?? 0;
+    const hand = started.hand;
+    expect(hand).toBeTruthy();
+    if (!hand) return;
+
+    const seat = started.seats[seatId];
+    const contributed = hand.roundContributions[seatId] ?? 0;
+    const expectedAllInTotal = seat.stack + contributed;
+
+    const result = applyAction(
+      started,
+      seatId,
+      { type: 'ALL_IN' },
+      { now: () => '2026-01-01T00:00:01.000Z' },
+    );
+
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+
+    const lastAction = result.state.hand?.actions[result.state.hand.actions.length - 1];
+    expect(lastAction?.type).toBe('ALL_IN');
+    expect(lastAction?.amount).toBe(expectedAllInTotal);
+  });
 });

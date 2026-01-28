@@ -176,13 +176,12 @@ describe('actionRules', () => {
       expect(result.reason).toBe('ILLEGAL_ACTION');
     });
 
-    it('should require amount for BET', () => {
-      const hand = createHandState({ currentBet: 0 });
+    it('should accept ALL_IN without amount', () => {
+      const hand = createHandState();
       const seat = createSeat();
 
-      const result = validateAction(hand, seat, { type: 'BET' });
-      expect(result.ok).toBe(false);
-      expect(result.reason).toBe('MISSING_AMOUNT');
+      const result = validateAction(hand, seat, { type: 'ALL_IN' });
+      expect(result.ok).toBe(true);
     });
 
     it('should reject BET that is too small', () => {

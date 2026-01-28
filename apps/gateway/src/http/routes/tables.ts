@@ -161,37 +161,149 @@ async function handleOkGrpcResponse(
   return res.json({ ok: true });
 }
 
-function createModerationHandler(options: {
-  action: 'kick' | 'mute' | 'unmute';
-  method: (request: {
-    table_id: string;
-    owner_id: string;
-    target_user_id: string;
-  }) => Promise<unknown>;
-}) {
+type ModerationAction = 'kick' | 'mute' | 'unmute';
+
+type ModerationRequest = {
+  readonly table_id: string;
+  readonly owner_id: string;
+  readonly target_user_id: string;
+};
+
+type ModerationMethod = (request: ModerationRequest) => Promise<unknown>;
+
+type ModerationContext = {
+  readonly tableId: string;
+  readonly ownerId: string;
+  readonly targetUserId: string;
+  readonly seatId?: number;
+};
+
+type ModerationTargetResolution = Pick<ModerationContext, 'targetUserId' | 'seatId'>;
+
+type ModerationTargetResolver = (params: {
+  req: Request;
+  res: Response;
+  tableId: string;
+  ownerId: string;
+}) => Promise<ModerationTargetResolution | null>;
+
+type ModerationResponseBuilder = (params: {
+  req: Request;
+  res: Response;
+  action: ModerationAction;
+  context: ModerationContext;
+}) => Promise<void>;
+
+type ModerationStrategy = {
+  readonly action: ModerationAction;
+  readonly method: ModerationMethod;
+  readonly resolveTarget: ModerationTargetResolver;
+  readonly respond: ModerationResponseBuilder;
+};
+
+const resolveModerationTargetFromBody: ModerationTargetResolver = async ({ req, res }) => {
+  const targetUserId = readNonEmptyString(
+    (req.body as { targetUserId?: unknown } | undefined)?.targetUserId,
+  );
+  if (!targetUserId) {
+    res.status(400).json({ error: 'targetUserId is required' });
+    return null;
+  }
+  return { targetUserId };
+};
+
+const resolveModerationTargetFromSeatId: ModerationTargetResolver = async ({
+  req,
+  res,
+  tableId,
+  ownerId,
+}) => {
+  const seatIdParsed = seatIdSchema.safeParse(req.body?.seatId);
+  if (!seatIdParsed.success) {
+    res.status(400).json({ error: 'seatId is required' });
+    return null;
+  }
+  const seatId = seatIdParsed.data;
+
+  const targetUserId = await resolveTargetUserIdBySeatId({ tableId, ownerId, seatId });
+  if (!targetUserId) {
+    res.status(404).json({ error: 'Seat not occupied' });
+    return null;
+  }
+
+  return { targetUserId, seatId };
+};
+
+const respondWithModerationOk: ModerationResponseBuilder = async ({ res }) => {
+  res.json({ ok: true });
+};
+
+const respondWithSeatModerationAction: ModerationResponseBuilder = async ({ res, action, context }) => {
+  if (typeof context.seatId !== 'number') {
+    res.status(500).json({ error: 'Moderation seatId missing' });
+    return;
+  }
+  res.json({
+    tableId: context.tableId,
+    seatId: context.seatId,
+    userId: context.targetUserId,
+    action,
+  });
+};
+
+const respondWithKickSeatModerationAction: ModerationResponseBuilder = async ({
+  res,
+  action,
+  context,
+}) => {
+  if (typeof context.seatId !== 'number') {
+    res.status(500).json({ error: 'Moderation seatId missing' });
+    return;
+  }
+
+  const updated = await grpc.game.GetTableState({
+    table_id: context.tableId,
+    user_id: context.ownerId,
+  });
+
+  res.json({
+    tableId: context.tableId,
+    seatId: context.seatId,
+    userId: context.targetUserId,
+    action,
+    tableState: updated.state,
+  });
+};
+
+function createModerationHandler(strategy: ModerationStrategy) {
   return async (req: Request, res: Response) => {
     try {
       const { tableId } = req.params;
       const ownerId = requireUserId(req, res);
       if (!ownerId) return;
 
-      const targetUserId = readNonEmptyString(
-        (req.body as { targetUserId?: unknown } | undefined)?.targetUserId,
-      );
-      if (!targetUserId) {
-        return res.status(400).json({ error: 'targetUserId is required' });
+      const target = await strategy.resolveTarget({ req, res, tableId, ownerId });
+      if (!target) {
+        return;
       }
 
-      await options.method({
+      const context: ModerationContext = {
+        tableId,
+        ownerId,
+        targetUserId: target.targetUserId,
+        ...(typeof target.seatId === 'number' ? { seatId: target.seatId } : {}),
+      };
+
+      await strategy.method({
         table_id: tableId,
         owner_id: ownerId,
-        target_user_id: targetUserId,
+        target_user_id: context.targetUserId,
       });
 
-      return res.json({ ok: true });
+      await strategy.respond({ req, res, action: strategy.action, context });
     } catch (err) {
-      logger.error({ err }, `Failed to ${options.action} player`);
-      return res.status(500).json({ error: `Failed to ${options.action} player` });
+      logger.error({ err }, `Failed to ${strategy.action} player`);
+      res.status(500).json({ error: `Failed to ${strategy.action} player` });
     }
   };
 }
@@ -199,16 +311,36 @@ function createModerationHandler(options: {
 const handleKickByTargetUserId = createModerationHandler({
   action: 'kick',
   method: grpc.game.KickPlayer,
+  resolveTarget: resolveModerationTargetFromBody,
+  respond: respondWithModerationOk,
 });
 
 const handleMuteByTargetUserId = createModerationHandler({
   action: 'mute',
   method: grpc.game.MutePlayer,
+  resolveTarget: resolveModerationTargetFromBody,
+  respond: respondWithModerationOk,
 });
 
 const handleUnmuteByTargetUserId = createModerationHandler({
   action: 'unmute',
   method: grpc.game.UnmutePlayer,
+  resolveTarget: resolveModerationTargetFromBody,
+  respond: respondWithModerationOk,
+});
+
+const handleKickBySeatId = createModerationHandler({
+  action: 'kick',
+  method: grpc.game.KickPlayer,
+  resolveTarget: resolveModerationTargetFromSeatId,
+  respond: respondWithKickSeatModerationAction,
+});
+
+const handleMuteBySeatId = createModerationHandler({
+  action: 'mute',
+  method: grpc.game.MutePlayer,
+  resolveTarget: resolveModerationTargetFromSeatId,
+  respond: respondWithSeatModerationAction,
 });
 
 // GET /api/tables - List all tables
@@ -410,82 +542,10 @@ router.post('/:tableId/action', async (req: Request, res: Response) => {
 });
 
 // POST /api/tables/:tableId/moderation/kick - Kick by seatId (owner only)
-router.post('/:tableId/moderation/kick', async (req: Request, res: Response) => {
-  try {
-    const { tableId } = req.params;
-    const ownerId = requireUserId(req, res);
-    if (!ownerId) return;
-
-    const seatIdParsed = seatIdSchema.safeParse(req.body?.seatId);
-    if (!seatIdParsed.success) {
-      return res.status(400).json({ error: 'seatId is required' });
-    }
-    const seatId = seatIdParsed.data;
-
-    const targetUserId = await resolveTargetUserIdBySeatId({ tableId, ownerId, seatId });
-    if (!targetUserId) {
-      return res.status(404).json({ error: 'Seat not occupied' });
-    }
-
-    await grpc.game.KickPlayer({
-      table_id: tableId,
-      owner_id: ownerId,
-      target_user_id: targetUserId,
-    });
-
-    const updated = await grpc.game.GetTableState({
-      table_id: tableId,
-      user_id: ownerId,
-    });
-
-    return res.json({
-      tableId,
-      seatId,
-      userId: targetUserId,
-      action: 'kick',
-      tableState: updated.state,
-    });
-  } catch (err) {
-    logger.error({ err }, 'Failed to kick player');
-    return res.status(500).json({ error: 'Failed to kick player' });
-  }
-});
+router.post('/:tableId/moderation/kick', handleKickBySeatId);
 
 // POST /api/tables/:tableId/moderation/mute - Mute by seatId (owner only)
-router.post('/:tableId/moderation/mute', async (req: Request, res: Response) => {
-  try {
-    const { tableId } = req.params;
-    const ownerId = requireUserId(req, res);
-    if (!ownerId) return;
-
-    const seatIdParsed = seatIdSchema.safeParse(req.body?.seatId);
-    if (!seatIdParsed.success) {
-      return res.status(400).json({ error: 'seatId is required' });
-    }
-    const seatId = seatIdParsed.data;
-
-    const targetUserId = await resolveTargetUserIdBySeatId({ tableId, ownerId, seatId });
-    if (!targetUserId) {
-      return res.status(404).json({ error: 'Seat not occupied' });
-    }
-
-    await grpc.game.MutePlayer({
-      table_id: tableId,
-      owner_id: ownerId,
-      target_user_id: targetUserId,
-    });
-
-    return res.json({
-      tableId,
-      seatId,
-      userId: targetUserId,
-      action: 'mute',
-    });
-  } catch (err) {
-    logger.error({ err }, 'Failed to mute player');
-    return res.status(500).json({ error: 'Failed to mute player' });
-  }
-});
+router.post('/:tableId/moderation/mute', handleMuteBySeatId);
 
 // POST /api/tables/:tableId/kick - Kick a player (owner only)
 router.post('/:tableId/kick', handleKickByTargetUserId);

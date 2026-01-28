@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 
+import { seatAt } from '../domain/seats';
 import type {
   ActionInput,
   Seat,
@@ -399,7 +400,7 @@ export class TableService {
       return { ok: true };
     }
 
-    const seat = state.seats.find((entry) => entry.seatId === seatId);
+    const seat = seatAt(state.seats, seatId);
     if (!seat || seat.userId || seat.status !== 'EMPTY') {
       recordSeatJoin('error', 'SEAT_NOT_AVAILABLE');
       return { ok: false, error: 'SEAT_NOT_AVAILABLE' };
@@ -460,7 +461,7 @@ export class TableService {
       return { type: 'error', error: 'TABLE_LOST' };
     }
 
-    const reservedSeat = reservedState.seats.find((entry) => entry.seatId === seatId);
+    const reservedSeat = seatAt(reservedState.seats, seatId);
     if (!reservedSeat || reservedSeat.userId !== userId || reservedSeat.status !== 'RESERVED') {
       return { type: 'error', error: 'SEAT_LOST' };
     }
@@ -520,7 +521,7 @@ export class TableService {
     if (!finalState) {
       return { type: 'error', error: 'TABLE_LOST' };
     }
-    const finalSeat = finalState.seats.find((entry) => entry.seatId === seatId);
+    const finalSeat = seatAt(finalState.seats, seatId);
     if (!finalSeat || finalSeat.userId !== userId) {
       return { type: 'error', error: 'SEAT_LOST' };
     }
@@ -560,7 +561,7 @@ export class TableService {
     logger.error({ err: error, tableId, seatId, userId }, 'Balance service unavailable');
     const state = await tableStateStore.get(tableId);
     if (!state) return;
-    const seat = state.seats.find((entry) => entry.seatId === seatId);
+    const seat = seatAt(state.seats, seatId);
     if (!seat || seat.userId !== userId) return;
     seat.stack = buyInAmount;
     seat.status = 'SEATED';
@@ -592,7 +593,7 @@ export class TableService {
     }
     const state = await tableStateStore.get(tableId);
     if (state) {
-      const seat = state.seats.find((entry) => entry.seatId === seatId);
+      const seat = seatAt(state.seats, seatId);
       if (seat && seat.userId === userId && seat.status === 'RESERVED') {
         this.clearSeatOwnership(seat);
         seat.status = 'EMPTY';
@@ -756,6 +757,8 @@ export class TableService {
     const actionRecord = hand?.actions[hand.actions.length - 1];
     const actedSeat = result.state.seats[seat.seatId];
     const isAllIn = actedSeat?.status === 'ALL_IN' || actionRecord?.type === 'ALL_IN';
+    const requestedAmount =
+      'amount' in action && typeof action.amount === 'number' ? action.amount : 0;
     void this.emitGameEvent(
       tableId,
       hand?.handId,
@@ -765,7 +768,7 @@ export class TableService {
       {
         seatId: seat.seatId,
         action: actionRecord?.type ?? action.type,
-        amount: actionRecord?.amount ?? action.amount ?? 0,
+        amount: actionRecord?.amount ?? requestedAmount,
         isAllIn,
         street: actionStreet,
       },
@@ -995,7 +998,7 @@ export class TableService {
     this.handTimeoutMeta.delete(table.tableId);
 
     const winnerUserIds = (hand.winners || [])
-      .map((seatId) => state.seats.find((seat) => seat.seatId === seatId)?.userId)
+      .map((seatId) => seatAt(state.seats, seatId)?.userId)
       .filter((value): value is string => Boolean(value));
 
     void this.emitGameEvent(

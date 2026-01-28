@@ -102,8 +102,8 @@ export function createEventApp(options: CreateEventAppOptions): EventApp {
         if (!options.isTest) {
           await handMaterializer.start();
           await archiver.start();
-          shutdown.add('jobs.stop', () => {
-            handMaterializer.stop();
+          shutdown.add('jobs.stop', async () => {
+            await handMaterializer.stop();
             archiver.stop();
           });
 

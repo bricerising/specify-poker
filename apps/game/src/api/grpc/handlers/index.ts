@@ -7,7 +7,7 @@ import { coerceNumber } from '../../../utils/coerce';
 import { toServiceError } from './grpcError';
 import { toProtoCard, toProtoConfig, toProtoState, toProtoTable } from './proto';
 import type { ProtoCard, ProtoTableState, ProtoTableSummary } from './proto';
-import type { ActionInput } from '../../../domain/types';
+import { parseActionInput } from '../../../domain/actionInput';
 
 type Empty = Record<string, never>;
 type ListTablesResponse = { tables: ProtoTableSummary[] };
@@ -160,11 +160,11 @@ export function createHandlers() {
     SubmitAction: createGameUnaryHandler<SubmitActionRequest, ActionResult>(
       'SubmitAction',
       ({ table_id, user_id, action_type, amount }) => {
-        const normalizedAction = action_type.toUpperCase() as ActionInput['type'];
-        return tableService.submitAction(table_id, user_id, {
-          type: normalizedAction,
-          amount: amount === undefined ? undefined : coerceNumber(amount, 0),
-        });
+        const parsed = parseActionInput({ actionType: action_type, amount });
+        if (!parsed.ok) {
+          return { ok: false, error: parsed.error.type };
+        }
+        return tableService.submitAction(table_id, user_id, parsed.value);
       },
     ),
 

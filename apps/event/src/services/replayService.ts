@@ -1,14 +1,27 @@
 import { eventStore } from '../storage/eventStore';
 import type { GameEvent } from '../domain/types';
+import { isRecord } from '../errors';
 import { privacyService } from './privacyService';
 
 function extractParticipants(events: GameEvent[]): Set<string> {
   const participants = new Set<string>();
   const handStarted = events.find((event) => event.type === 'HAND_STARTED');
-  const payload = handStarted?.payload as { seats?: { userId?: string }[] } | undefined;
-  for (const seat of payload?.seats || []) {
-    if (seat.userId) {
-      participants.add(seat.userId);
+  if (!handStarted || !isRecord(handStarted.payload)) {
+    return participants;
+  }
+
+  const seatsValue = handStarted.payload.seats;
+  if (!Array.isArray(seatsValue)) {
+    return participants;
+  }
+
+  for (const seat of seatsValue) {
+    if (!isRecord(seat)) {
+      continue;
+    }
+    const userId = seat.userId;
+    if (typeof userId === 'string' && userId.trim().length > 0) {
+      participants.add(userId);
     }
   }
   return participants;

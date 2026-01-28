@@ -128,7 +128,6 @@ describe('PrivacyService', () => {
       'user-1',
       false,
       new Set(['user-1']),
-      new Set([1]),
     );
 
     expect((event.payload as { reveals: { cards?: unknown[] }[] }).reveals[0].cards).toHaveLength(

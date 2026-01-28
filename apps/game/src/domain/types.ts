@@ -21,7 +21,22 @@ export type SeatStatus =
 
 export type HandStreet = 'PREFLOP' | 'FLOP' | 'TURN' | 'RIVER' | 'SHOWDOWN';
 
-export type ActionType = 'POST_BLIND' | 'FOLD' | 'CHECK' | 'CALL' | 'BET' | 'RAISE' | 'ALL_IN';
+export const ACTION_TYPES = [
+  'POST_BLIND',
+  'FOLD',
+  'CHECK',
+  'CALL',
+  'BET',
+  'RAISE',
+  'ALL_IN',
+] as const;
+export type ActionType = (typeof ACTION_TYPES)[number];
+
+const ACTION_TYPE_SET: ReadonlySet<ActionType> = new Set(ACTION_TYPES);
+
+export function isActionType(value: string): value is ActionType {
+  return ACTION_TYPE_SET.has(value as ActionType);
+}
 
 export interface Card {
   rank: string;
@@ -104,10 +119,14 @@ export interface TableState {
   updatedAt: string;
 }
 
-export interface ActionInput {
-  type: ActionType;
-  amount?: number;
-}
+export type ActionInput =
+  | { type: 'POST_BLIND'; amount: number }
+  | { type: 'FOLD' }
+  | { type: 'CHECK' }
+  | { type: 'CALL' }
+  | { type: 'BET'; amount: number }
+  | { type: 'RAISE'; amount: number }
+  | { type: 'ALL_IN'; amount?: number };
 
 export interface TableSummary {
   tableId: string;

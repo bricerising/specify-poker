@@ -1,3 +1,9 @@
+import {
+  runRedisStreamConsumer,
+  type RedisStreamConsumerClient,
+  type RedisStreamConsumerMessage,
+} from '@specify-poker/shared/redis';
+
 import { blockingRedisClient } from '../storage/redisClient';
 import { eventStore } from '../storage/eventStore';
 import { handStore } from '../storage/handStore';
@@ -18,7 +24,7 @@ import logger from '../observability/logger';
 import { getErrorMessage, isRecord } from '../errors';
 
 export interface HandMaterializerDependencies {
-  redisClient: typeof blockingRedisClient;
+  redisClient: RedisStreamConsumerClient;
   eventStore: typeof eventStore;
   handStore: typeof handStore;
   recordMaterializationLag: typeof recordMaterializationLag;
@@ -161,69 +167,69 @@ export class HandMaterializer {
   private streamRedisKey = streamKey('all');
   private groupName = 'hand-materializer';
   private consumerName = `materializer-${process.pid}`;
+  private pollPromise: Promise<void> | null = null;
+  private abortController: AbortController | null = null;
 
-  async start() {
+  async start(): Promise<void> {
+    if (this.isRunning) {
+      return;
+    }
     this.isRunning = true;
 
-    try {
-      await this.deps.redisClient.xGroupCreate(this.streamRedisKey, this.groupName, '$', {
-        MKSTREAM: true,
-      });
-    } catch (err: unknown) {
-      if (getErrorMessage(err).includes('BUSYGROUP')) {
-        logger.info(
-          { streamKey: this.streamRedisKey, group: this.groupName },
-          'HandMaterializer consumer group exists',
-        );
-      } else {
-        logger.error(
-          { error: err, streamKey: this.streamRedisKey, group: this.groupName },
-          'Error creating consumer group',
-        );
+    logger.info(
+      { streamKey: this.streamRedisKey, group: this.groupName },
+      'HandMaterializer starting',
+    );
+
+    const controller = new AbortController();
+    this.abortController = controller;
+
+    this.pollPromise = runRedisStreamConsumer(controller.signal, {
+      streamKey: this.streamRedisKey,
+      groupName: this.groupName,
+      consumerName: this.consumerName,
+      groupStartId: '$',
+      readCount: 1,
+      blockMs: 5000,
+      getClient: async () => this.deps.redisClient,
+      onMessage: async (message) => {
+        await this.handleStreamMessage(message);
+      },
+      logger,
+      isBusyGroupError: (error: unknown) => getErrorMessage(error).includes('BUSYGROUP'),
+    }).catch((error: unknown) => {
+      if (!this.isRunning || controller.signal.aborted) {
+        return;
       }
-    }
+      logger.error({ err: error }, 'HandMaterializer poll loop crashed');
+    });
 
     logger.info(
       { streamKey: this.streamRedisKey, group: this.groupName },
       'HandMaterializer started',
     );
-    void this.poll();
   }
 
-  private async poll() {
-    while (this.isRunning) {
-      try {
-        const streams = await this.deps.redisClient.xReadGroup(
-          this.groupName,
-          this.consumerName,
-          [{ key: this.streamRedisKey, id: '>' }],
-          { COUNT: 1, BLOCK: 5000 },
-        );
-
-        if (!streams) {
-          continue;
-        }
-        for (const stream of streams) {
-          for (const message of stream.messages) {
-            const parsed = safeJsonParse(message.message.data);
-            if (!parsed) {
-              logger.error(
-                { streamKey: this.streamRedisKey, group: this.groupName, messageId: message.id },
-                'Invalid JSON in HandMaterializer stream message',
-              );
-              await this.deps.redisClient.xAck(this.streamRedisKey, this.groupName, message.id);
-              continue;
-            }
-
-            await this.handleEvent(parsed);
-            await this.deps.redisClient.xAck(this.streamRedisKey, this.groupName, message.id);
-          }
-        }
-      } catch (err) {
-        logger.error({ error: err }, 'Error polling events in HandMaterializer');
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
+  private async handleStreamMessage(message: RedisStreamConsumerMessage): Promise<void> {
+    const rawData = message.fields.data;
+    if (typeof rawData !== 'string') {
+      logger.warn(
+        { streamKey: this.streamRedisKey, group: this.groupName, messageId: message.id },
+        'Invalid stream message (missing data)',
+      );
+      return;
     }
+
+    const parsed = safeJsonParse(rawData);
+    if (!parsed) {
+      logger.warn(
+        { streamKey: this.streamRedisKey, group: this.groupName, messageId: message.id },
+        'Invalid JSON in HandMaterializer stream message',
+      );
+      return;
+    }
+
+    await this.handleEvent(parsed);
   }
 
   private async handleEvent(event: Record<string, unknown>) {
@@ -301,8 +307,14 @@ export class HandMaterializer {
     };
   }
 
-  stop() {
+  async stop(): Promise<void> {
     this.isRunning = false;
+    this.abortController?.abort();
+    this.abortController = null;
+
+    const pollPromise = this.pollPromise;
+    this.pollPromise = null;
+    await pollPromise?.catch(() => undefined);
   }
 }
 
