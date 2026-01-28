@@ -1,8 +1,8 @@
-import React from "react";
+import React from 'react';
 
-import { parseCard } from "../utils/cardRenderer";
+import { parseCard } from '../utils/cardRenderer';
 
-type PlayingCardSize = "sm" | "lg";
+type PlayingCardSize = 'sm' | 'lg';
 
 interface PlayingCardProps {
   card: string;
@@ -11,18 +11,18 @@ interface PlayingCardProps {
 }
 
 const SUIT_NAMES: Record<string, string> = {
-  h: "hearts",
-  d: "diamonds",
-  c: "clubs",
-  s: "spades",
+  h: 'hearts',
+  d: 'diamonds',
+  c: 'clubs',
+  s: 'spades',
 };
 
-export function PlayingCard({ card, size = "sm", className = "" }: PlayingCardProps) {
+export function PlayingCard({ card, size = 'sm', className = '' }: PlayingCardProps) {
   const parsed = parseCard(card);
-  const sizeClass = size === "lg" ? "playing-card-lg" : "";
-  const suitClass = parsed ? `playing-card-${parsed.suitColor}` : "";
-  const label = parsed ? `${parsed.displayRank} of ${SUIT_NAMES[parsed.suit] ?? "unknown"}` : card;
-  const classes = ["playing-card", sizeClass, suitClass, className].filter(Boolean).join(" ");
+  const sizeClass = size === 'lg' ? 'playing-card-lg' : '';
+  const suitClass = parsed ? `playing-card-${parsed.suitColor}` : '';
+  const label = parsed ? `${parsed.displayRank} of ${SUIT_NAMES[parsed.suit] ?? 'unknown'}` : card;
+  const classes = ['playing-card', sizeClass, suitClass, className].filter(Boolean).join(' ');
 
   return (
     <span className={classes} role="img" aria-label={label}>

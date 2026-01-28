@@ -1,7 +1,12 @@
-import { createLazyUnaryCallProxy, type UnaryCallProxy } from "@specify-poker/shared";
+import { createLazyUnaryCallProxy, type UnaryCallProxy } from '@specify-poker/shared';
 
-import type { EventServiceClient, GameServiceClient, NotifyServiceClient, PlayerServiceClient } from "../types";
-import * as clients from "./clients";
+import type {
+  EventServiceClient,
+  GameServiceClient,
+  NotifyServiceClient,
+  PlayerServiceClient,
+} from '../types';
+import * as clients from './clients';
 
 export type GatewayGrpcClients = {
   game: GameServiceClient;

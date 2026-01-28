@@ -1,6 +1,4 @@
-export type JsonParseResult<T> =
-  | { ok: true; value: T }
-  | { ok: false; error: Error };
+export type JsonParseResult<T> = { ok: true; value: T } | { ok: false; error: Error };
 
 export function tryJsonParse<T>(input: string): JsonParseResult<T> {
   try {
@@ -10,4 +8,3 @@ export function tryJsonParse<T>(input: string): JsonParseResult<T> {
     return { ok: false, error: normalized };
   }
 }
-

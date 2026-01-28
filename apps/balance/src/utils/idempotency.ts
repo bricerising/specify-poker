@@ -2,11 +2,11 @@ import {
   getIdempotentResponse,
   setIdempotentResponse,
   withIdempotencyLock,
-} from "../storage/idempotencyStore";
+} from '../storage/idempotencyStore';
 
 export async function withIdempotentResponse<T>(
   idempotencyKey: string,
-  work: () => Promise<T>
+  work: () => Promise<T>,
 ): Promise<T> {
   const existingResponse = await getIdempotentResponse(idempotencyKey);
   if (existingResponse !== null) {
@@ -24,4 +24,3 @@ export async function withIdempotentResponse<T>(
     return result;
   });
 }
-

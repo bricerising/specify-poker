@@ -1,5 +1,5 @@
-import { PushSubscription, UserPushSubscription } from "../domain/types";
-import { SubscriptionStore } from "../storage/subscriptionStore";
+import type { PushSubscription, UserPushSubscription } from '../domain/types';
+import type { SubscriptionStore } from '../storage/subscriptionStore';
 
 export class SubscriptionService {
   constructor(private readonly store: SubscriptionStore) {}

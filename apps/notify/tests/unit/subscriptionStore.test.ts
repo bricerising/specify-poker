@@ -8,12 +8,13 @@ vi.mock('../../src/storage/redisClient', () => {
   const hGetAll = vi.fn();
   const hIncrBy = vi.fn();
   return {
-    getRedisClient: () => Promise.resolve({
-      hSet,
-      hDel,
-      hGetAll,
-      hIncrBy,
-    }),
+    getRedisClient: () =>
+      Promise.resolve({
+        hSet,
+        hDel,
+        hGetAll,
+        hIncrBy,
+      }),
   };
 });
 
@@ -41,7 +42,7 @@ describe('SubscriptionStore', () => {
     expect(redisMock.hSet).toHaveBeenCalledWith(
       `notify:push:${userId}`,
       sub.endpoint,
-      expect.stringContaining(sub.endpoint)
+      expect.stringContaining(sub.endpoint),
     );
   });
 

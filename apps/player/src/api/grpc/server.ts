@@ -1,13 +1,13 @@
-import * as grpc from "@grpc/grpc-js";
-import * as protoLoader from "@grpc/proto-loader";
-import * as path from "path";
-import { createGrpcServerLifecycle, type GrpcServerLifecycle } from "@specify-poker/shared";
-import { handlers } from "./handlers";
-import { createHealthHandlers } from "./health";
-import logger from "../../observability/logger";
+import * as grpc from '@grpc/grpc-js';
+import * as protoLoader from '@grpc/proto-loader';
+import * as path from 'path';
+import { createGrpcServerLifecycle, type GrpcServerLifecycle } from '@specify-poker/shared';
+import { handlers } from './handlers';
+import { createHealthHandlers } from './health';
+import logger from '../../observability/logger';
 
-const PROTO_PATH = path.resolve(__dirname, "../../../proto/player.proto");
-const HEALTH_PROTO_PATH = path.resolve(__dirname, "../../../proto/health.proto");
+const PROTO_PATH = path.resolve(__dirname, '../../../proto/player.proto');
+const HEALTH_PROTO_PATH = path.resolve(__dirname, '../../../proto/health.proto');
 
 type PlayerProto = {
   player: {
@@ -56,7 +56,7 @@ export async function startGrpcServer(port: number): Promise<void> {
       server.addService(proto.grpc.health.v1.Health.service, createHealthHandlers());
     },
     logger,
-    logMessage: "Player gRPC server listening",
+    logMessage: 'Player gRPC server listening',
   });
 
   await lifecycle.start();

@@ -1,10 +1,15 @@
-import { status } from "@grpc/grpc-js";
-import { asGrpcServiceError, createGrpcServiceError, isGrpcServiceErrorLike, type GrpcServiceError } from "@specify-poker/shared";
-import { AppError, ConflictError, NotFoundError, ValidationError } from "../../domain/errors";
+import { status } from '@grpc/grpc-js';
+import {
+  asGrpcServiceError,
+  createGrpcServiceError,
+  isGrpcServiceErrorLike,
+  type GrpcServiceError,
+} from '@specify-poker/shared';
+import { AppError, ConflictError, NotFoundError, ValidationError } from '../../domain/errors';
 
 export function toGrpcServiceError(error: unknown): GrpcServiceError {
   if (isGrpcServiceErrorLike(error)) {
-    return asGrpcServiceError(error, { code: status.INTERNAL, message: "Internal server error" });
+    return asGrpcServiceError(error, { code: status.INTERNAL, message: 'Internal server error' });
   }
 
   if (error instanceof ValidationError) {
@@ -23,5 +28,5 @@ export function toGrpcServiceError(error: unknown): GrpcServiceError {
     return createGrpcServiceError(status.FAILED_PRECONDITION, error.message, error);
   }
 
-  return createGrpcServiceError(status.INTERNAL, "Internal server error", error);
+  return createGrpcServiceError(status.INTERNAL, 'Internal server error', error);
 }

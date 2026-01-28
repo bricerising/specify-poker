@@ -1,12 +1,12 @@
-import { Account } from "../domain/types";
-import logger from "../observability/logger";
-import { createKeyedLock } from "../utils/keyedLock";
-import { tryJsonParse } from "../utils/json";
-import { nowIso } from "../utils/time";
-import { getRedisClient } from "./redisClient";
+import type { Account } from '../domain/types';
+import logger from '../observability/logger';
+import { createKeyedLock } from '../utils/keyedLock';
+import { tryJsonParse } from '../utils/json';
+import { nowIso } from '../utils/time';
+import { getRedisClient } from './redisClient';
 
-const ACCOUNTS_KEY = "balance:accounts";
-const ACCOUNTS_IDS_KEY = "balance:accounts:ids";
+const ACCOUNTS_KEY = 'balance:accounts';
+const ACCOUNTS_IDS_KEY = 'balance:accounts:ids';
 
 // In-memory cache
 const accounts = new Map<string, Account>();
@@ -26,7 +26,7 @@ export async function getAccount(accountId: string): Promise<Account | null> {
     if (payload) {
       const parsed = tryJsonParse<Account>(payload);
       if (!parsed.ok) {
-        logger.warn({ err: parsed.error, accountId }, "accountStore.parse.failed");
+        logger.warn({ err: parsed.error, accountId }, 'accountStore.parse.failed');
         return null;
       }
       const account = parsed.value;
@@ -40,7 +40,7 @@ export async function getAccount(accountId: string): Promise<Account | null> {
 
 export async function ensureAccount(
   accountId: string,
-  initialBalance: number = 0
+  initialBalance: number = 0,
 ): Promise<{ account: Account; created: boolean }> {
   const existing = await getAccount(accountId);
   if (existing) {
@@ -50,7 +50,7 @@ export async function ensureAccount(
   const account: Account = {
     accountId,
     balance: initialBalance,
-    currency: "CHIPS",
+    currency: 'CHIPS',
     version: 0,
     createdAt: nowIso(),
     updatedAt: nowIso(),
@@ -69,7 +69,7 @@ export async function ensureAccount(
 
 export async function updateAccount(
   accountId: string,
-  updater: (current: Account) => Account
+  updater: (current: Account) => Account,
 ): Promise<Account | null> {
   const current = await getAccount(accountId);
   if (!current) {
@@ -93,21 +93,21 @@ export async function updateAccount(
 export async function updateAccountWithVersion(
   accountId: string,
   expectedVersion: number,
-  updater: (current: Account) => Account
+  updater: (current: Account) => Account,
 ): Promise<{ ok: boolean; account?: Account; error?: string }> {
   return accountLock.withLock(accountId, async () => {
     const current = await getAccount(accountId);
     if (!current) {
-      return { ok: false, error: "ACCOUNT_NOT_FOUND" };
+      return { ok: false, error: 'ACCOUNT_NOT_FOUND' };
     }
 
     if (current.version !== expectedVersion) {
-      return { ok: false, error: "VERSION_CONFLICT" };
+      return { ok: false, error: 'VERSION_CONFLICT' };
     }
 
     const updated = await updateAccount(accountId, updater);
     if (!updated) {
-      return { ok: false, error: "UPDATE_FAILED" };
+      return { ok: false, error: 'UPDATE_FAILED' };
     }
 
     return { ok: true, account: updated };

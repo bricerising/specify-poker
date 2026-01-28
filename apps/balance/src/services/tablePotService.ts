@@ -1,21 +1,17 @@
-import {
+import type {
   ContributionResult,
   Pot,
   SettlementWinner,
   SettlePotResult,
   SettlementResultItem,
   TablePot,
-} from "../domain/types";
-import { nowIso } from "../utils/time";
-import {
-  getTablePot,
-  saveTablePot,
-  updateTablePot,
-} from "../storage/tablePotStore";
-import { creditBalance } from "./accountService";
-import { recordPotContribution, recordPotSettlement } from "../observability/metrics";
-import logger from "../observability/logger";
-import { withIdempotentResponse } from "../utils/idempotency";
+} from '../domain/types';
+import { nowIso } from '../utils/time';
+import { getTablePot, saveTablePot, updateTablePot } from '../storage/tablePotStore';
+import { creditBalance } from './accountService';
+import { recordPotContribution, recordPotSettlement } from '../observability/metrics';
+import logger from '../observability/logger';
+import { withIdempotentResponse } from '../utils/idempotency';
 
 function calculateRake(totalPot: number): number {
   if (totalPot <= 20) {
@@ -24,10 +20,7 @@ function calculateRake(totalPot: number): number {
   return Math.min(Math.floor(totalPot * 0.05), 5);
 }
 
-function normalizeWinners(
-  winners: SettlementWinner[],
-  targetTotal: number
-): SettlementWinner[] {
+function normalizeWinners(winners: SettlementWinner[], targetTotal: number): SettlementWinner[] {
   const totalRequested = winners.reduce((sum, w) => sum + w.amount, 0);
   if (totalRequested <= 0 || targetTotal <= 0) {
     return winners.map((w) => ({ ...w, amount: 0 }));
@@ -61,7 +54,7 @@ export async function createPot(tableId: string, handId: string): Promise<TableP
     contributions: {},
     pots: [],
     rakeAmount: 0,
-    status: "ACTIVE",
+    status: 'ACTIVE',
     version: 0,
     createdAt: nowIso(),
     settledAt: null,
@@ -86,16 +79,16 @@ export async function recordContribution(
   accountId: string,
   amount: number,
   contributionType: string,
-  idempotencyKey: string
+  idempotencyKey: string,
 ): Promise<ContributionResult> {
   return withIdempotentResponse(idempotencyKey, async () => {
     if (amount <= 0) {
-      return { ok: false, error: "INVALID_AMOUNT" };
+      return { ok: false, error: 'INVALID_AMOUNT' };
     }
 
     const pot = await ensurePot(tableId, handId);
-    if (pot.status !== "ACTIVE") {
-      return { ok: false, error: "POT_NOT_ACTIVE" };
+    if (pot.status !== 'ACTIVE') {
+      return { ok: false, error: 'POT_NOT_ACTIVE' };
     }
 
     // Update contributions
@@ -109,7 +102,7 @@ export async function recordContribution(
     });
 
     if (!updated) {
-      return { ok: false, error: "UPDATE_FAILED" };
+      return { ok: false, error: 'UPDATE_FAILED' };
     }
 
     const totalPot = Object.values(updated.contributions).reduce((sum, c) => sum + c, 0);
@@ -127,7 +120,7 @@ export async function recordContribution(
 // Calculate pots including side pots for all-in scenarios
 export function calculatePots(
   contributions: Record<number, number>,
-  foldedSeatIds: Set<number>
+  foldedSeatIds: Set<number>,
 ): Pot[] {
   const entries = Object.entries(contributions)
     .map(([seatId, amount]) => ({
@@ -175,21 +168,21 @@ export async function settlePot(
   tableId: string,
   handId: string,
   winners: SettlementWinner[],
-  idempotencyKey: string
+  idempotencyKey: string,
 ): Promise<SettlePotResult> {
   return withIdempotentResponse(idempotencyKey, async () => {
     const pot = await getTablePot(tableId, handId);
     if (!pot) {
-      return { ok: false, error: "POT_NOT_FOUND" };
+      return { ok: false, error: 'POT_NOT_FOUND' };
     }
 
-    if (pot.status === "SETTLED") {
+    if (pot.status === 'SETTLED') {
       // Already settled - return success (idempotent)
       return { ok: true, results: [] };
     }
 
-    if (pot.status !== "ACTIVE") {
-      return { ok: false, error: "POT_NOT_ACTIVE" };
+    if (pot.status !== 'ACTIVE') {
+      return { ok: false, error: 'POT_NOT_ACTIVE' };
     }
 
     const totalPot = Object.values(pot.contributions).reduce((sum, amount) => sum + amount, 0);
@@ -208,13 +201,13 @@ export async function settlePot(
       const creditResult = await creditBalance(
         winner.accountId,
         winner.amount,
-        "POT_WIN",
+        'POT_WIN',
         `${idempotencyKey}:${winner.seatId}`,
         {
           tableId,
           handId,
           seatId: winner.seatId,
-        }
+        },
       );
 
       if (!creditResult.ok) {
@@ -232,7 +225,7 @@ export async function settlePot(
     // Mark pot as settled
     await updateTablePot(tableId, handId, (current) => ({
       ...current,
-      status: "SETTLED",
+      status: 'SETTLED',
       rakeAmount,
       settledAt: nowIso(),
     }));
@@ -245,30 +238,27 @@ export async function settlePot(
 export async function cancelPot(
   tableId: string,
   handId: string,
-  reason: string
+  reason: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const pot = await getTablePot(tableId, handId);
   if (!pot) {
-    return { ok: false, error: "POT_NOT_FOUND" };
+    return { ok: false, error: 'POT_NOT_FOUND' };
   }
 
-  if (pot.status !== "ACTIVE") {
-    return { ok: false, error: "POT_NOT_ACTIVE" };
+  if (pot.status !== 'ACTIVE') {
+    return { ok: false, error: 'POT_NOT_ACTIVE' };
   }
 
   await updateTablePot(tableId, handId, (current) => ({
     ...current,
-    status: "CANCELLED",
+    status: 'CANCELLED',
     settledAt: nowIso(),
   }));
 
-  logger.info({ tableId, handId, reason }, "pot.cancelled");
+  logger.info({ tableId, handId, reason }, 'pot.cancelled');
   return { ok: true };
 }
 
-export async function getPotState(
-  tableId: string,
-  handId: string
-): Promise<TablePot | null> {
+export async function getPotState(tableId: string, handId: string): Promise<TablePot | null> {
   return getTablePot(tableId, handId);
 }

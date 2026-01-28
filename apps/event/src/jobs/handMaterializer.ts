@@ -1,8 +1,8 @@
-import { blockingRedisClient } from "../storage/redisClient";
-import { eventStore } from "../storage/eventStore";
-import { handStore } from "../storage/handStore";
-import { streamKey } from "../storage/streamStore";
-import {
+import { blockingRedisClient } from '../storage/redisClient';
+import { eventStore } from '../storage/eventStore';
+import { handStore } from '../storage/handStore';
+import { streamKey } from '../storage/streamStore';
+import type {
   ActionTakenPayload,
   Card,
   GameEvent,
@@ -12,10 +12,10 @@ import {
   PotAwardedPayload,
   ShowdownPayload,
   StreetAdvancedPayload,
-} from "../domain/types";
-import { recordMaterializationLag } from "../observability/metrics";
-import logger from "../observability/logger";
-import { getErrorMessage, isRecord } from "../errors";
+} from '../domain/types';
+import { recordMaterializationLag } from '../observability/metrics';
+import logger from '../observability/logger';
+import { getErrorMessage, isRecord } from '../errors';
 
 export interface HandMaterializerDependencies {
   redisClient: typeof blockingRedisClient;
@@ -32,7 +32,7 @@ type ParticipantRecord = {
   endingStack: number;
   holeCards: Card[] | null;
   actions: { street: string; action: string; amount: number; timestamp: string }[];
-  result: "WON" | "LOST" | "FOLDED" | "SPLIT";
+  result: 'WON' | 'LOST' | 'FOLDED' | 'SPLIT';
 };
 
 type AggregationContext = {
@@ -44,13 +44,13 @@ type AggregationContext = {
 };
 
 type MaterializableEventType =
-  | "HAND_STARTED"
-  | "CARDS_DEALT"
-  | "ACTION_TAKEN"
-  | "STREET_ADVANCED"
-  | "SHOWDOWN"
-  | "POT_AWARDED"
-  | "HAND_COMPLETED";
+  | 'HAND_STARTED'
+  | 'CARDS_DEALT'
+  | 'ACTION_TAKEN'
+  | 'STREET_ADVANCED'
+  | 'SHOWDOWN'
+  | 'POT_AWARDED'
+  | 'HAND_COMPLETED';
 
 type MaterializerEventHandler = (ctx: AggregationContext, event: GameEvent) => void;
 
@@ -67,7 +67,7 @@ const materializerEventHandlers = {
         endingStack: seat.stack,
         holeCards: null,
         actions: [],
-        result: "LOST",
+        result: 'LOST',
       });
       ctx.participantsBySeat.set(seat.seatId, seat.userId);
     });
@@ -92,13 +92,13 @@ const materializerEventHandlers = {
       return;
     }
     participant.actions.push({
-      street: payload.street || "unknown",
+      street: payload.street || 'unknown',
       action: payload.action,
       amount: payload.amount || 0,
       timestamp: event.timestamp.toISOString(),
     });
-    if (payload.action === "FOLD") {
-      participant.result = "FOLDED";
+    if (payload.action === 'FOLD') {
+      participant.result = 'FOLDED';
     }
   },
   STREET_ADVANCED: (ctx: AggregationContext, event: GameEvent) => {
@@ -133,7 +133,7 @@ const materializerEventHandlers = {
       ctx.winners.push({ userId, amount: winner.share });
       const participant = ctx.participants.get(userId);
       if (participant) {
-        participant.result = "WON";
+        participant.result = 'WON';
       }
     });
   },
@@ -158,24 +158,35 @@ export class HandMaterializer {
   constructor(private readonly deps: HandMaterializerDependencies) {}
 
   private isRunning = false;
-  private streamRedisKey = streamKey("all");
-  private groupName = "hand-materializer";
+  private streamRedisKey = streamKey('all');
+  private groupName = 'hand-materializer';
   private consumerName = `materializer-${process.pid}`;
 
   async start() {
     this.isRunning = true;
 
     try {
-      await this.deps.redisClient.xGroupCreate(this.streamRedisKey, this.groupName, "$", { MKSTREAM: true });
+      await this.deps.redisClient.xGroupCreate(this.streamRedisKey, this.groupName, '$', {
+        MKSTREAM: true,
+      });
     } catch (err: unknown) {
-      if (getErrorMessage(err).includes("BUSYGROUP")) {
-        logger.info({ streamKey: this.streamRedisKey, group: this.groupName }, "HandMaterializer consumer group exists");
+      if (getErrorMessage(err).includes('BUSYGROUP')) {
+        logger.info(
+          { streamKey: this.streamRedisKey, group: this.groupName },
+          'HandMaterializer consumer group exists',
+        );
       } else {
-        logger.error({ error: err, streamKey: this.streamRedisKey, group: this.groupName }, "Error creating consumer group");
+        logger.error(
+          { error: err, streamKey: this.streamRedisKey, group: this.groupName },
+          'Error creating consumer group',
+        );
       }
     }
 
-    logger.info({ streamKey: this.streamRedisKey, group: this.groupName }, "HandMaterializer started");
+    logger.info(
+      { streamKey: this.streamRedisKey, group: this.groupName },
+      'HandMaterializer started',
+    );
     void this.poll();
   }
 
@@ -185,8 +196,8 @@ export class HandMaterializer {
         const streams = await this.deps.redisClient.xReadGroup(
           this.groupName,
           this.consumerName,
-          [{ key: this.streamRedisKey, id: ">" }],
-          { COUNT: 1, BLOCK: 5000 }
+          [{ key: this.streamRedisKey, id: '>' }],
+          { COUNT: 1, BLOCK: 5000 },
         );
 
         if (!streams) {
@@ -198,7 +209,7 @@ export class HandMaterializer {
             if (!parsed) {
               logger.error(
                 { streamKey: this.streamRedisKey, group: this.groupName, messageId: message.id },
-                "Invalid JSON in HandMaterializer stream message"
+                'Invalid JSON in HandMaterializer stream message',
               );
               await this.deps.redisClient.xAck(this.streamRedisKey, this.groupName, message.id);
               continue;
@@ -209,7 +220,7 @@ export class HandMaterializer {
           }
         }
       } catch (err) {
-        logger.error({ error: err }, "Error polling events in HandMaterializer");
+        logger.error({ error: err }, 'Error polling events in HandMaterializer');
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
@@ -220,7 +231,10 @@ export class HandMaterializer {
     if (!handCompleted) {
       return;
     }
-    logger.info({ handId: handCompleted.handId, tableId: handCompleted.tableId }, "Materializing hand record");
+    logger.info(
+      { handId: handCompleted.handId, tableId: handCompleted.tableId },
+      'Materializing hand record',
+    );
     await this.materializeHand(handCompleted.handId, handCompleted.tableId);
   }
 
@@ -237,15 +251,15 @@ export class HandMaterializer {
       // 3. Save HandRecord
       await this.deps.handStore.saveHandRecord(record);
       this.deps.recordMaterializationLag(Date.now() - record.completedAt.getTime());
-      logger.info({ handId }, "Hand record saved");
+      logger.info({ handId }, 'Hand record saved');
     } catch (err) {
-      logger.error({ error: err, handId }, "Failed to materialize hand");
+      logger.error({ error: err, handId }, 'Failed to materialize hand');
     }
   }
 
   private aggregateEvents(handId: string, tableId: string, events: GameEvent[]): HandRecord {
-    const startedEvent = events.find((event) => event.type === "HAND_STARTED");
-    const completedEvent = events.find((event) => event.type === "HAND_COMPLETED");
+    const startedEvent = events.find((event) => event.type === 'HAND_STARTED');
+    const completedEvent = events.find((event) => event.type === 'HAND_COMPLETED');
 
     const ctx: AggregationContext = {
       participants: new Map(),
@@ -298,28 +312,28 @@ export function createHandMaterializer(
     eventStore,
     handStore,
     recordMaterializationLag,
-  }
+  },
 ) {
   return new HandMaterializer(deps);
 }
 
 export const handMaterializer = createHandMaterializer();
 
-type HandCompletedEvent = { type: "HAND_COMPLETED"; handId: string; tableId: string };
+type HandCompletedEvent = { type: 'HAND_COMPLETED'; handId: string; tableId: string };
 
 function parseHandCompletedEvent(event: Record<string, unknown>): HandCompletedEvent | null {
-  if (event.type !== "HAND_COMPLETED") {
+  if (event.type !== 'HAND_COMPLETED') {
     return null;
   }
   const handId = event.handId;
   const tableId = event.tableId;
-  if (typeof handId !== "string" || handId.trim().length === 0) {
+  if (typeof handId !== 'string' || handId.trim().length === 0) {
     return null;
   }
-  if (typeof tableId !== "string" || tableId.trim().length === 0) {
+  if (typeof tableId !== 'string' || tableId.trim().length === 0) {
     return null;
   }
-  return { type: "HAND_COMPLETED", handId, tableId };
+  return { type: 'HAND_COMPLETED', handId, tableId };
 }
 
 function safeJsonParse(raw: string): Record<string, unknown> | null {
@@ -331,17 +345,14 @@ function safeJsonParse(raw: string): Record<string, unknown> | null {
   }
 }
 
-function getSeats(
-  payload: HandStartedPayload,
-  rawPayload: unknown
-): HandStartedPayload["seats"] {
-  return payload.seats || (rawPayload as { seats?: HandStartedPayload["seats"] }).seats || [];
+function getSeats(payload: HandStartedPayload, rawPayload: unknown): HandStartedPayload['seats'] {
+  return payload.seats || (rawPayload as { seats?: HandStartedPayload['seats'] }).seats || [];
 }
 
 function resolveUserId(
   userId: string | undefined,
   seatId: number,
-  participantsBySeat: Map<number, string>
+  participantsBySeat: Map<number, string>,
 ): string | undefined {
   return userId || participantsBySeat.get(seatId);
 }
@@ -354,16 +365,19 @@ type HandStartedPayloadCompat = HandStartedPayload & {
   table_name?: unknown;
 };
 
-function adaptHandStartedConfig(
-  payload: unknown,
-): { tableName: string; smallBlind: number; bigBlind: number; ante: number } {
+function adaptHandStartedConfig(payload: unknown): {
+  tableName: string;
+  smallBlind: number;
+  bigBlind: number;
+  ante: number;
+} {
   const compat = (payload ?? {}) as Partial<HandStartedPayloadCompat>;
 
   const numberValue = (value: unknown, fallback: number) => {
-    if (typeof value === "number" && Number.isFinite(value)) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
       return value;
     }
-    if (typeof value === "string" && value.trim().length > 0) {
+    if (typeof value === 'string' && value.trim().length > 0) {
       const parsed = Number(value);
       if (Number.isFinite(parsed)) {
         return parsed;
@@ -372,12 +386,13 @@ function adaptHandStartedConfig(
     return fallback;
   };
 
-  const stringValue = (value: unknown, fallback: string) => (typeof value === "string" ? value : fallback);
+  const stringValue = (value: unknown, fallback: string) =>
+    typeof value === 'string' ? value : fallback;
 
   const smallBlind = numberValue(compat.smallBlind ?? compat.small_blind, 0);
   const bigBlind = numberValue(compat.bigBlind ?? compat.big_blind, 0);
   const ante = numberValue(compat.ante, 0);
-  const tableName = stringValue(compat.tableName ?? compat.table_name, "Unknown Table");
+  const tableName = stringValue(compat.tableName ?? compat.table_name, 'Unknown Table');
 
   return { tableName, smallBlind, bigBlind, ante };
 }

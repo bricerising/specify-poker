@@ -1,18 +1,20 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { trace } from "@opentelemetry/api";
+import React, { useEffect, useMemo, useState } from 'react';
+import { trace } from '@opentelemetry/api';
 
-import { ActionBar } from "../components/ActionBar";
-import { ChatPanel } from "../components/ChatPanel";
-import { ModerationMenu } from "../components/ModerationMenu";
-import { PlayingCard } from "../components/PlayingCard";
-import { TableLayout } from "../components/TableLayout";
-import { Timer } from "../components/Timer";
-import { deriveLegalActions } from "../state/deriveLegalActions";
-import { TableStore, tableStore } from "../state/tableStore";
-import { fetchProfile, UserProfile } from "../services/profileApi";
-import { recordAction } from "../observability/otel";
-import { formatBlinds } from "../utils/chipFormatter";
-import { testIds } from "../utils/testIds";
+import { ActionBar } from '../components/ActionBar';
+import { ChatPanel } from '../components/ChatPanel';
+import { ModerationMenu } from '../components/ModerationMenu';
+import { PlayingCard } from '../components/PlayingCard';
+import { TableLayout } from '../components/TableLayout';
+import { Timer } from '../components/Timer';
+import { deriveLegalActions } from '../state/deriveLegalActions';
+import type { TableStore } from '../state/tableStore';
+import { tableStore } from '../state/tableStore';
+import type { UserProfile } from '../services/profileApi';
+import { fetchProfile } from '../services/profileApi';
+import { recordAction } from '../observability/otel';
+import { formatBlinds } from '../utils/chipFormatter';
+import { testIds } from '../utils/testIds';
 
 interface TablePageProps {
   store?: TableStore;
@@ -32,17 +34,17 @@ export function TablePage({ store = tableStore, onLeave }: TablePageProps) {
         setProfile(data);
       })
       .catch((error: Error) => {
-        console.warn("profile.fetch.failed", { message: error.message });
+        console.warn('profile.fetch.failed', { message: error.message });
       });
   }, []);
 
   useEffect(() => {
     if (state.tableState) {
-      const tracer = trace.getTracer("ui");
-      const span = tracer.startSpan("ui.table.render", {
+      const tracer = trace.getTracer('ui');
+      const span = tracer.startSpan('ui.table.render', {
         attributes: {
-          "poker.table_id": state.tableState.tableId,
-          "poker.table_version": state.tableState.version,
+          'poker.table_id': state.tableState.tableId,
+          'poker.table_version': state.tableState.version,
         },
       });
       span.end();
@@ -73,7 +75,7 @@ export function TablePage({ store = tableStore, onLeave }: TablePageProps) {
   const blinds = formatBlinds(state.tableState.config.smallBlind, state.tableState.config.bigBlind);
 
   const handleLeaveTable = () => {
-    recordAction("leave_table", { "poker.table_id": state.tableState?.tableId ?? "" });
+    recordAction('leave_table', { 'poker.table_id': state.tableState?.tableId ?? '' });
     store.leaveTable();
     onLeave?.();
   };
@@ -88,7 +90,9 @@ export function TablePage({ store = tableStore, onLeave }: TablePageProps) {
           <h2>{state.tableState.name}</h2>
           <div className="meta-line">
             Table ID: {state.tableState.tableId} | Blinds {blinds}
-            {spectatorCount > 0 ? ` | ${spectatorCount} spectator${spectatorCount !== 1 ? "s" : ""}` : ""}
+            {spectatorCount > 0
+              ? ` | ${spectatorCount} spectator${spectatorCount !== 1 ? 's' : ''}`
+              : ''}
           </div>
         </div>
         <div className="table-topbar-actions">
@@ -131,11 +135,13 @@ export function TablePage({ store = tableStore, onLeave }: TablePageProps) {
               <div className="table-facts">
                 <div className="fact">
                   <span>Street</span>
-                  <strong>{hand?.currentStreet ?? "Waiting"}</strong>
+                  <strong>{hand?.currentStreet ?? 'Waiting'}</strong>
                 </div>
                 <div className="fact">
                   <span>Current Turn</span>
-                  <strong>{hand?.currentTurnSeat !== undefined ? `Seat ${hand.currentTurnSeat + 1}` : "-"}</strong>
+                  <strong>
+                    {hand?.currentTurnSeat !== undefined ? `Seat ${hand.currentTurnSeat + 1}` : '-'}
+                  </strong>
                 </div>
               </div>
               <Timer deadlineTs={hand?.actionTimerDeadline ?? null} />
@@ -143,9 +149,13 @@ export function TablePage({ store = tableStore, onLeave }: TablePageProps) {
           </TableLayout>
         </div>
 
-        <div className={`table-dock${showModeration ? " table-dock-with-side" : ""}`}>
+        <div className={`table-dock${showModeration ? ' table-dock-with-side' : ''}`}>
           <div className="table-dock-main">
-            <ActionBar actions={actions} pot={pot} onAction={(action) => store.sendAction(action)} />
+            <ActionBar
+              actions={actions}
+              pot={pot}
+              onAction={(action) => store.sendAction(action)}
+            />
           </div>
           {showModeration ? (
             <div className="table-dock-side">
@@ -154,7 +164,7 @@ export function TablePage({ store = tableStore, onLeave }: TablePageProps) {
           ) : null}
         </div>
 
-        <div className={`table-chat-dock${isChatCollapsed ? " is-collapsed" : ""}`}>
+        <div className={`table-chat-dock${isChatCollapsed ? ' is-collapsed' : ''}`}>
           <ChatPanel
             messages={state.chatMessages}
             onSend={(message) => store.sendChat(message)}

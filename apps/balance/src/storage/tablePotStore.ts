@@ -1,10 +1,10 @@
-import { TablePot } from "../domain/types";
-import logger from "../observability/logger";
-import { tryJsonParse } from "../utils/json";
-import { getRedisClient } from "./redisClient";
+import type { TablePot } from '../domain/types';
+import logger from '../observability/logger';
+import { tryJsonParse } from '../utils/json';
+import { getRedisClient } from './redisClient';
 
-const POTS_PREFIX = "balance:pots:";
-const POTS_ACTIVE_KEY = "balance:pots:active";
+const POTS_PREFIX = 'balance:pots:';
+const POTS_ACTIVE_KEY = 'balance:pots:active';
 
 // In-memory cache
 const tablePots = new Map<string, TablePot>();
@@ -27,7 +27,7 @@ export async function getTablePot(tableId: string, handId: string): Promise<Tabl
     if (payload) {
       const parsed = tryJsonParse<TablePot>(payload);
       if (!parsed.ok) {
-        logger.warn({ err: parsed.error, tableId, handId }, "tablePotStore.parse.failed");
+        logger.warn({ err: parsed.error, tableId, handId }, 'tablePotStore.parse.failed');
         return null;
       }
       const pot = parsed.value;
@@ -47,7 +47,7 @@ export async function saveTablePot(pot: TablePot): Promise<void> {
   if (redis) {
     await redis.set(`${POTS_PREFIX}${key}`, JSON.stringify(pot));
 
-    if (pot.status === "ACTIVE") {
+    if (pot.status === 'ACTIVE') {
       await redis.sAdd(POTS_ACTIVE_KEY, key);
     } else {
       await redis.sRem(POTS_ACTIVE_KEY, key);
@@ -58,7 +58,7 @@ export async function saveTablePot(pot: TablePot): Promise<void> {
 export async function updateTablePot(
   tableId: string,
   handId: string,
-  updater: (current: TablePot) => TablePot
+  updater: (current: TablePot) => TablePot,
 ): Promise<TablePot | null> {
   const current = await getTablePot(tableId, handId);
   if (!current) {
@@ -78,16 +78,16 @@ export async function getActivePots(): Promise<TablePot[]> {
     const keys = await redis.sMembers(POTS_ACTIVE_KEY);
     const result: TablePot[] = [];
     for (const key of keys) {
-      const [tableId, handId] = key.split(":");
+      const [tableId, handId] = key.split(':');
       const pot = await getTablePot(tableId, handId);
-      if (pot && pot.status === "ACTIVE") {
+      if (pot && pot.status === 'ACTIVE') {
         result.push(pot);
       }
     }
     return result;
   }
 
-  return Array.from(tablePots.values()).filter((p) => p.status === "ACTIVE");
+  return Array.from(tablePots.values()).filter((p) => p.status === 'ACTIVE');
 }
 
 export async function deleteTablePot(tableId: string, handId: string): Promise<void> {

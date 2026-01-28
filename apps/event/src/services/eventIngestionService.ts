@@ -1,20 +1,21 @@
-import { eventStore } from "../storage/eventStore";
-import { EventType, isEventType, NewGameEvent } from "../domain/types";
-import { recordIngestion } from "../observability/metrics";
-import { InvalidArgumentError, isRecord } from "../errors";
+import { eventStore } from '../storage/eventStore';
+import type { EventType, NewGameEvent } from '../domain/types';
+import { isEventType } from '../domain/types';
+import { recordIngestion } from '../observability/metrics';
+import { InvalidArgumentError, isRecord } from '../errors';
 
 const HAND_EVENT_TYPES = new Set<EventType>([
-  "HAND_STARTED",
-  "CARDS_DEALT",
-  "BLIND_POSTED",
-  "ACTION_TAKEN",
-  "STREET_ADVANCED",
-  "CARDS_REVEALED",
-  "SHOWDOWN",
-  "POT_AWARDED",
-  "HAND_COMPLETED",
-  "TURN_STARTED",
-  "RAKE_DEDUCTED",
+  'HAND_STARTED',
+  'CARDS_DEALT',
+  'BLIND_POSTED',
+  'ACTION_TAKEN',
+  'STREET_ADVANCED',
+  'CARDS_REVEALED',
+  'SHOWDOWN',
+  'POT_AWARDED',
+  'HAND_COMPLETED',
+  'TURN_STARTED',
+  'RAKE_DEDUCTED',
 ]);
 
 export class EventIngestionService {
@@ -36,7 +37,7 @@ export class EventIngestionService {
 
   private validateEvent(event: NewGameEvent): void {
     if (!event.type) {
-      throw new InvalidArgumentError("Event type is required");
+      throw new InvalidArgumentError('Event type is required');
     }
     if (!isEventType(event.type)) {
       throw new InvalidArgumentError(`Unknown event type: ${event.type}`);
@@ -44,10 +45,13 @@ export class EventIngestionService {
 
     const requiresHandId = HAND_EVENT_TYPES.has(event.type);
     const validations: Array<[boolean, string]> = [
-      [typeof event.tableId === "string" && event.tableId.trim().length > 0, "Table ID is required"],
-      [isRecord(event.payload), "Payload must be an object"],
       [
-        !requiresHandId || (typeof event.handId === "string" && event.handId.trim().length > 0),
+        typeof event.tableId === 'string' && event.tableId.trim().length > 0,
+        'Table ID is required',
+      ],
+      [isRecord(event.payload), 'Payload must be an object'],
+      [
+        !requiresHandId || (typeof event.handId === 'string' && event.handId.trim().length > 0),
         `handId is required for event type ${event.type}`,
       ],
     ];

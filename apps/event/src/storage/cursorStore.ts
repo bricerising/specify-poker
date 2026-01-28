@@ -1,7 +1,7 @@
-import pool from "./pgClient";
-import redisClient from "./redisClient";
-import { Cursor } from "../domain/types";
-import { isRecord } from "../errors";
+import pool from './pgClient';
+import redisClient from './redisClient';
+import type { Cursor } from '../domain/types';
+import { isRecord } from '../errors';
 
 const cursorKey = (cursorId: string) => `event:cursors:${cursorId}`;
 const subscriberKey = (subscriberId: string) => `event:cursors:by-subscriber:${subscriberId}`;
@@ -50,16 +50,20 @@ function parseCachedCursor(raw: string): Cursor | null {
     }
     const { cursorId, streamId, subscriberId, position, createdAt, updatedAt } = parsed;
 
-    if (typeof cursorId !== "string" || typeof streamId !== "string" || typeof subscriberId !== "string") {
+    if (
+      typeof cursorId !== 'string' ||
+      typeof streamId !== 'string' ||
+      typeof subscriberId !== 'string'
+    ) {
       return null;
     }
-    if (typeof position !== "number" || !Number.isFinite(position)) {
+    if (typeof position !== 'number' || !Number.isFinite(position)) {
       return null;
     }
-    if (typeof createdAt !== "string" && !(createdAt instanceof Date)) {
+    if (typeof createdAt !== 'string' && !(createdAt instanceof Date)) {
       return null;
     }
-    if (typeof updatedAt !== "string" && !(updatedAt instanceof Date)) {
+    if (typeof updatedAt !== 'string' && !(updatedAt instanceof Date)) {
       return null;
     }
 
@@ -92,10 +96,10 @@ export class CursorStore {
       }
     }
 
-    const res = await pool.query("SELECT * FROM cursors WHERE stream_id = $1 AND subscriber_id = $2", [
-      streamId,
-      subscriberId,
-    ]);
+    const res = await pool.query(
+      'SELECT * FROM cursors WHERE stream_id = $1 AND subscriber_id = $2',
+      [streamId, subscriberId],
+    );
     if (!res.rows[0]) {
       return null;
     }
@@ -113,7 +117,7 @@ export class CursorStore {
        ON CONFLICT (stream_id, subscriber_id)
        DO UPDATE SET position = EXCLUDED.position, updated_at = NOW()
        RETURNING *`,
-      [cursorId, streamId, subscriberId, position]
+      [cursorId, streamId, subscriberId, position],
     );
 
     const cursor = mapRowToCursor(res.rows[0]);
@@ -124,7 +128,7 @@ export class CursorStore {
 
   async deleteCursor(streamId: string, subscriberId: string): Promise<void> {
     const cursorId = `${streamId}:${subscriberId}`;
-    await pool.query("DELETE FROM cursors WHERE stream_id = $1 AND subscriber_id = $2", [
+    await pool.query('DELETE FROM cursors WHERE stream_id = $1 AND subscriber_id = $2', [
       streamId,
       subscriberId,
     ]);
@@ -133,7 +137,7 @@ export class CursorStore {
   }
 
   async findBySubscriber(subscriberId: string): Promise<Cursor[]> {
-    const res = await pool.query("SELECT * FROM cursors WHERE subscriber_id = $1", [subscriberId]);
+    const res = await pool.query('SELECT * FROM cursors WHERE subscriber_id = $1', [subscriberId]);
     return res.rows.map(mapRowToCursor);
   }
 }

@@ -1,6 +1,6 @@
-import { Statistics } from "../domain/types";
-import { getRedisClient } from "./redisClient";
-import { decodeStatistics } from "../domain/decoders";
+import type { Statistics } from '../domain/types';
+import { getRedisClient } from './redisClient';
+import { decodeStatistics } from '../domain/decoders';
 
 const STATS_TTL_SECONDS = 60;
 

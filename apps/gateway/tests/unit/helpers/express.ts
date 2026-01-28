@@ -1,4 +1,4 @@
-import type { Request, Response, Router } from "express";
+import type { Request, Response, Router } from 'express';
 
 type MockAuth = {
   userId: string;
@@ -26,7 +26,7 @@ type MockResponse = Response & {
 export function createMockReq(options: MockRequestOptions): Request {
   const headers: Record<string, string> = {};
   for (const [key, value] of Object.entries(options.headers ?? {})) {
-    if (typeof value === "string") {
+    if (typeof value === 'string') {
       headers[key.toLowerCase()] = value;
     }
   }
@@ -38,7 +38,7 @@ export function createMockReq(options: MockRequestOptions): Request {
     body: options.body,
     query: options.query ?? {},
     params: {},
-    protocol: options.protocol ?? "http",
+    protocol: options.protocol ?? 'http',
     auth: options.auth,
     get(name: string) {
       return headers[name.toLowerCase()];
@@ -78,15 +78,15 @@ export function createMockRes(): { res: MockResponse; done: Promise<MockResponse
     json(payload: unknown) {
       this.body = payload;
       this.finished = true;
-      this.headers["content-type"] = "application/json";
-      emit("finish");
+      this.headers['content-type'] = 'application/json';
+      emit('finish');
       resolveDone(this);
       return this;
     },
     send(payload?: unknown) {
       this.body = payload;
       this.finished = true;
-      emit("finish");
+      emit('finish');
       resolveDone(this);
       return this;
     },
@@ -95,7 +95,7 @@ export function createMockRes(): { res: MockResponse; done: Promise<MockResponse
         this.body = payload;
       }
       this.finished = true;
-      emit("finish");
+      emit('finish');
       resolveDone(this);
       return this;
     },
@@ -106,9 +106,9 @@ export function createMockRes(): { res: MockResponse; done: Promise<MockResponse
       return this.headers[name.toLowerCase()];
     },
     set(field: string | Record<string, string>, value?: string) {
-      if (typeof field === "string" && typeof value === "string") {
+      if (typeof field === 'string' && typeof value === 'string') {
         this.headers[field.toLowerCase()] = value;
-      } else if (typeof field === "object") {
+      } else if (typeof field === 'object') {
         for (const [key, val] of Object.entries(field)) {
           this.headers[key.toLowerCase()] = val;
         }
@@ -122,7 +122,7 @@ export function createMockRes(): { res: MockResponse; done: Promise<MockResponse
 
 export async function dispatchToRouter(
   router: Router,
-  options: MockRequestOptions
+  options: MockRequestOptions,
 ): Promise<MockResponse> {
   const req = createMockReq(options);
   const { res, done } = createMockRes();
@@ -135,7 +135,7 @@ export async function dispatchToRouter(
       res.status(500).json({ error: err.message });
       return;
     }
-    res.status(404).json({ error: "Not found" });
+    res.status(404).json({ error: 'Not found' });
   });
 
   return done;

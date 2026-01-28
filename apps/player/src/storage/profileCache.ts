@@ -1,6 +1,6 @@
-import { Profile } from "../domain/types";
-import { getRedisClient } from "./redisClient";
-import { decodeProfile } from "../domain/decoders";
+import type { Profile } from '../domain/types';
+import { getRedisClient } from './redisClient';
+import { decodeProfile } from '../domain/decoders';
 
 const PROFILE_TTL_SECONDS = 300;
 const NICKNAME_TTL_SECONDS = 300;

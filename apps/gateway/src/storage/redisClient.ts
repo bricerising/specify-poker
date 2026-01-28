@@ -1,8 +1,8 @@
-import { createRedisClientManager } from "@specify-poker/shared/redis";
-import { getConfig } from "../config";
-import logger from "../observability/logger";
+import { createRedisClientManager } from '@specify-poker/shared/redis';
+import { getConfig } from '../config';
+import logger from '../observability/logger';
 
-const redis = createRedisClientManager({ url: getConfig().redisUrl, log: logger, name: "gateway" });
+const redis = createRedisClientManager({ url: getConfig().redisUrl, log: logger, name: 'gateway' });
 
 export async function getRedisClient() {
   return redis.getClientOrNull();

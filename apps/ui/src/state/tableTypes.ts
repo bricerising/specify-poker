@@ -4,7 +4,7 @@ export interface TableConfig {
   ante?: number | null;
   maxPlayers: number;
   startingStack: number;
-  bettingStructure: "NoLimit";
+  bettingStructure: 'NoLimit';
 }
 
 export interface TableSummary {
@@ -21,7 +21,7 @@ export interface TableSummary {
 export interface SpectatorView {
   userId: string;
   username?: string;
-  status: "active" | "disconnected";
+  status: 'active' | 'disconnected';
 }
 
 export interface TableSeat {
@@ -75,7 +75,7 @@ export interface TableStoreState {
   tableState: TableState | null;
   seatId: number | null;
   isSpectating: boolean;
-  status: "idle" | "connecting" | "connected" | "error";
+  status: 'idle' | 'connecting' | 'connected' | 'error';
   error?: string;
   chatMessages: ChatMessage[];
   chatError?: string;
@@ -96,4 +96,3 @@ export interface TableStore {
   subscribeChat(tableId: string): void;
   sendChat(message: string): void;
 }
-

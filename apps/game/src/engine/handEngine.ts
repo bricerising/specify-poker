@@ -1,6 +1,6 @@
-import { randomUUID } from "crypto";
+import { randomUUID } from 'crypto';
 
-import {
+import type {
   Action,
   ActionInput,
   Card,
@@ -9,22 +9,22 @@ import {
   Seat,
   TableConfig,
   TableState,
-} from "../domain/types";
-import { getCallAmount, validateAction } from "./actionRules";
-import { evaluateWinners } from "./rankings";
-import { calculatePots, calculateRake } from "./potCalculator";
-import { calculatePotPayouts } from "./potSettlement";
+} from '../domain/types';
+import { getCallAmount, validateAction } from './actionRules';
+import { evaluateWinners } from './rankings';
+import { calculatePots, calculateRake } from './potCalculator';
+import { calculatePotPayouts } from './potSettlement';
 
 // ============================================================================
 // Result Types (Discriminated Unions)
 // ============================================================================
 
 type ActionRejectionReason =
-  | "NO_HAND"
-  | "NOT_YOUR_TURN"
-  | "SEAT_MISSING"
-  | "SEAT_INACTIVE"
-  | "ILLEGAL_ACTION";
+  | 'NO_HAND'
+  | 'NOT_YOUR_TURN'
+  | 'SEAT_MISSING'
+  | 'SEAT_INACTIVE'
+  | 'ILLEGAL_ACTION';
 
 export type ApplyActionResult =
   | {
@@ -39,7 +39,10 @@ export type ApplyActionResult =
       handComplete: boolean;
     };
 
-function rejectAction(tableState: TableState, reason: ActionRejectionReason | string): ApplyActionResult {
+function rejectAction(
+  tableState: TableState,
+  reason: ActionRejectionReason | string,
+): ApplyActionResult {
   return { accepted: false, state: tableState, reason };
 }
 
@@ -61,8 +64,8 @@ function acceptAction(
 // Constants
 // ============================================================================
 
-const SUITS = ["hearts", "diamonds", "clubs", "spades"] as const;
-const RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"] as const;
+const SUITS = ['hearts', 'diamonds', 'clubs', 'spades'] as const;
+const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'] as const;
 const MAX_RAKE = 5;
 
 // ============================================================================
@@ -70,11 +73,11 @@ const MAX_RAKE = 5;
 // ============================================================================
 
 const STREET_PROGRESSION: Readonly<Record<HandStreet, HandStreet>> = {
-  PREFLOP: "FLOP",
-  FLOP: "TURN",
-  TURN: "RIVER",
-  RIVER: "SHOWDOWN",
-  SHOWDOWN: "SHOWDOWN",
+  PREFLOP: 'FLOP',
+  FLOP: 'TURN',
+  TURN: 'RIVER',
+  RIVER: 'SHOWDOWN',
+  SHOWDOWN: 'SHOWDOWN',
 };
 
 const COMMUNITY_CARDS_TO_DEAL: Readonly<Record<HandStreet, number>> = {
@@ -127,7 +130,7 @@ function nextActiveSeat(seats: Seat[], startSeat: number): number {
   const total = seats.length;
   for (let offset = 1; offset <= total; offset += 1) {
     const seat = seats[(startSeat + offset) % total];
-    if (seat.status === "ACTIVE") {
+    if (seat.status === 'ACTIVE') {
       return seat.seatId;
     }
   }
@@ -138,7 +141,7 @@ function nextEligibleSeat(seats: Seat[], startSeat: number): number {
   const total = seats.length;
   for (let offset = 1; offset <= total; offset += 1) {
     const seat = seats[(startSeat + offset) % total];
-    if (seat.status === "SEATED") {
+    if (seat.status === 'SEATED') {
       return seat.seatId;
     }
   }
@@ -146,7 +149,7 @@ function nextEligibleSeat(seats: Seat[], startSeat: number): number {
 }
 
 function findEligibleSeats(seats: Seat[]): Seat[] {
-  return seats.filter((seat) => seat.userId && seat.status === "SEATED" && seat.stack > 0);
+  return seats.filter((seat) => seat.userId && seat.status === 'SEATED' && seat.stack > 0);
 }
 
 // ============================================================================
@@ -166,7 +169,7 @@ function dealCards(deck: Card[], count: number): Card[] {
 }
 
 function getFoldedSeatIds(seats: Seat[]): Set<number> {
-  return new Set(seats.filter((seat) => seat.status === "FOLDED").map((seat) => seat.seatId));
+  return new Set(seats.filter((seat) => seat.status === 'FOLDED').map((seat) => seat.seatId));
 }
 
 // ============================================================================
@@ -174,21 +177,21 @@ function getFoldedSeatIds(seats: Seat[]): Set<number> {
 // ============================================================================
 
 function activeSeatsRemaining(seats: Seat[]): Seat[] {
-  return seats.filter((seat) => seat.status === "ACTIVE" || seat.status === "ALL_IN");
+  return seats.filter((seat) => seat.status === 'ACTIVE' || seat.status === 'ALL_IN');
 }
 
 function activeSeats(seats: Seat[]): Seat[] {
-  return seats.filter((seat) => seat.status === "ACTIVE");
+  return seats.filter((seat) => seat.status === 'ACTIVE');
 }
 
 function resetHandSeats(seats: Seat[]): void {
   for (const seat of seats) {
     if (seat.userId) {
-      if (seat.status === "ACTIVE" || seat.status === "FOLDED" || seat.status === "ALL_IN") {
-        seat.status = "SEATED";
+      if (seat.status === 'ACTIVE' || seat.status === 'FOLDED' || seat.status === 'ALL_IN') {
+        seat.status = 'SEATED';
       }
-    } else if (seat.status !== "EMPTY") {
-      seat.status = "EMPTY";
+    } else if (seat.status !== 'EMPTY') {
+      seat.status = 'EMPTY';
     }
     seat.holeCards = null;
   }
@@ -213,7 +216,7 @@ function dealRemainingCommunityCards(hand: HandState): void {
 function isBettingRoundComplete(hand: HandState, seats: Seat[]): boolean {
   if (hand.currentBet === 0) {
     for (const seat of seats) {
-      if (seat.status !== "ACTIVE") {
+      if (seat.status !== 'ACTIVE') {
         continue;
       }
       if (!hand.actedSeats.includes(seat.seatId)) {
@@ -223,7 +226,7 @@ function isBettingRoundComplete(hand: HandState, seats: Seat[]): boolean {
     return true;
   }
   for (const seat of seats) {
-    if (seat.status !== "ACTIVE") {
+    if (seat.status !== 'ACTIVE') {
       continue;
     }
     const contribution = hand.roundContributions[seat.seatId] ?? 0;
@@ -236,8 +239,8 @@ function isBettingRoundComplete(hand: HandState, seats: Seat[]): boolean {
 
 function advanceStreet(hand: HandState, seats: Seat[], buttonSeat: number): HandState {
   const nextStreet = STREET_PROGRESSION[hand.street];
-  if (nextStreet === "SHOWDOWN") {
-    hand.street = "SHOWDOWN";
+  if (nextStreet === 'SHOWDOWN') {
+    hand.street = 'SHOWDOWN';
     return hand;
   }
 
@@ -340,7 +343,7 @@ function createAction(handId: string, seat: Seat, input: ActionInput, timestamp:
     actionId: randomUUID(),
     handId,
     seatId: seat.seatId,
-    userId: seat.userId ?? "",
+    userId: seat.userId ?? '',
     type: input.type,
     amount: input.amount ?? 0,
     timestamp,
@@ -353,7 +356,7 @@ function createAction(handId: string, seat: Seat, input: ActionInput, timestamp:
 
 function markAllInIfEmpty(seat: Seat): void {
   if (seat.stack === 0) {
-    seat.status = "ALL_IN";
+    seat.status = 'ALL_IN';
   }
 }
 
@@ -400,17 +403,13 @@ function applyRaise(
     hand.raiseCapped = true;
   }
   hand.roundContributions[seatId] = raiseAmount;
-  hand.totalContributions[seatId] = (hand.totalContributions[seatId] ?? 0) + Math.max(0, additional);
+  hand.totalContributions[seatId] =
+    (hand.totalContributions[seatId] ?? 0) + Math.max(0, additional);
   markAllInIfEmpty(seat);
   return { resetActedSeats: raiseSize >= previousMinRaise };
 }
 
-function applyAllIn(
-  hand: HandState,
-  seat: Seat,
-  seatId: number,
-  previousMinRaise: number,
-) {
+function applyAllIn(hand: HandState, seat: Seat, seatId: number, previousMinRaise: number) {
   const maxTotal = seat.stack + (hand.roundContributions[seatId] ?? 0);
   if (maxTotal <= hand.currentBet) {
     applyCall(hand, seat, seatId);
@@ -428,12 +427,13 @@ function applyAllIn(
     hand.raiseCapped = true;
   }
   hand.roundContributions[seatId] = maxTotal;
-  hand.totalContributions[seatId] = (hand.totalContributions[seatId] ?? 0) + Math.max(0, additional);
-  seat.status = "ALL_IN";
+  hand.totalContributions[seatId] =
+    (hand.totalContributions[seatId] ?? 0) + Math.max(0, additional);
+  seat.status = 'ALL_IN';
   return { resetActedSeats: raiseSize >= previousMinRaise };
 }
 
-type PlayerActionType = Exclude<ActionInput["type"], "POST_BLIND">;
+type PlayerActionType = Exclude<ActionInput['type'], 'POST_BLIND'>;
 
 type PlayerActionHandler = (
   hand: HandState,
@@ -445,7 +445,7 @@ type PlayerActionHandler = (
 
 const playerActionHandlers = {
   FOLD: (_hand: HandState, seat: Seat) => {
-    seat.status = "FOLDED";
+    seat.status = 'FOLDED';
     return { resetActedSeats: false };
   },
   CHECK: () => ({ resetActedSeats: false }),
@@ -471,13 +471,17 @@ const playerActionHandlers = {
   ) => applyAllIn(hand, seat, seatId, ctx.previousMinRaise),
 } satisfies Record<PlayerActionType, PlayerActionHandler>;
 
-const ALLOWED_INACTIVE_ACTIONS: ReadonlySet<ActionInput["type"]> = new Set(["FOLD", "CHECK"]);
+const ALLOWED_INACTIVE_ACTIONS: ReadonlySet<ActionInput['type']> = new Set(['FOLD', 'CHECK']);
 
-function canPerformInactiveAction(seat: Seat, action: ActionInput, allowInactive: boolean | undefined): boolean {
+function canPerformInactiveAction(
+  seat: Seat,
+  action: ActionInput,
+  allowInactive: boolean | undefined,
+): boolean {
   if (!allowInactive) {
     return false;
   }
-  if (seat.status !== "DISCONNECTED") {
+  if (seat.status !== 'DISCONNECTED') {
     return false;
   }
   return ALLOWED_INACTIVE_ACTIONS.has(action.type);
@@ -493,9 +497,14 @@ function endHandByFold(hand: HandState, seats: Seat[], buttonSeat: number, ended
   hand.endedAt = endedAt;
 }
 
-function endHandByShowdown(hand: HandState, seats: Seat[], buttonSeat: number, endedAt: string): void {
+function endHandByShowdown(
+  hand: HandState,
+  seats: Seat[],
+  buttonSeat: number,
+  endedAt: string,
+): void {
   dealRemainingCommunityCards(hand);
-  hand.street = "SHOWDOWN";
+  hand.street = 'SHOWDOWN';
   settleShowdown(hand, seats, buttonSeat);
   resetHandSeats(seats);
   hand.endedAt = endedAt;
@@ -523,17 +532,17 @@ type PostActionContext = {
 };
 
 type PostActionHandlerResult =
-  | { readonly kind: "pass" }
-  | { readonly kind: "handled"; readonly handComplete: boolean };
+  | { readonly kind: 'pass' }
+  | { readonly kind: 'handled'; readonly handComplete: boolean };
 
 type PostActionHandler = (ctx: PostActionContext) => PostActionHandlerResult;
 
 function pass(): PostActionHandlerResult {
-  return { kind: "pass" };
+  return { kind: 'pass' };
 }
 
 function handled(handComplete: boolean): PostActionHandlerResult {
-  return { kind: "handled", handComplete };
+  return { kind: 'handled', handComplete };
 }
 
 function handleEndHandByFold(ctx: PostActionContext): PostActionHandlerResult {
@@ -565,7 +574,7 @@ function handleContinueBettingRound(ctx: PostActionContext): PostActionHandlerRe
 }
 
 function handleEndHandAtRiver(ctx: PostActionContext): PostActionHandlerResult {
-  if (ctx.hand.street !== "RIVER") {
+  if (ctx.hand.street !== 'RIVER') {
     return pass();
   }
   endHandAtRiver(ctx.hand, ctx.seats, ctx.buttonSeat, ctx.timestamp);
@@ -588,7 +597,7 @@ const postActionHandlers: readonly PostActionHandler[] = [
 function resolvePostAction(ctx: PostActionContext): { readonly handComplete: boolean } {
   for (const handler of postActionHandlers) {
     const result = handler(ctx);
-    if (result.kind === "handled") {
+    if (result.kind === 'handled') {
       return result;
     }
   }
@@ -613,7 +622,7 @@ export function startHand(
   const sortedSeats = eligible.map((seat) => seat.seatId).sort((a, b) => a - b);
   const previousButton = tableState.button;
   const buttonSeat =
-    typeof previousButton === "number"
+    typeof previousButton === 'number'
       ? nextEligibleSeat(tableState.seats, previousButton)
       : sortedSeats[0];
   const smallBlindSeat =
@@ -623,7 +632,7 @@ export function startHand(
   const deck = options.deck ?? seededShuffle(createDeck(), `${tableState.tableId}:${now()}`);
   for (const seat of eligible) {
     seat.holeCards = dealCards(deck, 2);
-    seat.status = "ACTIVE";
+    seat.status = 'ACTIVE';
   }
 
   const roundContributions = resetRoundContributions(tableState.seats);
@@ -637,17 +646,10 @@ export function startHand(
       roundContributions[seat.seatId] += ante;
       totalContributions[seat.seatId] += ante;
       if (ante > 0) {
-        actions.push(
-          createAction(
-            "pending",
-            seat,
-            { type: "POST_BLIND", amount: ante },
-            now(),
-          ),
-        );
+        actions.push(createAction('pending', seat, { type: 'POST_BLIND', amount: ante }, now()));
       }
       if (seat.stack === 0) {
-        seat.status = "ALL_IN";
+        seat.status = 'ALL_IN';
       }
     }
   }
@@ -666,9 +668,9 @@ export function startHand(
   if (smallBlindAmount > 0) {
     actions.push(
       createAction(
-        "pending",
+        'pending',
         tableState.seats[smallBlindSeat],
-        { type: "POST_BLIND", amount: smallBlindAmount },
+        { type: 'POST_BLIND', amount: smallBlindAmount },
         now(),
       ),
     );
@@ -676,19 +678,19 @@ export function startHand(
   if (bigBlindAmount > 0) {
     actions.push(
       createAction(
-        "pending",
+        'pending',
         tableState.seats[bigBlindSeat],
-        { type: "POST_BLIND", amount: bigBlindAmount },
+        { type: 'POST_BLIND', amount: bigBlindAmount },
         now(),
       ),
     );
   }
 
   if (tableState.seats[smallBlindSeat].stack === 0) {
-    tableState.seats[smallBlindSeat].status = "ALL_IN";
+    tableState.seats[smallBlindSeat].status = 'ALL_IN';
   }
   if (tableState.seats[bigBlindSeat].stack === 0) {
-    tableState.seats[bigBlindSeat].status = "ALL_IN";
+    tableState.seats[bigBlindSeat].status = 'ALL_IN';
   }
 
   const handId = randomUUID();
@@ -697,7 +699,7 @@ export function startHand(
   const hand: HandState = {
     handId,
     tableId: tableState.tableId,
-    street: "PREFLOP",
+    street: 'PREFLOP',
     communityCards: [],
     pots: [],
     currentBet: bigBlindAmount,
@@ -734,24 +736,24 @@ export function applyAction(
 ): ApplyActionResult {
   const hand = tableState.hand;
   if (!hand) {
-    return rejectAction(tableState, "NO_HAND");
+    return rejectAction(tableState, 'NO_HAND');
   }
 
   if (hand.turn !== seatId) {
-    return rejectAction(tableState, "NOT_YOUR_TURN");
+    return rejectAction(tableState, 'NOT_YOUR_TURN');
   }
 
   const seat = tableState.seats.find((entry) => entry.seatId === seatId);
   if (!seat) {
-    return rejectAction(tableState, "SEAT_MISSING");
+    return rejectAction(tableState, 'SEAT_MISSING');
   }
 
   const allowInactiveAction = canPerformInactiveAction(seat, action, options.allowInactive);
-  if (seat.status !== "ACTIVE" && !allowInactiveAction) {
-    return rejectAction(tableState, "SEAT_INACTIVE");
+  if (seat.status !== 'ACTIVE' && !allowInactiveAction) {
+    return rejectAction(tableState, 'SEAT_INACTIVE');
   }
 
-  const validationSeat = allowInactiveAction ? { ...seat, status: "ACTIVE" as const } : seat;
+  const validationSeat = allowInactiveAction ? { ...seat, status: 'ACTIVE' as const } : seat;
   const validation = validateAction(hand, validationSeat, action);
   if (!validation.ok) {
     return rejectAction(tableState, validation.reason);
@@ -761,7 +763,7 @@ export function applyAction(
   const timestamp = now();
   const previousMinRaise = hand.minRaise;
   if (!(action.type in playerActionHandlers)) {
-    return rejectAction(tableState, "ILLEGAL_ACTION");
+    return rejectAction(tableState, 'ILLEGAL_ACTION');
   }
 
   const update = playerActionHandlers[action.type as PlayerActionType](hand, seat, seatId, action, {

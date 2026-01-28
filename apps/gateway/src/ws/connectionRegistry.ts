@@ -1,7 +1,8 @@
-import { saveConnection, deleteConnection, ConnectionInfo } from "../storage/connectionStore";
-import { registerLocalSocket, unregisterLocalSocket } from "./localRegistry";
-import WebSocket from "ws";
-import { getWsInstanceId } from "./pubsub";
+import type { ConnectionInfo } from '../storage/connectionStore';
+import { saveConnection, deleteConnection } from '../storage/connectionStore';
+import { registerLocalSocket, unregisterLocalSocket } from './localRegistry';
+import type WebSocket from 'ws';
+import { getWsInstanceId } from './pubsub';
 
 export async function registerConnection(
   params: { connectionId: string; userId: string; connectedAt: string; ip: string },
@@ -9,7 +10,7 @@ export async function registerConnection(
 ) {
   const info: ConnectionInfo = {
     ...params,
-    instanceId: getWsInstanceId()
+    instanceId: getWsInstanceId(),
   };
   await saveConnection(info);
   registerLocalSocket(params.connectionId, socket, { userId: params.userId, ip: params.ip });

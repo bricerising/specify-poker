@@ -1,4 +1,4 @@
-import WebSocket from "ws";
+import WebSocket from 'ws';
 
 type LocalConnection = {
   socket: WebSocket;
@@ -8,7 +8,11 @@ type LocalConnection = {
 
 const localConnections = new Map<string, LocalConnection>();
 
-export function registerLocalSocket(connectionId: string, socket: WebSocket, meta: { userId: string; ip: string }) {
+export function registerLocalSocket(
+  connectionId: string,
+  socket: WebSocket,
+  meta: { userId: string; ip: string },
+) {
   localConnections.set(connectionId, { socket, ...meta });
 }
 

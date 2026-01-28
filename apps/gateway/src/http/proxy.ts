@@ -1,34 +1,34 @@
-import type { Request, Response, Router } from "express";
-import httpProxy from "http-proxy";
-import { ServerResponse } from "http";
-import { getConfig } from "../config";
-import logger from "../observability/logger";
+import type { Request, Response, Router } from 'express';
+import httpProxy from 'http-proxy';
+import { ServerResponse } from 'http';
+import { getConfig } from '../config';
+import logger from '../observability/logger';
 
 const proxy = httpProxy.createProxyServer({});
 
-proxy.on("error", (err, req, res) => {
-  logger.error({ err, url: req.url }, "Proxy error");
+proxy.on('error', (err, req, res) => {
+  logger.error({ err, url: req.url }, 'Proxy error');
   if (res instanceof ServerResponse && !res.headersSent) {
-    res.writeHead(502, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "Proxy error" }));
+    res.writeHead(502, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Proxy error' }));
   }
 });
 
-proxy.on("proxyReq", (proxyReq, req) => {
+proxy.on('proxyReq', (proxyReq, req) => {
   const auth = (req as Request).auth;
   if (!auth) {
     return;
   }
 
-  proxyReq.setHeader("x-user-id", auth.userId);
-  proxyReq.setHeader("x-gateway-user-id", auth.userId);
-  proxyReq.setHeader("x-user-claims", JSON.stringify(auth.claims));
+  proxyReq.setHeader('x-user-id', auth.userId);
+  proxyReq.setHeader('x-gateway-user-id', auth.userId);
+  proxyReq.setHeader('x-user-claims', JSON.stringify(auth.claims));
 
   // Express body parsing consumes the request stream, which would otherwise
   // leave the proxied request with a Content-Length but no body. Re-send the
   // parsed JSON body when present.
-  const method = (req.method ?? "GET").toUpperCase();
-  if (!["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+  const method = (req.method ?? 'GET').toUpperCase();
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
     return;
   }
 
@@ -38,13 +38,13 @@ proxy.on("proxyReq", (proxyReq, req) => {
     return;
   }
 
-  const contentType = String(expressReq.headers["content-type"] ?? "");
-  if (!contentType.toLowerCase().includes("application/json")) {
+  const contentType = String(expressReq.headers['content-type'] ?? '');
+  if (!contentType.toLowerCase().includes('application/json')) {
     return;
   }
 
-  const bodyData = typeof body === "string" ? body : JSON.stringify(body);
-  proxyReq.setHeader("Content-Length", Buffer.byteLength(bodyData));
+  const bodyData = typeof body === 'string' ? body : JSON.stringify(body);
+  proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
   proxyReq.write(bodyData);
 });
 
@@ -66,5 +66,5 @@ export function setupProxy(app: Router) {
   // Balance Service has HTTP API at its configured port
   // Game, Player, Event services are gRPC-only and handled by /http/routes/*
 
-  forward("/api/accounts", config.balanceServiceHttpUrl);
+  forward('/api/accounts', config.balanceServiceHttpUrl);
 }

@@ -1,11 +1,17 @@
-import * as grpc from "@grpc/grpc-js";
-import * as protoLoader from "@grpc/proto-loader";
-import * as path from "path";
-import { createBoundTargetProxy, createGrpcServiceClientFactory } from "@specify-poker/shared";
-import { getConfig, type Config } from "../config";
-import type { BalanceServiceClient, EventServiceClient, GameServiceClient, NotifyServiceClient, PlayerServiceClient } from "../types";
+import * as grpc from '@grpc/grpc-js';
+import * as protoLoader from '@grpc/proto-loader';
+import * as path from 'path';
+import { createBoundTargetProxy, createGrpcServiceClientFactory } from '@specify-poker/shared';
+import { getConfig, type Config } from '../config';
+import type {
+  BalanceServiceClient,
+  EventServiceClient,
+  GameServiceClient,
+  NotifyServiceClient,
+  PlayerServiceClient,
+} from '../types';
 
-type ProtoName = "balance" | "event" | "game" | "notify" | "player";
+type ProtoName = 'balance' | 'event' | 'game' | 'notify' | 'player';
 
 const PROTO_LOADER_OPTIONS: protoLoader.Options = {
   keepCase: true,
@@ -15,13 +21,16 @@ const PROTO_LOADER_OPTIONS: protoLoader.Options = {
   oneofs: true,
 };
 
-const PROTO_DIR = path.resolve(__dirname, "../../proto");
+const PROTO_DIR = path.resolve(__dirname, '../../proto');
 
 function resolveProtoPath(protoName: ProtoName): string {
   return path.resolve(PROTO_DIR, `${protoName}.proto`);
 }
 
-type GrpcClientConstructor<TClient> = new (address: string, credentials: grpc.ChannelCredentials) => TClient;
+type GrpcClientConstructor<TClient> = new (
+  address: string,
+  credentials: grpc.ChannelCredentials,
+) => TClient;
 
 type GameProto = { game: { GameService: GrpcClientConstructor<GameServiceClient> } };
 type PlayerProto = { player: { PlayerService: GrpcClientConstructor<PlayerServiceClient> } };
@@ -42,15 +51,34 @@ function createClientFactory<TProto, TClient>(
   });
 }
 
-const gameClientFactory = createClientFactory<GameProto, GameServiceClient>("game", (proto) => proto.game.GameService);
-const playerClientFactory = createClientFactory<PlayerProto, PlayerServiceClient>("player", (proto) => proto.player.PlayerService);
-const balanceClientFactory = createClientFactory<BalanceProto, BalanceServiceClient>("balance", (proto) => proto.balance.BalanceService);
-const eventClientFactory = createClientFactory<EventProto, EventServiceClient>("event", (proto) => proto.event.EventService);
-const notifyClientFactory = createClientFactory<NotifyProto, NotifyServiceClient>("notify", (proto) => proto.notify.NotifyService);
+const gameClientFactory = createClientFactory<GameProto, GameServiceClient>(
+  'game',
+  (proto) => proto.game.GameService,
+);
+const playerClientFactory = createClientFactory<PlayerProto, PlayerServiceClient>(
+  'player',
+  (proto) => proto.player.PlayerService,
+);
+const balanceClientFactory = createClientFactory<BalanceProto, BalanceServiceClient>(
+  'balance',
+  (proto) => proto.balance.BalanceService,
+);
+const eventClientFactory = createClientFactory<EventProto, EventServiceClient>(
+  'event',
+  (proto) => proto.event.EventService,
+);
+const notifyClientFactory = createClientFactory<NotifyProto, NotifyServiceClient>(
+  'notify',
+  (proto) => proto.notify.NotifyService,
+);
 
 type GrpcClientsConfig = Pick<
   Config,
-  "gameServiceUrl" | "playerServiceUrl" | "balanceServiceUrl" | "eventServiceUrl" | "notifyServiceUrl"
+  | 'gameServiceUrl'
+  | 'playerServiceUrl'
+  | 'balanceServiceUrl'
+  | 'eventServiceUrl'
+  | 'notifyServiceUrl'
 >;
 
 export interface GrpcClients {
@@ -65,10 +93,19 @@ export function createGrpcClients(config: GrpcClientsConfig): GrpcClients {
   const credentials = grpc.credentials.createInsecure();
   return {
     gameClient: gameClientFactory.createClient({ address: config.gameServiceUrl, credentials }),
-    playerClient: playerClientFactory.createClient({ address: config.playerServiceUrl, credentials }),
-    balanceClient: balanceClientFactory.createClient({ address: config.balanceServiceUrl, credentials }),
+    playerClient: playerClientFactory.createClient({
+      address: config.playerServiceUrl,
+      credentials,
+    }),
+    balanceClient: balanceClientFactory.createClient({
+      address: config.balanceServiceUrl,
+      credentials,
+    }),
     eventClient: eventClientFactory.createClient({ address: config.eventServiceUrl, credentials }),
-    notifyClient: notifyClientFactory.createClient({ address: config.notifyServiceUrl, credentials }),
+    notifyClient: notifyClientFactory.createClient({
+      address: config.notifyServiceUrl,
+      credentials,
+    }),
   };
 }
 
@@ -105,27 +142,42 @@ function createClientCache<TClient>(createClient: () => TClient): ClientCache<TC
 
 function createDefaultGameClient(): GameServiceClient {
   const config = getConfig();
-  return gameClientFactory.createClient({ address: config.gameServiceUrl, credentials: getCredentials() });
+  return gameClientFactory.createClient({
+    address: config.gameServiceUrl,
+    credentials: getCredentials(),
+  });
 }
 
 function createDefaultPlayerClient(): PlayerServiceClient {
   const config = getConfig();
-  return playerClientFactory.createClient({ address: config.playerServiceUrl, credentials: getCredentials() });
+  return playerClientFactory.createClient({
+    address: config.playerServiceUrl,
+    credentials: getCredentials(),
+  });
 }
 
 function createDefaultBalanceClient(): BalanceServiceClient {
   const config = getConfig();
-  return balanceClientFactory.createClient({ address: config.balanceServiceUrl, credentials: getCredentials() });
+  return balanceClientFactory.createClient({
+    address: config.balanceServiceUrl,
+    credentials: getCredentials(),
+  });
 }
 
 function createDefaultEventClient(): EventServiceClient {
   const config = getConfig();
-  return eventClientFactory.createClient({ address: config.eventServiceUrl, credentials: getCredentials() });
+  return eventClientFactory.createClient({
+    address: config.eventServiceUrl,
+    credentials: getCredentials(),
+  });
 }
 
 function createDefaultNotifyClient(): NotifyServiceClient {
   const config = getConfig();
-  return notifyClientFactory.createClient({ address: config.notifyServiceUrl, credentials: getCredentials() });
+  return notifyClientFactory.createClient({
+    address: config.notifyServiceUrl,
+    credentials: getCredentials(),
+  });
 }
 
 const gameClientCache = createClientCache(createDefaultGameClient);

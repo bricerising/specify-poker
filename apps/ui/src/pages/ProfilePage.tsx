@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
-import { trace } from "@opentelemetry/api";
+import React, { useEffect, useState } from 'react';
+import { trace } from '@opentelemetry/api';
 
-import { ProfileForm } from "../components/ProfileForm";
-import { fetchProfile, updateProfile, UserProfile } from "../services/profileApi";
+import { ProfileForm } from '../components/ProfileForm';
+import type { UserProfile } from '../services/profileApi';
+import { fetchProfile, updateProfile } from '../services/profileApi';
 
 interface ProfilePageProps {
   onProfileUpdated?: (profile: UserProfile) => void;
@@ -11,20 +12,20 @@ interface ProfilePageProps {
 export function ProfilePage({ onProfileUpdated }: ProfilePageProps) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<"idle" | "loading">("idle");
+  const [status, setStatus] = useState<'idle' | 'loading'>('idle');
 
   const loadProfile = async () => {
-    setStatus("loading");
+    setStatus('loading');
     try {
       const next = await fetchProfile();
       setProfile(next);
       onProfileUpdated?.(next);
       setError(null);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to load profile";
+      const message = err instanceof Error ? err.message : 'Unable to load profile';
       setError(message);
     } finally {
-      setStatus("idle");
+      setStatus('idle');
     }
   };
 
@@ -36,10 +37,10 @@ export function ProfilePage({ onProfileUpdated }: ProfilePageProps) {
     if (!profile) {
       return;
     }
-    const tracer = trace.getTracer("ui");
-    const span = tracer.startSpan("ui.profile.render", {
+    const tracer = trace.getTracer('ui');
+    const span = tracer.startSpan('ui.profile.render', {
       attributes: {
-        "poker.user_id": profile.userId,
+        'poker.user_id': profile.userId,
       },
     });
     span.end();
@@ -52,13 +53,13 @@ export function ProfilePage({ onProfileUpdated }: ProfilePageProps) {
       onProfileUpdated?.(updated);
       setError(null);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to update profile";
+      const message = err instanceof Error ? err.message : 'Unable to update profile';
       setError(message);
     }
   };
 
   if (!profile) {
-    return <div>{status === "loading" ? "Loading profile..." : "Profile unavailable."}</div>;
+    return <div>{status === 'loading' ? 'Loading profile...' : 'Profile unavailable.'}</div>;
   }
 
   const initials = profile.username.slice(0, 2).toUpperCase();

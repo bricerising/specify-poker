@@ -1,7 +1,7 @@
-import { apiFetch } from "./apiClient";
-import { normalizeTableSummary } from "../state/tableNormalization";
-import type { TableSummary } from "../state/tableTypes";
-import { asRecord } from "../utils/unknown";
+import { apiFetch } from './apiClient';
+import { normalizeTableSummary } from '../state/tableNormalization';
+import type { TableSummary } from '../state/tableTypes';
+import { asRecord } from '../utils/unknown';
 
 export interface CreateTableInput {
   name: string;
@@ -14,24 +14,24 @@ export interface CreateTableInput {
 function decodeTableSummary(payload: unknown): TableSummary {
   const record = asRecord(payload);
   if (!record) {
-    throw new Error("Invalid table response");
+    throw new Error('Invalid table response');
   }
   return normalizeTableSummary(record);
 }
 
 export async function listTables() {
-  const response = await apiFetch("/api/tables");
+  const response = await apiFetch('/api/tables');
   const payload: unknown = await response.json();
   if (!Array.isArray(payload)) {
-    throw new Error("Invalid tables response");
+    throw new Error('Invalid tables response');
   }
   return payload.map(decodeTableSummary);
 }
 
 export async function createTable(input: CreateTableInput) {
-  const response = await apiFetch("/api/tables", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+  const response = await apiFetch('/api/tables', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       name: input.name,
       config: {

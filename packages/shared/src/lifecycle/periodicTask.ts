@@ -57,7 +57,10 @@ export function createPeriodicTask(options: CreatePeriodicTaskOptions): Periodic
       try {
         await options.run({ signal });
       } catch (err: unknown) {
-        (options.logger?.error ?? options.logger?.warn)?.({ err, task: options.name }, "periodic_task.run.failed");
+        (options.logger?.error ?? options.logger?.warn)?.(
+          { err, task: options.name },
+          'periodic_task.run.failed',
+        );
       } finally {
         inFlight = null;
         scheduleNextRun(signal);
@@ -93,4 +96,3 @@ export function createPeriodicTask(options: CreatePeriodicTaskOptions): Periodic
     isRunning: () => Boolean(controller && !controller.signal.aborted),
   };
 }
-

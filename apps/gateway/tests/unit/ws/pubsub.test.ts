@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const subscribeHandlers: Record<string, (message: string) => void> = {};
 
@@ -17,34 +17,34 @@ const pubClient = {
   duplicate: vi.fn(() => subClient),
 };
 
-vi.mock("redis", () => ({
+vi.mock('redis', () => ({
   createClient: vi.fn(() => pubClient),
 }));
 
-vi.mock("../../../src/config", () => ({
-  getConfig: () => ({ redisUrl: "redis://localhost:6379" }),
+vi.mock('../../../src/config', () => ({
+  getConfig: () => ({ redisUrl: 'redis://localhost:6379' }),
 }));
 
-vi.mock("crypto", () => ({
-  randomUUID: () => "instance-1",
+vi.mock('crypto', () => ({
+  randomUUID: () => 'instance-1',
 }));
 
-vi.mock("../../../src/observability/logger", () => ({
+vi.mock('../../../src/observability/logger', () => ({
   default: {
     info: vi.fn(),
     error: vi.fn(),
   },
 }));
 
-describe("WS pubsub", () => {
+describe('WS pubsub', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Object.keys(subscribeHandlers).forEach((key) => delete subscribeHandlers[key]);
     vi.resetModules();
   });
 
-  it("routes pubsub messages to handlers", async () => {
-    const { initWsPubSub } = await import("../../../src/ws/pubsub");
+  it('routes pubsub messages to handlers', async () => {
+    const { initWsPubSub } = await import('../../../src/ws/pubsub');
     const handlers = {
       onTableEvent: vi.fn(),
       onChatEvent: vi.fn(),
@@ -54,25 +54,23 @@ describe("WS pubsub", () => {
 
     await initWsPubSub(handlers);
 
-    const handler = subscribeHandlers["gateway:ws:events"];
+    const handler = subscribeHandlers['gateway:ws:events'];
     expect(handler).toBeDefined();
 
     handler(
       JSON.stringify({
-        channel: "table",
-        tableId: "t1",
-        payload: { type: "TablePatch" },
-        sourceId: "other",
-      })
+        channel: 'table',
+        tableId: 't1',
+        payload: { type: 'TablePatch' },
+        sourceId: 'other',
+      }),
     );
 
-    expect(handlers.onTableEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ tableId: "t1" })
-    );
+    expect(handlers.onTableEvent).toHaveBeenCalledWith(expect.objectContaining({ tableId: 't1' }));
   });
 
-  it("ignores messages from the same instance", async () => {
-    const { initWsPubSub } = await import("../../../src/ws/pubsub");
+  it('ignores messages from the same instance', async () => {
+    const { initWsPubSub } = await import('../../../src/ws/pubsub');
     const handlers = {
       onTableEvent: vi.fn(),
       onChatEvent: vi.fn(),
@@ -81,22 +79,22 @@ describe("WS pubsub", () => {
     };
 
     await initWsPubSub(handlers);
-    const handler = subscribeHandlers["gateway:ws:events"];
+    const handler = subscribeHandlers['gateway:ws:events'];
 
     handler(
       JSON.stringify({
-        channel: "chat",
-        tableId: "t1",
-        payload: { type: "ChatMessage" },
-        sourceId: "instance-1",
-      })
+        channel: 'chat',
+        tableId: 't1',
+        payload: { type: 'ChatMessage' },
+        sourceId: 'instance-1',
+      }),
     );
 
     expect(handlers.onChatEvent).not.toHaveBeenCalled();
   });
 
-  it("publishes table events with instance id", async () => {
-    const { initWsPubSub, publishTableEvent } = await import("../../../src/ws/pubsub");
+  it('publishes table events with instance id', async () => {
+    const { initWsPubSub, publishTableEvent } = await import('../../../src/ws/pubsub');
     await initWsPubSub({
       onTableEvent: vi.fn(),
       onChatEvent: vi.fn(),
@@ -104,11 +102,11 @@ describe("WS pubsub", () => {
       onLobbyEvent: vi.fn(),
     });
 
-    await publishTableEvent("t1", { type: "TablePatch" });
+    await publishTableEvent('t1', { type: 'TablePatch' });
 
     expect(pubClient.publish).toHaveBeenCalledWith(
-      "gateway:ws:events",
-      expect.stringContaining("\"sourceId\":\"instance-1\"")
+      'gateway:ws:events',
+      expect.stringContaining('"sourceId":"instance-1"'),
     );
   });
 });

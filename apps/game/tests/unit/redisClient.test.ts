@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from 'vitest';
 
 const redisState = {
   isOpen: false,
@@ -11,13 +11,13 @@ const redisState = {
   on: vi.fn(),
 };
 
-vi.mock("redis", () => ({
+vi.mock('redis', () => ({
   createClient: () => redisState,
 }));
 
-describe("redisClient", () => {
-  it("connects and closes the Redis client", async () => {
-    const { connectRedis, closeRedisClient } = await import("../../src/storage/redisClient");
+describe('redisClient', () => {
+  it('connects and closes the Redis client', async () => {
+    const { connectRedis, closeRedisClient } = await import('../../src/storage/redisClient');
 
     await connectRedis();
     expect(redisState.connect).toHaveBeenCalledTimes(1);

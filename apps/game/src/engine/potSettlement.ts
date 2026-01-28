@@ -48,4 +48,3 @@ export function calculatePotPayouts(options: {
     return { seatId, amount: share + extra };
   });
 }
-

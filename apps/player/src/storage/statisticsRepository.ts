@@ -1,5 +1,5 @@
-import { query } from "./db";
-import { Statistics } from "../domain/types";
+import { query } from './db';
+import type { Statistics } from '../domain/types';
 
 interface StatisticsRow {
   user_id: string;
@@ -32,7 +32,7 @@ export async function findById(userId: string): Promise<Statistics | null> {
     `SELECT user_id, hands_played, wins, vpip, pfr, all_in_count, biggest_pot, referral_count, last_updated
      FROM statistics
      WHERE user_id = $1`,
-    [userId]
+    [userId],
   );
 
   if (result.rows.length === 0) {
@@ -66,7 +66,7 @@ export async function upsert(stats: Statistics): Promise<Statistics> {
       stats.biggestPot,
       stats.referralCount,
       new Date(stats.lastUpdated),
-    ]
+    ],
   );
 
   return mapStatistics(result.rows[0]);
@@ -95,7 +95,7 @@ export async function update(stats: Statistics): Promise<Statistics> {
       stats.biggestPot,
       stats.referralCount,
       new Date(stats.lastUpdated),
-    ]
+    ],
   );
 
   return mapStatistics(result.rows[0]);

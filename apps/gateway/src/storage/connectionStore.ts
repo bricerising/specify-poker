@@ -1,6 +1,6 @@
-import { getRedisClient } from "./redisClient";
-import logger from "../observability/logger";
-import { safeJsonParseRecord } from "../utils/json";
+import { getRedisClient } from './redisClient';
+import logger from '../observability/logger';
+import { safeJsonParseRecord } from '../utils/json';
 
 export interface ConnectionInfo {
   connectionId: string;
@@ -10,13 +10,13 @@ export interface ConnectionInfo {
   ip: string;
 }
 
-const CONNECTIONS_KEY = "gateway:connections";
-const USER_CONNECTIONS_KEY = "gateway:user_connections"; // Map userId to set of connectionIds
+const CONNECTIONS_KEY = 'gateway:connections';
+const USER_CONNECTIONS_KEY = 'gateway:user_connections'; // Map userId to set of connectionIds
 
 function readNonEmptyString(record: Record<string, unknown>, keys: string[]): string | null {
   for (const key of keys) {
     const value = record[key];
-    if (typeof value !== "string") {
+    if (typeof value !== 'string') {
       continue;
     }
     const trimmed = value.trim();
@@ -33,11 +33,11 @@ function parseConnectionInfo(raw: string): ConnectionInfo | null {
     return null;
   }
 
-  const connectionId = readNonEmptyString(record, ["connectionId", "connection_id"]);
-  const userId = readNonEmptyString(record, ["userId", "user_id"]);
-  const connectedAt = readNonEmptyString(record, ["connectedAt", "connected_at"]);
-  const instanceId = readNonEmptyString(record, ["instanceId", "instance_id"]);
-  const ip = readNonEmptyString(record, ["ip"]);
+  const connectionId = readNonEmptyString(record, ['connectionId', 'connection_id']);
+  const userId = readNonEmptyString(record, ['userId', 'user_id']);
+  const connectedAt = readNonEmptyString(record, ['connectedAt', 'connected_at']);
+  const instanceId = readNonEmptyString(record, ['instanceId', 'instance_id']);
+  const ip = readNonEmptyString(record, ['ip']);
 
   if (!connectionId || !userId || !connectedAt || !instanceId || !ip) {
     return null;
@@ -54,7 +54,7 @@ export async function saveConnection(info: ConnectionInfo) {
     await redis.hSet(CONNECTIONS_KEY, info.connectionId, JSON.stringify(info));
     await redis.sAdd(`${USER_CONNECTIONS_KEY}:${info.userId}`, info.connectionId);
   } catch (err) {
-    logger.error({ err, connectionId: info.connectionId }, "Failed to save connection to Redis");
+    logger.error({ err, connectionId: info.connectionId }, 'Failed to save connection to Redis');
   }
 }
 
@@ -66,7 +66,7 @@ export async function deleteConnection(connectionId: string, userId: string) {
     await redis.hDel(CONNECTIONS_KEY, connectionId);
     await redis.sRem(`${USER_CONNECTIONS_KEY}:${userId}`, connectionId);
   } catch (err) {
-    logger.error({ err, connectionId }, "Failed to delete connection from Redis");
+    logger.error({ err, connectionId }, 'Failed to delete connection from Redis');
   }
 }
 
@@ -78,7 +78,7 @@ export async function getConnection(connectionId: string): Promise<ConnectionInf
     const data = await redis.hGet(CONNECTIONS_KEY, connectionId);
     return data ? parseConnectionInfo(data) : null;
   } catch (err) {
-    logger.error({ err, connectionId }, "Failed to get connection from Redis");
+    logger.error({ err, connectionId }, 'Failed to get connection from Redis');
     return null;
   }
 }
@@ -90,7 +90,7 @@ export async function getConnectionsByUser(userId: string): Promise<string[]> {
   try {
     return await redis.sMembers(`${USER_CONNECTIONS_KEY}:${userId}`);
   } catch (err) {
-    logger.error({ err, userId }, "Failed to get user connections from Redis");
+    logger.error({ err, userId }, 'Failed to get user connections from Redis');
     return [];
   }
 }
@@ -111,6 +111,6 @@ export async function clearInstanceConnections(instanceId: string) {
       }
     }
   } catch (err) {
-    logger.error({ err, instanceId }, "Failed to clear instance connections");
+    logger.error({ err, instanceId }, 'Failed to clear instance connections');
   }
 }

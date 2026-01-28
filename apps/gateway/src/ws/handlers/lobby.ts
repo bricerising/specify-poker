@@ -1,17 +1,17 @@
-import WebSocket from "ws";
-import { grpc } from "../../grpc/unaryClients";
-import { WsPubSubMessage } from "../pubsub";
-import { subscribeToChannel, unsubscribeFromChannel } from "../subscriptions";
-import { sendToLocal } from "../localRegistry";
-import { toWireTableSummary } from "../transforms/gameWire";
-import logger from "../../observability/logger";
-import { safeAsyncHandler } from "../../utils/safeAsyncHandler";
-import { deliverToSubscribers } from "../delivery";
+import type WebSocket from 'ws';
+import { grpc } from '../../grpc/unaryClients';
+import type { WsPubSubMessage } from '../pubsub';
+import { subscribeToChannel, unsubscribeFromChannel } from '../subscriptions';
+import { sendToLocal } from '../localRegistry';
+import { toWireTableSummary } from '../transforms/gameWire';
+import logger from '../../observability/logger';
+import { safeAsyncHandler } from '../../utils/safeAsyncHandler';
+import { deliverToSubscribers } from '../delivery';
 
-const LOBBY_CHANNEL = "lobby";
+const LOBBY_CHANNEL = 'lobby';
 
 export async function handleLobbyPubSubEvent(message: WsPubSubMessage) {
-  if (message.channel !== "lobby") {
+  if (message.channel !== 'lobby') {
     return;
   }
   const tables = Array.isArray(message.payload.tables) ? message.payload.tables : null;
@@ -19,7 +19,10 @@ export async function handleLobbyPubSubEvent(message: WsPubSubMessage) {
     return;
   }
   const normalizedTables = tables.map(toWireTableSummary);
-  await deliverToSubscribers(LOBBY_CHANNEL, { type: "LobbyTablesUpdated", tables: normalizedTables });
+  await deliverToSubscribers(LOBBY_CHANNEL, {
+    type: 'LobbyTablesUpdated',
+    tables: normalizedTables,
+  });
 }
 
 export async function attachLobbyHub(socket: WebSocket, connectionId: string) {
@@ -29,18 +32,21 @@ export async function attachLobbyHub(socket: WebSocket, connectionId: string) {
   void grpc.game
     .ListTables({})
     .then((response) => {
-      sendToLocal(connectionId, { type: "LobbyTablesUpdated", tables: (response.tables ?? []).map(toWireTableSummary) });
+      sendToLocal(connectionId, {
+        type: 'LobbyTablesUpdated',
+        tables: (response.tables ?? []).map(toWireTableSummary),
+      });
     })
     .catch(() => undefined);
 
   socket.on(
-    "close",
+    'close',
     safeAsyncHandler(
       async () => {
         await unsubscribeFromChannel(connectionId, LOBBY_CHANNEL);
       },
       (err) => {
-        logger.error({ err, connectionId }, "lobby.unsubscribe.failed");
+        logger.error({ err, connectionId }, 'lobby.unsubscribe.failed');
       },
     ),
   );

@@ -1,7 +1,7 @@
-import { PoolClient } from "pg";
-import { query } from "./db";
-import { Profile } from "../domain/types";
-import { normalizeUserPreferences } from "../domain/decoders";
+import type { PoolClient } from 'pg';
+import { query } from './db';
+import type { Profile } from '../domain/types';
+import { normalizeUserPreferences } from '../domain/decoders';
 
 const profileColumns = `user_id, username, nickname, avatar_url, preferences, last_login_at, referred_by, created_at, updated_at, deleted_at`;
 
@@ -34,10 +34,10 @@ function mapProfile(row: ProfileRow): Profile {
 }
 
 export async function findById(userId: string, includeDeleted = false): Promise<Profile | null> {
-  const condition = includeDeleted ? "" : "AND deleted_at IS NULL";
+  const condition = includeDeleted ? '' : 'AND deleted_at IS NULL';
   const result = await query<ProfileRow>(
     `SELECT ${profileColumns} FROM profiles WHERE user_id = $1 ${condition}`,
-    [userId]
+    [userId],
   );
 
   if (result.rows.length === 0) {
@@ -50,10 +50,10 @@ export async function findByIds(userIds: string[], includeDeleted = false): Prom
   if (userIds.length === 0) {
     return [];
   }
-  const condition = includeDeleted ? "" : "AND deleted_at IS NULL";
+  const condition = includeDeleted ? '' : 'AND deleted_at IS NULL';
   const result = await query<ProfileRow>(
     `SELECT ${profileColumns} FROM profiles WHERE user_id = ANY($1::varchar[]) ${condition}`,
-    [userIds]
+    [userIds],
   );
 
   return result.rows.map(mapProfile);
@@ -62,7 +62,7 @@ export async function findByIds(userIds: string[], includeDeleted = false): Prom
 export async function findByNickname(nickname: string): Promise<Profile | null> {
   const result = await query<ProfileRow>(
     `SELECT ${profileColumns} FROM profiles WHERE nickname = $1 AND deleted_at IS NULL LIMIT 1`,
-    [nickname]
+    [nickname],
   );
 
   if (result.rows.length === 0) {
@@ -106,7 +106,7 @@ export async function create(
 
   const existingRow = selectResult.rows[0];
   if (!existingRow) {
-    throw new Error("PROFILE_CREATE_FAILED");
+    throw new Error('PROFILE_CREATE_FAILED');
   }
 
   return { profile: mapProfile(existingRow), created: false };
@@ -166,7 +166,7 @@ export async function upsert(profile: Profile): Promise<Profile> {
       new Date(profile.createdAt),
       new Date(profile.updatedAt),
       profile.deletedAt ? new Date(profile.deletedAt) : null,
-    ]
+    ],
   );
 
   return mapProfile(result.rows[0]);
@@ -182,7 +182,7 @@ export async function softDelete(userId: string, deletedAt: Date): Promise<void>
          preferences = $3,
          updated_at = $2
      WHERE user_id = $1`,
-    [userId, deletedAt, {}]
+    [userId, deletedAt, {}],
   );
 }
 
@@ -196,6 +196,6 @@ export async function touchLogin(userId: string, lastLoginAt: Date): Promise<voi
      SET last_login_at = $2,
          updated_at = $2
      WHERE user_id = $1`,
-    [userId, lastLoginAt]
+    [userId, lastLoginAt],
   );
 }

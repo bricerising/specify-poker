@@ -1,19 +1,24 @@
-import * as profileService from "../../services/profileService";
-import * as statisticsService from "../../services/statisticsService";
-import * as friendsService from "../../services/friendsService";
+import * as profileService from '../../services/profileService';
+import * as statisticsService from '../../services/statisticsService';
+import * as friendsService from '../../services/friendsService';
 import {
   recordFriendMutation,
   recordGrpcRequest,
   recordProfileLookup,
   recordProfileUpdate,
   recordStatisticsUpdate,
-} from "../../observability/metrics";
-import type { ServerUnaryCall, ServiceError } from "@grpc/grpc-js";
-import type { FriendProfile, Profile, Statistics, ThemePreference } from "../../domain/types";
-import logger from "../../observability/logger";
-import { ValidationError } from "../../domain/errors";
-import { toGrpcServiceError } from "./errors";
-import { createUnaryHandler, withUnaryErrorHandling, withUnaryHooks, withUnaryTiming } from "@specify-poker/shared";
+} from '../../observability/metrics';
+import type { ServerUnaryCall, ServiceError } from '@grpc/grpc-js';
+import type { FriendProfile, Profile, Statistics, ThemePreference } from '../../domain/types';
+import logger from '../../observability/logger';
+import { ValidationError } from '../../domain/errors';
+import { toGrpcServiceError } from './errors';
+import {
+  createUnaryHandler,
+  withUnaryErrorHandling,
+  withUnaryHooks,
+  withUnaryTiming,
+} from '@specify-poker/shared';
 
 function createPlayerUnaryHandler<Req, Res>(
   method: string,
@@ -21,7 +26,7 @@ function createPlayerUnaryHandler<Req, Res>(
   hooks?: {
     onSuccess?: (request: Req, response: Res) => void;
     onError?: (request: Req, error: unknown) => void;
-  }
+  },
 ) {
   return createUnaryHandler<Req, Res, ServerUnaryCall<Req, Res>, ServiceError>({
     handler: ({ request }) => handler(request),
@@ -34,7 +39,7 @@ function createPlayerUnaryHandler<Req, Res>(
               onSuccess: ({ request }, response) => hooks.onSuccess?.(request, response),
               onError: ({ request }, error) => hooks.onError?.(request, error),
             }
-          : undefined
+          : undefined,
       ),
     ],
   });
@@ -99,15 +104,15 @@ function mapProfile(profile: Profile) {
     userId: profile.userId,
     username: profile.username,
     nickname: profile.nickname,
-    avatarUrl: profile.avatarUrl ?? "",
+    avatarUrl: profile.avatarUrl ?? '',
     preferences: {
       soundEnabled: profile.preferences.soundEnabled,
       chatEnabled: profile.preferences.chatEnabled,
       showHandStrength: profile.preferences.showHandStrength,
       theme: profile.preferences.theme,
     },
-    lastLoginAt: profile.lastLoginAt ?? "",
-    referredBy: profile.referredBy ?? "",
+    lastLoginAt: profile.lastLoginAt ?? '',
+    referredBy: profile.referredBy ?? '',
     createdAt: profile.createdAt,
     updatedAt: profile.updatedAt,
   };
@@ -131,8 +136,8 @@ function mapFriendProfile(friend: FriendProfile) {
   return {
     userId: friend.userId,
     nickname: friend.nickname,
-    avatarUrl: friend.avatarUrl ?? "",
-    status: friend.status ?? "",
+    avatarUrl: friend.avatarUrl ?? '',
+    status: friend.status ?? '',
   };
 }
 
@@ -145,13 +150,13 @@ function normalizeOptionalString(value: string | undefined): string | undefined 
 }
 
 const STATISTIC_TYPE_MAP = new Map<string, statisticsService.StatisticType>([
-  ["STATISTIC_TYPE_HANDS_PLAYED", statisticsService.StatisticType.HandsPlayed],
-  ["STATISTIC_TYPE_WINS", statisticsService.StatisticType.Wins],
-  ["STATISTIC_TYPE_VPIP", statisticsService.StatisticType.Vpip],
-  ["STATISTIC_TYPE_PFR", statisticsService.StatisticType.Pfr],
-  ["STATISTIC_TYPE_ALL_IN", statisticsService.StatisticType.AllIn],
-  ["STATISTIC_TYPE_BIGGEST_POT", statisticsService.StatisticType.BiggestPot],
-  ["STATISTIC_TYPE_REFERRAL_COUNT", statisticsService.StatisticType.ReferralCount],
+  ['STATISTIC_TYPE_HANDS_PLAYED', statisticsService.StatisticType.HandsPlayed],
+  ['STATISTIC_TYPE_WINS', statisticsService.StatisticType.Wins],
+  ['STATISTIC_TYPE_VPIP', statisticsService.StatisticType.Vpip],
+  ['STATISTIC_TYPE_PFR', statisticsService.StatisticType.Pfr],
+  ['STATISTIC_TYPE_ALL_IN', statisticsService.StatisticType.AllIn],
+  ['STATISTIC_TYPE_BIGGEST_POT', statisticsService.StatisticType.BiggestPot],
+  ['STATISTIC_TYPE_REFERRAL_COUNT', statisticsService.StatisticType.ReferralCount],
 ]);
 
 function toStatisticType(value: string): statisticsService.StatisticType | null {
@@ -159,27 +164,33 @@ function toStatisticType(value: string): statisticsService.StatisticType | null 
 }
 
 export const handlers = {
-  GetProfile: createPlayerUnaryHandler<GetProfileRequest, unknown>("GetProfile", async (request) => {
-    const profile = await profileService.getProfile(
-      request.userId,
-      normalizeOptionalString(request.referrerId),
-      normalizeOptionalString(request.username)
-    );
-    recordProfileLookup(profile.deletedAt ? "deleted" : "ok");
-    return { profile: mapProfile(profile) };
-  }),
+  GetProfile: createPlayerUnaryHandler<GetProfileRequest, unknown>(
+    'GetProfile',
+    async (request) => {
+      const profile = await profileService.getProfile(
+        request.userId,
+        normalizeOptionalString(request.referrerId),
+        normalizeOptionalString(request.username),
+      );
+      recordProfileLookup(profile.deletedAt ? 'deleted' : 'ok');
+      return { profile: mapProfile(profile) };
+    },
+  ),
 
-  GetProfiles: createPlayerUnaryHandler<GetProfilesRequest, unknown>("GetProfiles", async (request) => {
-    const profiles = await profileService.getProfiles(request.userIds ?? []);
-    return { profiles: profiles.map(mapProfile) };
-  }),
+  GetProfiles: createPlayerUnaryHandler<GetProfilesRequest, unknown>(
+    'GetProfiles',
+    async (request) => {
+      const profiles = await profileService.getProfiles(request.userIds ?? []);
+      return { profiles: profiles.map(mapProfile) };
+    },
+  ),
 
   UpdateProfile: createPlayerUnaryHandler<UpdateProfileRequest, unknown>(
-    "UpdateProfile",
+    'UpdateProfile',
     async (request) => {
       const nickname = normalizeOptionalString(request.nickname);
       const avatarUrlRaw = request.avatarUrl;
-      const avatarUrl = avatarUrlRaw === "" ? null : normalizeOptionalString(avatarUrlRaw);
+      const avatarUrl = avatarUrlRaw === '' ? null : normalizeOptionalString(avatarUrlRaw);
       const profile = await profileService.updateProfile(request.userId, {
         nickname,
         avatarUrl,
@@ -188,73 +199,85 @@ export const handlers = {
       return { profile: mapProfile(profile) };
     },
     {
-      onSuccess: () => recordProfileUpdate("ok"),
-      onError: () => recordProfileUpdate("error"),
-    }
+      onSuccess: () => recordProfileUpdate('ok'),
+      onError: () => recordProfileUpdate('error'),
+    },
   ),
 
-  DeleteProfile: createPlayerUnaryHandler<DeleteProfileRequest, unknown>("DeleteProfile", async (request) => {
-    await profileService.deleteProfile(request.userId);
-    return { success: true };
-  }),
+  DeleteProfile: createPlayerUnaryHandler<DeleteProfileRequest, unknown>(
+    'DeleteProfile',
+    async (request) => {
+      await profileService.deleteProfile(request.userId);
+      return { success: true };
+    },
+  ),
 
-  GetStatistics: createPlayerUnaryHandler<GetStatisticsRequest, unknown>("GetStatistics", async (request) => {
-    const statistics = await statisticsService.getStatistics(request.userId);
-    return { statistics: mapStatistics(statistics) };
-  }),
+  GetStatistics: createPlayerUnaryHandler<GetStatisticsRequest, unknown>(
+    'GetStatistics',
+    async (request) => {
+      const statistics = await statisticsService.getStatistics(request.userId);
+      return { statistics: mapStatistics(statistics) };
+    },
+  ),
 
   IncrementStatistic: createPlayerUnaryHandler<IncrementStatisticRequest, unknown>(
-    "IncrementStatistic",
+    'IncrementStatistic',
     async (request) => {
       const type = toStatisticType(request.type);
       if (!type) {
-        throw new ValidationError("Invalid statistic type");
+        throw new ValidationError('Invalid statistic type');
       }
       const updated = await statisticsService.incrementStatistic(
         request.userId,
         type,
-        request.amount ?? 0
+        request.amount ?? 0,
       );
       recordStatisticsUpdate(type);
       return mapStatistics(updated);
-    }
+    },
   ),
 
-  GetFriends: createPlayerUnaryHandler<GetFriendsRequest, unknown>("GetFriends", async (request) => {
-    const friends = await friendsService.getFriends(request.userId);
-    return { friends: friends.map(mapFriendProfile) };
-  }),
+  GetFriends: createPlayerUnaryHandler<GetFriendsRequest, unknown>(
+    'GetFriends',
+    async (request) => {
+      const friends = await friendsService.getFriends(request.userId);
+      return { friends: friends.map(mapFriendProfile) };
+    },
+  ),
 
   AddFriend: createPlayerUnaryHandler<AddFriendRequest, unknown>(
-    "AddFriend",
+    'AddFriend',
     async (request) => {
       await friendsService.addFriend(request.userId, request.friendId);
       return {};
     },
     {
-      onSuccess: () => recordFriendMutation("add", "ok"),
-      onError: () => recordFriendMutation("add", "error"),
-    }
+      onSuccess: () => recordFriendMutation('add', 'ok'),
+      onError: () => recordFriendMutation('add', 'error'),
+    },
   ),
 
   RemoveFriend: createPlayerUnaryHandler<RemoveFriendRequest, unknown>(
-    "RemoveFriend",
+    'RemoveFriend',
     async (request) => {
       await friendsService.removeFriend(request.userId, request.friendId);
       return {};
     },
     {
-      onSuccess: () => recordFriendMutation("remove", "ok"),
-      onError: () => recordFriendMutation("remove", "error"),
-    }
+      onSuccess: () => recordFriendMutation('remove', 'ok'),
+      onError: () => recordFriendMutation('remove', 'error'),
+    },
   ),
 
-  GetNicknames: createPlayerUnaryHandler<GetNicknamesRequest, unknown>("GetNicknames", async (request) => {
-    const profiles = await profileService.getProfiles(request.userIds ?? []);
-    const nicknames = profiles.map((profile) => ({
-      userId: profile.userId,
-      nickname: profile.nickname,
-    }));
-    return { nicknames };
-  }),
+  GetNicknames: createPlayerUnaryHandler<GetNicknamesRequest, unknown>(
+    'GetNicknames',
+    async (request) => {
+      const profiles = await profileService.getProfiles(request.userIds ?? []);
+      const nicknames = profiles.map((profile) => ({
+        userId: profile.userId,
+        nickname: profile.nickname,
+      }));
+      return { nicknames };
+    },
+  ),
 };

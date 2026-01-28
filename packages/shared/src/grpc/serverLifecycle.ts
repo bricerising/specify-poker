@@ -49,8 +49,10 @@ type CreateGrpcServerLifecycleOptions<TProto> = {
  * - binds and optionally starts
  * - exposes a stable start/stop lifecycle
  */
-export function createGrpcServerLifecycle<TProto>(options: CreateGrpcServerLifecycleOptions<TProto>): GrpcServerLifecycle {
-  const host = options.host ?? "0.0.0.0";
+export function createGrpcServerLifecycle<TProto>(
+  options: CreateGrpcServerLifecycleOptions<TProto>,
+): GrpcServerLifecycle {
+  const host = options.host ?? '0.0.0.0';
   const startAfterBind = options.startAfterBind ?? true;
   const loadProto = options.loadProto ?? ((loaded: unknown) => loaded as TProto);
 
@@ -68,7 +70,10 @@ export function createGrpcServerLifecycle<TProto>(options: CreateGrpcServerLifec
 
     const startGeneration = generation;
     startPromise = (async () => {
-      const packageDefinition = options.protoLoader.loadSync(options.protoPath, options.protoLoaderOptions);
+      const packageDefinition = options.protoLoader.loadSync(
+        options.protoPath,
+        options.protoLoaderOptions,
+      );
       const loaded = options.grpc.loadPackageDefinition(packageDefinition);
       const proto = loadProto(loaded);
 
@@ -95,7 +100,10 @@ export function createGrpcServerLifecycle<TProto>(options: CreateGrpcServerLifec
               nextServer.start?.();
             }
 
-            options.logger?.info?.({ port: boundPort }, options.logMessage ?? "gRPC server listening");
+            options.logger?.info?.(
+              { port: boundPort },
+              options.logMessage ?? 'gRPC server listening',
+            );
             resolve();
           },
         );

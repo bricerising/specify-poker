@@ -1,4 +1,4 @@
-import * as grpc from "@grpc/grpc-js";
+import * as grpc from '@grpc/grpc-js';
 import {
   asGrpcServiceError,
   createGrpcServiceError,
@@ -6,28 +6,20 @@ import {
   isGrpcServiceErrorLike,
   withUnaryErrorHandling,
   withUnaryTiming,
-} from "@specify-poker/shared";
-import {
-  getBalance,
-  ensureAccount,
-  processCashOut,
-} from "../../services/accountService";
+} from '@specify-poker/shared';
+import { getBalance, ensureAccount, processCashOut } from '../../services/accountService';
 import {
   reserveForBuyIn,
   commitReservation,
   releaseReservation,
-} from "../../services/reservationService";
-import {
-  recordContribution,
-  settlePot,
-  cancelPot,
-} from "../../services/tablePotService";
-import { recordGrpcRequest } from "../../observability/metrics";
-import logger from "../../observability/logger";
-import { toNonEmptyString, toNumber } from "../validation";
+} from '../../services/reservationService';
+import { recordContribution, settlePot, cancelPot } from '../../services/tablePotService';
+import { recordGrpcRequest } from '../../observability/metrics';
+import logger from '../../observability/logger';
+import { toNonEmptyString, toNumber } from '../validation';
 
 class InvalidArgumentError extends Error {
-  override name = "InvalidArgumentError";
+  override name = 'InvalidArgumentError';
 }
 
 function invalidArgument(message: string): never {
@@ -36,20 +28,27 @@ function invalidArgument(message: string): never {
 
 function asServiceError(error: unknown): grpc.ServiceError {
   if (error instanceof InvalidArgumentError) {
-    return createGrpcServiceError(grpc.status.INVALID_ARGUMENT, error.message, error) as grpc.ServiceError;
+    return createGrpcServiceError(
+      grpc.status.INVALID_ARGUMENT,
+      error.message,
+      error,
+    ) as grpc.ServiceError;
   }
 
   if (isGrpcServiceErrorLike(error)) {
-    return asGrpcServiceError(error, { code: grpc.status.INTERNAL, message: "Unknown error" }) as grpc.ServiceError;
+    return asGrpcServiceError(error, {
+      code: grpc.status.INTERNAL,
+      message: 'Unknown error',
+    }) as grpc.ServiceError;
   }
 
-  const message = error instanceof Error ? error.message : "Unknown error";
+  const message = error instanceof Error ? error.message : 'Unknown error';
   return createGrpcServiceError(grpc.status.INTERNAL, message, error) as grpc.ServiceError;
 }
 
 function createBalanceUnaryHandler<Req, Res>(
   method: string,
-  handler: (request: Req) => Promise<Res> | Res
+  handler: (request: Req) => Promise<Res> | Res,
 ): grpc.handleUnaryCall<Req, Res> {
   return createUnaryHandler<Req, Res, grpc.ServerUnaryCall<Req, Res>, grpc.ServiceError>({
     handler: ({ request }) => handler(request),
@@ -59,7 +58,8 @@ function createBalanceUnaryHandler<Req, Res>(
         method,
         logger,
         toServiceError: asServiceError,
-        shouldLog: (error) => !(error instanceof InvalidArgumentError) && !isGrpcServiceErrorLike(error),
+        shouldLog: (error) =>
+          !(error instanceof InvalidArgumentError) && !isGrpcServiceErrorLike(error),
       }),
     ],
   });
@@ -67,32 +67,35 @@ function createBalanceUnaryHandler<Req, Res>(
 
 // gRPC handler implementations
 export const handlers = {
-  GetBalance: createBalanceUnaryHandler("GetBalance", async ({ account_id }: { account_id: string }) => {
-    const balance = await getBalance(account_id);
-    if (!balance) {
+  GetBalance: createBalanceUnaryHandler(
+    'GetBalance',
+    async ({ account_id }: { account_id: string }) => {
+      const balance = await getBalance(account_id);
+      if (!balance) {
+        return {
+          account_id,
+          balance: 0,
+          available_balance: 0,
+          currency: 'CHIPS',
+          version: 0,
+        };
+      }
       return {
-        account_id,
-        balance: 0,
-        available_balance: 0,
-        currency: "CHIPS",
-        version: 0,
+        account_id: balance.accountId,
+        balance: balance.balance,
+        available_balance: balance.availableBalance,
+        currency: balance.currency,
+        version: balance.version,
       };
-    }
-    return {
-      account_id: balance.accountId,
-      balance: balance.balance,
-      available_balance: balance.availableBalance,
-      currency: balance.currency,
-      version: balance.version,
-    };
-  }),
+    },
+  ),
 
   EnsureAccount: createBalanceUnaryHandler(
-    "EnsureAccount",
+    'EnsureAccount',
     async ({ account_id, initial_balance }: { account_id: string; initial_balance?: number }) => {
       const accountId = toNonEmptyString(account_id);
       if (!accountId) {
-        invalidArgument("account_id is required");
+        invalidArgument('account_id is required');
       }
       const initialBalance = toNumber(initial_balance ?? 0, 0);
       const result = await ensureAccount(accountId, initialBalance);
@@ -101,11 +104,11 @@ export const handlers = {
         balance: result.account.balance,
         created: result.created,
       };
-    }
+    },
   ),
 
   ReserveForBuyIn: createBalanceUnaryHandler(
-    "ReserveForBuyIn",
+    'ReserveForBuyIn',
     async (request: {
       account_id: string;
       table_id: string;
@@ -120,7 +123,7 @@ export const handlers = {
       const timeoutCandidate = toNumber(request.timeout_seconds, 0);
       const timeoutSeconds = timeoutCandidate > 0 ? timeoutCandidate : 30;
       if (!accountId || !tableId || !idempotencyKey || amount <= 0) {
-        invalidArgument("invalid ReserveForBuyIn request");
+        invalidArgument('invalid ReserveForBuyIn request');
       }
 
       const result = await reserveForBuyIn(
@@ -128,53 +131,53 @@ export const handlers = {
         tableId,
         amount,
         idempotencyKey,
-        timeoutSeconds
+        timeoutSeconds,
       );
 
       return {
         ok: result.ok,
-        reservation_id: result.ok ? result.reservationId : "",
-        error: result.ok ? "" : result.error,
+        reservation_id: result.ok ? result.reservationId : '',
+        error: result.ok ? '' : result.error,
         available_balance: result.availableBalance ?? 0,
       };
-    }
+    },
   ),
 
   CommitReservation: createBalanceUnaryHandler(
-    "CommitReservation",
+    'CommitReservation',
     async ({ reservation_id }: { reservation_id: string }) => {
       const reservationId = toNonEmptyString(reservation_id);
       if (!reservationId) {
-        invalidArgument("reservation_id is required");
+        invalidArgument('reservation_id is required');
       }
       const result = await commitReservation(reservationId);
       return {
         ok: result.ok,
-        transaction_id: result.ok ? result.transactionId : "",
-        error: result.ok ? "" : result.error,
+        transaction_id: result.ok ? result.transactionId : '',
+        error: result.ok ? '' : result.error,
         new_balance: result.ok ? (result.newBalance ?? 0) : 0,
       };
-    }
+    },
   ),
 
   ReleaseReservation: createBalanceUnaryHandler(
-    "ReleaseReservation",
+    'ReleaseReservation',
     async ({ reservation_id, reason }: { reservation_id: string; reason?: string }) => {
       const reservationId = toNonEmptyString(reservation_id);
       if (!reservationId) {
-        invalidArgument("reservation_id is required");
+        invalidArgument('reservation_id is required');
       }
       const result = await releaseReservation(reservationId, reason);
       return {
         ok: result.ok,
-        error: result.ok ? "" : result.error,
+        error: result.ok ? '' : result.error,
         available_balance: result.ok ? (result.availableBalance ?? 0) : 0,
       };
-    }
+    },
   ),
 
   ProcessCashOut: createBalanceUnaryHandler(
-    "ProcessCashOut",
+    'ProcessCashOut',
     async (request: {
       account_id: string;
       table_id: string;
@@ -190,7 +193,7 @@ export const handlers = {
       const amount = toNumber(request.amount, 0);
       const handId = toNonEmptyString(request.hand_id);
       if (!accountId || !tableId || !idempotencyKey || seatId < 0 || amount <= 0) {
-        invalidArgument("invalid ProcessCashOut request");
+        invalidArgument('invalid ProcessCashOut request');
       }
 
       const result = await processCashOut(
@@ -199,20 +202,20 @@ export const handlers = {
         seatId,
         amount,
         idempotencyKey,
-        handId ?? undefined
+        handId ?? undefined,
       );
 
       return {
         ok: result.ok,
-        transaction_id: result.ok ? result.transactionId : "",
-        error: result.ok ? "" : result.error,
+        transaction_id: result.ok ? result.transactionId : '',
+        error: result.ok ? '' : result.error,
         new_balance: result.ok ? result.newBalance : 0,
       };
-    }
+    },
   ),
 
   RecordContribution: createBalanceUnaryHandler(
-    "RecordContribution",
+    'RecordContribution',
     async (request: {
       table_id: string;
       hand_id: string;
@@ -238,7 +241,7 @@ export const handlers = {
         seatId < 0 ||
         amount <= 0
       ) {
-        invalidArgument("invalid RecordContribution request");
+        invalidArgument('invalid RecordContribution request');
       }
 
       const result = await recordContribution(
@@ -248,20 +251,20 @@ export const handlers = {
         accountId,
         amount,
         contributionType,
-        idempotencyKey
+        idempotencyKey,
       );
 
       return {
         ok: result.ok,
-        error: result.ok ? "" : result.error,
+        error: result.ok ? '' : result.error,
         total_pot: result.ok ? result.totalPot : 0,
         seat_contribution: result.ok ? result.seatContribution : 0,
       };
-    }
+    },
   ),
 
   SettlePot: createBalanceUnaryHandler(
-    "SettlePot",
+    'SettlePot',
     async ({
       table_id,
       hand_id,
@@ -277,7 +280,7 @@ export const handlers = {
       const handId = toNonEmptyString(hand_id);
       const idempotencyKey = toNonEmptyString(idempotency_key);
       if (!tableId || !handId || !idempotencyKey) {
-        invalidArgument("invalid SettlePot request");
+        invalidArgument('invalid SettlePot request');
       }
 
       const parsedWinners = winners.map((winner) => {
@@ -285,49 +288,51 @@ export const handlers = {
         const seatId = toNumber(winner.seat_id, -1);
         const amount = toNumber(winner.amount, -1);
         if (!accountId || seatId < 0 || amount < 0) {
-          invalidArgument("invalid SettlePot winner");
+          invalidArgument('invalid SettlePot winner');
         }
         return { seatId, accountId, amount };
       });
 
-      const result = await settlePot(
-        tableId,
-        handId,
-        parsedWinners,
-        idempotencyKey
-      );
+      const result = await settlePot(tableId, handId, parsedWinners, idempotencyKey);
 
       return {
         ok: result.ok,
-        error: result.ok ? "" : result.error,
-        results:
-          result.ok
-            ? result.results.map((r) => ({
-                account_id: r.accountId,
-                transaction_id: r.transactionId,
-                amount: r.amount,
-                new_balance: r.newBalance,
-              }))
-            : [],
+        error: result.ok ? '' : result.error,
+        results: result.ok
+          ? result.results.map((r) => ({
+              account_id: r.accountId,
+              transaction_id: r.transactionId,
+              amount: r.amount,
+              new_balance: r.newBalance,
+            }))
+          : [],
       };
-    }
+    },
   ),
 
   CancelPot: createBalanceUnaryHandler(
-    "CancelPot",
-    async ({ table_id, hand_id, reason }: { table_id: string; hand_id: string; reason: string }) => {
+    'CancelPot',
+    async ({
+      table_id,
+      hand_id,
+      reason,
+    }: {
+      table_id: string;
+      hand_id: string;
+      reason: string;
+    }) => {
       const tableId = toNonEmptyString(table_id);
       const handId = toNonEmptyString(hand_id);
       const cancelReason = toNonEmptyString(reason);
       if (!tableId || !handId || !cancelReason) {
-        invalidArgument("invalid CancelPot request");
+        invalidArgument('invalid CancelPot request');
       }
 
       const result = await cancelPot(tableId, handId, cancelReason);
       return {
         ok: result.ok,
-        error: result.error ?? "",
+        error: result.error ?? '',
       };
-    }
+    },
   ),
 };

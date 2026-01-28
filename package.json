@@ -11,6 +11,8 @@
     "env:local": "node scripts/generate-local-env.mjs",
     "grafana": "node scripts/grafana.mjs",
     "redis": "node scripts/redis.mjs",
+    "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "format:check": "prettier -c \"**/*.{ts,tsx}\"",
     "lint": "eslint .",
     "test": "vitest run"
   },

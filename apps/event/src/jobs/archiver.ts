@@ -1,6 +1,6 @@
-import { createPeriodicTask, type PeriodicTask } from "@specify-poker/shared";
+import { createPeriodicTask, type PeriodicTask } from '@specify-poker/shared';
 
-import logger from "../observability/logger";
+import logger from '../observability/logger';
 
 const ONE_HOUR_MS = 3600 * 1000;
 
@@ -14,11 +14,11 @@ export class Archiver {
     }
 
     this.isRunning = true;
-    logger.info("Archiver started");
+    logger.info('Archiver started');
     // Periodically check for old data to archive
     this.task?.stop();
     this.task = createPeriodicTask({
-      name: "event.archiver",
+      name: 'event.archiver',
       intervalMs: ONE_HOUR_MS,
       logger,
       run: async () => {
@@ -30,7 +30,7 @@ export class Archiver {
 
   async run() {
     if (!this.isRunning) return;
-    logger.info("Archiver: Checking for events older than retention period...");
+    logger.info('Archiver: Checking for events older than retention period...');
     // Implementation: Move events older than 7 years to secondary storage (e.g. S3)
     // For now, this is a stub as per local development needs
   }

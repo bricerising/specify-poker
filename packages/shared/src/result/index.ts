@@ -24,6 +24,8 @@
  * ```
  */
 
+import { ensureError } from '../errors/ensureError';
+
 /** Represents a successful result containing a value */
 export interface Ok<T> {
   readonly ok: true;
@@ -63,10 +65,7 @@ export function isErr<T, E>(result: Result<T, E>): result is Err<E> {
  * Maps the success value of a Result to a new value.
  * If the result is an error, returns the error unchanged.
  */
-export function mapResult<T, U, E>(
-  result: Result<T, E>,
-  fn: (value: T) => U
-): Result<U, E> {
+export function mapResult<T, U, E>(result: Result<T, E>, fn: (value: T) => U): Result<U, E> {
   if (result.ok) {
     return ok(fn(result.value));
   }
@@ -77,10 +76,7 @@ export function mapResult<T, U, E>(
  * Maps the error of a Result to a new error.
  * If the result is successful, returns the success unchanged.
  */
-export function mapError<T, E, F>(
-  result: Result<T, E>,
-  fn: (error: E) => F
-): Result<T, F> {
+export function mapError<T, E, F>(result: Result<T, E>, fn: (error: E) => F): Result<T, F> {
   if (!result.ok) {
     return err(fn(result.error));
   }
@@ -94,7 +90,7 @@ export function mapError<T, E, F>(
  */
 export function flatMap<T, U, E>(
   result: Result<T, E>,
-  fn: (value: T) => Result<U, E>
+  fn: (value: T) => Result<U, E>,
 ): Result<U, E> {
   if (result.ok) {
     return fn(result.value);
@@ -110,9 +106,7 @@ export function unwrap<T, E>(result: Result<T, E>): T {
   if (result.ok) {
     return result.value;
   }
-  throw result.error instanceof Error
-    ? result.error
-    : new Error(String(result.error));
+  throw result.error instanceof Error ? result.error : new Error(String(result.error));
 }
 
 /**
@@ -129,35 +123,42 @@ export function unwrapOr<T, E>(result: Result<T, E>, defaultValue: T): T {
  * Converts a Promise that might reject to a Promise<Result>.
  * Catches any thrown errors and wraps them in an Err.
  */
-export async function tryCatch<T, E = Error>(
+export async function tryCatch<T>(fn: () => Promise<T>): Promise<Result<T, Error>>;
+export async function tryCatch<T, E>(
   fn: () => Promise<T>,
-  mapError?: (error: unknown) => E
-): Promise<Result<T, E>> {
+  mapError: (error: unknown) => E,
+): Promise<Result<T, E>>;
+export async function tryCatch<T, E>(
+  fn: () => Promise<T>,
+  mapError?: (error: unknown) => E,
+): Promise<Result<T, E | Error>> {
   try {
     const value = await fn();
     return ok(value);
-  } catch (error) {
+  } catch (error: unknown) {
     if (mapError) {
       return err(mapError(error));
     }
-    return err(error as E);
+    return err(ensureError(error));
   }
 }
 
 /**
  * Converts a synchronous function that might throw to a Result.
  */
-export function tryCatchSync<T, E = Error>(
+export function tryCatchSync<T>(fn: () => T): Result<T, Error>;
+export function tryCatchSync<T, E>(fn: () => T, mapError: (error: unknown) => E): Result<T, E>;
+export function tryCatchSync<T, E>(
   fn: () => T,
-  mapError?: (error: unknown) => E
-): Result<T, E> {
+  mapError?: (error: unknown) => E,
+): Result<T, E | Error> {
   try {
     const value = fn();
     return ok(value);
-  } catch (error) {
+  } catch (error: unknown) {
     if (mapError) {
       return err(mapError(error));
     }
-    return err(error as E);
+    return err(ensureError(error));
   }
 }

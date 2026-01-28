@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import profileRouter from "../../../src/http/routes/profile";
-import { dispatchToRouter } from "../helpers/express";
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import profileRouter from '../../../src/http/routes/profile';
+import { dispatchToRouter } from '../helpers/express';
 
 // Mock the gRPC client
-vi.mock("../../../src/grpc/clients", () => ({
+vi.mock('../../../src/grpc/clients', () => ({
   playerClient: {
     GetProfile: vi.fn(),
     UpdateProfile: vi.fn(),
@@ -17,7 +17,7 @@ vi.mock("../../../src/grpc/clients", () => ({
 }));
 
 // Mock logger
-vi.mock("../../../src/observability/logger", () => ({
+vi.mock('../../../src/observability/logger', () => ({
   default: {
     error: vi.fn(),
     info: vi.fn(),
@@ -25,10 +25,10 @@ vi.mock("../../../src/observability/logger", () => ({
   },
 }));
 
-import { playerClient } from "../../../src/grpc/clients";
+import { playerClient } from '../../../src/grpc/clients';
 
-describe("Profile Routes", () => {
-  const auth = { userId: "user-123", claims: { preferred_username: "TestUser" } };
+describe('Profile Routes', () => {
+  const auth = { userId: 'user-123', claims: { preferred_username: 'TestUser' } };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -37,13 +37,13 @@ describe("Profile Routes", () => {
     vi.mocked(playerClient.GetStatistics).mockImplementation(
       (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
         callback(null, { statistics: { handsPlayed: 0, wins: 0 } });
-      }
+      },
     );
 
     vi.mocked(playerClient.GetFriends).mockImplementation(
       (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
         callback(null, { friends: [] });
-      }
+      },
     );
   });
 
@@ -51,129 +51,129 @@ describe("Profile Routes", () => {
     vi.restoreAllMocks();
   });
 
-  describe("GET /api/me", () => {
-    it("should return current user profile", async () => {
+  describe('GET /api/me', () => {
+    it('should return current user profile', async () => {
       const mockProfile = {
-        user_id: "user-123",
-        username: "TestUser",
-        nickname: "TestUser",
-        avatar_url: "https://example.com/avatar.png",
+        user_id: 'user-123',
+        username: 'TestUser',
+        nickname: 'TestUser',
+        avatar_url: 'https://example.com/avatar.png',
       };
 
       vi.mocked(playerClient.GetProfile).mockImplementation(
         (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
           callback(null, { profile: mockProfile });
-        }
+        },
       );
 
       const response = await dispatchToRouter(profileRouter, {
-        method: "GET",
-        url: "/me",
+        method: 'GET',
+        url: '/me',
         auth,
       });
 
       expect(response.statusCode).toBe(200);
       expect(response.body).toEqual({
-        userId: "user-123",
-        username: "TestUser",
-        nickname: "TestUser",
-        avatarUrl: "https://example.com/avatar.png",
+        userId: 'user-123',
+        username: 'TestUser',
+        nickname: 'TestUser',
+        avatarUrl: 'https://example.com/avatar.png',
         stats: { handsPlayed: 0, wins: 0 },
         friends: [],
       });
     });
 
-    it("should handle errors", async () => {
+    it('should handle errors', async () => {
       vi.mocked(playerClient.GetProfile).mockImplementation(
         (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
-          callback(new Error("Database error"), null);
-        }
+          callback(new Error('Database error'), null);
+        },
       );
 
       const response = await dispatchToRouter(profileRouter, {
-        method: "GET",
-        url: "/me",
+        method: 'GET',
+        url: '/me',
         auth,
       });
 
       expect(response.statusCode).toBe(500);
-      expect(response.body).toEqual(expect.objectContaining({ error: "Failed to get profile" }));
+      expect(response.body).toEqual(expect.objectContaining({ error: 'Failed to get profile' }));
     });
   });
 
-  describe("PUT /api/me", () => {
-    it("should update current user profile", async () => {
+  describe('PUT /api/me', () => {
+    it('should update current user profile', async () => {
       const updatedProfile = {
-        user_id: "user-123",
-        username: "TestUser",
-        nickname: "NewNickname",
-        avatar_url: "https://example.com/new-avatar.png",
+        user_id: 'user-123',
+        username: 'TestUser',
+        nickname: 'NewNickname',
+        avatar_url: 'https://example.com/new-avatar.png',
       };
 
       vi.mocked(playerClient.UpdateProfile).mockImplementation(
         (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
           callback(null, { profile: updatedProfile });
-        }
+        },
       );
 
       const response = await dispatchToRouter(profileRouter, {
-        method: "PUT",
-        url: "/me",
+        method: 'PUT',
+        url: '/me',
         auth,
-        body: { nickname: "NewNickname", avatarUrl: "https://example.com/new-avatar.png" },
+        body: { nickname: 'NewNickname', avatarUrl: 'https://example.com/new-avatar.png' },
       });
 
       expect(response.statusCode).toBe(200);
       expect(response.body).toEqual({
-        userId: "user-123",
-        username: "TestUser",
-        nickname: "NewNickname",
-        avatarUrl: "https://example.com/new-avatar.png",
+        userId: 'user-123',
+        username: 'TestUser',
+        nickname: 'NewNickname',
+        avatarUrl: 'https://example.com/new-avatar.png',
         stats: { handsPlayed: 0, wins: 0 },
         friends: [],
       });
     });
   });
 
-  describe("DELETE /api/me", () => {
-    it("should delete current user profile (GDPR)", async () => {
+  describe('DELETE /api/me', () => {
+    it('should delete current user profile (GDPR)', async () => {
       vi.mocked(playerClient.DeleteProfile).mockImplementation(
         (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
           callback(null, { success: true });
-        }
+        },
       );
 
       const response = await dispatchToRouter(profileRouter, {
-        method: "DELETE",
-        url: "/me",
+        method: 'DELETE',
+        url: '/me',
         auth,
       });
 
       expect(response.statusCode).toBe(204);
     });
 
-    it("should handle deletion failure", async () => {
+    it('should handle deletion failure', async () => {
       vi.mocked(playerClient.DeleteProfile).mockImplementation(
         (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
           callback(null, { success: false });
-        }
+        },
       );
 
       const response = await dispatchToRouter(profileRouter, {
-        method: "DELETE",
-        url: "/me",
+        method: 'DELETE',
+        url: '/me',
         auth,
       });
 
       expect(response.statusCode).toBe(500);
-      expect(response.body).toEqual(expect.objectContaining({ error: "Failed to delete profile" }));
+      expect(response.body).toEqual(expect.objectContaining({ error: 'Failed to delete profile' }));
     });
   });
 
-  describe("GET /api/me/statistics", () => {
-    it("should return user statistics", async () => {
+  describe('GET /api/me/statistics', () => {
+    it('should return user statistics', async () => {
       const mockStats = {
-        user_id: "user-123",
+        user_id: 'user-123',
         hands_played: 100,
         wins: 25,
         vpip: 28.5,
@@ -183,12 +183,12 @@ describe("Profile Routes", () => {
       vi.mocked(playerClient.GetStatistics).mockImplementation(
         (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
           callback(null, { statistics: mockStats });
-        }
+        },
       );
 
       const response = await dispatchToRouter(profileRouter, {
-        method: "GET",
-        url: "/me/statistics",
+        method: 'GET',
+        url: '/me/statistics',
         auth,
       });
 
@@ -197,73 +197,73 @@ describe("Profile Routes", () => {
     });
   });
 
-  describe("GET /api/friends", () => {
-    it("should return friends list", async () => {
+  describe('GET /api/friends', () => {
+    it('should return friends list', async () => {
       const mockFriends = [
-        { user_id: "friend-1", nickname: "Friend1" },
-        { user_id: "friend-2", nickname: "Friend2" },
+        { user_id: 'friend-1', nickname: 'Friend1' },
+        { user_id: 'friend-2', nickname: 'Friend2' },
       ];
 
       vi.mocked(playerClient.GetFriends).mockImplementation(
         (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
           callback(null, { friends: mockFriends });
-        }
+        },
       );
 
       const response = await dispatchToRouter(profileRouter, {
-        method: "GET",
-        url: "/friends",
+        method: 'GET',
+        url: '/friends',
         auth,
       });
 
       expect(response.statusCode).toBe(200);
-      expect(response.body).toEqual(expect.objectContaining({ friends: ["friend-1", "friend-2"] }));
+      expect(response.body).toEqual(expect.objectContaining({ friends: ['friend-1', 'friend-2'] }));
     });
   });
 
-  describe("POST /api/friends", () => {
-    it("should add a friend", async () => {
+  describe('POST /api/friends', () => {
+    it('should add a friend', async () => {
       vi.mocked(playerClient.AddFriend).mockImplementation(
         (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
           callback(null, {});
-        }
+        },
       );
 
       const response = await dispatchToRouter(profileRouter, {
-        method: "POST",
-        url: "/friends",
+        method: 'POST',
+        url: '/friends',
         auth,
-        body: { friendId: "friend-123" },
+        body: { friendId: 'friend-123' },
       });
 
       expect(response.statusCode).toBe(201);
       expect(response.body).toEqual(expect.objectContaining({ ok: true }));
     });
 
-    it("should return error when friendId is missing", async () => {
+    it('should return error when friendId is missing', async () => {
       const response = await dispatchToRouter(profileRouter, {
-        method: "POST",
-        url: "/friends",
+        method: 'POST',
+        url: '/friends',
         auth,
         body: {},
       });
 
       expect(response.statusCode).toBe(400);
-      expect(response.body).toEqual(expect.objectContaining({ error: "friendId is required" }));
+      expect(response.body).toEqual(expect.objectContaining({ error: 'friendId is required' }));
     });
   });
 
-  describe("DELETE /api/friends/:friendId", () => {
-    it("should remove a friend", async () => {
+  describe('DELETE /api/friends/:friendId', () => {
+    it('should remove a friend', async () => {
       vi.mocked(playerClient.RemoveFriend).mockImplementation(
         (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
           callback(null, {});
-        }
+        },
       );
 
       const response = await dispatchToRouter(profileRouter, {
-        method: "DELETE",
-        url: "/friends/friend-123",
+        method: 'DELETE',
+        url: '/friends/friend-123',
         auth,
       });
 
@@ -271,40 +271,42 @@ describe("Profile Routes", () => {
     });
   });
 
-  describe("POST /api/nicknames", () => {
-    it("should batch lookup nicknames", async () => {
+  describe('POST /api/nicknames', () => {
+    it('should batch lookup nicknames', async () => {
       const mockNicknames = [
-        { user_id: "user-1", nickname: "User1" },
-        { user_id: "user-2", nickname: "User2" },
+        { user_id: 'user-1', nickname: 'User1' },
+        { user_id: 'user-2', nickname: 'User2' },
       ];
 
       vi.mocked(playerClient.GetNicknames).mockImplementation(
         (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
           callback(null, { nicknames: mockNicknames });
-        }
+        },
       );
 
       const response = await dispatchToRouter(profileRouter, {
-        method: "POST",
-        url: "/nicknames",
+        method: 'POST',
+        url: '/nicknames',
         auth,
-        body: { userIds: ["user-1", "user-2"] },
+        body: { userIds: ['user-1', 'user-2'] },
       });
 
       expect(response.statusCode).toBe(200);
       expect(response.body).toEqual(expect.objectContaining({ nicknames: mockNicknames }));
     });
 
-    it("should return error when userIds is missing", async () => {
+    it('should return error when userIds is missing', async () => {
       const response = await dispatchToRouter(profileRouter, {
-        method: "POST",
-        url: "/nicknames",
+        method: 'POST',
+        url: '/nicknames',
         auth,
         body: {},
       });
 
       expect(response.statusCode).toBe(400);
-      expect(response.body).toEqual(expect.objectContaining({ error: "userIds array is required" }));
+      expect(response.body).toEqual(
+        expect.objectContaining({ error: 'userIds array is required' }),
+      );
     });
   });
 });

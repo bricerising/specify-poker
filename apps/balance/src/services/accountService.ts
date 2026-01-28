@@ -1,37 +1,35 @@
-import { randomUUID } from "crypto";
-import {
+import { randomUUID } from 'crypto';
+import type {
   Account,
   BalanceInfo,
   CashOutResult,
   Transaction,
   TransactionType,
   TransactionMetadata,
-} from "../domain/types";
-import { nowIso } from "../utils/time";
+} from '../domain/types';
+import { nowIso } from '../utils/time';
 import {
   ensureAccount as storeEnsureAccount,
   getAccount,
   updateAccountWithVersion,
-} from "../storage/accountStore";
-import { saveTransaction } from "../storage/transactionStore";
-import { appendLedgerEntry } from "../storage/ledgerStore";
-import { getActiveReservationsByAccount } from "../storage/reservationStore";
-import { recordAccountDelta } from "../observability/metrics";
-import { withIdempotentResponse } from "../utils/idempotency";
+} from '../storage/accountStore';
+import { saveTransaction } from '../storage/transactionStore';
+import { appendLedgerEntry } from '../storage/ledgerStore';
+import { getActiveReservationsByAccount } from '../storage/reservationStore';
+import { recordAccountDelta } from '../observability/metrics';
+import { withIdempotentResponse } from '../utils/idempotency';
 
-type TransactionResult =
-  | { ok: true; transaction: Transaction }
-  | { ok: false; error: string };
+type TransactionResult = { ok: true; transaction: Transaction } | { ok: false; error: string };
 
 async function updateBalanceWithRetry(
   accountId: string,
   updater: (current: Account) => Account,
-  options: { maxRetries?: number; validate?: (current: Account) => Promise<string | null> } = {}
+  options: { maxRetries?: number; validate?: (current: Account) => Promise<string | null> } = {},
 ): Promise<{ ok: true; account: Account } | { ok: false; error: string }> {
   const { maxRetries = 10, validate } = options;
   let current = await getAccount(accountId);
   if (!current) {
-    return { ok: false, error: "ACCOUNT_NOT_FOUND" };
+    return { ok: false, error: 'ACCOUNT_NOT_FOUND' };
   }
 
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
@@ -46,26 +44,26 @@ async function updateBalanceWithRetry(
     if (updated.ok && updated.account) {
       return { ok: true, account: updated.account };
     }
-    if (updated.error !== "VERSION_CONFLICT") {
-      return { ok: false, error: updated.error ?? "UPDATE_FAILED" };
+    if (updated.error !== 'VERSION_CONFLICT') {
+      return { ok: false, error: updated.error ?? 'UPDATE_FAILED' };
     }
     current = await getAccount(accountId);
     if (!current) {
-      return { ok: false, error: "ACCOUNT_NOT_FOUND" };
+      return { ok: false, error: 'ACCOUNT_NOT_FOUND' };
     }
   }
 
-  return { ok: false, error: "VERSION_CONFLICT" };
+  return { ok: false, error: 'VERSION_CONFLICT' };
 }
 
 function resolveDepositType(source: string): TransactionType {
-  if (source === "BONUS") {
-    return "BONUS";
+  if (source === 'BONUS') {
+    return 'BONUS';
   }
-  if (source === "REFERRAL") {
-    return "REFERRAL";
+  if (source === 'REFERRAL') {
+    return 'REFERRAL';
   }
-  return "DEPOSIT";
+  return 'DEPOSIT';
 }
 
 export async function getBalance(accountId: string): Promise<BalanceInfo | null> {
@@ -88,7 +86,7 @@ export async function getBalance(accountId: string): Promise<BalanceInfo | null>
 
 export async function ensureAccount(
   accountId: string,
-  initialBalance: number = 0
+  initialBalance: number = 0,
 ): Promise<{ account: Account; created: boolean }> {
   return storeEnsureAccount(accountId, initialBalance);
 }
@@ -98,16 +96,16 @@ export async function creditBalance(
   amount: number,
   type: TransactionType,
   idempotencyKey: string,
-  metadata: TransactionMetadata = {}
+  metadata: TransactionMetadata = {},
 ): Promise<TransactionResult> {
   if (amount <= 0) {
-    return { ok: false, error: "INVALID_AMOUNT" };
+    return { ok: false, error: 'INVALID_AMOUNT' };
   }
 
   return withIdempotentResponse(idempotencyKey, async () => {
     const account = await getAccount(accountId);
     if (!account) {
-      return { ok: false, error: "ACCOUNT_NOT_FOUND" };
+      return { ok: false, error: 'ACCOUNT_NOT_FOUND' };
     }
 
     const transaction: Transaction = {
@@ -119,7 +117,7 @@ export async function creditBalance(
       balanceBefore: account.balance,
       balanceAfter: account.balance + amount,
       metadata,
-      status: "PENDING",
+      status: 'PENDING',
       createdAt: nowIso(),
       completedAt: null,
     };
@@ -135,12 +133,12 @@ export async function creditBalance(
     }
 
     // Mark transaction complete
-    transaction.status = "COMPLETED";
+    transaction.status = 'COMPLETED';
     transaction.completedAt = nowIso();
     transaction.balanceAfter = updated.account.balance;
     transaction.balanceBefore = updated.account.balance - amount;
     await saveTransaction(transaction);
-    recordAccountDelta(type, "credit", amount);
+    recordAccountDelta(type, 'credit', amount);
 
     // Append to ledger
     await appendLedgerEntry({
@@ -165,10 +163,10 @@ export async function debitBalance(
   type: TransactionType,
   idempotencyKey: string,
   metadata: TransactionMetadata = {},
-  options: { useAvailableBalance?: boolean } = {}
+  options: { useAvailableBalance?: boolean } = {},
 ): Promise<TransactionResult> {
   if (amount <= 0) {
-    return { ok: false, error: "INVALID_AMOUNT" };
+    return { ok: false, error: 'INVALID_AMOUNT' };
   }
 
   return withIdempotentResponse(idempotencyKey, async () => {
@@ -183,7 +181,7 @@ export async function debitBalance(
       balanceBefore: 0,
       balanceAfter: 0,
       metadata,
-      status: "PENDING",
+      status: 'PENDING',
       createdAt: nowIso(),
       completedAt: null,
     };
@@ -199,11 +197,11 @@ export async function debitBalance(
           if (useAvailableBalance) {
             const activeReservations = await getActiveReservationsByAccount(accountId);
             const reservedAmount = activeReservations.reduce((sum, r) => sum + r.amount, 0);
-            return current.balance - reservedAmount < amount ? "INSUFFICIENT_BALANCE" : null;
+            return current.balance - reservedAmount < amount ? 'INSUFFICIENT_BALANCE' : null;
           }
-          return current.balance < amount ? "INSUFFICIENT_BALANCE" : null;
+          return current.balance < amount ? 'INSUFFICIENT_BALANCE' : null;
         },
-      }
+      },
     );
 
     if (!updated.ok) {
@@ -211,12 +209,12 @@ export async function debitBalance(
     }
 
     // Mark transaction complete
-    transaction.status = "COMPLETED";
+    transaction.status = 'COMPLETED';
     transaction.completedAt = nowIso();
     transaction.balanceAfter = updated.account.balance;
     transaction.balanceBefore = updated.account.balance + amount;
     await saveTransaction(transaction);
-    recordAccountDelta(type, "debit", amount);
+    recordAccountDelta(type, 'debit', amount);
 
     // Append to ledger
     await appendLedgerEntry({
@@ -241,9 +239,9 @@ export async function processCashOut(
   seatId: number,
   amount: number,
   idempotencyKey: string,
-  handId?: string
+  handId?: string,
 ): Promise<CashOutResult> {
-  const result = await creditBalance(accountId, amount, "CASH_OUT", idempotencyKey, {
+  const result = await creditBalance(accountId, amount, 'CASH_OUT', idempotencyKey, {
     tableId,
     seatId,
     handId,
@@ -264,7 +262,7 @@ export async function processDeposit(
   accountId: string,
   amount: number,
   source: string,
-  idempotencyKey: string
+  idempotencyKey: string,
 ): Promise<TransactionResult> {
   // Ensure account exists
   await ensureAccount(accountId);
@@ -276,7 +274,7 @@ export async function processWithdrawal(
   accountId: string,
   amount: number,
   idempotencyKey: string,
-  reason?: string
+  reason?: string,
 ): Promise<TransactionResult> {
-  return debitBalance(accountId, amount, "WITHDRAW", idempotencyKey, { reason });
+  return debitBalance(accountId, amount, 'WITHDRAW', idempotencyKey, { reason });
 }

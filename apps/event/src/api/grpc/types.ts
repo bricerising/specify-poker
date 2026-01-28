@@ -1,8 +1,8 @@
-import * as grpc from "@grpc/grpc-js";
+import type * as grpc from '@grpc/grpc-js';
 
 export type GrpcHandler<Req, Res> = (
   call: grpc.ServerUnaryCall<Req, Res>,
-  callback: grpc.sendUnaryData<Res>
+  callback: grpc.sendUnaryData<Res>,
 ) => Promise<void>;
 
 export interface PublishEventRequest {

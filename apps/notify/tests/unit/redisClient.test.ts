@@ -38,7 +38,7 @@ describe('redisClient', () => {
     await getRedisClient();
     await closeRedisClient();
     expect(createClient).toHaveBeenCalledTimes(1);
-    // Since we cleared mocks and closeRedisClient sets client to null, 
+    // Since we cleared mocks and closeRedisClient sets client to null,
     // we can check if it creates a new one next time
     await getRedisClient();
     expect(createClient).toHaveBeenCalledTimes(2);

@@ -1,10 +1,10 @@
-import { apiFetch } from "./apiClient";
-import { registerPushSubscription } from "./pushClient";
-import { asRecord, readTrimmedString } from "../utils/unknown";
+import { apiFetch } from './apiClient';
+import { registerPushSubscription } from './pushClient';
+import { asRecord, readTrimmedString } from '../utils/unknown';
 
 function urlBase64ToUint8Array(base64String: string) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = atob(base64);
   const outputArray = new Uint8Array(rawData.length);
   for (let i = 0; i < rawData.length; i += 1) {
@@ -14,19 +14,23 @@ function urlBase64ToUint8Array(base64String: string) {
 }
 
 export async function ensurePushSubscription() {
-  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+  if (
+    !('serviceWorker' in navigator) ||
+    !('PushManager' in window) ||
+    !('Notification' in window)
+  ) {
     return;
   }
 
   const permission = await Notification.requestPermission();
-  if (permission !== "granted") {
+  if (permission !== 'granted') {
     return;
   }
 
-  const registration = await navigator.serviceWorker.register("/sw.js");
+  const registration = await navigator.serviceWorker.register('/sw.js');
   let subscription = await registration.pushManager.getSubscription();
   if (!subscription) {
-    const response = await apiFetch("/api/push/vapid");
+    const response = await apiFetch('/api/push/vapid');
     const payload = asRecord(await response.json());
     const publicKey = readTrimmedString(payload?.publicKey);
     if (!publicKey) {

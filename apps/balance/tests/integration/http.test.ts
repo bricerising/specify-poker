@@ -1,17 +1,17 @@
-import { describe, expect, it, beforeEach } from "vitest";
-import type { Router } from "express";
+import { describe, expect, it, beforeEach } from 'vitest';
+import type { Router } from 'express';
 
-import app from "../../src/api/http/router";
-import { resetAccounts } from "../../src/storage/accountStore";
-import { resetTransactions } from "../../src/storage/transactionStore";
-import { resetIdempotency } from "../../src/storage/idempotencyStore";
-import { resetLedger } from "../../src/storage/ledgerStore";
-import { dispatchToRouter } from "../helpers/express";
+import app from '../../src/api/http/router';
+import { resetAccounts } from '../../src/storage/accountStore';
+import { resetTransactions } from '../../src/storage/transactionStore';
+import { resetIdempotency } from '../../src/storage/idempotencyStore';
+import { resetLedger } from '../../src/storage/ledgerStore';
+import { dispatchToRouter } from '../helpers/express';
 
 type ApiResponse = { status: number; body: unknown };
 
 function splitUrl(url: string): { path: string; query: Record<string, unknown> } {
-  const [path, search] = url.split("?");
+  const [path, search] = url.split('?');
   const query: Record<string, unknown> = {};
   if (search) {
     const params = new URLSearchParams(search);
@@ -64,12 +64,12 @@ class RequestBuilder implements PromiseLike<ApiResponse> {
 
 function request(router: Router) {
   return {
-    get: (url: string) => new RequestBuilder(router, "GET", url),
-    post: (url: string) => new RequestBuilder(router, "POST", url),
+    get: (url: string) => new RequestBuilder(router, 'GET', url),
+    post: (url: string) => new RequestBuilder(router, 'POST', url),
   };
 }
 
-describe("Balance Service HTTP API", () => {
+describe('Balance Service HTTP API', () => {
   beforeEach(async () => {
     await resetAccounts();
     await resetTransactions();
@@ -77,21 +77,21 @@ describe("Balance Service HTTP API", () => {
     await resetLedger();
   });
 
-  describe("Health Endpoints", () => {
-    describe("GET /api/health", () => {
-      it("returns health status", async () => {
-        const response = await request(app).get("/api/health");
+  describe('Health Endpoints', () => {
+    describe('GET /api/health', () => {
+      it('returns health status', async () => {
+        const response = await request(app).get('/api/health');
 
         expect(response.status).toBe(200);
         expect(response.body.status).toMatch(/healthy|degraded/);
         expect(response.body.timestamp).toBeDefined();
-        expect(typeof response.body.redis).toBe("boolean");
+        expect(typeof response.body.redis).toBe('boolean');
       });
     });
 
-    describe("GET /api/ready", () => {
-      it("returns ready status", async () => {
-        const response = await request(app).get("/api/ready");
+    describe('GET /api/ready', () => {
+      it('returns ready status', async () => {
+        const response = await request(app).get('/api/ready');
 
         expect(response.status).toBe(200);
         expect(response.body.ready).toBe(true);
@@ -99,46 +99,42 @@ describe("Balance Service HTTP API", () => {
     });
   });
 
-  describe("Account Endpoints", () => {
-    describe("GET /api/accounts/:accountId/balance", () => {
-      it("returns 404 for non-existent account", async () => {
-        const response = await request(app).get("/api/accounts/unknown/balance");
+  describe('Account Endpoints', () => {
+    describe('GET /api/accounts/:accountId/balance', () => {
+      it('returns 404 for non-existent account', async () => {
+        const response = await request(app).get('/api/accounts/unknown/balance');
 
         expect(response.status).toBe(404);
-        expect(response.body.error).toBe("ACCOUNT_NOT_FOUND");
+        expect(response.body.error).toBe('ACCOUNT_NOT_FOUND');
       });
 
-      it("returns balance for existing account", async () => {
+      it('returns balance for existing account', async () => {
         // First create the account
-        await request(app)
-          .post("/api/accounts/user-123")
-          .send({ initialBalance: 1000 });
+        await request(app).post('/api/accounts/user-123').send({ initialBalance: 1000 });
 
-        const response = await request(app).get("/api/accounts/user-123/balance");
+        const response = await request(app).get('/api/accounts/user-123/balance');
 
         expect(response.status).toBe(200);
-        expect(response.body.accountId).toBe("user-123");
+        expect(response.body.accountId).toBe('user-123');
         expect(response.body.balance).toBe(1000);
-        expect(response.body.currency).toBe("CHIPS");
+        expect(response.body.currency).toBe('CHIPS');
       });
     });
 
-    describe("POST /api/accounts/:accountId", () => {
-      it("creates new account with default balance", async () => {
-        const response = await request(app)
-          .post("/api/accounts/new-user")
-          .send({});
+    describe('POST /api/accounts/:accountId', () => {
+      it('creates new account with default balance', async () => {
+        const response = await request(app).post('/api/accounts/new-user').send({});
 
         expect(response.status).toBe(201);
-        expect(response.body.accountId).toBe("new-user");
+        expect(response.body.accountId).toBe('new-user');
         expect(response.body.balance).toBe(0);
-        expect(response.body.currency).toBe("CHIPS");
+        expect(response.body.currency).toBe('CHIPS');
         expect(response.body.created).toBe(true);
       });
 
-      it("creates account with initial balance", async () => {
+      it('creates account with initial balance', async () => {
         const response = await request(app)
-          .post("/api/accounts/funded-user")
+          .post('/api/accounts/funded-user')
           .send({ initialBalance: 5000 });
 
         expect(response.status).toBe(201);
@@ -146,15 +142,13 @@ describe("Balance Service HTTP API", () => {
         expect(response.body.created).toBe(true);
       });
 
-      it("returns existing account without modification", async () => {
+      it('returns existing account without modification', async () => {
         // Create account
-        await request(app)
-          .post("/api/accounts/existing-user")
-          .send({ initialBalance: 1000 });
+        await request(app).post('/api/accounts/existing-user').send({ initialBalance: 1000 });
 
         // Try to create again with different balance
         const response = await request(app)
-          .post("/api/accounts/existing-user")
+          .post('/api/accounts/existing-user')
           .send({ initialBalance: 9999 });
 
         expect(response.status).toBe(200);
@@ -163,156 +157,152 @@ describe("Balance Service HTTP API", () => {
       });
     });
 
-    describe("POST /api/accounts/:accountId/deposit", () => {
+    describe('POST /api/accounts/:accountId/deposit', () => {
       beforeEach(async () => {
-        await request(app)
-          .post("/api/accounts/depositor")
-          .send({ initialBalance: 0 });
+        await request(app).post('/api/accounts/depositor').send({ initialBalance: 0 });
       });
 
-      it("requires idempotency key", async () => {
+      it('requires idempotency key', async () => {
         const response = await request(app)
-          .post("/api/accounts/depositor/deposit")
-          .send({ amount: 100, source: "PURCHASE" });
+          .post('/api/accounts/depositor/deposit')
+          .send({ amount: 100, source: 'PURCHASE' });
 
         expect(response.status).toBe(400);
-        expect(response.body.error).toBe("MISSING_IDEMPOTENCY_KEY");
+        expect(response.body.error).toBe('MISSING_IDEMPOTENCY_KEY');
       });
 
-      it("requires positive amount", async () => {
+      it('requires positive amount', async () => {
         const response = await request(app)
-          .post("/api/accounts/depositor/deposit")
-          .set("Idempotency-Key", "key-1")
-          .send({ amount: -100, source: "PURCHASE" });
+          .post('/api/accounts/depositor/deposit')
+          .set('Idempotency-Key', 'key-1')
+          .send({ amount: -100, source: 'PURCHASE' });
 
         expect(response.status).toBe(400);
-        expect(response.body.error).toBe("INVALID_AMOUNT");
+        expect(response.body.error).toBe('INVALID_AMOUNT');
       });
 
-      it("requires source", async () => {
+      it('requires source', async () => {
         const response = await request(app)
-          .post("/api/accounts/depositor/deposit")
-          .set("Idempotency-Key", "key-2")
+          .post('/api/accounts/depositor/deposit')
+          .set('Idempotency-Key', 'key-2')
           .send({ amount: 100 });
 
         expect(response.status).toBe(400);
-        expect(response.body.error).toBe("MISSING_SOURCE");
+        expect(response.body.error).toBe('MISSING_SOURCE');
       });
 
-      it("successfully deposits chips", async () => {
+      it('successfully deposits chips', async () => {
         const response = await request(app)
-          .post("/api/accounts/depositor/deposit")
-          .set("Idempotency-Key", "deposit-key-1")
-          .send({ amount: 500, source: "PURCHASE" });
+          .post('/api/accounts/depositor/deposit')
+          .set('Idempotency-Key', 'deposit-key-1')
+          .send({ amount: 500, source: 'PURCHASE' });
 
         expect(response.status).toBe(200);
-        expect(response.body.type).toBe("DEPOSIT");
+        expect(response.body.type).toBe('DEPOSIT');
         expect(response.body.amount).toBe(500);
         expect(response.body.balanceBefore).toBe(0);
         expect(response.body.balanceAfter).toBe(500);
-        expect(response.body.status).toBe("COMPLETED");
+        expect(response.body.status).toBe('COMPLETED');
       });
 
-      it("handles idempotent deposits", async () => {
-        const key = "idempotent-deposit";
+      it('handles idempotent deposits', async () => {
+        const key = 'idempotent-deposit';
 
         const response1 = await request(app)
-          .post("/api/accounts/depositor/deposit")
-          .set("Idempotency-Key", key)
-          .send({ amount: 1000, source: "BONUS" });
+          .post('/api/accounts/depositor/deposit')
+          .set('Idempotency-Key', key)
+          .send({ amount: 1000, source: 'BONUS' });
 
         const response2 = await request(app)
-          .post("/api/accounts/depositor/deposit")
-          .set("Idempotency-Key", key)
-          .send({ amount: 1000, source: "BONUS" });
+          .post('/api/accounts/depositor/deposit')
+          .set('Idempotency-Key', key)
+          .send({ amount: 1000, source: 'BONUS' });
 
         expect(response1.status).toBe(200);
         expect(response2.status).toBe(200);
         expect(response1.body.transactionId).toBe(response2.body.transactionId);
 
         // Verify balance only increased once
-        const balanceResponse = await request(app).get("/api/accounts/depositor/balance");
+        const balanceResponse = await request(app).get('/api/accounts/depositor/balance');
         expect(balanceResponse.body.balance).toBe(1000);
       });
 
-      it("creates account if not exists during deposit", async () => {
+      it('creates account if not exists during deposit', async () => {
         const response = await request(app)
-          .post("/api/accounts/auto-created/deposit")
-          .set("Idempotency-Key", "auto-create-key")
-          .send({ amount: 100, source: "FREEROLL" });
+          .post('/api/accounts/auto-created/deposit')
+          .set('Idempotency-Key', 'auto-create-key')
+          .send({ amount: 100, source: 'FREEROLL' });
 
         expect(response.status).toBe(200);
         expect(response.body.balanceAfter).toBe(100);
       });
     });
 
-    describe("POST /api/accounts/:accountId/withdraw", () => {
+    describe('POST /api/accounts/:accountId/withdraw', () => {
       beforeEach(async () => {
         // Create account with funds
-        await request(app)
-          .post("/api/accounts/withdrawer")
-          .send({ initialBalance: 0 });
+        await request(app).post('/api/accounts/withdrawer').send({ initialBalance: 0 });
 
         await request(app)
-          .post("/api/accounts/withdrawer/deposit")
-          .set("Idempotency-Key", "setup-deposit")
-          .send({ amount: 1000, source: "PURCHASE" });
+          .post('/api/accounts/withdrawer/deposit')
+          .set('Idempotency-Key', 'setup-deposit')
+          .send({ amount: 1000, source: 'PURCHASE' });
       });
 
-      it("requires idempotency key", async () => {
+      it('requires idempotency key', async () => {
         const response = await request(app)
-          .post("/api/accounts/withdrawer/withdraw")
+          .post('/api/accounts/withdrawer/withdraw')
           .send({ amount: 100 });
 
         expect(response.status).toBe(400);
-        expect(response.body.error).toBe("MISSING_IDEMPOTENCY_KEY");
+        expect(response.body.error).toBe('MISSING_IDEMPOTENCY_KEY');
       });
 
-      it("requires positive amount", async () => {
+      it('requires positive amount', async () => {
         const response = await request(app)
-          .post("/api/accounts/withdrawer/withdraw")
-          .set("Idempotency-Key", "key-w1")
+          .post('/api/accounts/withdrawer/withdraw')
+          .set('Idempotency-Key', 'key-w1')
           .send({ amount: 0 });
 
         expect(response.status).toBe(400);
-        expect(response.body.error).toBe("INVALID_AMOUNT");
+        expect(response.body.error).toBe('INVALID_AMOUNT');
       });
 
-      it("successfully withdraws chips", async () => {
+      it('successfully withdraws chips', async () => {
         const response = await request(app)
-          .post("/api/accounts/withdrawer/withdraw")
-          .set("Idempotency-Key", "withdraw-key-1")
-          .send({ amount: 300, reason: "cashout" });
+          .post('/api/accounts/withdrawer/withdraw')
+          .set('Idempotency-Key', 'withdraw-key-1')
+          .send({ amount: 300, reason: 'cashout' });
 
         expect(response.status).toBe(200);
-        expect(response.body.type).toBe("WITHDRAW");
+        expect(response.body.type).toBe('WITHDRAW');
         expect(response.body.amount).toBe(300);
         expect(response.body.balanceBefore).toBe(1000);
         expect(response.body.balanceAfter).toBe(700);
-        expect(response.body.status).toBe("COMPLETED");
+        expect(response.body.status).toBe('COMPLETED');
       });
 
-      it("rejects withdrawal exceeding balance", async () => {
+      it('rejects withdrawal exceeding balance', async () => {
         const response = await request(app)
-          .post("/api/accounts/withdrawer/withdraw")
-          .set("Idempotency-Key", "exceed-key")
+          .post('/api/accounts/withdrawer/withdraw')
+          .set('Idempotency-Key', 'exceed-key')
           .send({ amount: 2000 });
 
         expect(response.status).toBe(400);
-        expect(response.body.error).toBe("INSUFFICIENT_BALANCE");
+        expect(response.body.error).toBe('INSUFFICIENT_BALANCE');
       });
 
-      it("handles idempotent withdrawals", async () => {
-        const key = "idempotent-withdraw";
+      it('handles idempotent withdrawals', async () => {
+        const key = 'idempotent-withdraw';
 
         const response1 = await request(app)
-          .post("/api/accounts/withdrawer/withdraw")
-          .set("Idempotency-Key", key)
+          .post('/api/accounts/withdrawer/withdraw')
+          .set('Idempotency-Key', key)
           .send({ amount: 500 });
 
         const response2 = await request(app)
-          .post("/api/accounts/withdrawer/withdraw")
-          .set("Idempotency-Key", key)
+          .post('/api/accounts/withdrawer/withdraw')
+          .set('Idempotency-Key', key)
           .send({ amount: 500 });
 
         expect(response1.status).toBe(200);
@@ -320,45 +310,45 @@ describe("Balance Service HTTP API", () => {
         expect(response1.body.transactionId).toBe(response2.body.transactionId);
 
         // Verify balance only decreased once
-        const balanceResponse = await request(app).get("/api/accounts/withdrawer/balance");
+        const balanceResponse = await request(app).get('/api/accounts/withdrawer/balance');
         expect(balanceResponse.body.balance).toBe(500);
       });
     });
 
-    describe("GET /api/accounts/:accountId/transactions", () => {
+    describe('GET /api/accounts/:accountId/transactions', () => {
       beforeEach(async () => {
         // Create account with multiple transactions
-        await request(app)
-          .post("/api/accounts/history-user")
-          .send({});
+        await request(app).post('/api/accounts/history-user').send({});
 
         // Multiple deposits
         await request(app)
-          .post("/api/accounts/history-user/deposit")
-          .set("Idempotency-Key", "hist-dep-1")
-          .send({ amount: 100, source: "PURCHASE" });
+          .post('/api/accounts/history-user/deposit')
+          .set('Idempotency-Key', 'hist-dep-1')
+          .send({ amount: 100, source: 'PURCHASE' });
 
         await request(app)
-          .post("/api/accounts/history-user/deposit")
-          .set("Idempotency-Key", "hist-dep-2")
-          .send({ amount: 200, source: "BONUS" });
+          .post('/api/accounts/history-user/deposit')
+          .set('Idempotency-Key', 'hist-dep-2')
+          .send({ amount: 200, source: 'BONUS' });
 
         await request(app)
-          .post("/api/accounts/history-user/withdraw")
-          .set("Idempotency-Key", "hist-wit-1")
+          .post('/api/accounts/history-user/withdraw')
+          .set('Idempotency-Key', 'hist-wit-1')
           .send({ amount: 50 });
       });
 
-      it("returns transaction history", async () => {
-        const response = await request(app).get("/api/accounts/history-user/transactions");
+      it('returns transaction history', async () => {
+        const response = await request(app).get('/api/accounts/history-user/transactions');
 
         expect(response.status).toBe(200);
         expect(response.body.transactions).toHaveLength(3);
         expect(response.body.total).toBe(3);
       });
 
-      it("supports pagination", async () => {
-        const response = await request(app).get("/api/accounts/history-user/transactions?limit=2&offset=0");
+      it('supports pagination', async () => {
+        const response = await request(app).get(
+          '/api/accounts/history-user/transactions?limit=2&offset=0',
+        );
 
         expect(response.status).toBe(200);
         expect(response.body.transactions).toHaveLength(2);
@@ -366,44 +356,44 @@ describe("Balance Service HTTP API", () => {
         expect(response.body.offset).toBe(0);
       });
 
-      it("filters by transaction type", async () => {
-        const response = await request(app).get("/api/accounts/history-user/transactions?type=DEPOSIT");
+      it('filters by transaction type', async () => {
+        const response = await request(app).get(
+          '/api/accounts/history-user/transactions?type=DEPOSIT',
+        );
 
         expect(response.status).toBe(200);
-        expect(response.body.transactions.every((tx: { type: string }) => tx.type === "DEPOSIT")).toBe(true);
+        expect(
+          response.body.transactions.every((tx: { type: string }) => tx.type === 'DEPOSIT'),
+        ).toBe(true);
       });
 
-      it("returns empty list for new account", async () => {
-        await request(app)
-          .post("/api/accounts/empty-history")
-          .send({});
+      it('returns empty list for new account', async () => {
+        await request(app).post('/api/accounts/empty-history').send({});
 
-        const response = await request(app).get("/api/accounts/empty-history/transactions");
+        const response = await request(app).get('/api/accounts/empty-history/transactions');
 
         expect(response.status).toBe(200);
         expect(response.body.transactions).toHaveLength(0);
       });
     });
 
-    describe("GET /api/accounts/:accountId/ledger", () => {
+    describe('GET /api/accounts/:accountId/ledger', () => {
       beforeEach(async () => {
-        await request(app)
-          .post("/api/accounts/ledger-user")
-          .send({});
+        await request(app).post('/api/accounts/ledger-user').send({});
 
         await request(app)
-          .post("/api/accounts/ledger-user/deposit")
-          .set("Idempotency-Key", "ledger-dep-1")
-          .send({ amount: 1000, source: "PURCHASE" });
+          .post('/api/accounts/ledger-user/deposit')
+          .set('Idempotency-Key', 'ledger-dep-1')
+          .send({ amount: 1000, source: 'PURCHASE' });
 
         await request(app)
-          .post("/api/accounts/ledger-user/withdraw")
-          .set("Idempotency-Key", "ledger-wit-1")
+          .post('/api/accounts/ledger-user/withdraw')
+          .set('Idempotency-Key', 'ledger-wit-1')
           .send({ amount: 100 });
       });
 
-      it("returns ledger entries", async () => {
-        const response = await request(app).get("/api/accounts/ledger-user/ledger");
+      it('returns ledger entries', async () => {
+        const response = await request(app).get('/api/accounts/ledger-user/ledger');
 
         expect(response.status).toBe(200);
         expect(response.body.entries).toBeDefined();
@@ -411,26 +401,24 @@ describe("Balance Service HTTP API", () => {
         expect(response.body.total).toBeGreaterThan(0);
       });
 
-      it("returns latest checksum for audit", async () => {
-        const response = await request(app).get("/api/accounts/ledger-user/ledger");
+      it('returns latest checksum for audit', async () => {
+        const response = await request(app).get('/api/accounts/ledger-user/ledger');
 
         expect(response.status).toBe(200);
         // Checksum may or may not be set depending on implementation
-        expect(response.body).toHaveProperty("latestChecksum");
+        expect(response.body).toHaveProperty('latestChecksum');
       });
     });
   });
 
-  describe("Realistic Usage Scenarios", () => {
-    describe("Player session flow", () => {
-      it("handles complete buy-in and cash-out cycle", async () => {
-        const accountId = "player-session-test";
+  describe('Realistic Usage Scenarios', () => {
+    describe('Player session flow', () => {
+      it('handles complete buy-in and cash-out cycle', async () => {
+        const accountId = 'player-session-test';
         const idempBase = `session-${Date.now()}`;
 
         // 1. Player creates account
-        const createResponse = await request(app)
-          .post(`/api/accounts/${accountId}`)
-          .send({});
+        const createResponse = await request(app).post(`/api/accounts/${accountId}`).send({});
 
         expect(createResponse.body.created).toBe(true);
         expect(createResponse.body.balance).toBe(0);
@@ -438,16 +426,16 @@ describe("Balance Service HTTP API", () => {
         // 2. Player purchases chips
         const purchaseResponse = await request(app)
           .post(`/api/accounts/${accountId}/deposit`)
-          .set("Idempotency-Key", `${idempBase}-purchase`)
-          .send({ amount: 10000, source: "PURCHASE" });
+          .set('Idempotency-Key', `${idempBase}-purchase`)
+          .send({ amount: 10000, source: 'PURCHASE' });
 
         expect(purchaseResponse.body.balanceAfter).toBe(10000);
 
         // 3. Player gets bonus
         const bonusResponse = await request(app)
           .post(`/api/accounts/${accountId}/deposit`)
-          .set("Idempotency-Key", `${idempBase}-bonus`)
-          .send({ amount: 500, source: "BONUS" });
+          .set('Idempotency-Key', `${idempBase}-bonus`)
+          .send({ amount: 500, source: 'BONUS' });
 
         expect(bonusResponse.body.balanceAfter).toBe(10500);
 
@@ -458,8 +446,8 @@ describe("Balance Service HTTP API", () => {
         // 5. Player cashes out most chips
         const cashoutResponse = await request(app)
           .post(`/api/accounts/${accountId}/withdraw`)
-          .set("Idempotency-Key", `${idempBase}-cashout`)
-          .send({ amount: 10000, reason: "cashout_request" });
+          .set('Idempotency-Key', `${idempBase}-cashout`)
+          .send({ amount: 10000, reason: 'cashout_request' });
 
         expect(cashoutResponse.body.balanceAfter).toBe(500);
 
@@ -473,21 +461,19 @@ describe("Balance Service HTTP API", () => {
       });
     });
 
-    describe("Concurrent request handling", () => {
-      it("handles simultaneous deposits with idempotency", async () => {
-        const accountId = "concurrent-test";
+    describe('Concurrent request handling', () => {
+      it('handles simultaneous deposits with idempotency', async () => {
+        const accountId = 'concurrent-test';
         const idempotencyKey = `concurrent-${Date.now()}`;
 
-        await request(app)
-          .post(`/api/accounts/${accountId}`)
-          .send({});
+        await request(app).post(`/api/accounts/${accountId}`).send({});
 
         // Simulate concurrent requests with same idempotency key
         const requests = Array.from({ length: 5 }, () =>
           request(app)
             .post(`/api/accounts/${accountId}/deposit`)
-            .set("Idempotency-Key", idempotencyKey)
-            .send({ amount: 1000, source: "PURCHASE" })
+            .set('Idempotency-Key', idempotencyKey)
+            .send({ amount: 1000, source: 'PURCHASE' }),
         );
 
         const responses = await Promise.all(requests);
@@ -502,19 +488,17 @@ describe("Balance Service HTTP API", () => {
         expect(balance.body.balance).toBe(1000);
       });
 
-      it("handles multiple unique deposits correctly", async () => {
-        const accountId = "multi-deposit-test";
+      it('handles multiple unique deposits correctly', async () => {
+        const accountId = 'multi-deposit-test';
 
-        await request(app)
-          .post(`/api/accounts/${accountId}`)
-          .send({});
+        await request(app).post(`/api/accounts/${accountId}`).send({});
 
         // Multiple unique deposits
         const depositPromises = Array.from({ length: 5 }, (_, i) =>
           request(app)
             .post(`/api/accounts/${accountId}/deposit`)
-            .set("Idempotency-Key", `unique-deposit-${i}`)
-            .send({ amount: 100, source: "PURCHASE" })
+            .set('Idempotency-Key', `unique-deposit-${i}`)
+            .send({ amount: 100, source: 'PURCHASE' }),
         );
 
         await Promise.all(depositPromises);
@@ -525,38 +509,36 @@ describe("Balance Service HTTP API", () => {
       });
     });
 
-    describe("Error recovery scenarios", () => {
-      it("handles withdrawal after failed attempt due to insufficient funds", async () => {
-        const accountId = "error-recovery-test";
+    describe('Error recovery scenarios', () => {
+      it('handles withdrawal after failed attempt due to insufficient funds', async () => {
+        const accountId = 'error-recovery-test';
 
-        await request(app)
-          .post(`/api/accounts/${accountId}`)
-          .send({});
+        await request(app).post(`/api/accounts/${accountId}`).send({});
 
         await request(app)
           .post(`/api/accounts/${accountId}/deposit`)
-          .set("Idempotency-Key", "initial-deposit")
-          .send({ amount: 500, source: "PURCHASE" });
+          .set('Idempotency-Key', 'initial-deposit')
+          .send({ amount: 500, source: 'PURCHASE' });
 
         // Try to withdraw too much
         const failedWithdraw = await request(app)
           .post(`/api/accounts/${accountId}/withdraw`)
-          .set("Idempotency-Key", "failed-withdraw")
+          .set('Idempotency-Key', 'failed-withdraw')
           .send({ amount: 1000 });
 
         expect(failedWithdraw.status).toBe(400);
-        expect(failedWithdraw.body.error).toBe("INSUFFICIENT_BALANCE");
+        expect(failedWithdraw.body.error).toBe('INSUFFICIENT_BALANCE');
 
         // Deposit more
         await request(app)
           .post(`/api/accounts/${accountId}/deposit`)
-          .set("Idempotency-Key", "additional-deposit")
-          .send({ amount: 600, source: "PURCHASE" });
+          .set('Idempotency-Key', 'additional-deposit')
+          .send({ amount: 600, source: 'PURCHASE' });
 
         // Now withdraw should succeed with new key
         const successWithdraw = await request(app)
           .post(`/api/accounts/${accountId}/withdraw`)
-          .set("Idempotency-Key", "success-withdraw")
+          .set('Idempotency-Key', 'success-withdraw')
           .send({ amount: 1000 });
 
         expect(successWithdraw.status).toBe(200);
@@ -564,28 +546,26 @@ describe("Balance Service HTTP API", () => {
       });
     });
 
-    describe("Audit trail validation", () => {
-      it("maintains complete audit trail of all operations", async () => {
-        const accountId = "audit-test";
+    describe('Audit trail validation', () => {
+      it('maintains complete audit trail of all operations', async () => {
+        const accountId = 'audit-test';
 
         // Perform various operations
-        await request(app)
-          .post(`/api/accounts/${accountId}`)
-          .send({ initialBalance: 0 });
+        await request(app).post(`/api/accounts/${accountId}`).send({ initialBalance: 0 });
 
         await request(app)
           .post(`/api/accounts/${accountId}/deposit`)
-          .set("Idempotency-Key", "audit-dep-1")
-          .send({ amount: 1000, source: "PURCHASE" });
+          .set('Idempotency-Key', 'audit-dep-1')
+          .send({ amount: 1000, source: 'PURCHASE' });
 
         await request(app)
           .post(`/api/accounts/${accountId}/deposit`)
-          .set("Idempotency-Key", "audit-dep-2")
-          .send({ amount: 500, source: "BONUS" });
+          .set('Idempotency-Key', 'audit-dep-2')
+          .send({ amount: 500, source: 'BONUS' });
 
         await request(app)
           .post(`/api/accounts/${accountId}/withdraw`)
-          .set("Idempotency-Key", "audit-wit-1")
+          .set('Idempotency-Key', 'audit-wit-1')
           .send({ amount: 200 });
 
         // Check ledger has entries for all operations

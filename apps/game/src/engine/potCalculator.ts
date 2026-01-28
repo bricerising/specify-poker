@@ -1,4 +1,4 @@
-import { Pot } from "../domain/types";
+import type { Pot } from '../domain/types';
 
 export function calculatePots(
   contributions: Record<number, number>,

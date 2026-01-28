@@ -1,4 +1,4 @@
-import { Card } from "../domain/types";
+import type { Card } from '../domain/types';
 
 /** Hand strength categories from lowest (0) to highest (8) */
 export enum HandCategory {
@@ -14,15 +14,15 @@ export enum HandCategory {
 }
 
 const RANK_VALUES: Readonly<Record<string, number>> = {
-  "2": 2,
-  "3": 3,
-  "4": 4,
-  "5": 5,
-  "6": 6,
-  "7": 7,
-  "8": 8,
-  "9": 9,
-  "10": 10,
+  '2': 2,
+  '3': 3,
+  '4': 4,
+  '5': 5,
+  '6': 6,
+  '7': 7,
+  '8': 8,
+  '9': 9,
+  '10': 10,
   T: 10,
   J: 11,
   Q: 12,
@@ -181,12 +181,15 @@ export function evaluateBestHand(cards: Card[]): HandRank {
     }
   }
   if (!best) {
-    throw new Error("No hand combos available");
+    throw new Error('No hand combos available');
   }
   return best;
 }
 
-export function evaluateWinners(players: Record<number, Card[]>, communityCards: Card[]): WinnerResult {
+export function evaluateWinners(
+  players: Record<number, Card[]>,
+  communityCards: Card[],
+): WinnerResult {
   let bestRank: HandRank | null = null;
   let winners: number[] = [];
 
@@ -201,7 +204,7 @@ export function evaluateWinners(players: Record<number, Card[]>, communityCards:
   }
 
   if (!bestRank) {
-    throw new Error("No players to evaluate");
+    throw new Error('No players to evaluate');
   }
 
   return { winners, rank: bestRank };

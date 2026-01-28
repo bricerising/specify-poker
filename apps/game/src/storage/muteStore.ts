@@ -1,6 +1,6 @@
-import redisClient from "./redisClient";
+import redisClient from './redisClient';
 
-const MUTE_PREFIX = "game:mutes:";
+const MUTE_PREFIX = 'game:mutes:';
 
 export class MuteStore {
   async mute(tableId: string, userId: string): Promise<void> {

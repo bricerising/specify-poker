@@ -1,10 +1,10 @@
-import { ensureError } from "../errors/ensureError";
+import { ensureError } from '../errors/ensureError';
 
 export type UnaryCall<Req> = { request: Req };
 
 export type UnaryCallback<Res, CallbackError extends Error = Error> = (
   error: CallbackError | null,
-  response?: Res
+  response?: Res,
 ) => void;
 
 export type UnaryContext<Req, _Res, Call extends UnaryCall<Req> = UnaryCall<Req>> = {
@@ -13,21 +13,21 @@ export type UnaryContext<Req, _Res, Call extends UnaryCall<Req> = UnaryCall<Req>
 };
 
 export type RequestHandler<Req, Res, Call extends UnaryCall<Req> = UnaryCall<Req>> = (
-  context: UnaryContext<Req, Res, Call>
+  context: UnaryContext<Req, Res, Call>,
 ) => Promise<Res>;
 
 export type UnaryInterceptor<Req, Res, Call extends UnaryCall<Req> = UnaryCall<Req>> = (
   context: UnaryContext<Req, Res, Call>,
-  next: RequestHandler<Req, Res, Call>
+  next: RequestHandler<Req, Res, Call>,
 ) => Promise<Res>;
 
 export function chainUnaryInterceptors<Req, Res, Call extends UnaryCall<Req>>(
   handler: RequestHandler<Req, Res, Call>,
-  interceptors: ReadonlyArray<UnaryInterceptor<Req, Res, Call>>
+  interceptors: ReadonlyArray<UnaryInterceptor<Req, Res, Call>>,
 ): RequestHandler<Req, Res, Call> {
   return interceptors.reduceRight<RequestHandler<Req, Res, Call>>(
     (next, interceptor) => (context) => interceptor(context, next),
-    handler
+    handler,
   );
 }
 
@@ -49,18 +49,18 @@ export function withUnaryHooks<Req, Res, Call extends UnaryCall<Req>>(hooks?: {
 
 export function withUnaryTiming<Req, Res, Call extends UnaryCall<Req>>(options: {
   method: string;
-  record: (method: string, status: "ok" | "error", durationMs: number) => void;
-  statusFromResponse?: (response: Res) => "ok" | "error";
+  record: (method: string, status: 'ok' | 'error', durationMs: number) => void;
+  statusFromResponse?: (response: Res) => 'ok' | 'error';
 }): UnaryInterceptor<Req, Res, Call> {
   return async (context, next) => {
     const startedAt = Date.now();
     try {
       const response = await next(context);
-      const status = options.statusFromResponse?.(response) ?? "ok";
+      const status = options.statusFromResponse?.(response) ?? 'ok';
       options.record(options.method, status, Date.now() - startedAt);
       return response;
     } catch (error: unknown) {
-      options.record(options.method, "error", Date.now() - startedAt);
+      options.record(options.method, 'error', Date.now() - startedAt);
       throw error;
     }
   };
@@ -79,7 +79,10 @@ export function withUnaryErrorHandling<Req, Res, Call extends UnaryCall<Req>>(op
     } catch (error: unknown) {
       const shouldLog = options.shouldLog?.(error) ?? true;
       if (shouldLog) {
-        options.logger?.error?.({ err: ensureError(error) }, options.message ?? `${options.method} failed`);
+        options.logger?.error?.(
+          { err: ensureError(error) },
+          options.message ?? `${options.method} failed`,
+        );
       }
       throw options.toServiceError(error);
     }
@@ -112,7 +115,8 @@ export function createUnaryHandler<
 }): (call: Call, callback: UnaryCallback<Res, CallbackError>) => Promise<void> {
   const baseHandler: RequestHandler<Req, Res, Call> = async (context) => options.handler(context);
   const handleRequest = chainUnaryInterceptors(baseHandler, options.interceptors ?? []);
-  const toCallbackError = options.toCallbackError ?? ((error) => ensureError(error) as CallbackError);
+  const toCallbackError =
+    options.toCallbackError ?? ((error) => ensureError(error) as CallbackError);
 
   return async (call, callback) => {
     try {

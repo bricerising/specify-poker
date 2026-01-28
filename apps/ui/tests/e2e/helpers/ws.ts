@@ -1,11 +1,14 @@
-import WebSocket from "ws";
+import WebSocket from 'ws';
 
 export type WsClient = {
   socket: WebSocket;
   messages: Array<Record<string, unknown>>;
   close: () => Promise<{ code?: number; reason?: string }>;
   send: (message: Record<string, unknown>) => void;
-  waitForMessage: (predicate: (message: Record<string, unknown>) => boolean, timeoutMs?: number) => Promise<Record<string, unknown>>;
+  waitForMessage: (
+    predicate: (message: Record<string, unknown>) => boolean,
+    timeoutMs?: number,
+  ) => Promise<Record<string, unknown>>;
 };
 
 export async function connectWs(
@@ -16,10 +19,10 @@ export async function connectWs(
   const messages: Array<Record<string, unknown>> = [];
   let closeMeta: { code?: number; reason?: string } | null = null;
 
-  socket.on("message", (data) => {
+  socket.on('message', (data) => {
     try {
       const parsed: unknown = JSON.parse(data.toString());
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         messages.push(parsed as Record<string, unknown>);
       }
     } catch {
@@ -27,23 +30,23 @@ export async function connectWs(
     }
   });
 
-  socket.on("close", (code, reason) => {
+  socket.on('close', (code, reason) => {
     closeMeta = { code, reason: reason.toString() };
   });
 
   await new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error(`WS open timeout: ${url}`)), 5000);
-    socket.once("open", () => {
+    socket.once('open', () => {
       clearTimeout(timeout);
       resolve();
     });
-    socket.once("error", (err) => {
+    socket.once('error', (err) => {
       clearTimeout(timeout);
       reject(err);
     });
   });
 
-  const waitForMessage: WsClient["waitForMessage"] = async (predicate, timeoutMs = 5000) => {
+  const waitForMessage: WsClient['waitForMessage'] = async (predicate, timeoutMs = 5000) => {
     const startedAt = Date.now();
     while (Date.now() - startedAt < timeoutMs) {
       const found = messages.find(predicate);
@@ -53,7 +56,7 @@ export async function connectWs(
     throw new Error(`Timed out waiting for WS message after ${timeoutMs}ms`);
   };
 
-  await waitForMessage((message) => message.type === "Welcome", 10_000);
+  await waitForMessage((message) => message.type === 'Welcome', 10_000);
 
   return {
     socket,
@@ -67,7 +70,7 @@ export async function connectWs(
       }
       socket.close();
       await new Promise<void>((resolve) => {
-        socket.once("close", () => resolve());
+        socket.once('close', () => resolve());
       });
       return closeMeta ?? {};
     },

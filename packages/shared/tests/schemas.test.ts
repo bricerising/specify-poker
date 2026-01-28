@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from 'vitest';
 
 import {
   buyInAmountSchema,
@@ -11,23 +11,23 @@ import {
   tableJoinResponseSchema,
   tableSummarySchema,
   userProfileSchema,
-} from "../src/schemas/index";
+} from '../src/schemas/index';
 
-describe("shared schemas", () => {
-  it("validates table config and summary", () => {
+describe('shared schemas', () => {
+  it('validates table config and summary', () => {
     const config = {
       smallBlind: 10,
       bigBlind: 20,
       ante: null,
       maxPlayers: 6,
       startingStack: 2000,
-      bettingStructure: "NoLimit" as const,
+      bettingStructure: 'NoLimit' as const,
     };
 
     const summary = {
-      tableId: "table-1",
-      name: "Friendly Table",
-      ownerId: "user-1",
+      tableId: 'table-1',
+      name: 'Friendly Table',
+      ownerId: 'user-1',
       config,
       seatsTaken: 0,
       occupiedSeatIds: [],
@@ -38,10 +38,10 @@ describe("shared schemas", () => {
     expect(tableSummarySchema.parse(summary)).toEqual({ ...summary, spectatorCount: 0 });
   });
 
-  it("validates user profile and moderation request", () => {
+  it('validates user profile and moderation request', () => {
     const profile = {
-      userId: "user-1",
-      nickname: "Dealer",
+      userId: 'user-1',
+      nickname: 'Dealer',
       avatarUrl: null,
       stats: {
         handsPlayed: 0,
@@ -56,21 +56,21 @@ describe("shared schemas", () => {
     });
   });
 
-  it("validates table join response", () => {
+  it('validates table join response', () => {
     const payload = {
-      tableId: "table-1",
+      tableId: 'table-1',
       seatId: 2,
-      wsUrl: "ws://localhost:4000/ws",
+      wsUrl: 'ws://localhost:4000/ws',
     };
 
     expect(tableJoinResponseSchema.parse(payload)).toEqual(payload);
   });
 
-  it("coerces common gateway request inputs", () => {
-    expect(seatIdSchema.parse("3")).toBe(3);
-    expect(buyInAmountSchema.parse("200")).toBe(200);
+  it('coerces common gateway request inputs', () => {
+    expect(seatIdSchema.parse('3')).toBe(3);
+    expect(buyInAmountSchema.parse('200')).toBe(200);
 
-    expect(tableJoinSeatRequestSchema.parse({ seatId: "1", buyInAmount: "50" })).toEqual({
+    expect(tableJoinSeatRequestSchema.parse({ seatId: '1', buyInAmount: '50' })).toEqual({
       seatId: 1,
       buyInAmount: 50,
     });
@@ -81,19 +81,19 @@ describe("shared schemas", () => {
       ante: 0,
       maxPlayers: 9,
       startingStack: 200,
-      bettingStructure: "NoLimit",
+      bettingStructure: 'NoLimit',
       turnTimerSeconds: 20,
     });
 
-    expect(tableCreateRequestInputSchema.parse({ name: "Test Table" })).toEqual({
-      name: "Test Table",
+    expect(tableCreateRequestInputSchema.parse({ name: 'Test Table' })).toEqual({
+      name: 'Test Table',
       config: {
         smallBlind: 1,
         bigBlind: 2,
         ante: 0,
         maxPlayers: 9,
         startingStack: 200,
-        bettingStructure: "NoLimit",
+        bettingStructure: 'NoLimit',
         turnTimerSeconds: 20,
       },
     });

@@ -1,15 +1,13 @@
-import { startObservability, stopObservability } from "./observability";
-import { runServiceMain } from "@specify-poker/shared";
-import type { BalanceApp } from "./app";
+import { startObservability, stopObservability } from './observability';
+import { runServiceMain } from '@specify-poker/shared';
+import type { BalanceApp } from './app';
 
 const isDirectRun =
-  typeof require !== "undefined" &&
-  typeof module !== "undefined" &&
-  require.main === module;
+  typeof require !== 'undefined' && typeof module !== 'undefined' && require.main === module;
 
-const isTestEnv = process.env.NODE_ENV === "test";
+const isTestEnv = process.env.NODE_ENV === 'test';
 
-import logger from "./observability/logger";
+import logger from './observability/logger';
 
 let runningApp: BalanceApp | null = null;
 
@@ -19,8 +17,8 @@ async function getOrCreateApp(): Promise<BalanceApp> {
   }
 
   const [{ getConfig }, { createBalanceApp }] = await Promise.all([
-    import("./config"),
-    import("./app"),
+    import('./config'),
+    import('./app'),
   ]);
 
   runningApp = createBalanceApp({
@@ -40,11 +38,11 @@ export async function start() {
 }
 
 export async function shutdown() {
-  logger.info("Shutting down balance service...");
+  logger.info('Shutting down balance service...');
   const app = runningApp;
   runningApp = null;
   await app?.stop();
-  logger.info("Balance service shut down complete");
+  logger.info('Balance service shut down complete');
 }
 
 // Only start if this is the main module

@@ -1,13 +1,13 @@
-import WebSocket from "ws";
-import { context, trace, SpanStatusCode, ROOT_CONTEXT } from "@opentelemetry/api";
+import type WebSocket from 'ws';
+import { context, trace, SpanStatusCode, ROOT_CONTEXT } from '@opentelemetry/api';
 
-import logger from "../observability/logger";
-import { safeAsyncHandler } from "../utils/safeAsyncHandler";
+import logger from '../observability/logger';
+import { safeAsyncHandler } from '../utils/safeAsyncHandler';
 
 export type WsMessageHandler<TMessage> = (message: TMessage) => Promise<void> | void;
 
 export type WsMessageHandlerMap<TMessage extends { type: string }> = Partial<{
-  [K in TMessage["type"]]: WsMessageHandler<Extract<TMessage, { type: K }>>;
+  [K in TMessage['type']]: WsMessageHandler<Extract<TMessage, { type: K }>>;
 }>;
 
 export function attachWsRouter<TMessage extends { type: string }>(
@@ -20,10 +20,10 @@ export function attachWsRouter<TMessage extends { type: string }>(
     onClose?: () => Promise<void>;
   },
 ) {
-  const tracer = trace.getTracer("gateway-ws");
+  const tracer = trace.getTracer('gateway-ws');
 
   socket.on(
-    "message",
+    'message',
     safeAsyncHandler(
       async (data) => {
         let message: TMessage | null;
@@ -48,14 +48,14 @@ export function attachWsRouter<TMessage extends { type: string }>(
         }
 
         const attributes: Record<string, string> = {
-          "ws.message_type": message.type,
+          'ws.message_type': message.type,
           ...extraAttributes,
         };
 
         const span = tracer.startSpan(`ws.${options.hubName}`, { attributes }, ROOT_CONTEXT);
         try {
           await context.with(trace.setSpan(ROOT_CONTEXT, span), async () => {
-            const handler = options.handlers[message.type as TMessage["type"]] as
+            const handler = options.handlers[message.type as TMessage['type']] as
               | WsMessageHandler<TMessage>
               | undefined;
             if (!handler) {
@@ -65,7 +65,7 @@ export function attachWsRouter<TMessage extends { type: string }>(
           });
         } catch (err: unknown) {
           span.recordException(err instanceof Error ? err : { message: String(err) });
-          const messageText = err instanceof Error ? err.message : "unknown_error";
+          const messageText = err instanceof Error ? err.message : 'unknown_error';
           span.setStatus({ code: SpanStatusCode.ERROR, message: messageText });
           context.with(trace.setSpan(ROOT_CONTEXT, span), () => {
             logger.error({ err, type: message.type }, `ws.${options.hubName}.failed`);
@@ -81,7 +81,7 @@ export function attachWsRouter<TMessage extends { type: string }>(
   );
 
   socket.on(
-    "close",
+    'close',
     safeAsyncHandler(
       async () => {
         await options.onClose?.();

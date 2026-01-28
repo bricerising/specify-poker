@@ -1,4 +1,4 @@
-import type { TableSeat, TableState } from "./tableTypes";
+import type { TableSeat, TableState } from './tableTypes';
 
 type SeatId = number;
 
@@ -10,7 +10,7 @@ type SeatIdResolutionContext = {
 type SeatIdResolutionStrategy = (ctx: SeatIdResolutionContext) => SeatId | null;
 
 function resolveTurnSeatId({ matchingSeats, turnSeatId }: SeatIdResolutionContext): SeatId | null {
-  if (typeof turnSeatId !== "number" || !Number.isFinite(turnSeatId)) {
+  if (typeof turnSeatId !== 'number' || !Number.isFinite(turnSeatId)) {
     return null;
   }
   const seat = matchingSeats.find((candidate) => candidate.seatId === turnSeatId);
@@ -21,7 +21,9 @@ function resolveInHandSeatId({ matchingSeats }: SeatIdResolutionContext): SeatId
   const seat =
     matchingSeats.find(
       (candidate) =>
-        candidate.status === "ACTIVE" || candidate.status === "ALL_IN" || candidate.status === "FOLDED",
+        candidate.status === 'ACTIVE' ||
+        candidate.status === 'ALL_IN' ||
+        candidate.status === 'FOLDED',
     ) ?? null;
   return seat ? seat.seatId : null;
 }
@@ -63,4 +65,3 @@ export function inferSeatIdForUserId(tableState: TableState, userId: string | nu
 
   return matchingSeats[0].seatId;
 }
-

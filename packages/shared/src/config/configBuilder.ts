@@ -1,5 +1,5 @@
-import type { Env, ReadIntEnvOptions, ReadStringEnvOptions } from "./env";
-import { readIntEnv, readNullableStringEnv, readStringEnv } from "./env";
+import type { Env, ReadIntEnvOptions, ReadStringEnvOptions } from './env';
+import { readIntEnv, readNullableStringEnv, readStringEnv } from './env';
 
 export class ConfigBuilder<TConfig extends Record<string, unknown>> {
   private readonly env: Env;

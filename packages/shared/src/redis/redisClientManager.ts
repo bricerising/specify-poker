@@ -1,4 +1,4 @@
-import { createClient as createRedisClient, type RedisClientType } from "redis";
+import { createClient as createRedisClient, type RedisClientType } from 'redis';
 
 export type RedisClient = RedisClientType;
 
@@ -26,9 +26,11 @@ type CreateRedisClientManagerOptions = {
   name?: string;
 };
 
-export function createRedisClientManager(options: CreateRedisClientManagerOptions): RedisClientManager {
+export function createRedisClientManager(
+  options: CreateRedisClientManagerOptions,
+): RedisClientManager {
   const url = options.url;
-  const name = options.name ?? "redis";
+  const name = options.name ?? 'redis';
   const log = options.log;
   const createClient = options.createClient ?? createRedisClient;
 
@@ -55,9 +57,9 @@ export function createRedisClientManager(options: CreateRedisClientManagerOption
     return url;
   };
 
-  const attachErrorHandler = (nextClient: RedisClient, kind: "client" | "blocking") => {
-    nextClient.on("error", (err: unknown) => {
-      logError({ err, name, kind }, "redis.error");
+  const attachErrorHandler = (nextClient: RedisClient, kind: 'client' | 'blocking') => {
+    nextClient.on('error', (err: unknown) => {
+      logError({ err, name, kind }, 'redis.error');
     });
   };
 
@@ -72,8 +74,12 @@ export function createRedisClientManager(options: CreateRedisClientManagerOption
       return clientPromise;
     }
 
-    const nextClient = createClient<Record<string, never>, Record<string, never>, Record<string, never>>({ url: redisUrl });
-    attachErrorHandler(nextClient, "client");
+    const nextClient = createClient<
+      Record<string, never>,
+      Record<string, never>,
+      Record<string, never>
+    >({ url: redisUrl });
+    attachErrorHandler(nextClient, 'client');
 
     const promise = nextClient
       .connect()
@@ -105,8 +111,10 @@ export function createRedisClientManager(options: CreateRedisClientManagerOption
 
     const nextBlockingClient = client
       ? client.duplicate()
-      : createClient<Record<string, never>, Record<string, never>, Record<string, never>>({ url: redisUrl });
-    attachErrorHandler(nextBlockingClient, "blocking");
+      : createClient<Record<string, never>, Record<string, never>, Record<string, never>>({
+          url: redisUrl,
+        });
+    attachErrorHandler(nextBlockingClient, 'blocking');
 
     const promise = nextBlockingClient
       .connect()
@@ -132,7 +140,7 @@ export function createRedisClientManager(options: CreateRedisClientManagerOption
     try {
       return await connectClient();
     } catch (err: unknown) {
-      logWarn({ err, name }, "redis.connect.failed");
+      logWarn({ err, name }, 'redis.connect.failed');
       return null;
     }
   };
@@ -144,7 +152,7 @@ export function createRedisClientManager(options: CreateRedisClientManagerOption
     try {
       return await connectBlockingClient();
     } catch (err: unknown) {
-      logWarn({ err, name }, "redis.blocking.connect.failed");
+      logWarn({ err, name }, 'redis.blocking.connect.failed');
       return null;
     }
   };
@@ -160,8 +168,8 @@ export function createRedisClientManager(options: CreateRedisClientManagerOption
         clientPromise?.catch(() => null) ?? Promise.resolve(null),
       ]);
 
-      await safeQuit(resolvedBlocking ?? blockingClient, { logWarn, name, kind: "blocking" });
-      await safeQuit(resolvedClient ?? client, { logWarn, name, kind: "client" });
+      await safeQuit(resolvedBlocking ?? blockingClient, { logWarn, name, kind: 'blocking' });
+      await safeQuit(resolvedClient ?? client, { logWarn, name, kind: 'client' });
 
       blockingClient = null;
       blockingPromise = null;
@@ -186,28 +194,32 @@ export function createRedisClientManager(options: CreateRedisClientManagerOption
 
 async function safeQuit(
   client: RedisClient | null,
-  options: { logWarn: (obj: Record<string, unknown>, msg: string) => void; name: string; kind: string },
+  options: {
+    logWarn: (obj: Record<string, unknown>, msg: string) => void;
+    name: string;
+    kind: string;
+  },
 ): Promise<void> {
   if (!client) {
     return;
   }
 
   const isOpen = (client as unknown as { isOpen?: unknown }).isOpen;
-  if (typeof isOpen === "boolean" && !isOpen) {
+  if (typeof isOpen === 'boolean' && !isOpen) {
     return;
   }
 
   try {
     await client.quit();
   } catch (err: unknown) {
-    options.logWarn({ err, name: options.name, kind: options.kind }, "redis.quit.failed");
+    options.logWarn({ err, name: options.name, kind: options.kind }, 'redis.quit.failed');
     safeDisconnect(client);
   }
 }
 
 function safeDisconnect(client: unknown): void {
   const disconnect = (client as { disconnect?: unknown }).disconnect;
-  if (typeof disconnect === "function") {
+  if (typeof disconnect === 'function') {
     disconnect.call(client);
   }
 }

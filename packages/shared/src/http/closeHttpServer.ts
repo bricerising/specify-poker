@@ -6,10 +6,10 @@ type HttpServerLike = {
 
 function isServerNotRunningError(error: unknown): boolean {
   return (
-    typeof error === "object" &&
+    typeof error === 'object' &&
     error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === "ERR_SERVER_NOT_RUNNING"
+    'code' in error &&
+    (error as { code?: unknown }).code === 'ERR_SERVER_NOT_RUNNING'
   );
 }
 
@@ -32,4 +32,3 @@ export async function closeHttpServer(server: HttpServerLike): Promise<void> {
     }
   });
 }
-

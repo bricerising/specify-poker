@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { addService, bindAsync, forceShutdown, start, createHandlers } = vi.hoisted(() => ({
   addService: vi.fn(),
@@ -20,7 +20,7 @@ const { addService, bindAsync, forceShutdown, start, createHandlers } = vi.hoist
   })),
 }));
 
-vi.mock("@grpc/grpc-js", () => ({
+vi.mock('@grpc/grpc-js', () => ({
   Server: vi.fn(() => ({
     addService,
     bindAsync,
@@ -28,61 +28,67 @@ vi.mock("@grpc/grpc-js", () => ({
     start,
   })),
   ServerCredentials: {
-    createInsecure: vi.fn(() => "creds"),
+    createInsecure: vi.fn(() => 'creds'),
   },
   loadPackageDefinition: vi.fn(() => ({
-    event: { EventService: { service: { name: "EventService" } } },
+    event: { EventService: { service: { name: 'EventService' } } },
   })),
 }));
 
-vi.mock("@grpc/proto-loader", () => ({
+vi.mock('@grpc/proto-loader', () => ({
   loadSync: vi.fn(() => ({})),
 }));
 
-vi.mock("../handlers", () => ({
+vi.mock('../handlers', () => ({
   createHandlers,
 }));
 
-import { startGrpcServer, stopGrpcServer } from "../server";
+import { startGrpcServer, stopGrpcServer } from '../server';
 
-describe("event gRPC server", () => {
+describe('event gRPC server', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("binds and registers handlers", async () => {
-    bindAsync.mockImplementation((_: string, __: unknown, callback: (err: Error | null, port: number) => void) => {
-      callback(null, 50054);
-    });
+  it('binds and registers handlers', async () => {
+    bindAsync.mockImplementation(
+      (_: string, __: unknown, callback: (err: Error | null, port: number) => void) => {
+        callback(null, 50054);
+      },
+    );
 
     await startGrpcServer(50054);
 
     expect(createHandlers).toHaveBeenCalledTimes(1);
     expect(addService).toHaveBeenCalledWith(
-      { name: "EventService" },
+      { name: 'EventService' },
       expect.objectContaining({
         PublishEvent: expect.any(Function),
         PublishEvents: expect.any(Function),
         QueryEvents: expect.any(Function),
         GetEvent: expect.any(Function),
-      })
+      }),
     );
-    expect(bindAsync).toHaveBeenCalledWith("0.0.0.0:50054", "creds", expect.any(Function));
+    expect(bindAsync).toHaveBeenCalledWith('0.0.0.0:50054', 'creds', expect.any(Function));
     expect(start).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects when bind fails", async () => {
-    bindAsync.mockImplementation((_: string, __: unknown, callback: (err: Error | null, port: number) => void) => {
-      callback(new Error("bind fail"), 0);
-    });
+  it('rejects when bind fails', async () => {
+    bindAsync.mockImplementation(
+      (_: string, __: unknown, callback: (err: Error | null, port: number) => void) => {
+        callback(new Error('bind fail'), 0);
+      },
+    );
 
-    await expect(startGrpcServer(50054)).rejects.toThrow("bind fail");
+    await expect(startGrpcServer(50054)).rejects.toThrow('bind fail');
   });
 
-  it("can be stopped", async () => {
-    bindAsync.mockImplementation((_: string, __: unknown, callback: (err: Error | null, port: number) => void) => {
-      callback(null, 50054);
-    });
+  it('can be stopped', async () => {
+    bindAsync.mockImplementation(
+      (_: string, __: unknown, callback: (err: Error | null, port: number) => void) => {
+        callback(null, 50054);
+      },
+    );
 
     await startGrpcServer(50054);
     stopGrpcServer();

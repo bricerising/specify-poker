@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
 
-import { fetchFriends, updateFriends } from "../services/friendsApi";
-import { testIds } from "../utils/testIds";
+import { fetchFriends, updateFriends } from '../services/friendsApi';
+import { testIds } from '../utils/testIds';
 
 export function FriendsPage() {
   const [friends, setFriends] = useState<string[]>([]);
-  const [newFriend, setNewFriend] = useState("");
+  const [newFriend, setNewFriend] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const loadFriends = async () => {
@@ -14,7 +14,7 @@ export function FriendsPage() {
       setFriends(next);
       setError(null);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to load friends";
+      const message = err instanceof Error ? err.message : 'Unable to load friends';
       setError(message);
     }
   };
@@ -29,7 +29,7 @@ export function FriendsPage() {
       setFriends(updated);
       setError(null);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to update friends";
+      const message = err instanceof Error ? err.message : 'Unable to update friends';
       setError(message);
     }
   };
@@ -39,7 +39,7 @@ export function FriendsPage() {
     if (!trimmed) {
       return;
     }
-    setNewFriend("");
+    setNewFriend('');
     await persistFriends([...friends, trimmed]);
   };
 

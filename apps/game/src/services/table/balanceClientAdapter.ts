@@ -1,17 +1,17 @@
-import { createLazyUnaryCallProxy } from "@specify-poker/shared";
-import {
+import { createLazyUnaryCallProxy } from '@specify-poker/shared';
+import type {
   BalanceCashOutResponse,
   BalanceCommitResponse,
   BalanceReservationResponse,
   BalanceSettleResponse,
-  getBalanceClient,
-} from "../../api/grpc/clients";
+} from '../../api/grpc/clients';
+import { getBalanceClient } from '../../api/grpc/clients';
 
 const unaryBalanceClient = createLazyUnaryCallProxy(getBalanceClient);
 
 export type BalanceCall<TResponse> =
-  | { type: "available"; response: TResponse }
-  | { type: "unavailable"; error: unknown };
+  | { type: 'available'; response: TResponse }
+  | { type: 'unavailable'; error: unknown };
 
 // Re-export response types for consumers
 export type BalanceReservation = BalanceReservationResponse;
@@ -19,12 +19,14 @@ export type BalanceCommit = BalanceCommitResponse;
 export type BalanceCashOut = BalanceCashOutResponse;
 export type BalanceSettle = BalanceSettleResponse;
 
-async function callWithAvailability<TResponse>(promise: Promise<TResponse>): Promise<BalanceCall<TResponse>> {
+async function callWithAvailability<TResponse>(
+  promise: Promise<TResponse>,
+): Promise<BalanceCall<TResponse>> {
   try {
     const response = await promise;
-    return { type: "available", response };
+    return { type: 'available', response };
   } catch (error: unknown) {
-    return { type: "unavailable", error };
+    return { type: 'unavailable', error };
   }
 }
 
@@ -36,15 +38,11 @@ export class BalanceClientAdapter {
     idempotency_key: string;
     timeout_seconds: number;
   }) {
-    return callWithAvailability(
-      unaryBalanceClient.ReserveForBuyIn(request),
-    );
+    return callWithAvailability(unaryBalanceClient.ReserveForBuyIn(request));
   }
 
   commitReservation(request: { reservation_id: string }) {
-    return callWithAvailability(
-      unaryBalanceClient.CommitReservation(request),
-    );
+    return callWithAvailability(unaryBalanceClient.CommitReservation(request));
   }
 
   releaseReservation(request: { reservation_id: string; reason?: string }) {
@@ -59,9 +57,7 @@ export class BalanceClientAdapter {
     idempotency_key: string;
     hand_id?: string;
   }) {
-    return callWithAvailability(
-      unaryBalanceClient.ProcessCashOut(request),
-    );
+    return callWithAvailability(unaryBalanceClient.ProcessCashOut(request));
   }
 
   settlePot(request: {
@@ -70,9 +66,7 @@ export class BalanceClientAdapter {
     winners: Array<{ seat_id: number; account_id: string; amount: number }>;
     idempotency_key: string;
   }) {
-    return callWithAvailability(
-      unaryBalanceClient.SettlePot(request),
-    );
+    return callWithAvailability(unaryBalanceClient.SettlePot(request));
   }
 }
 

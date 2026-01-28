@@ -7,7 +7,7 @@ import type {
   Table,
   TableConfig,
   TableState,
-} from "../../../domain/types";
+} from '../../../domain/types';
 
 export type Timestamp = { seconds: number; nanos: number };
 
@@ -146,7 +146,7 @@ function toProtoAction(action: Action): ProtoAction {
   };
 }
 
-function toProtoPot(pot: HandState["pots"][number]): ProtoPot {
+function toProtoPot(pot: HandState['pots'][number]): ProtoPot {
   return {
     amount: pot.amount,
     eligible_seat_ids: pot.eligibleSeats,
@@ -182,4 +182,3 @@ export function toProtoState(state: TableState): ProtoTableState {
     updated_at: toTimestamp(state.updatedAt),
   };
 }
-

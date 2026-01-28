@@ -1,10 +1,10 @@
-import { Transaction } from "../domain/types";
-import logger from "../observability/logger";
-import { tryJsonParse } from "../utils/json";
-import { getRedisClient } from "./redisClient";
+import type { Transaction } from '../domain/types';
+import logger from '../observability/logger';
+import { tryJsonParse } from '../utils/json';
+import { getRedisClient } from './redisClient';
 
-const TRANSACTIONS_KEY = "balance:transactions";
-const TRANSACTIONS_BY_ACCOUNT_PREFIX = "balance:transactions:by-account:";
+const TRANSACTIONS_KEY = 'balance:transactions';
+const TRANSACTIONS_BY_ACCOUNT_PREFIX = 'balance:transactions:by-account:';
 
 // In-memory cache
 const transactions = new Map<string, Transaction>();
@@ -22,7 +22,7 @@ export async function getTransaction(transactionId: string): Promise<Transaction
     if (payload) {
       const parsed = tryJsonParse<Transaction>(payload);
       if (!parsed.ok) {
-        logger.warn({ err: parsed.error, transactionId }, "transactionStore.parse.failed");
+        logger.warn({ err: parsed.error, transactionId }, 'transactionStore.parse.failed');
         return null;
       }
       const tx = parsed.value;
@@ -56,7 +56,7 @@ export async function saveTransaction(tx: Transaction): Promise<void> {
 
 export async function updateTransaction(
   transactionId: string,
-  updater: (current: Transaction) => Transaction
+  updater: (current: Transaction) => Transaction,
 ): Promise<Transaction | null> {
   const current = await getTransaction(transactionId);
   if (!current) {
@@ -76,7 +76,7 @@ export async function updateTransaction(
 
 export async function getTransactionsByAccount(
   accountId: string,
-  options: { limit?: number; offset?: number; type?: string } = {}
+  options: { limit?: number; offset?: number; type?: string } = {},
 ): Promise<{ transactions: Transaction[]; total: number }> {
   const { limit = 50, offset = 0, type } = options;
 
@@ -87,7 +87,7 @@ export async function getTransactionsByAccount(
       `${TRANSACTIONS_BY_ACCOUNT_PREFIX}${accountId}`,
       offset,
       offset + limit - 1,
-      { REV: true }
+      { REV: true },
     );
 
     const result: Transaction[] = [];

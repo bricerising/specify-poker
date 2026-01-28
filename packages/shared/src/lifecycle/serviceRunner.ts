@@ -22,7 +22,7 @@ export function runServiceMain(options: RunServiceMainOptions): void {
   const proc = options.process ?? process;
   const exit = options.exit ?? process.exit;
   const fatalExitCode = options.fatalExitCode ?? 1;
-  const signals = options.signals ?? ["SIGINT", "SIGTERM"];
+  const signals = options.signals ?? ['SIGINT', 'SIGTERM'];
 
   let shutdownPromise: Promise<void> | null = null;
   let isExiting = false;
@@ -41,22 +41,22 @@ export function runServiceMain(options: RunServiceMainOptions): void {
     isExiting = true;
 
     if (error !== undefined) {
-      options.logger?.error?.({ err: error }, "service.failed");
+      options.logger?.error?.({ err: error }, 'service.failed');
     }
 
     safeShutdown().finally(() => exit(code));
   };
 
-  proc.on("uncaughtException", (error: unknown) => {
+  proc.on('uncaughtException', (error: unknown) => {
     requestExit(fatalExitCode, error);
   });
-  proc.on("unhandledRejection", (reason: unknown) => {
+  proc.on('unhandledRejection', (reason: unknown) => {
     requestExit(fatalExitCode, reason);
   });
 
   for (const signal of signals) {
     proc.on(signal, () => {
-      options.logger?.info?.({ signal }, "service.shutdown.signal");
+      options.logger?.info?.({ signal }, 'service.shutdown.signal');
       requestExit(0);
     });
   }

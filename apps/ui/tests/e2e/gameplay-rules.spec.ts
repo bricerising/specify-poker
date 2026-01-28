@@ -1,11 +1,11 @@
-import { expect, test } from "@playwright/test";
-import type { APIRequestContext } from "@playwright/test";
-import crypto from "crypto";
-import { decodeStructLike } from "@specify-poker/shared";
-import { ensureBalance } from "./helpers/balance";
-import { generateToken } from "./helpers/auth";
-import { authHeaders } from "./helpers/http";
-import { urls } from "./helpers/urls";
+import { expect, test } from '@playwright/test';
+import type { APIRequestContext } from '@playwright/test';
+import crypto from 'crypto';
+import { decodeStructLike } from '@specify-poker/shared';
+import { ensureBalance } from './helpers/balance';
+import { generateToken } from './helpers/auth';
+import { authHeaders } from './helpers/http';
+import { urls } from './helpers/urls';
 
 type TableStateResponse = {
   state?: {
@@ -45,7 +45,7 @@ async function createTwoPlayerTable(
   const bobToken = generateToken(bobId, `Bob${runId}`);
 
   const create = await request.post(`${urls.gateway}/api/tables`, {
-    headers: { ...authHeaders(aliceToken), "Content-Type": "application/json" },
+    headers: { ...authHeaders(aliceToken), 'Content-Type': 'application/json' },
     data: {
       name: tableName,
       config: {
@@ -72,11 +72,11 @@ async function createTwoPlayerTable(
   };
 }
 
-test.describe("Gameplay Rules (Game + Gateway)", () => {
-  test.skip(({ browserName }) => browserName !== "chromium", "API-heavy rules checks run once.");
+test.describe('Gameplay Rules (Game + Gateway)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'API-heavy rules checks run once.');
   test.setTimeout(90_000);
 
-  test("rejects joining multiple seats with the same user", async ({ request }) => {
+  test('rejects joining multiple seats with the same user', async ({ request }) => {
     const runId = crypto.randomUUID().slice(0, 8);
     const tableName = `E2E Single Seat ${runId}`;
     const userId = `user-seat-${runId}`;
@@ -85,7 +85,7 @@ test.describe("Gameplay Rules (Game + Gateway)", () => {
     const token = generateToken(userId, `Seat${runId}`);
 
     const create = await request.post(`${urls.gateway}/api/tables`, {
-      headers: { ...authHeaders(token), "Content-Type": "application/json" },
+      headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
       data: {
         name: tableName,
         config: {
@@ -103,25 +103,29 @@ test.describe("Gameplay Rules (Game + Gateway)", () => {
     expect(tableId).toBeTruthy();
 
     const joinFirst = await request.post(`${urls.gateway}/api/tables/${tableId}/join`, {
-      headers: { ...authHeaders(token), "Content-Type": "application/json" },
+      headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
       data: { seatId: 0 },
     });
     expect(joinFirst.ok()).toBeTruthy();
 
     const joinSecond = await request.post(`${urls.gateway}/api/tables/${tableId}/join`, {
-      headers: { ...authHeaders(token), "Content-Type": "application/json" },
+      headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
       data: { seatId: 1 },
     });
     expect(joinSecond.status()).toBe(400);
     const body = (await joinSecond.json()) as { error?: string };
-    expect(body.error).toBe("ALREADY_SEATED");
+    expect(body.error).toBe('ALREADY_SEATED');
   });
 
-  test("starts hands only with 2+ players and posts blinds", async ({ request }) => {
-    const setup = await createTwoPlayerTable(request, { smallBlind: 5, bigBlind: 10, turnTimerSeconds: 20 });
+  test('starts hands only with 2+ players and posts blinds', async ({ request }) => {
+    const setup = await createTwoPlayerTable(request, {
+      smallBlind: 5,
+      bigBlind: 10,
+      turnTimerSeconds: 20,
+    });
 
     const joinAlice = await request.post(`${urls.gateway}/api/tables/${setup.tableId}/join`, {
-      headers: { ...authHeaders(setup.aliceToken), "Content-Type": "application/json" },
+      headers: { ...authHeaders(setup.aliceToken), 'Content-Type': 'application/json' },
       data: { seatId: 0 },
     });
     expect(joinAlice.ok()).toBeTruthy();
@@ -133,18 +137,23 @@ test.describe("Gameplay Rules (Game + Gateway)", () => {
     expect(stateAfterOnePayload.state?.hand ?? null).toBeNull();
 
     const joinBob = await request.post(`${urls.gateway}/api/tables/${setup.tableId}/join`, {
-      headers: { ...authHeaders(setup.bobToken), "Content-Type": "application/json" },
+      headers: { ...authHeaders(setup.bobToken), 'Content-Type': 'application/json' },
       data: { seatId: 1 },
     });
     expect(joinBob.ok()).toBeTruthy();
 
-    await expect.poll(async () => {
-      const stateRes = await request.get(`${urls.gateway}/api/tables/${setup.tableId}/state`, {
-        headers: authHeaders(setup.aliceToken),
-      });
-      const payload = (await stateRes.json()) as TableStateResponse;
-      return payload.state?.hand ?? null;
-    }, { timeout: 15_000 }).not.toBeNull();
+    await expect
+      .poll(
+        async () => {
+          const stateRes = await request.get(`${urls.gateway}/api/tables/${setup.tableId}/state`, {
+            headers: authHeaders(setup.aliceToken),
+          });
+          const payload = (await stateRes.json()) as TableStateResponse;
+          return payload.state?.hand ?? null;
+        },
+        { timeout: 15_000 },
+      )
+      .not.toBeNull();
 
     const stateRes = await request.get(`${urls.gateway}/api/tables/${setup.tableId}/state`, {
       headers: authHeaders(setup.aliceToken),
@@ -153,7 +162,7 @@ test.describe("Gameplay Rules (Game + Gateway)", () => {
     const hand = payload.state?.hand ?? null;
     expect(hand).not.toBeNull();
 
-    const blindActions = (hand?.actions ?? []).filter((action) => action.type === "POST_BLIND");
+    const blindActions = (hand?.actions ?? []).filter((action) => action.type === 'POST_BLIND');
     expect(blindActions.length).toBe(2);
     const blindAmounts = blindActions
       .map((action) => Number(action.amount ?? 0))
@@ -166,28 +175,37 @@ test.describe("Gameplay Rules (Game + Gateway)", () => {
     expect((payload.hole_cards ?? []).length).toBe(2);
   });
 
-  test("rejects out-of-turn actions with NOT_YOUR_TURN", async ({ request }) => {
-    const setup = await createTwoPlayerTable(request, { smallBlind: 1, bigBlind: 2, turnTimerSeconds: 20 });
+  test('rejects out-of-turn actions with NOT_YOUR_TURN', async ({ request }) => {
+    const setup = await createTwoPlayerTable(request, {
+      smallBlind: 1,
+      bigBlind: 2,
+      turnTimerSeconds: 20,
+    });
 
     const joinAlice = await request.post(`${urls.gateway}/api/tables/${setup.tableId}/join`, {
-      headers: { ...authHeaders(setup.aliceToken), "Content-Type": "application/json" },
+      headers: { ...authHeaders(setup.aliceToken), 'Content-Type': 'application/json' },
       data: { seatId: 0 },
     });
     expect(joinAlice.ok()).toBeTruthy();
 
     const joinBob = await request.post(`${urls.gateway}/api/tables/${setup.tableId}/join`, {
-      headers: { ...authHeaders(setup.bobToken), "Content-Type": "application/json" },
+      headers: { ...authHeaders(setup.bobToken), 'Content-Type': 'application/json' },
       data: { seatId: 1 },
     });
     expect(joinBob.ok()).toBeTruthy();
 
-    await expect.poll(async () => {
-      const stateRes = await request.get(`${urls.gateway}/api/tables/${setup.tableId}/state`, {
-        headers: authHeaders(setup.aliceToken),
-      });
-      const payload = (await stateRes.json()) as TableStateResponse;
-      return Boolean(payload.state?.hand);
-    }, { timeout: 15_000 }).toBe(true);
+    await expect
+      .poll(
+        async () => {
+          const stateRes = await request.get(`${urls.gateway}/api/tables/${setup.tableId}/state`, {
+            headers: authHeaders(setup.aliceToken),
+          });
+          const payload = (await stateRes.json()) as TableStateResponse;
+          return Boolean(payload.state?.hand);
+        },
+        { timeout: 15_000 },
+      )
+      .toBe(true);
 
     const stateRes = await request.get(`${urls.gateway}/api/tables/${setup.tableId}/state`, {
       headers: authHeaders(setup.aliceToken),
@@ -197,7 +215,7 @@ test.describe("Gameplay Rules (Game + Gateway)", () => {
     expect(hand).toBeTruthy();
 
     const currentTurnSeat = hand?.turn;
-    expect(typeof currentTurnSeat).toBe("number");
+    expect(typeof currentTurnSeat).toBe('number');
     const seats = payload.state?.seats ?? [];
     const nonTurnSeat = seats.find((seat) => seat.seat_id !== currentTurnSeat);
     expect(nonTurnSeat?.user_id).toBeTruthy();
@@ -206,49 +224,68 @@ test.describe("Gameplay Rules (Game + Gateway)", () => {
     const actorToken = actorUserId === setup.aliceId ? setup.aliceToken : setup.bobToken;
 
     const actionRes = await request.post(`${urls.gateway}/api/tables/${setup.tableId}/action`, {
-      headers: { ...authHeaders(actorToken), "Content-Type": "application/json" },
-      data: { actionType: "CHECK" },
+      headers: { ...authHeaders(actorToken), 'Content-Type': 'application/json' },
+      data: { actionType: 'CHECK' },
     });
     expect(actionRes.status()).toBe(400);
     const body = (await actionRes.json()) as { error?: string };
-    expect(body.error).toBe("NOT_YOUR_TURN");
+    expect(body.error).toBe('NOT_YOUR_TURN');
   });
 
-  test("turn timers trigger auto-action events", async ({ request }) => {
-    const setup = await createTwoPlayerTable(request, { smallBlind: 1, bigBlind: 2, turnTimerSeconds: 1 });
+  test('turn timers trigger auto-action events', async ({ request }) => {
+    const setup = await createTwoPlayerTable(request, {
+      smallBlind: 1,
+      bigBlind: 2,
+      turnTimerSeconds: 1,
+    });
 
     const joinAlice = await request.post(`${urls.gateway}/api/tables/${setup.tableId}/join`, {
-      headers: { ...authHeaders(setup.aliceToken), "Content-Type": "application/json" },
+      headers: { ...authHeaders(setup.aliceToken), 'Content-Type': 'application/json' },
       data: { seatId: 0 },
     });
     expect(joinAlice.ok()).toBeTruthy();
 
     const joinBob = await request.post(`${urls.gateway}/api/tables/${setup.tableId}/join`, {
-      headers: { ...authHeaders(setup.bobToken), "Content-Type": "application/json" },
+      headers: { ...authHeaders(setup.bobToken), 'Content-Type': 'application/json' },
       data: { seatId: 1 },
     });
     expect(joinBob.ok()).toBeTruthy();
 
-    await expect.poll(async () => {
-      const stateRes = await request.get(`${urls.gateway}/api/tables/${setup.tableId}/state`, {
-        headers: authHeaders(setup.aliceToken),
-      });
-      const payload = (await stateRes.json()) as TableStateResponse;
-      return Boolean(payload.state?.hand);
-    }, { timeout: 15_000 }).toBe(true);
+    await expect
+      .poll(
+        async () => {
+          const stateRes = await request.get(`${urls.gateway}/api/tables/${setup.tableId}/state`, {
+            headers: authHeaders(setup.aliceToken),
+          });
+          const payload = (await stateRes.json()) as TableStateResponse;
+          return Boolean(payload.state?.hand);
+        },
+        { timeout: 15_000 },
+      )
+      .toBe(true);
 
-    await expect.poll(async () => {
-      const eventsRes = await request.get(`${urls.gateway}/api/audit/events?tableId=${setup.tableId}&limit=100`, {
-        headers: authHeaders(setup.aliceToken),
-      });
-      const payload = (await eventsRes.json()) as { events?: Array<{ type?: string; payload?: unknown }> };
-      return (payload.events ?? []).some((event) => {
-        if (event.type !== "ACTION_TAKEN") {
-          return false;
-        }
-        const decoded = decodeStructLike(event.payload);
-        return decoded.action === "FOLD" || decoded.action === "CHECK";
-      });
-    }, { timeout: 20_000 }).toBe(true);
+    await expect
+      .poll(
+        async () => {
+          const eventsRes = await request.get(
+            `${urls.gateway}/api/audit/events?tableId=${setup.tableId}&limit=100`,
+            {
+              headers: authHeaders(setup.aliceToken),
+            },
+          );
+          const payload = (await eventsRes.json()) as {
+            events?: Array<{ type?: string; payload?: unknown }>;
+          };
+          return (payload.events ?? []).some((event) => {
+            if (event.type !== 'ACTION_TAKEN') {
+              return false;
+            }
+            const decoded = decodeStructLike(event.payload);
+            return decoded.action === 'FOLD' || decoded.action === 'CHECK';
+          });
+        },
+        { timeout: 20_000 },
+      )
+      .toBe(true);
   });
 });

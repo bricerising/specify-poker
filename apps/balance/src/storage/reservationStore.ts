@@ -1,11 +1,11 @@
-import { Reservation } from "../domain/types";
-import logger from "../observability/logger";
-import { tryJsonParse } from "../utils/json";
-import { getRedisClient } from "./redisClient";
+import type { Reservation } from '../domain/types';
+import logger from '../observability/logger';
+import { tryJsonParse } from '../utils/json';
+import { getRedisClient } from './redisClient';
 
-const RESERVATIONS_KEY = "balance:reservations";
-const RESERVATIONS_BY_ACCOUNT_PREFIX = "balance:reservations:by-account:";
-const RESERVATIONS_EXPIRY_KEY = "balance:reservations:expiry";
+const RESERVATIONS_KEY = 'balance:reservations';
+const RESERVATIONS_BY_ACCOUNT_PREFIX = 'balance:reservations:by-account:';
+const RESERVATIONS_EXPIRY_KEY = 'balance:reservations:expiry';
 
 // In-memory cache
 const reservations = new Map<string, Reservation>();
@@ -23,7 +23,7 @@ export async function getReservation(reservationId: string): Promise<Reservation
     if (payload) {
       const parsed = tryJsonParse<Reservation>(payload);
       if (!parsed.ok) {
-        logger.warn({ err: parsed.error, reservationId }, "reservationStore.parse.failed");
+        logger.warn({ err: parsed.error, reservationId }, 'reservationStore.parse.failed');
         return null;
       }
       const reservation = parsed.value;
@@ -51,11 +51,11 @@ export async function saveReservation(reservation: Reservation): Promise<void> {
     await redis.hSet(RESERVATIONS_KEY, reservation.reservationId, JSON.stringify(reservation));
     await redis.sAdd(
       `${RESERVATIONS_BY_ACCOUNT_PREFIX}${reservation.accountId}`,
-      reservation.reservationId
+      reservation.reservationId,
     );
 
     // Add to expiry sorted set if status is HELD
-    if (reservation.status === "HELD") {
+    if (reservation.status === 'HELD') {
       await redis.zAdd(RESERVATIONS_EXPIRY_KEY, {
         score: new Date(reservation.expiresAt).getTime(),
         value: reservation.reservationId,
@@ -66,7 +66,7 @@ export async function saveReservation(reservation: Reservation): Promise<void> {
 
 export async function updateReservation(
   reservationId: string,
-  updater: (current: Reservation) => Reservation
+  updater: (current: Reservation) => Reservation,
 ): Promise<Reservation | null> {
   const current = await getReservation(reservationId);
   if (!current) {
@@ -81,7 +81,7 @@ export async function updateReservation(
     await redis.hSet(RESERVATIONS_KEY, reservationId, JSON.stringify(updated));
 
     // Remove from expiry set if no longer HELD
-    if (updated.status !== "HELD") {
+    if (updated.status !== 'HELD') {
       await redis.zRem(RESERVATIONS_EXPIRY_KEY, reservationId);
     }
   }
@@ -92,9 +92,7 @@ export async function updateReservation(
 export async function getReservationsByAccount(accountId: string): Promise<Reservation[]> {
   const redis = await getRedisClient();
   if (redis) {
-    const reservationIds = await redis.sMembers(
-      `${RESERVATIONS_BY_ACCOUNT_PREFIX}${accountId}`
-    );
+    const reservationIds = await redis.sMembers(`${RESERVATIONS_BY_ACCOUNT_PREFIX}${accountId}`);
     const result: Reservation[] = [];
     for (const id of reservationIds) {
       const reservation = await getReservation(id);
@@ -122,21 +120,17 @@ export async function getReservationsByAccount(accountId: string): Promise<Reser
 
 export async function getActiveReservationsByAccount(accountId: string): Promise<Reservation[]> {
   const all = await getReservationsByAccount(accountId);
-  return all.filter((r) => r.status === "HELD");
+  return all.filter((r) => r.status === 'HELD');
 }
 
 export async function getExpiredReservations(beforeTimestamp: number): Promise<Reservation[]> {
   const redis = await getRedisClient();
   if (redis) {
-    const reservationIds = await redis.zRangeByScore(
-      RESERVATIONS_EXPIRY_KEY,
-      0,
-      beforeTimestamp
-    );
+    const reservationIds = await redis.zRangeByScore(RESERVATIONS_EXPIRY_KEY, 0, beforeTimestamp);
     const result: Reservation[] = [];
     for (const id of reservationIds) {
       const reservation = await getReservation(id);
-      if (reservation && reservation.status === "HELD") {
+      if (reservation && reservation.status === 'HELD') {
         result.push(reservation);
       }
     }
@@ -147,7 +141,7 @@ export async function getExpiredReservations(beforeTimestamp: number): Promise<R
   const result: Reservation[] = [];
   for (const reservation of reservations.values()) {
     if (
-      reservation.status === "HELD" &&
+      reservation.status === 'HELD' &&
       new Date(reservation.expiresAt).getTime() <= beforeTimestamp
     ) {
       result.push(reservation);

@@ -1,15 +1,15 @@
-import * as grpc from "@grpc/grpc-js";
-import * as protoLoader from "@grpc/proto-loader";
-import * as path from "path";
-import { createGrpcServerLifecycle } from "@specify-poker/shared";
-import { createHandlers } from "./handlers";
-import { createHealthHandlers } from "./health";
-import { SubscriptionService } from "../../services/subscriptionService";
-import { PushSenderService } from "../../services/pushSenderService";
-import logger from "../../observability/logger";
+import * as grpc from '@grpc/grpc-js';
+import * as protoLoader from '@grpc/proto-loader';
+import * as path from 'path';
+import { createGrpcServerLifecycle } from '@specify-poker/shared';
+import { createHandlers } from './handlers';
+import { createHealthHandlers } from './health';
+import type { SubscriptionService } from '../../services/subscriptionService';
+import type { PushSenderService } from '../../services/pushSenderService';
+import logger from '../../observability/logger';
 
-const PROTO_PATH = path.resolve(__dirname, "../../../proto/notify.proto");
-const HEALTH_PROTO_PATH = path.resolve(__dirname, "../../../proto/health.proto");
+const PROTO_PATH = path.resolve(__dirname, '../../../proto/notify.proto');
+const HEALTH_PROTO_PATH = path.resolve(__dirname, '../../../proto/health.proto');
 
 export type GrpcServer = {
   start(): Promise<void>;
@@ -45,14 +45,17 @@ export function createGrpcServer(params: CreateGrpcServerParams): GrpcServer {
       const handlers = createHandlers(params.subscriptionService, params.pushService);
       const healthHandlers = createHealthHandlers();
 
-      server.addService(proto.notify.NotifyService.service, handlers as unknown as grpc.UntypedServiceImplementation);
+      server.addService(
+        proto.notify.NotifyService.service,
+        handlers as unknown as grpc.UntypedServiceImplementation,
+      );
       server.addService(
         proto.grpc.health.v1.Health.service,
         healthHandlers as unknown as grpc.UntypedServiceImplementation,
       );
     },
     logger,
-    logMessage: "Notify gRPC server listening",
+    logMessage: 'Notify gRPC server listening',
   });
 
   return lifecycle;
@@ -63,7 +66,7 @@ let defaultServer: GrpcServer | null = null;
 export async function startGrpcServer(
   port: number,
   subscriptionService: SubscriptionService,
-  pushService: PushSenderService
+  pushService: PushSenderService,
 ): Promise<void> {
   if (defaultServer) {
     defaultServer.stop();

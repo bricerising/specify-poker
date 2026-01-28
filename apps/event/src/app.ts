@@ -1,8 +1,12 @@
-import { closeHttpServer, createShutdownManager, type ShutdownManager } from "@specify-poker/shared";
-import type { Server as HttpServer } from "http";
-import type { Config } from "./config";
-import { startObservability, stopObservability } from "./observability";
-import logger from "./observability/logger";
+import {
+  closeHttpServer,
+  createShutdownManager,
+  type ShutdownManager,
+} from '@specify-poker/shared';
+import type { Server as HttpServer } from 'http';
+import type { Config } from './config';
+import { startObservability, stopObservability } from './observability';
+import logger from './observability/logger';
 
 export type EventApp = {
   start(): Promise<void>;
@@ -69,42 +73,42 @@ export function createEventApp(options: CreateEventAppOptions): EventApp {
         if (!options.isTest) {
           // Start OTel before importing instrumented subsystems (pg, redis, grpc, etc.)
           await startObservability();
-          shutdown.add("otel.shutdown", async () => {
+          shutdown.add('otel.shutdown', async () => {
             await stopObservability();
           });
         }
 
-        const { closePgPool } = await import("./storage/pgClient");
-        shutdown.add("pg.close", async () => {
+        const { closePgPool } = await import('./storage/pgClient');
+        shutdown.add('pg.close', async () => {
           await closePgPool();
         });
 
-        const { runMigrations } = await import("./storage/migrations");
-        const { connectRedis, closeRedis } = await import("./storage/redisClient");
-        const { handMaterializer } = await import("./jobs/handMaterializer");
-        const { archiver } = await import("./jobs/archiver");
-        const { startMetricsServer } = await import("./observability/metrics");
-        const { startGrpcServer, stopGrpcServer } = await import("./api/grpc/server");
+        const { runMigrations } = await import('./storage/migrations');
+        const { connectRedis, closeRedis } = await import('./storage/redisClient');
+        const { handMaterializer } = await import('./jobs/handMaterializer');
+        const { archiver } = await import('./jobs/archiver');
+        const { startMetricsServer } = await import('./observability/metrics');
+        const { startGrpcServer, stopGrpcServer } = await import('./api/grpc/server');
 
         if (!options.isTest) {
           await runMigrations();
         }
 
         await connectRedis();
-        shutdown.add("redis.close", async () => {
+        shutdown.add('redis.close', async () => {
           await closeRedis();
         });
 
         if (!options.isTest) {
           await handMaterializer.start();
           await archiver.start();
-          shutdown.add("jobs.stop", () => {
+          shutdown.add('jobs.stop', () => {
             handMaterializer.stop();
             archiver.stop();
           });
 
           metricsServer = startMetricsServer(options.config.metricsPort);
-          shutdown.add("metrics.close", async () => {
+          shutdown.add('metrics.close', async () => {
             if (!metricsServer) {
               return;
             }
@@ -114,7 +118,7 @@ export function createEventApp(options: CreateEventAppOptions): EventApp {
         }
 
         await startGrpcServer(options.config.grpcPort);
-        shutdown.add("grpc.stop", () => {
+        shutdown.add('grpc.stop', () => {
           stopGrpcServer();
         });
 
@@ -123,7 +127,7 @@ export function createEventApp(options: CreateEventAppOptions): EventApp {
         try {
           await shutdown.run();
         } catch (shutdownError: unknown) {
-          logger.error({ err: shutdownError }, "EventApp shutdown failed after start error");
+          logger.error({ err: shutdownError }, 'EventApp shutdown failed after start error');
         } finally {
           shutdownManager = null;
           metricsServer = null;

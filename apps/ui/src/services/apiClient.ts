@@ -1,7 +1,7 @@
-import { getToken } from "./auth";
-import { recordApiCall, recordError } from "../observability/otel";
+import { getToken } from './auth';
+import { recordApiCall, recordError } from '../observability/otel';
 
-const DEFAULT_BASE_URL = "http://localhost:4000";
+const DEFAULT_BASE_URL = 'http://localhost:4000';
 
 export function getApiBaseUrl() {
   return (window as Window & { __API_BASE_URL__?: string }).__API_BASE_URL__ ?? DEFAULT_BASE_URL;
@@ -11,10 +11,10 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
   const token = getToken();
   const headers = new Headers(options.headers);
   if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
+    headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const method = options.method ?? "GET";
+  const method = options.method ?? 'GET';
   const endpoint = `${getApiBaseUrl()}${path}`;
   const startedAt = Date.now();
   let response: Response;
@@ -28,7 +28,7 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
   } catch (error) {
     recordApiCall(endpoint, method, undefined, Date.now() - startedAt);
     if (error instanceof Error) {
-      recordError(error, { "http.url": endpoint, "http.method": method });
+      recordError(error, { 'http.url': endpoint, 'http.method': method });
     }
     throw error;
   }

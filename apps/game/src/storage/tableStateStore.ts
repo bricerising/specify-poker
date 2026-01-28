@@ -1,8 +1,8 @@
-import redisClient from "./redisClient";
-import { TableState } from "../domain/types";
+import redisClient from './redisClient';
+import type { TableState } from '../domain/types';
 
-const STATE_PREFIX = "game:state:";
-const STATE_LOCK_PREFIX = "game:state:lock:";
+const STATE_PREFIX = 'game:state:';
+const STATE_LOCK_PREFIX = 'game:state:lock:';
 
 export class TableStateStore {
   async save(state: TableState): Promise<void> {
@@ -25,7 +25,7 @@ export class TableStateStore {
   async lock(tableId: string, owner: string, ttlMs = 5000): Promise<boolean> {
     const key = `${STATE_LOCK_PREFIX}${tableId}`;
     const result = await redisClient.set(key, owner, { NX: true, PX: ttlMs });
-    return result === "OK";
+    return result === 'OK';
   }
 
   async unlock(tableId: string, owner: string): Promise<void> {

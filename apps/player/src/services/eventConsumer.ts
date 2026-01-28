@@ -3,16 +3,16 @@ import {
   runRedisStreamConsumer,
   type RedisStreamConsumerClient,
   type RedisStreamConsumerMessage,
-} from "@specify-poker/shared/redis";
-import { incrementHandsPlayed, incrementWins } from "./statisticsService";
-import logger from "../observability/logger";
-import { decodeStructLike } from "@specify-poker/shared";
-import { getConfig } from "../config";
+} from '@specify-poker/shared/redis';
+import { incrementHandsPlayed, incrementWins } from './statisticsService';
+import logger from '../observability/logger';
+import { decodeStructLike } from '@specify-poker/shared';
+import { getConfig } from '../config';
 
 type UnknownRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is UnknownRecord {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function safeJsonParse(value: string): unknown | null {
@@ -28,7 +28,7 @@ type StatisticsService = {
   incrementWins(userId: string): Promise<unknown>;
 };
 
-type HandEventType = "HAND_STARTED" | "HAND_ENDED";
+type HandEventType = 'HAND_STARTED' | 'HAND_ENDED';
 
 type HandEventHandlers = {
   [Type in HandEventType]: (data: Record<string, unknown>) => Promise<void>;
@@ -39,7 +39,7 @@ export function createHandEventHandlers(statisticsService: StatisticsService): H
     HAND_STARTED: async (data) => {
       const participants = Array.isArray(data.participants) ? data.participants : [];
       for (const userId of participants) {
-        if (typeof userId === "string" && userId) {
+        if (typeof userId === 'string' && userId) {
           await statisticsService.incrementHandsPlayed(userId);
         }
       }
@@ -47,7 +47,7 @@ export function createHandEventHandlers(statisticsService: StatisticsService): H
     HAND_ENDED: async (data) => {
       const winnerUserIds = Array.isArray(data.winnerUserIds) ? data.winnerUserIds : [];
       for (const userId of winnerUserIds) {
-        if (typeof userId === "string" && userId) {
+        if (typeof userId === 'string' && userId) {
           await statisticsService.incrementWins(userId);
         }
       }
@@ -85,8 +85,8 @@ export class EventConsumer {
   private abortController: AbortController | null = null;
 
   constructor(options: EventConsumerOptions = {}) {
-    this.streamKey = options.streamKey ?? "events:all";
-    this.groupName = options.groupName ?? "player-service";
+    this.streamKey = options.streamKey ?? 'events:all';
+    this.groupName = options.groupName ?? 'player-service';
     this.consumerName = options.consumerName ?? `consumer-${process.pid}`;
     this.blockMs = options.blockMs ?? 5000;
     this.readCount = options.readCount ?? 10;
@@ -106,7 +106,7 @@ export class EventConsumer {
 
     const getManager = () => {
       if (!manager) {
-        manager = createRedisClientManager({ url, log: logger, name: "player-event-consumer" });
+        manager = createRedisClientManager({ url, log: logger, name: 'player-event-consumer' });
       }
       return manager;
     };
@@ -131,12 +131,12 @@ export class EventConsumer {
 
     const client = await this.getClient();
     if (!client) {
-      logger.warn("Redis not available, EventConsumer will not start");
+      logger.warn('Redis not available, EventConsumer will not start');
       return;
     }
 
     this.isRunning = true;
-    logger.info("Player EventConsumer started");
+    logger.info('Player EventConsumer started');
 
     const controller = new AbortController();
     this.abortController = controller;
@@ -148,7 +148,7 @@ export class EventConsumer {
       getClient: async () => {
         const nextClient = await this.getClient();
         if (!nextClient) {
-          throw new Error("player_event_consumer.redis_not_available");
+          throw new Error('player_event_consumer.redis_not_available');
         }
         return nextClient;
       },
@@ -163,20 +163,20 @@ export class EventConsumer {
       if (!this.isRunning) {
         return;
       }
-      logger.error({ err: error }, "EventConsumer poll loop crashed");
+      logger.error({ err: error }, 'EventConsumer poll loop crashed');
     });
   }
 
   private async handleStreamMessage(message: RedisStreamConsumerMessage): Promise<void> {
     const rawData = message.fields.data;
-    if (typeof rawData !== "string") {
-      logger.warn({ messageId: message.id }, "eventConsumer.invalidMessage");
+    if (typeof rawData !== 'string') {
+      logger.warn({ messageId: message.id }, 'eventConsumer.invalidMessage');
       return;
     }
 
     const parsed = safeJsonParse(rawData);
     if (!parsed) {
-      logger.warn({ messageId: message.id }, "eventConsumer.invalidJson");
+      logger.warn({ messageId: message.id }, 'eventConsumer.invalidJson');
       return;
     }
 
@@ -190,15 +190,15 @@ export class EventConsumer {
       }
 
       const type = event.type;
-      if (type !== "HAND_STARTED" && type !== "HAND_ENDED") {
+      if (type !== 'HAND_STARTED' && type !== 'HAND_ENDED') {
         return;
       }
 
       const data = decodeStructLike(event.payload);
       await this.handlers[type](data);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "unknown";
-      logger.error({ message }, "Error handling event");
+      const message = error instanceof Error ? error.message : 'unknown';
+      logger.error({ message }, 'Error handling event');
     }
   }
 

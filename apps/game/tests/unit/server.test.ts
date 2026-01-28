@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const serverState = vi.hoisted(() => ({
   connectRedis: vi.fn(async () => undefined),
@@ -15,44 +15,44 @@ const serverState = vi.hoisted(() => ({
   logger: { info: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock("../../src/observability", () => ({
+vi.mock('../../src/observability', () => ({
   startObservability: serverState.startObservability,
   stopObservability: serverState.stopObservability,
 }));
 
-vi.mock("../../src/api/grpc/server", () => ({
+vi.mock('../../src/api/grpc/server', () => ({
   startGrpcServer: serverState.startGrpcServer,
   stopGrpcServer: serverState.stopGrpcServer,
 }));
 
-vi.mock("../../src/storage/redisClient", () => ({
+vi.mock('../../src/storage/redisClient', () => ({
   connectRedis: serverState.connectRedis,
   closeRedisClient: serverState.closeRedisClient,
 }));
 
-vi.mock("../../src/observability/metrics", () => ({
+vi.mock('../../src/observability/metrics', () => ({
   startMetricsServer: serverState.startMetricsServer,
 }));
 
-vi.mock("../../src/observability/logger", () => ({
+vi.mock('../../src/observability/logger', () => ({
   default: serverState.logger,
 }));
 
-vi.mock("../../src/config", () => ({
+vi.mock('../../src/config', () => ({
   config: { port: 50053, metricsPort: 9105 },
 }));
 
-describe("server lifecycle", () => {
+describe('server lifecycle', () => {
   const originalEnv = process.env.NODE_ENV;
 
   afterEach(() => {
     process.env.NODE_ENV = originalEnv;
   });
 
-  it("starts services and shuts down cleanly", async () => {
-    const server = await import("../../src/server");
+  it('starts services and shuts down cleanly', async () => {
+    const server = await import('../../src/server');
 
-    process.env.NODE_ENV = "production";
+    process.env.NODE_ENV = 'production';
     await server.main();
     expect(serverState.connectRedis).toHaveBeenCalledTimes(1);
     expect(serverState.startGrpcServer).toHaveBeenCalledWith(50053);

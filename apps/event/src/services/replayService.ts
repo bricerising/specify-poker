@@ -1,10 +1,10 @@
-import { eventStore } from "../storage/eventStore";
-import { GameEvent } from "../domain/types";
-import { privacyService } from "./privacyService";
+import { eventStore } from '../storage/eventStore';
+import type { GameEvent } from '../domain/types';
+import { privacyService } from './privacyService';
 
 function extractParticipants(events: GameEvent[]): Set<string> {
   const participants = new Set<string>();
-  const handStarted = events.find((event) => event.type === "HAND_STARTED");
+  const handStarted = events.find((event) => event.type === 'HAND_STARTED');
   const payload = handStarted?.payload as { seats?: { userId?: string }[] } | undefined;
   for (const seat of payload?.seats || []) {
     if (seat.userId) {
@@ -15,7 +15,11 @@ function extractParticipants(events: GameEvent[]): Set<string> {
 }
 
 export class ReplayService {
-  async getHandEvents(handId: string, requesterUserId?: string, isOperator = false): Promise<GameEvent[]> {
+  async getHandEvents(
+    handId: string,
+    requesterUserId?: string,
+    isOperator = false,
+  ): Promise<GameEvent[]> {
     const result = await eventStore.queryEvents({ handId, limit: 1000 });
     const events = result.events;
 
@@ -25,7 +29,9 @@ export class ReplayService {
 
     const participantUserIds = extractParticipants(events);
 
-    return events.map((event) => privacyService.filterEvent(event, requesterUserId, isOperator, participantUserIds));
+    return events.map((event) =>
+      privacyService.filterEvent(event, requesterUserId, isOperator, participantUserIds),
+    );
   }
 }
 

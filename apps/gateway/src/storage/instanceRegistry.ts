@@ -1,9 +1,9 @@
-import { getRedisClient } from "./redisClient";
-import { getWsInstanceId } from "../ws/pubsub";
-import { clearInstanceConnections } from "./connectionStore";
-import logger from "../observability/logger";
+import { getRedisClient } from './redisClient';
+import { getWsInstanceId } from '../ws/pubsub';
+import { clearInstanceConnections } from './connectionStore';
+import logger from '../observability/logger';
 
-const INSTANCE_REGISTRY_KEY = "gateway:instances";
+const INSTANCE_REGISTRY_KEY = 'gateway:instances';
 const HEARTBEAT_INTERVAL = 10000;
 const STALE_THRESHOLD = 30000;
 
@@ -17,7 +17,7 @@ async function updateHeartbeat(
   try {
     await redis.hSet(INSTANCE_REGISTRY_KEY, instanceId, Date.now().toString());
   } catch (err) {
-    logger.error({ err }, "Failed to update instance heartbeat");
+    logger.error({ err }, 'Failed to update instance heartbeat');
   }
 }
 
@@ -50,7 +50,7 @@ export async function registerInstance() {
     // Initial cleanup of other stale instances
     await cleanupStaleInstances();
   } catch (err) {
-    logger.error({ err }, "Failed to register instance");
+    logger.error({ err }, 'Failed to register instance');
   }
 }
 
@@ -73,7 +73,7 @@ export async function unregisterInstance(): Promise<void> {
     await clearInstanceConnections(instanceId);
     await redis.hDel(INSTANCE_REGISTRY_KEY, instanceId);
   } catch (err) {
-    logger.error({ err, instanceId }, "Failed to unregister instance");
+    logger.error({ err, instanceId }, 'Failed to unregister instance');
   }
 }
 
@@ -87,12 +87,12 @@ export async function cleanupStaleInstances() {
 
     for (const [instanceId, lastSeen] of Object.entries(instances)) {
       if (now - parseInt(lastSeen, 10) > STALE_THRESHOLD) {
-        logger.info({ staleInstanceId: instanceId }, "Cleaning up stale instance");
+        logger.info({ staleInstanceId: instanceId }, 'Cleaning up stale instance');
         await clearInstanceConnections(instanceId);
         await redis.hDel(INSTANCE_REGISTRY_KEY, instanceId);
       }
     }
   } catch (err) {
-    logger.error({ err }, "Failed to cleanup stale instances");
+    logger.error({ err }, 'Failed to cleanup stale instances');
   }
 }

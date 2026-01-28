@@ -1,10 +1,10 @@
-import { NodeSDK } from "@opentelemetry/sdk-node";
-import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-grpc";
-import { Resource } from "@opentelemetry/resources";
-import { SemanticResourceAttributes } from "@opentelemetry/semantic-conventions";
-import { getConfig } from "../config";
-import logger from "./logger";
+import { NodeSDK } from '@opentelemetry/sdk-node';
+import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
+import { Resource } from '@opentelemetry/resources';
+import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
+import { getConfig } from '../config';
+import logger from './logger';
 
 let sdk: NodeSDK | null = null;
 
@@ -16,7 +16,7 @@ export function startObservability() {
   const config = getConfig();
   sdk = new NodeSDK({
     resource: new Resource({
-      [SemanticResourceAttributes.SERVICE_NAME]: "balance-service",
+      [SemanticResourceAttributes.SERVICE_NAME]: 'balance-service',
     }),
     traceExporter: new OTLPTraceExporter({
       url: config.otelExporterEndpoint,
@@ -25,7 +25,7 @@ export function startObservability() {
   });
 
   sdk.start();
-  logger.info("OpenTelemetry SDK started");
+  logger.info('OpenTelemetry SDK started');
 }
 
 export async function stopObservability() {
@@ -35,5 +35,5 @@ export async function stopObservability() {
 
   await sdk.shutdown();
   sdk = null;
-  logger.info("OpenTelemetry SDK shut down");
+  logger.info('OpenTelemetry SDK shut down');
 }

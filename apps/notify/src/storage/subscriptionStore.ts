@@ -1,20 +1,20 @@
-import { getRedisClient } from "./redisClient";
-import { UserPushSubscription, PushSubscription } from "../domain/types";
-import logger from "../observability/logger";
-import { toError } from "../shared/errors";
+import { getRedisClient } from './redisClient';
+import type { UserPushSubscription, PushSubscription } from '../domain/types';
+import logger from '../observability/logger';
+import { toError } from '../shared/errors';
 
-const KEY_PREFIX = "notify:push:";
-const STATS_KEY = "notify:stats";
+const KEY_PREFIX = 'notify:push:';
+const STATS_KEY = 'notify:stats';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isPushKeys(value: unknown): value is PushSubscription["keys"] {
+function isPushKeys(value: unknown): value is PushSubscription['keys'] {
   if (!isRecord(value)) {
     return false;
   }
-  return typeof value.p256dh === "string" && typeof value.auth === "string";
+  return typeof value.p256dh === 'string' && typeof value.auth === 'string';
 }
 
 function isUserPushSubscription(value: unknown): value is UserPushSubscription {
@@ -23,9 +23,9 @@ function isUserPushSubscription(value: unknown): value is UserPushSubscription {
   }
 
   return (
-    typeof value.userId === "string" &&
-    typeof value.endpoint === "string" &&
-    typeof value.createdAt === "string" &&
+    typeof value.userId === 'string' &&
+    typeof value.endpoint === 'string' &&
+    typeof value.createdAt === 'string' &&
     isPushKeys(value.keys)
   );
 }
@@ -38,7 +38,7 @@ function parseUserPushSubscription(serialized: string): UserPushSubscription | n
     }
     return parsed;
   } catch (error: unknown) {
-    logger.warn({ err: toError(error) }, "Failed to parse stored subscription JSON");
+    logger.warn({ err: toError(error) }, 'Failed to parse stored subscription JSON');
     return null;
   }
 }
@@ -100,7 +100,7 @@ export class SubscriptionStore {
     return subscriptions;
   }
 
-  async incrementStat(field: "success" | "failure" | "cleanup"): Promise<void> {
+  async incrementStat(field: 'success' | 'failure' | 'cleanup'): Promise<void> {
     const client = await this.getClient();
     await client.hIncrBy(STATS_KEY, field, 1);
   }

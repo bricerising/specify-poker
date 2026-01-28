@@ -1,5 +1,5 @@
-import type { Result } from "../result";
-import { err, ok } from "../result";
+import type { Result } from '../result';
+import { err, ok } from '../result';
 
 export type UnaryClientCallback<Response, CallbackError extends Error = Error> = (
   error: CallbackError | null,
@@ -33,7 +33,7 @@ export function unaryCall<Request, Response, CallbackError extends Error = Error
     let call: unknown;
 
     const cleanup = () => {
-      signal?.removeEventListener("abort", onAbort);
+      signal?.removeEventListener('abort', onAbort);
     };
 
     const settle = (action: () => void) => {
@@ -55,7 +55,7 @@ export function unaryCall<Request, Response, CallbackError extends Error = Error
       settle(() => reject(createAbortError()));
     };
 
-    signal?.addEventListener("abort", onAbort);
+    signal?.addEventListener('abort', onAbort);
 
     try {
       call = method(request, (error, response) => {
@@ -86,15 +86,15 @@ export async function unaryCallResult<Request, Response, CallbackError extends E
 }
 
 function isCancelableCall(value: unknown): value is CancelableCall {
-  if (typeof value !== "object" || value === null) {
+  if (typeof value !== 'object' || value === null) {
     return false;
   }
 
-  return "cancel" in value && typeof (value as { cancel?: unknown }).cancel === "function";
+  return 'cancel' in value && typeof (value as { cancel?: unknown }).cancel === 'function';
 }
 
 function createAbortError(): Error {
-  const error = new Error("Aborted");
-  error.name = "AbortError";
+  const error = new Error('Aborted');
+  error.name = 'AbortError';
   return error;
 }

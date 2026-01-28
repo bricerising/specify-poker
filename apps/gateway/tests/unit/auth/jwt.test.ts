@@ -1,31 +1,31 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const jwtMock = {
   decode: vi.fn(),
   verify: vi.fn(),
 };
 
-vi.mock("jsonwebtoken", () => ({
+vi.mock('jsonwebtoken', () => ({
   default: jwtMock,
 }));
 
-vi.mock("../../../src/config", () => ({
-  getConfig: () => ({ jwtSecret: process.env.JWT_CONFIG_SECRET ?? "config-secret" }),
+vi.mock('../../../src/config', () => ({
+  getConfig: () => ({ jwtSecret: process.env.JWT_CONFIG_SECRET ?? 'config-secret' }),
 }));
 
 const originalFetch = global.fetch;
 
 function base64UrlEncode(value: unknown): string {
-  return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
+  return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
 }
 
 function createTestJwt(header: Record<string, unknown>): string {
-  const headerSegment = base64UrlEncode({ typ: "JWT", alg: "RS256", ...header });
+  const headerSegment = base64UrlEncode({ typ: 'JWT', alg: 'RS256', ...header });
   const payloadSegment = base64UrlEncode({});
   return `${headerSegment}.${payloadSegment}.sig`;
 }
 
-describe("JWT verification", () => {
+describe('JWT verification', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
@@ -42,71 +42,71 @@ describe("JWT verification", () => {
     global.fetch = originalFetch;
   });
 
-  it("uses configured public key when provided", async () => {
-    process.env.JWT_PUBLIC_KEY = "PUBLICKEY";
-    jwtMock.verify.mockReturnValue({ sub: "user-1" });
+  it('uses configured public key when provided', async () => {
+    process.env.JWT_PUBLIC_KEY = 'PUBLICKEY';
+    jwtMock.verify.mockReturnValue({ sub: 'user-1' });
 
-    const { verifyToken } = await import("../../../src/auth/jwt");
+    const { verifyToken } = await import('../../../src/auth/jwt');
     const token = createTestJwt({});
     const result = await verifyToken(token);
 
     expect(jwtMock.verify).toHaveBeenCalledWith(
       token,
-      expect.stringContaining("BEGIN PUBLIC KEY"),
-      expect.objectContaining({ algorithms: ["RS256"] })
+      expect.stringContaining('BEGIN PUBLIC KEY'),
+      expect.objectContaining({ algorithms: ['RS256'] }),
     );
-    expect(result.sub).toBe("user-1");
+    expect(result.sub).toBe('user-1');
   });
 
-  it("uses JWKS certificate when token header has kid", async () => {
-    jwtMock.verify.mockReturnValue({ sub: "user-2" });
+  it('uses JWKS certificate when token header has kid', async () => {
+    jwtMock.verify.mockReturnValue({ sub: 'user-2' });
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ keys: [{ kid: "kid-1", x5c: ["CERTDATA"] }] }),
+      json: async () => ({ keys: [{ kid: 'kid-1', x5c: ['CERTDATA'] }] }),
     } as Response);
 
-    const { verifyToken } = await import("../../../src/auth/jwt");
-    const token = createTestJwt({ kid: "kid-1" });
+    const { verifyToken } = await import('../../../src/auth/jwt');
+    const token = createTestJwt({ kid: 'kid-1' });
     await verifyToken(token);
 
     expect(jwtMock.verify).toHaveBeenCalledWith(
       token,
-      expect.stringContaining("BEGIN CERTIFICATE"),
-      expect.objectContaining({ algorithms: ["RS256"] })
+      expect.stringContaining('BEGIN CERTIFICATE'),
+      expect.objectContaining({ algorithms: ['RS256'] }),
     );
   });
 
-  it("falls back to HS256 secret when no kid or public key", async () => {
-    process.env.JWT_HS256_SECRET = "shared-secret";
-    jwtMock.verify.mockReturnValue({ sub: "user-3" });
+  it('falls back to HS256 secret when no kid or public key', async () => {
+    process.env.JWT_HS256_SECRET = 'shared-secret';
+    jwtMock.verify.mockReturnValue({ sub: 'user-3' });
 
-    const { verifyToken } = await import("../../../src/auth/jwt");
+    const { verifyToken } = await import('../../../src/auth/jwt');
     const token = createTestJwt({});
     await verifyToken(token);
 
     expect(jwtMock.verify).toHaveBeenCalledWith(
       token,
-      "shared-secret",
-      expect.objectContaining({ algorithms: ["HS256"] })
+      'shared-secret',
+      expect.objectContaining({ algorithms: ['HS256'] }),
     );
   });
 
-  it("fetches Keycloak realm public key when no secret or kid", async () => {
-    process.env.JWT_CONFIG_SECRET = "";
-    jwtMock.verify.mockReturnValue({ sub: "user-4" });
+  it('fetches Keycloak realm public key when no secret or kid', async () => {
+    process.env.JWT_CONFIG_SECRET = '';
+    jwtMock.verify.mockReturnValue({ sub: 'user-4' });
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ public_key: "REALMKEY" }),
+      json: async () => ({ public_key: 'REALMKEY' }),
     } as Response);
 
-    const { verifyToken } = await import("../../../src/auth/jwt");
+    const { verifyToken } = await import('../../../src/auth/jwt');
     const token = createTestJwt({});
     await verifyToken(token);
 
     expect(jwtMock.verify).toHaveBeenCalledWith(
       token,
-      expect.stringContaining("BEGIN PUBLIC KEY"),
-      expect.objectContaining({ algorithms: ["RS256"] })
+      expect.stringContaining('BEGIN PUBLIC KEY'),
+      expect.objectContaining({ algorithms: ['RS256'] }),
     );
   });
 });

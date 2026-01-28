@@ -1,14 +1,19 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from 'vitest';
 
-import { runRedisStreamConsumer, type RedisStreamConsumerClient } from "../src/redis/streamConsumer";
+import {
+  runRedisStreamConsumer,
+  type RedisStreamConsumerClient,
+} from '../src/redis/streamConsumer';
 
-describe("runRedisStreamConsumer", () => {
-  it("calls onMessage and acks messages", async () => {
+describe('runRedisStreamConsumer', () => {
+  it('calls onMessage and acks messages', async () => {
     const controller = new AbortController();
 
     const client: RedisStreamConsumerClient = {
-      xGroupCreate: vi.fn(async () => "OK"),
-      xReadGroup: vi.fn(async () => [{ name: "events:all", messages: [{ id: "1-0", message: { data: "hello" } }] }]),
+      xGroupCreate: vi.fn(async () => 'OK'),
+      xReadGroup: vi.fn(async () => [
+        { name: 'events:all', messages: [{ id: '1-0', message: { data: 'hello' } }] },
+      ]),
       xAck: vi.fn(async () => {
         controller.abort();
         return 1;
@@ -18,9 +23,9 @@ describe("runRedisStreamConsumer", () => {
     const onMessage = vi.fn(async () => undefined);
 
     await runRedisStreamConsumer(controller.signal, {
-      streamKey: "events:all",
-      groupName: "group",
-      consumerName: "consumer",
+      streamKey: 'events:all',
+      groupName: 'group',
+      consumerName: 'consumer',
       getClient: async () => client,
       onMessage,
       blockMs: 0,
@@ -28,17 +33,21 @@ describe("runRedisStreamConsumer", () => {
       sleep: async () => undefined,
     });
 
-    expect(client.xGroupCreate).toHaveBeenCalledWith("events:all", "group", "0", { MKSTREAM: true });
-    expect(onMessage).toHaveBeenCalledWith({ id: "1-0", fields: { data: "hello" } });
-    expect(client.xAck).toHaveBeenCalledWith("events:all", "group", "1-0");
+    expect(client.xGroupCreate).toHaveBeenCalledWith('events:all', 'group', '0', {
+      MKSTREAM: true,
+    });
+    expect(onMessage).toHaveBeenCalledWith({ id: '1-0', fields: { data: 'hello' } });
+    expect(client.xAck).toHaveBeenCalledWith('events:all', 'group', '1-0');
   });
 
-  it("acks even when the message handler throws", async () => {
+  it('acks even when the message handler throws', async () => {
     const controller = new AbortController();
 
     const client: RedisStreamConsumerClient = {
-      xGroupCreate: vi.fn(async () => "OK"),
-      xReadGroup: vi.fn(async () => [{ name: "events:all", messages: [{ id: "1-0", message: { data: "boom" } }] }]),
+      xGroupCreate: vi.fn(async () => 'OK'),
+      xReadGroup: vi.fn(async () => [
+        { name: 'events:all', messages: [{ id: '1-0', message: { data: 'boom' } }] },
+      ]),
       xAck: vi.fn(async () => {
         controller.abort();
         return 1;
@@ -46,13 +55,13 @@ describe("runRedisStreamConsumer", () => {
     };
 
     const onMessage = vi.fn(() => {
-      throw new Error("handler_failed");
+      throw new Error('handler_failed');
     });
 
     await runRedisStreamConsumer(controller.signal, {
-      streamKey: "events:all",
-      groupName: "group",
-      consumerName: "consumer",
+      streamKey: 'events:all',
+      groupName: 'group',
+      consumerName: 'consumer',
       getClient: async () => client,
       onMessage,
       blockMs: 0,
@@ -64,14 +73,16 @@ describe("runRedisStreamConsumer", () => {
     expect(client.xAck).toHaveBeenCalledTimes(1);
   });
 
-  it("ignores BUSYGROUP errors for consumer group creation", async () => {
+  it('ignores BUSYGROUP errors for consumer group creation', async () => {
     const controller = new AbortController();
 
     const client: RedisStreamConsumerClient = {
       xGroupCreate: vi.fn(async () => {
-        throw new Error("BUSYGROUP Consumer Group name already exists");
+        throw new Error('BUSYGROUP Consumer Group name already exists');
       }),
-      xReadGroup: vi.fn(async () => [{ name: "events:all", messages: [{ id: "1-0", message: { data: "ok" } }] }]),
+      xReadGroup: vi.fn(async () => [
+        { name: 'events:all', messages: [{ id: '1-0', message: { data: 'ok' } }] },
+      ]),
       xAck: vi.fn(async () => {
         controller.abort();
         return 1;
@@ -79,9 +90,9 @@ describe("runRedisStreamConsumer", () => {
     };
 
     await runRedisStreamConsumer(controller.signal, {
-      streamKey: "events:all",
-      groupName: "group",
-      consumerName: "consumer",
+      streamKey: 'events:all',
+      groupName: 'group',
+      consumerName: 'consumer',
       getClient: async () => client,
       onMessage: async () => undefined,
       blockMs: 0,

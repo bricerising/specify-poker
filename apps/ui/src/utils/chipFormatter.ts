@@ -11,7 +11,7 @@ export function formatChips(amount: number): string {
 }
 
 export function formatChipsWithCommas(amount: number): string {
-  return amount.toLocaleString("en-US");
+  return amount.toLocaleString('en-US');
 }
 
 export function formatBlinds(smallBlind: number, bigBlind: number): string {
@@ -28,7 +28,7 @@ export function calculatePotOdds(potSize: number, callAmount: number): number {
 export function formatPotOdds(potSize: number, callAmount: number): string {
   const odds = calculatePotOdds(potSize, callAmount);
   if (odds === 0) {
-    return "Free";
+    return 'Free';
   }
   const percentage = (odds * 100).toFixed(1);
   return `${percentage}%`;

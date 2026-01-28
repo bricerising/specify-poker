@@ -1,4 +1,4 @@
-import { recordWebSocketMessage } from "../observability/otel";
+import { recordWebSocketMessage } from '../observability/otel';
 
 export function isStaleVersion(currentVersion: number | null, incomingVersion: number) {
   if (currentVersion === null || currentVersion < 0) {
@@ -18,7 +18,7 @@ export function requestResync(socket: WebSocket | null, tableId: string) {
   if (!socket || socket.readyState !== WebSocket.OPEN) {
     return;
   }
-  recordWebSocketMessage("ResyncTable", "sent", tableId);
+  recordWebSocketMessage('ResyncTable', 'sent', tableId);
 
-  socket.send(JSON.stringify({ type: "ResyncTable", tableId }));
+  socket.send(JSON.stringify({ type: 'ResyncTable', tableId }));
 }

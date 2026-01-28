@@ -1,7 +1,7 @@
 export type TableId = string;
 export type UserId = string;
 
-export type BettingStructure = "NoLimit";
+export type BettingStructure = 'NoLimit';
 
 export interface UserProfile {
   userId: UserId;

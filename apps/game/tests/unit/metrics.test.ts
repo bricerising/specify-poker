@@ -1,13 +1,22 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from 'vitest';
 
 const httpState = vi.hoisted(() => ({
-  handler: null as ((req: { url?: string }, res: { statusCode: number; setHeader: (k: string, v: string) => void; end: (body?: string) => void }) => void) | null,
-  lastBody: "",
+  handler: null as
+    | ((
+        req: { url?: string },
+        res: {
+          statusCode: number;
+          setHeader: (k: string, v: string) => void;
+          end: (body?: string) => void;
+        },
+      ) => void)
+    | null,
+  lastBody: '',
   lastStatus: 0,
   lastHeaders: {} as Record<string, string>,
 }));
 
-vi.mock("http", () => ({
+vi.mock('http', () => ({
   createServer: (handler: typeof httpState.handler) => {
     httpState.handler = handler;
     return {
@@ -26,31 +35,31 @@ vi.mock("http", () => ({
   },
 }));
 
-vi.mock("../../src/observability/logger", () => ({
+vi.mock('../../src/observability/logger', () => ({
   default: { info: vi.fn() },
 }));
 
-describe("metrics", () => {
-  it("records metrics and renders output", async () => {
-    const metrics = await import("../../src/observability/metrics");
+describe('metrics', () => {
+  it('records metrics and renders output', async () => {
+    const metrics = await import('../../src/observability/metrics');
 
-    metrics.recordGrpcRequest("Test", "ok", 12);
-    metrics.recordHandStarted("table-1");
-    metrics.recordHandCompleted("table-1", "showdown");
-    metrics.recordAction("CALL");
-    metrics.recordTurnTime("PREFLOP", "CALL", 500);
+    metrics.recordGrpcRequest('Test', 'ok', 12);
+    metrics.recordHandStarted('table-1');
+    metrics.recordHandCompleted('table-1', 'showdown');
+    metrics.recordAction('CALL');
+    metrics.recordTurnTime('PREFLOP', 'CALL', 500);
     metrics.setActiveTables(2);
     metrics.setSeatedPlayers(4);
     metrics.setSpectatorCount(1);
 
     const output = await metrics.renderMetrics();
-    expect(output).toContain("game_grpc_request_duration_seconds");
-    expect(output).toContain("game_hands_started_total");
-    expect(output).toContain("game_actions_processed_total");
+    expect(output).toContain('game_grpc_request_duration_seconds');
+    expect(output).toContain('game_hands_started_total');
+    expect(output).toContain('game_actions_processed_total');
   });
 
-  it("serves the metrics endpoint", async () => {
-    const metrics = await import("../../src/observability/metrics");
+  it('serves the metrics endpoint', async () => {
+    const metrics = await import('../../src/observability/metrics');
     metrics.startMetricsServer(9105);
 
     expect(httpState.handler).toBeTruthy();
@@ -60,11 +69,11 @@ describe("metrics", () => {
         httpState.lastHeaders[key] = value;
       },
       end: (body?: string) => {
-        httpState.lastBody = body ?? "";
+        httpState.lastBody = body ?? '';
       },
     };
 
-    await Promise.resolve(httpState.handler?.({ url: "/metrics" }, response));
-    expect(httpState.lastBody).toContain("game_hands_started_total");
+    await Promise.resolve(httpState.handler?.({ url: '/metrics' }, response));
+    expect(httpState.lastBody).toContain('game_hands_started_total');
   });
 });

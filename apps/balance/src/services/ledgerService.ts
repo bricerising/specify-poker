@@ -1,10 +1,6 @@
-import { LedgerEntry } from "../domain/types";
-import {
-  getLedgerEntries,
-  verifyLedgerIntegrity,
-  getLatestChecksum,
-} from "../storage/ledgerStore";
-import logger from "../observability/logger";
+import type { LedgerEntry } from '../domain/types';
+import { getLedgerEntries, verifyLedgerIntegrity, getLatestChecksum } from '../storage/ledgerStore';
+import logger from '../observability/logger';
 
 export interface LedgerQueryOptions {
   limit?: number;
@@ -26,7 +22,7 @@ export interface IntegrityResult {
 
 export async function queryLedger(
   accountId: string,
-  options: LedgerQueryOptions = {}
+  options: LedgerQueryOptions = {},
 ): Promise<LedgerQueryResult> {
   return getLedgerEntries(accountId, options);
 }
@@ -41,7 +37,7 @@ export async function getAccountChecksum(accountId: string): Promise<string> {
 
 // Background job to verify all ledgers
 export async function verifyAllLedgers(
-  accountIds: string[]
+  accountIds: string[],
 ): Promise<{ valid: boolean; results: Record<string, IntegrityResult> }> {
   const results: Record<string, IntegrityResult> = {};
   let allValid = true;
@@ -51,11 +47,14 @@ export async function verifyAllLedgers(
     results[accountId] = result;
     if (!result.valid) {
       allValid = false;
-      logger.error({
-        accountId,
-        entriesChecked: result.entriesChecked,
-        firstInvalidEntry: result.firstInvalidEntry,
-      }, "ledger.integrity.failed");
+      logger.error(
+        {
+          accountId,
+          entriesChecked: result.entriesChecked,
+          firstInvalidEntry: result.firstInvalidEntry,
+        },
+        'ledger.integrity.failed',
+      );
     }
   }
 

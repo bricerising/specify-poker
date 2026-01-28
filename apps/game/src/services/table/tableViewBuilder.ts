@@ -1,6 +1,6 @@
-import { HandState, Table, TableState } from "../../domain/types";
+import type { HandState, Table, TableState } from '../../domain/types';
 
-function redactSeatForBroadcast(seat: TableState["seats"][number]) {
+function redactSeatForBroadcast(seat: TableState['seats'][number]) {
   return {
     seatId: seat.seatId,
     userId: seat.userId,

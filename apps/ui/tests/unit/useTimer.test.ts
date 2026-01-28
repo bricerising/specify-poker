@@ -1,9 +1,9 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { renderHook } from '@testing-library/react';
 
-import { useTimer } from "../../src/hooks/useTimer";
+import { useTimer } from '../../src/hooks/useTimer';
 
-describe("useTimer", () => {
+describe('useTimer', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -12,15 +12,15 @@ describe("useTimer", () => {
     vi.useRealTimers();
   });
 
-  it("returns expired state when no deadline", () => {
+  it('returns expired state when no deadline', () => {
     const { result } = renderHook(() => useTimer(null));
 
     expect(result.current.isExpired).toBe(true);
     expect(result.current.remainingMs).toBe(0);
-    expect(result.current.formatted).toBe("--:--");
+    expect(result.current.formatted).toBe('--:--');
   });
 
-  it("calculates remaining time correctly", () => {
+  it('calculates remaining time correctly', () => {
     const now = Date.now();
     vi.setSystemTime(now);
 
@@ -33,7 +33,7 @@ describe("useTimer", () => {
     expect(result.current.isCritical).toBe(false);
   });
 
-  it("marks urgent when under 10 seconds", () => {
+  it('marks urgent when under 10 seconds', () => {
     const now = Date.now();
     vi.setSystemTime(now);
 
@@ -44,7 +44,7 @@ describe("useTimer", () => {
     expect(result.current.isCritical).toBe(false);
   });
 
-  it("marks critical when under 5 seconds", () => {
+  it('marks critical when under 5 seconds', () => {
     const now = Date.now();
     vi.setSystemTime(now);
 
@@ -54,13 +54,13 @@ describe("useTimer", () => {
     expect(result.current.isCritical).toBe(true);
   });
 
-  it("formats time correctly", () => {
+  it('formats time correctly', () => {
     const now = Date.now();
     vi.setSystemTime(now);
 
     const deadline = new Date(now + 65000).toISOString();
     const { result } = renderHook(() => useTimer(deadline));
 
-    expect(result.current.formatted).toBe("1:05");
+    expect(result.current.formatted).toBe('1:05');
   });
 });

@@ -1,22 +1,23 @@
-import React from "react";
-import { createRoot } from "react-dom/client";
+import React from 'react';
+import { createRoot } from 'react-dom/client';
 
-import { LobbyPage } from "./pages/LobbyPage";
-import { TablePage } from "./pages/TablePage";
-import { ProfilePage } from "./pages/ProfilePage";
-import { FriendsPage } from "./pages/FriendsPage";
-import { PokerArt } from "./components/PokerArt";
-import { initUiTelemetry, recordNavigation } from "./observability/otel";
-import { clearToken, hydrateTokenFromCallback, isAuthenticated, startLogin } from "./services/auth";
-import { ensurePushSubscription } from "./services/pushManager";
-import { tableStore } from "./state/tableStore";
-import { fetchProfile, UserProfile } from "./services/profileApi";
-import { testIds } from "./utils/testIds";
+import { LobbyPage } from './pages/LobbyPage';
+import { TablePage } from './pages/TablePage';
+import { ProfilePage } from './pages/ProfilePage';
+import { FriendsPage } from './pages/FriendsPage';
+import { PokerArt } from './components/PokerArt';
+import { initUiTelemetry, recordNavigation } from './observability/otel';
+import { clearToken, hydrateTokenFromCallback, isAuthenticated, startLogin } from './services/auth';
+import { ensurePushSubscription } from './services/pushManager';
+import { tableStore } from './state/tableStore';
+import type { UserProfile } from './services/profileApi';
+import { fetchProfile } from './services/profileApi';
+import { testIds } from './utils/testIds';
 
-const rootElement = document.getElementById("root");
+const rootElement = document.getElementById('root');
 
 if (!rootElement) {
-  throw new Error("Root element #root not found");
+  throw new Error('Root element #root not found');
 }
 
 initUiTelemetry();
@@ -25,29 +26,29 @@ recordNavigation(window.location.pathname);
 const root = createRoot(rootElement);
 
 type AppRoute =
-  | { kind: "lobby" }
-  | { kind: "profile" }
-  | { kind: "friends" }
-  | { kind: "table"; tableId: string };
+  | { kind: 'lobby' }
+  | { kind: 'profile' }
+  | { kind: 'friends' }
+  | { kind: 'table'; tableId: string };
 
 function normalizePathname(pathname: string) {
-  const trimmed = pathname.trim().replace(/\/+$/, "");
-  return trimmed.length > 0 ? trimmed : "/";
+  const trimmed = pathname.trim().replace(/\/+$/, '');
+  return trimmed.length > 0 ? trimmed : '/';
 }
 
 function parseRoute(pathname: string): AppRoute {
   const normalized = normalizePathname(pathname);
   const tableMatch = normalized.match(/^\/table\/([^/]+)$/);
   if (tableMatch) {
-    return { kind: "table", tableId: decodeURIComponent(tableMatch[1]) };
+    return { kind: 'table', tableId: decodeURIComponent(tableMatch[1]) };
   }
-  if (normalized === "/profile") {
-    return { kind: "profile" };
+  if (normalized === '/profile') {
+    return { kind: 'profile' };
   }
-  if (normalized === "/friends") {
-    return { kind: "friends" };
+  if (normalized === '/friends') {
+    return { kind: 'friends' };
   }
-  return { kind: "lobby" };
+  return { kind: 'lobby' };
 }
 
 function buildTablePath(tableId: string) {
@@ -59,7 +60,7 @@ function PokerApp() {
   const [profile, setProfile] = React.useState<UserProfile | null>(null);
   const [pathname, setPathname] = React.useState(() => normalizePathname(window.location.pathname));
   const route = React.useMemo(() => parseRoute(pathname), [pathname]);
-  const tableRouteId = route.kind === "table" ? route.tableId : null;
+  const tableRouteId = route.kind === 'table' ? route.tableId : null;
   const previousTableIdRef = React.useRef<string | null>(null);
 
   React.useEffect(() => tableStore.subscribe(setState), []);
@@ -69,8 +70,8 @@ function PokerApp() {
       setPathname(nextPath);
       recordNavigation(nextPath);
     };
-    window.addEventListener("popstate", handler);
-    return () => window.removeEventListener("popstate", handler);
+    window.addEventListener('popstate', handler);
+    return () => window.removeEventListener('popstate', handler);
   }, []);
 
   const navigate = React.useCallback((nextPath: string) => {
@@ -78,7 +79,7 @@ function PokerApp() {
     if (normalized === window.location.pathname) {
       return;
     }
-    window.history.pushState(null, "", normalized);
+    window.history.pushState(null, '', normalized);
     setPathname(normalized);
     recordNavigation(normalized);
   }, []);
@@ -98,7 +99,7 @@ function PokerApp() {
   }, [tableRouteId]);
 
   React.useEffect(() => {
-    if (route.kind === "table") {
+    if (route.kind === 'table') {
       return;
     }
     if (state.tableState) {
@@ -111,12 +112,12 @@ function PokerApp() {
     const previousTableId = previousTableIdRef.current;
     previousTableIdRef.current = currentTableId;
 
-    if (route.kind === "table" && previousTableId && !currentTableId) {
-      navigate("/");
+    if (route.kind === 'table' && previousTableId && !currentTableId) {
+      navigate('/');
       return;
     }
 
-    if (route.kind !== "table" && currentTableId && !previousTableId) {
+    if (route.kind !== 'table' && currentTableId && !previousTableId) {
       navigate(buildTablePath(currentTableId));
     }
   }, [navigate, route.kind, state.tableState?.tableId]);
@@ -125,13 +126,13 @@ function PokerApp() {
     fetchProfile()
       .then((data) => setProfile(data))
       .catch((error: Error) => {
-        console.warn("profile.fetch.failed", { message: error.message });
+        console.warn('profile.fetch.failed', { message: error.message });
       });
   }, []);
 
   React.useEffect(() => {
     ensurePushSubscription().catch((error: Error) => {
-      console.warn("push.subscribe.failed", { message: error.message });
+      console.warn('push.subscribe.failed', { message: error.message });
     });
   }, []);
 
@@ -149,7 +150,7 @@ function PokerApp() {
       <div className="header-actions">
         <div className="user-badge">
           <div className="user-label">Signed in</div>
-          <div className="user-value">{profile ? profile.username : "Player"}</div>
+          <div className="user-value">{profile ? profile.username : 'Player'}</div>
         </div>
         <button
           type="button"
@@ -163,19 +164,20 @@ function PokerApp() {
     </header>
   );
 
-  if (route.kind === "table" || state.tableState) {
+  if (route.kind === 'table' || state.tableState) {
     return (
       <div className="app-shell app-shell-table">
         {header}
         <div className="content">
-          <TablePage store={tableStore} onLeave={() => navigate("/")} />
+          <TablePage store={tableStore} onLeave={() => navigate('/')} />
         </div>
       </div>
     );
   }
 
   const view = route.kind;
-  const navClass = (target: "lobby" | "profile" | "friends") => `nav-button${view === target ? " active" : ""}`;
+  const navClass = (target: 'lobby' | 'profile' | 'friends') =>
+    `nav-button${view === target ? ' active' : ''}`;
 
   return (
     <div className="app-shell">
@@ -183,64 +185,64 @@ function PokerApp() {
       <nav className="app-nav">
         <button
           type="button"
-          className={navClass("lobby")}
-          onClick={() => navigate("/")}
+          className={navClass('lobby')}
+          onClick={() => navigate('/')}
           data-testid={testIds.nav.lobby}
         >
           Lobby
         </button>
         <button
           type="button"
-          className={navClass("profile")}
-          onClick={() => navigate("/profile")}
+          className={navClass('profile')}
+          onClick={() => navigate('/profile')}
           data-testid={testIds.nav.profile}
         >
           Profile
         </button>
         <button
           type="button"
-          className={navClass("friends")}
-          onClick={() => navigate("/friends")}
+          className={navClass('friends')}
+          onClick={() => navigate('/friends')}
           data-testid={testIds.nav.friends}
         >
           Friends
         </button>
       </nav>
       <div className="content">
-        {view === "lobby" ? <LobbyPage store={tableStore} /> : null}
-        {view === "profile" ? <ProfilePage onProfileUpdated={setProfile} /> : null}
-        {view === "friends" ? <FriendsPage /> : null}
+        {view === 'lobby' ? <LobbyPage store={tableStore} /> : null}
+        {view === 'profile' ? <ProfilePage onProfileUpdated={setProfile} /> : null}
+        {view === 'friends' ? <FriendsPage /> : null}
       </div>
     </div>
   );
 }
 
 function AppRoot() {
-  const hasAuthCode = new URLSearchParams(window.location.search).has("code");
-  const [authStatus, setAuthStatus] = React.useState<"checking" | "authed" | "anon">(() => {
+  const hasAuthCode = new URLSearchParams(window.location.search).has('code');
+  const [authStatus, setAuthStatus] = React.useState<'checking' | 'authed' | 'anon'>(() => {
     if (hasAuthCode) {
-      return "checking";
+      return 'checking';
     }
-    return isAuthenticated() ? "authed" : "anon";
+    return isAuthenticated() ? 'authed' : 'anon';
   });
 
   React.useEffect(() => {
-    if (authStatus !== "checking") {
+    if (authStatus !== 'checking') {
       return;
     }
     hydrateTokenFromCallback()
       .then(() => {
-        setAuthStatus(isAuthenticated() ? "authed" : "anon");
+        setAuthStatus(isAuthenticated() ? 'authed' : 'anon');
       })
       .catch((error: Error) => {
-        console.warn("auth.callback.failed", { message: error.message });
-        setAuthStatus("anon");
+        console.warn('auth.callback.failed', { message: error.message });
+        setAuthStatus('anon');
       });
   }, [authStatus]);
 
   return (
     <div className="app-root">
-      {authStatus === "checking" ? (
+      {authStatus === 'checking' ? (
         <div className="app-shell">
           <header className="app-header">
             <div className="brand">
@@ -250,7 +252,7 @@ function AppRoot() {
           </header>
           <div className="card card-subtle">Signing in...</div>
         </div>
-      ) : authStatus === "authed" ? (
+      ) : authStatus === 'authed' ? (
         <PokerApp />
       ) : (
         <div className="app-shell">

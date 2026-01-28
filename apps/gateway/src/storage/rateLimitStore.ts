@@ -1,5 +1,5 @@
-import { getRedisClient } from "./redisClient";
-import logger from "../observability/logger";
+import { getRedisClient } from './redisClient';
+import logger from '../observability/logger';
 
 export async function incrementRateLimit(key: string, windowMs: number): Promise<number> {
   const redis = await getRedisClient();
@@ -12,7 +12,7 @@ export async function incrementRateLimit(key: string, windowMs: number): Promise
     }
     return current;
   } catch (err) {
-    logger.error({ err, key }, "Failed to increment rate limit in Redis");
+    logger.error({ err, key }, 'Failed to increment rate limit in Redis');
     return 0;
   }
 }
@@ -25,7 +25,7 @@ export async function getRateLimit(key: string): Promise<number> {
     const val = await redis.get(key);
     return val ? parseInt(val, 10) : 0;
   } catch (err) {
-    logger.error({ err, key }, "Failed to get rate limit from Redis");
+    logger.error({ err, key }, 'Failed to get rate limit from Redis');
     return 0;
   }
 }

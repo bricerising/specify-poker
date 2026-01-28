@@ -1,33 +1,33 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from '@playwright/test';
 
-test("lobby flow creates a table and updates the list", async ({ page }) => {
+test('lobby flow creates a table and updates the list', async ({ page }) => {
   const tables: Array<Record<string, unknown>> = [];
 
-  await page.route("**/api/tables", async (route, request) => {
-    if (request.method() === "GET") {
+  await page.route('**/api/tables', async (route, request) => {
+    if (request.method() === 'GET') {
       await route.fulfill({
         status: 200,
-        contentType: "application/json",
+        contentType: 'application/json',
         body: JSON.stringify(tables),
       });
       return;
     }
 
-    if (request.method() === "POST") {
-      const payload = JSON.parse(request.postData() ?? "{}") as {
+    if (request.method() === 'POST') {
+      const payload = JSON.parse(request.postData() ?? '{}') as {
         name?: string;
         config?: Record<string, number>;
       };
       const created = {
-        tableId: "table-1",
-        name: payload.name ?? "New Table",
-        ownerId: "owner-1",
+        tableId: 'table-1',
+        name: payload.name ?? 'New Table',
+        ownerId: 'owner-1',
         config: {
           smallBlind: payload.config?.smallBlind ?? 5,
           bigBlind: payload.config?.bigBlind ?? 10,
           maxPlayers: payload.config?.maxPlayers ?? 6,
           startingStack: payload.config?.startingStack ?? 500,
-          bettingStructure: "NoLimit",
+          bettingStructure: 'NoLimit',
         },
         seatsTaken: 0,
         inProgress: false,
@@ -35,7 +35,7 @@ test("lobby flow creates a table and updates the list", async ({ page }) => {
       tables.splice(0, tables.length, created);
       await route.fulfill({
         status: 201,
-        contentType: "application/json",
+        contentType: 'application/json',
         body: JSON.stringify(created),
       });
       return;
@@ -45,13 +45,13 @@ test("lobby flow creates a table and updates the list", async ({ page }) => {
   });
 
   await page.addInitScript(() => {
-    window.sessionStorage.setItem("poker.auth.token", "test-token");
+    window.sessionStorage.setItem('poker.auth.token', 'test-token');
   });
 
-  await page.goto("/");
+  await page.goto('/');
 
-  await page.getByTestId("create-table-name").fill("High Stakes");
-  await page.getByTestId("create-table-submit").click();
+  await page.getByTestId('create-table-name').fill('High Stakes');
+  await page.getByTestId('create-table-submit').click();
 
-  await expect(page.getByText("High Stakes")).toBeVisible();
+  await expect(page.getByText('High Stakes')).toBeVisible();
 });

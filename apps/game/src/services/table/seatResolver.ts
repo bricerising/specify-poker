@@ -1,4 +1,4 @@
-import type { Seat, TableState } from "../../domain/types";
+import type { Seat, TableState } from '../../domain/types';
 
 type SeatResolutionContext = {
   readonly matchingSeats: readonly Seat[];
@@ -8,7 +8,7 @@ type SeatResolutionContext = {
 type SeatResolutionStrategy = (ctx: SeatResolutionContext) => Seat | undefined;
 
 function resolveTurnSeat({ matchingSeats, turnSeatId }: SeatResolutionContext): Seat | undefined {
-  if (typeof turnSeatId !== "number") {
+  if (typeof turnSeatId !== 'number') {
     return undefined;
   }
   return matchingSeats.find((seat) => seat.seatId === turnSeatId);
@@ -20,8 +20,9 @@ function resolveSeatWithHoleCards({ matchingSeats }: SeatResolutionContext): Sea
 
 function resolveInHandSeat({ matchingSeats }: SeatResolutionContext): Seat | undefined {
   return (
-    matchingSeats.find((seat) => seat.status === "ACTIVE" || seat.status === "ALL_IN" || seat.status === "FOLDED") ??
-    undefined
+    matchingSeats.find(
+      (seat) => seat.status === 'ACTIVE' || seat.status === 'ALL_IN' || seat.status === 'FOLDED',
+    ) ?? undefined
   );
 }
 
@@ -55,4 +56,3 @@ export function resolveSeatForUser(state: TableState, userId: string): Seat | un
 
   return matchingSeats[0];
 }
-

@@ -1,8 +1,11 @@
-import { getBlockingRedisClient } from "../storage/redisClient";
-import logger from "../observability/logger";
-import { getConfig } from "../config";
-import { getErrorMessage } from "../shared/errors";
-import { runRedisStreamConsumer, type RedisStreamConsumerClient } from "@specify-poker/shared/redis";
+import { getBlockingRedisClient } from '../storage/redisClient';
+import logger from '../observability/logger';
+import { getConfig } from '../config';
+import { getErrorMessage } from '../shared/errors';
+import {
+  runRedisStreamConsumer,
+  type RedisStreamConsumerClient,
+} from '@specify-poker/shared/redis';
 import {
   createGameEventHandlers,
   decodeGameEvent,
@@ -10,7 +13,7 @@ import {
   type GameEventDecodeResult,
   type GameEventHandlers,
   type PushSender,
-} from "./gameEventHandlers";
+} from './gameEventHandlers';
 
 type EventConsumerOptions = {
   streamKey?: string;
@@ -39,7 +42,7 @@ export class EventConsumer {
   constructor(pushSender: PushSender, options: EventConsumerOptions = {}) {
     this.pushSender = pushSender;
     this.streamKey = options.streamKey ?? getConfig().eventStreamKey;
-    this.groupName = options.groupName ?? "notify-service";
+    this.groupName = options.groupName ?? 'notify-service';
     this.consumerName = options.consumerName ?? `consumer-${process.pid}`;
     this.getClient = options.getRedisClient ?? getBlockingRedisClient;
     this.blockMs = options.blockMs ?? 5000;
@@ -53,7 +56,7 @@ export class EventConsumer {
       return;
     }
     this.isRunning = true;
-    logger.info({ streamKey: this.streamKey }, "EventConsumer starting");
+    logger.info({ streamKey: this.streamKey }, 'EventConsumer starting');
 
     const controller = new AbortController();
     this.abortController = controller;
@@ -70,9 +73,9 @@ export class EventConsumer {
       readCount: this.readCount,
       sleep: this.sleep,
       logger,
-      isBusyGroupError: (error: unknown) => getErrorMessage(error).includes("BUSYGROUP"),
+      isBusyGroupError: (error: unknown) => getErrorMessage(error).includes('BUSYGROUP'),
     }).catch((error: unknown) => {
-      logger.error({ err: error }, "EventConsumer poll loop crashed");
+      logger.error({ err: error }, 'EventConsumer poll loop crashed');
     });
   }
 
@@ -86,16 +89,16 @@ export class EventConsumer {
 
       await this.dispatch(decoded.event);
     } catch (err) {
-      logger.error({ err }, "Error handling event");
+      logger.error({ err }, 'Error handling event');
     }
   }
 
   private logDecodeFailure(result: Extract<GameEventDecodeResult, { ok: false }>): void {
-    if (result.reason !== "UnknownType") {
+    if (result.reason !== 'UnknownType') {
       return;
     }
 
-    logger.debug({ type: result.type }, "Ignoring unknown game event");
+    logger.debug({ type: result.type }, 'Ignoring unknown game event');
   }
 
   private async dispatch(event: GameEvent): Promise<void> {

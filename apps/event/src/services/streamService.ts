@@ -1,6 +1,7 @@
-import { cursorStore } from "../storage/cursorStore";
-import { streamStore, StreamResponse } from "../storage/streamStore";
-import { Cursor } from "../domain/types";
+import { cursorStore } from '../storage/cursorStore';
+import type { StreamResponse } from '../storage/streamStore';
+import { streamStore } from '../storage/streamStore';
+import type { Cursor } from '../domain/types';
 
 export class StreamService {
   async getCursor(streamId: string, subscriberId: string): Promise<Cursor | null> {

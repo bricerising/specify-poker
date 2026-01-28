@@ -1,14 +1,19 @@
-import { closeHttpServer, createShutdownManager, runServiceMain, type ShutdownManager } from "@specify-poker/shared";
-import type { Server as HttpServer } from "http";
-import { startObservability, stopObservability } from "./observability";
-import logger from "./observability/logger";
+import {
+  closeHttpServer,
+  createShutdownManager,
+  runServiceMain,
+  type ShutdownManager,
+} from '@specify-poker/shared';
+import type { Server as HttpServer } from 'http';
+import { startObservability, stopObservability } from './observability';
+import logger from './observability/logger';
 
 let metricsServer: HttpServer | null = null;
 let eventConsumerInstance: { stop(): Promise<void> } | null = null;
 let runningShutdown: ShutdownManager | null = null;
 
 export async function main() {
-  const isTestEnv = process.env.NODE_ENV === "test";
+  const isTestEnv = process.env.NODE_ENV === 'test';
 
   // Start OTel before importing instrumented subsystems (grpc/pg/redis/etc.).
   if (!isTestEnv) {
@@ -17,7 +22,7 @@ export async function main() {
 
   const shutdownManager = createShutdownManager({ logger });
   runningShutdown = shutdownManager;
-  shutdownManager.add("otel.shutdown", async () => {
+  shutdownManager.add('otel.shutdown', async () => {
     if (!isTestEnv) {
       await stopObservability();
     }
@@ -25,28 +30,28 @@ export async function main() {
 
   try {
     const [{ getConfig }, { closeRedisClient }] = await Promise.all([
-      import("./config"),
-      import("./storage/redisClient"),
+      import('./config'),
+      import('./storage/redisClient'),
     ]);
 
     const config = getConfig();
 
-    shutdownManager.add("redis.close", async () => {
+    shutdownManager.add('redis.close', async () => {
       await closeRedisClient();
     });
 
-    const { default: pool } = await import("./storage/db");
-    shutdownManager.add("db.close", async () => {
+    const { default: pool } = await import('./storage/db');
+    shutdownManager.add('db.close', async () => {
       await pool.end();
     });
 
-    const { startGrpcServer, stopGrpcServer } = await import("./api/grpc/server");
-    shutdownManager.add("grpc.stop", () => {
+    const { startGrpcServer, stopGrpcServer } = await import('./api/grpc/server');
+    shutdownManager.add('grpc.stop', () => {
       stopGrpcServer();
     });
 
-    const { startMetricsServer } = await import("./observability/metrics");
-    shutdownManager.add("metrics.close", async () => {
+    const { startMetricsServer } = await import('./observability/metrics');
+    shutdownManager.add('metrics.close', async () => {
       if (!metricsServer) {
         return;
       }
@@ -54,19 +59,20 @@ export async function main() {
       metricsServer = null;
     });
 
-    const { EventConsumer } = await import("./services/eventConsumer");
-    shutdownManager.add("eventConsumer.stop", () => {
+    const { EventConsumer } = await import('./services/eventConsumer');
+    shutdownManager.add('eventConsumer.stop', () => {
       const consumer = eventConsumerInstance;
       eventConsumerInstance = null;
       return consumer?.stop();
     });
 
-    const { startDeletionProcessor, stopDeletionProcessor } = await import("./jobs/deletionProcessor");
-    shutdownManager.add("deletionProcessor.stop", () => {
+    const { startDeletionProcessor, stopDeletionProcessor } =
+      await import('./jobs/deletionProcessor');
+    shutdownManager.add('deletionProcessor.stop', () => {
       stopDeletionProcessor();
     });
 
-    const { runMigrations } = await import("./storage/migrations");
+    const { runMigrations } = await import('./storage/migrations');
 
     await runMigrations();
     await startGrpcServer(config.grpcPort);
@@ -79,9 +85,9 @@ export async function main() {
     // Start background jobs
     startDeletionProcessor();
 
-    logger.info({ port: config.grpcPort }, "Player Service is running");
+    logger.info({ port: config.grpcPort }, 'Player Service is running');
   } catch (error: unknown) {
-    logger.error({ err: error }, "Failed to start Player Service");
+    logger.error({ err: error }, 'Failed to start Player Service');
     await shutdownManager.run();
     runningShutdown = null;
     throw error;
@@ -89,16 +95,14 @@ export async function main() {
 }
 
 export async function shutdown() {
-  logger.info("Shutting down Player Service");
+  logger.info('Shutting down Player Service');
   await runningShutdown?.run();
   runningShutdown = null;
 }
 
 const isDirectRun =
-  typeof require !== "undefined" &&
-  typeof module !== "undefined" &&
-  require.main === module;
+  typeof require !== 'undefined' && typeof module !== 'undefined' && require.main === module;
 
-if (isDirectRun && process.env.NODE_ENV !== "test") {
+if (isDirectRun && process.env.NODE_ENV !== 'test') {
   runServiceMain({ logger, main, shutdown });
 }

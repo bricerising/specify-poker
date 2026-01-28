@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from 'vitest';
 
-import { runServiceMain } from "../src/lifecycle/serviceRunner";
+import { runServiceMain } from '../src/lifecycle/serviceRunner';
 
 type Listener = (...args: unknown[]) => void;
 
@@ -25,8 +25,8 @@ function nextTick(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
 }
 
-describe("runServiceMain", () => {
-  it("runs main and does not exit on success", async () => {
+describe('runServiceMain', () => {
+  it('runs main and does not exit on success', async () => {
     const proc = new FakeProcess();
     const main = vi.fn(async () => {});
     const shutdown = vi.fn(async () => {});
@@ -41,10 +41,10 @@ describe("runServiceMain", () => {
     expect(exit).not.toHaveBeenCalled();
   });
 
-  it("shuts down and exits on main error", async () => {
+  it('shuts down and exits on main error', async () => {
     const proc = new FakeProcess();
     const main = vi.fn(async () => {
-      throw new Error("boom");
+      throw new Error('boom');
     });
     const shutdown = vi.fn(async () => {});
     const exit = vi.fn();
@@ -59,7 +59,7 @@ describe("runServiceMain", () => {
     expect(exit).toHaveBeenCalledWith(9);
   });
 
-  it("is idempotent across multiple exit signals", async () => {
+  it('is idempotent across multiple exit signals', async () => {
     const proc = new FakeProcess();
     const main = vi.fn(async () => {
       await new Promise(() => {});
@@ -69,8 +69,8 @@ describe("runServiceMain", () => {
 
     runServiceMain({ main, shutdown, exit, process: proc });
 
-    proc.emit("SIGINT");
-    proc.emit("SIGTERM");
+    proc.emit('SIGINT');
+    proc.emit('SIGTERM');
 
     await nextTick();
     await nextTick();
@@ -80,4 +80,3 @@ describe("runServiceMain", () => {
     expect(exit).toHaveBeenCalledWith(0);
   });
 });
-

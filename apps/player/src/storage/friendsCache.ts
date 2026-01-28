@@ -1,4 +1,4 @@
-import { getRedisClient } from "./redisClient";
+import { getRedisClient } from './redisClient';
 
 const FRIENDS_TTL_SECONDS = 300;
 

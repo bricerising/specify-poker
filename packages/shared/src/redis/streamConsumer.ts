@@ -1,8 +1,8 @@
-import type { RedisClient } from "./redisClientManager";
+import type { RedisClient } from './redisClientManager';
 
-export type RedisStreamConsumerClient = Pick<RedisClient, "xGroupCreate" | "xReadGroup" | "xAck">;
+export type RedisStreamConsumerClient = Pick<RedisClient, 'xGroupCreate' | 'xReadGroup' | 'xAck'>;
 
-type RedisStreamReadGroupReply = Awaited<ReturnType<RedisStreamConsumerClient["xReadGroup"]>>;
+type RedisStreamReadGroupReply = Awaited<ReturnType<RedisStreamConsumerClient['xReadGroup']>>;
 type RedisStreamReadGroupResponse = Exclude<RedisStreamReadGroupReply, null>;
 
 export type RedisStreamConsumerMessage = {
@@ -36,23 +36,27 @@ export type RedisStreamConsumerOptions = {
   logger?: RedisStreamConsumerLogger;
 };
 
-export async function runRedisStreamConsumer(signal: AbortSignal, options: RedisStreamConsumerOptions): Promise<void> {
+export async function runRedisStreamConsumer(
+  signal: AbortSignal,
+  options: RedisStreamConsumerOptions,
+): Promise<void> {
   const readCount = options.readCount ?? 10;
   const blockMs = options.blockMs ?? 5000;
   const retryMs = options.retryMs ?? 1000;
-  const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const sleep =
+    options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
 
-  const groupStartId = options.groupStartId ?? "0";
+  const groupStartId = options.groupStartId ?? '0';
   const mkStream = options.mkStream ?? true;
 
   const isBusyGroupError =
     options.isBusyGroupError ??
     ((error: unknown) => {
-      if (!error || typeof error !== "object") {
+      if (!error || typeof error !== 'object') {
         return false;
       }
       const message = (error as { message?: unknown }).message;
-      return typeof message === "string" && message.includes("BUSYGROUP");
+      return typeof message === 'string' && message.includes('BUSYGROUP');
     });
 
   const logger = options.logger;
@@ -69,11 +73,11 @@ export async function runRedisStreamConsumer(signal: AbortSignal, options: Redis
   };
 
   const toStringMessageId = (id: unknown): string => {
-    if (typeof id === "string") {
+    if (typeof id === 'string') {
       return id;
     }
-    if (typeof Buffer !== "undefined" && Buffer.isBuffer(id)) {
-      return id.toString("utf8");
+    if (typeof Buffer !== 'undefined' && Buffer.isBuffer(id)) {
+      return id.toString('utf8');
     }
     return String(id);
   };
@@ -83,7 +87,10 @@ export async function runRedisStreamConsumer(signal: AbortSignal, options: Redis
     try {
       client = await options.getClient();
     } catch (error: unknown) {
-      logWarn({ err: error, streamKey: options.streamKey }, "redis_stream_consumer.get_client.failed");
+      logWarn(
+        { err: error, streamKey: options.streamKey },
+        'redis_stream_consumer.get_client.failed',
+      );
       await sleepUnlessAborted(retryMs);
       continue;
     }
@@ -97,7 +104,10 @@ export async function runRedisStreamConsumer(signal: AbortSignal, options: Redis
       );
     } catch (error: unknown) {
       if (!isBusyGroupError(error)) {
-        logWarn({ err: error, streamKey: options.streamKey }, "redis_stream_consumer.group_create.failed");
+        logWarn(
+          { err: error, streamKey: options.streamKey },
+          'redis_stream_consumer.group_create.failed',
+        );
         await sleepUnlessAborted(retryMs);
         continue;
       }
@@ -108,11 +118,11 @@ export async function runRedisStreamConsumer(signal: AbortSignal, options: Redis
       streams = await client.xReadGroup(
         options.groupName,
         options.consumerName,
-        [{ key: options.streamKey, id: ">" }],
+        [{ key: options.streamKey, id: '>' }],
         { COUNT: readCount, BLOCK: blockMs },
       );
     } catch (error: unknown) {
-      logWarn({ err: error, streamKey: options.streamKey }, "redis_stream_consumer.read.failed");
+      logWarn({ err: error, streamKey: options.streamKey }, 'redis_stream_consumer.read.failed');
       await sleepUnlessAborted(retryMs);
       continue;
     }
@@ -130,13 +140,16 @@ export async function runRedisStreamConsumer(signal: AbortSignal, options: Redis
         } catch (error: unknown) {
           (logger?.error ?? logger?.warn)?.(
             { err: error, streamKey: options.streamKey, messageId },
-            "redis_stream_consumer.message.failed",
+            'redis_stream_consumer.message.failed',
           );
         } finally {
           try {
             await client.xAck(options.streamKey, options.groupName, messageId);
           } catch (error: unknown) {
-            logWarn({ err: error, streamKey: options.streamKey, messageId }, "redis_stream_consumer.ack.failed");
+            logWarn(
+              { err: error, streamKey: options.streamKey, messageId },
+              'redis_stream_consumer.ack.failed',
+            );
           }
         }
 

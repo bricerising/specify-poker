@@ -1,16 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EventConsumer } from "../../src/services/eventConsumer";
-import { PushSenderService } from "../../src/services/pushSenderService";
+import { EventConsumer } from '../../src/services/eventConsumer';
+import type { PushSenderService } from '../../src/services/pushSenderService';
 
 // Mock redis
 vi.mock('../../src/storage/redisClient', () => {
-  const xReadGroup = vi.fn().mockImplementation(() => new Promise(resolve => setTimeout(() => resolve(null), 100)));
+  const xReadGroup = vi
+    .fn()
+    .mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve(null), 100)));
   return {
-    getBlockingRedisClient: () => Promise.resolve({
-      xGroupCreate: vi.fn(),
-      xReadGroup,
-      xAck: vi.fn(),
-    }),
+    getBlockingRedisClient: () =>
+      Promise.resolve({
+        xGroupCreate: vi.fn(),
+        xReadGroup,
+        xAck: vi.fn(),
+      }),
   };
 });
 
@@ -35,10 +38,13 @@ describe('EventConsumer', () => {
     // Access private method for testing
     await (consumer as unknown).handleEvent(message);
 
-    expect(pushServiceMock.sendToUser).toHaveBeenCalledWith('u1', expect.objectContaining({
-      title: "It's your turn!",
-      data: expect.objectContaining({ tableId: 't1' }),
-    }));
+    expect(pushServiceMock.sendToUser).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({
+        title: "It's your turn!",
+        data: expect.objectContaining({ tableId: 't1' }),
+      }),
+    );
   });
 
   it('should ignore other event types', async () => {

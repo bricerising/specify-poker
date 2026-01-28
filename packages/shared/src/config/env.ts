@@ -7,7 +7,7 @@ export type ReadIntEnvOptions = {
    * - "fallback" (default): ignore invalid values and continue to next key; if none are valid, return fallback.
    * - "throw": throw an Error if a non-empty value is present but invalid.
    */
-  onInvalid?: "fallback" | "throw";
+  onInvalid?: 'fallback' | 'throw';
 };
 
 export type ReadStringEnvOptions = {
@@ -16,15 +16,15 @@ export type ReadStringEnvOptions = {
    * - "fallback" (default): treat empty strings as not set and continue to next key; if none are set, return fallback.
    * - "throw": throw an Error if a key is present but empty.
    */
-  onEmpty?: "fallback" | "throw";
+  onEmpty?: 'fallback' | 'throw';
 };
 
 function asKeyList(keys: readonly string[] | string): readonly string[] {
-  return typeof keys === "string" ? [keys] : keys;
+  return typeof keys === 'string' ? [keys] : keys;
 }
 
 function formatEnvKeyList(keys: readonly string[]): string {
-  return keys.length === 1 ? keys[0] : keys.join(" | ");
+  return keys.length === 1 ? keys[0] : keys.join(' | ');
 }
 
 function parseInteger(value: string): number | null {
@@ -48,7 +48,7 @@ export function readIntEnv(
   options: ReadIntEnvOptions = {},
 ): number {
   const keyList = asKeyList(keys);
-  const onInvalid = options.onInvalid ?? "fallback";
+  const onInvalid = options.onInvalid ?? 'fallback';
 
   for (const key of keyList) {
     const raw = env[key];
@@ -63,20 +63,20 @@ export function readIntEnv(
 
     const parsed = parseInteger(trimmed);
     if (parsed === null) {
-      if (onInvalid === "throw") {
+      if (onInvalid === 'throw') {
         throw new Error(`${key} must be an integer (got "${trimmed}")`);
       }
       continue;
     }
 
     if (options.min !== undefined && parsed < options.min) {
-      if (onInvalid === "throw") {
+      if (onInvalid === 'throw') {
         throw new Error(`${key} must be >= ${options.min} (got "${trimmed}")`);
       }
       continue;
     }
     if (options.max !== undefined && parsed > options.max) {
-      if (onInvalid === "throw") {
+      if (onInvalid === 'throw') {
         throw new Error(`${key} must be <= ${options.max} (got "${trimmed}")`);
       }
       continue;
@@ -95,7 +95,7 @@ export function readStringEnv(
   options: ReadStringEnvOptions = {},
 ): string {
   const keyList = asKeyList(keys);
-  const onEmpty = options.onEmpty ?? "fallback";
+  const onEmpty = options.onEmpty ?? 'fallback';
   const trim = options.trim ?? true;
 
   for (const key of keyList) {
@@ -106,7 +106,7 @@ export function readStringEnv(
 
     const maybeTrimmed = trim ? raw.trim() : raw;
     if (maybeTrimmed.length === 0) {
-      if (onEmpty === "throw") {
+      if (onEmpty === 'throw') {
         throw new Error(`${key} must be a non-empty string`);
       }
       continue;
@@ -125,7 +125,7 @@ export function readNullableStringEnv(
   options: ReadStringEnvOptions = {},
 ): string | null {
   const keyList = asKeyList(keys);
-  const onEmpty = options.onEmpty ?? "fallback";
+  const onEmpty = options.onEmpty ?? 'fallback';
   const trim = options.trim ?? true;
 
   for (const key of keyList) {
@@ -136,7 +136,7 @@ export function readNullableStringEnv(
 
     const maybeTrimmed = trim ? raw.trim() : raw;
     if (maybeTrimmed.length === 0) {
-      if (onEmpty === "throw") {
+      if (onEmpty === 'throw') {
         throw new Error(`${formatEnvKeyList(keyList)} must be a non-empty string`);
       }
       continue;

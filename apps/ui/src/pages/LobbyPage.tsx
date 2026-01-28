@@ -1,12 +1,14 @@
-import React, { useEffect, useState } from "react";
-import { trace } from "@opentelemetry/api";
+import React, { useEffect, useState } from 'react';
+import { trace } from '@opentelemetry/api';
 
-import { CreateTableForm } from "../components/CreateTableForm";
-import { PokerArt } from "../components/PokerArt";
-import { createTable } from "../services/lobbyApi";
-import { fetchProfile, UserProfile } from "../services/profileApi";
-import { TableStore, tableStore, TableSummary } from "../state/tableStore";
-import { testIds } from "../utils/testIds";
+import { CreateTableForm } from '../components/CreateTableForm';
+import { PokerArt } from '../components/PokerArt';
+import { createTable } from '../services/lobbyApi';
+import type { UserProfile } from '../services/profileApi';
+import { fetchProfile } from '../services/profileApi';
+import type { TableStore, TableSummary } from '../state/tableStore';
+import { tableStore } from '../state/tableStore';
+import { testIds } from '../utils/testIds';
 
 interface LobbyPageProps {
   store?: TableStore;
@@ -15,22 +17,22 @@ interface LobbyPageProps {
 export function LobbyPage({ store = tableStore }: LobbyPageProps) {
   const [tables, setTables] = useState<TableSummary[]>(store.getState().tables);
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<"idle" | "loading">("idle");
+  const [status, setStatus] = useState<'idle' | 'loading'>('idle');
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [inviteStatus, setInviteStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const [inviteStatus, setInviteStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
 
-  const instanceUrl = typeof window === "undefined" ? null : window.location.origin;
+  const instanceUrl = typeof window === 'undefined' ? null : window.location.origin;
 
   const loadTables = async () => {
-    setStatus("loading");
+    setStatus('loading');
     try {
       await store.fetchTables();
       setError(null);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to load lobby";
+      const message = err instanceof Error ? err.message : 'Unable to load lobby';
       setError(message);
     } finally {
-      setStatus("idle");
+      setStatus('idle');
     }
   };
 
@@ -45,15 +47,15 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
     fetchProfile()
       .then((data) => setProfile(data))
       .catch((err: Error) => {
-        console.warn("profile.fetch.failed", { message: err.message });
+        console.warn('profile.fetch.failed', { message: err.message });
       });
   }, []);
 
   useEffect(() => {
-    const tracer = trace.getTracer("ui");
-    const span = tracer.startSpan("ui.lobby.render", {
+    const tracer = trace.getTracer('ui');
+    const span = tracer.startSpan('ui.lobby.render', {
       attributes: {
-        "poker.lobby_count": tables.length,
+        'poker.lobby_count': tables.length,
       },
     });
     span.end();
@@ -62,12 +64,12 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
   const handleCreate = async (input: Parameters<typeof createTable>[0]) => {
     try {
       await createTable(input);
-      const tracer = trace.getTracer("ui");
-      const span = tracer.startSpan("ui.table.create_submit");
+      const tracer = trace.getTracer('ui');
+      const span = tracer.startSpan('ui.table.create_submit');
       span.end();
       await loadTables();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Create table failed";
+      const message = err instanceof Error ? err.message : 'Create table failed';
       setError(message);
     }
   };
@@ -76,7 +78,7 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
     try {
       await store.joinSeat(tableId, seatId);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to join seat";
+      const message = err instanceof Error ? err.message : 'Unable to join seat';
       setError(message);
     }
   };
@@ -93,22 +95,22 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(instanceUrl);
       } else {
-        const textarea = document.createElement("textarea");
+        const textarea = document.createElement('textarea');
         textarea.value = instanceUrl;
-        textarea.style.position = "fixed";
-        textarea.style.left = "-9999px";
-        textarea.style.top = "0";
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        textarea.style.top = '0';
         document.body.appendChild(textarea);
         textarea.focus();
         textarea.select();
-        document.execCommand("copy");
+        document.execCommand('copy');
         textarea.remove();
       }
-      setInviteStatus("copied");
+      setInviteStatus('copied');
     } catch {
-      setInviteStatus("failed");
+      setInviteStatus('failed');
     } finally {
-      window.setTimeout(() => setInviteStatus("idle"), 2_000);
+      window.setTimeout(() => setInviteStatus('idle'), 2_000);
     }
   };
 
@@ -136,7 +138,7 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
       <div
         key={table.tableId}
         className="card table-card stagger-item"
-        style={{ "--stagger": index } as React.CSSProperties}
+        style={{ '--stagger': index } as React.CSSProperties}
         data-testid={testIds.lobby.tableCard}
         data-table-id={table.tableId}
       >
@@ -147,14 +149,14 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
               Blinds {table.config.smallBlind}/{table.config.bigBlind}
             </div>
           </div>
-          <div className={`status-pill ${table.inProgress ? "live" : "waiting"}`}>
-            {table.inProgress ? "In Hand" : "Waiting"}
+          <div className={`status-pill ${table.inProgress ? 'live' : 'waiting'}`}>
+            {table.inProgress ? 'In Hand' : 'Waiting'}
           </div>
         </div>
         <div className="table-meta">
           <div>
             Seats: {table.seatsTaken}/{table.config.maxPlayers}
-            {table.spectatorCount ? ` | ${table.spectatorCount} watching` : ""}
+            {table.spectatorCount ? ` | ${table.spectatorCount} watching` : ''}
           </div>
           <div>Starting Stack: {table.config.startingStack}</div>
         </div>
@@ -174,7 +176,7 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
     );
   });
 
-  const profileInitials = profile ? profile.username.slice(0, 2).toUpperCase() : "";
+  const profileInitials = profile ? profile.username.slice(0, 2).toUpperCase() : '';
 
   return (
     <section className="page">
@@ -190,25 +192,31 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
         <CreateTableForm onCreate={handleCreate} />
         <div className="card invite-panel">
           <h3>Invite Friends</h3>
-          <p className="meta-line">Share this lobby link with friends so they can sign in and join.</p>
+          <p className="meta-line">
+            Share this lobby link with friends so they can sign in and join.
+          </p>
           <div className="seat-actions">
             <a
               className="invite-url"
-              href={instanceUrl ?? "#"}
+              href={instanceUrl ?? '#'}
               target="_blank"
               rel="noreferrer"
               data-testid={testIds.lobby.inviteLink}
             >
-              {instanceUrl ?? "Invite link available in browser"}
+              {instanceUrl ?? 'Invite link available in browser'}
             </a>
             <button
               type="button"
               className="btn btn-quiet"
               onClick={handleCopyInvite}
-              disabled={!instanceUrl || inviteStatus === "copied"}
+              disabled={!instanceUrl || inviteStatus === 'copied'}
               data-testid={testIds.lobby.copyInvite}
             >
-              {inviteStatus === "copied" ? "Copied" : inviteStatus === "failed" ? "Copy failed" : "Copy"}
+              {inviteStatus === 'copied'
+                ? 'Copied'
+                : inviteStatus === 'failed'
+                  ? 'Copy failed'
+                  : 'Copy'}
             </button>
           </div>
         </div>
@@ -242,7 +250,7 @@ export function LobbyPage({ store = tableStore }: LobbyPageProps) {
         ) : null}
       </div>
       <div className="table-list">
-        {status === "loading" ? <div className="meta-line">Loading tables...</div> : null}
+        {status === 'loading' ? <div className="meta-line">Loading tables...</div> : null}
         {tableRows.length === 0 ? (
           <div className="meta-line">No tables yet. Create one to start a private game.</div>
         ) : (

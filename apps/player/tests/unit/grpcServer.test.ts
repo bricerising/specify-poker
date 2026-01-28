@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const addService = vi.fn();
 const bindAsync = vi.fn();
 const forceShutdown = vi.fn();
 
-vi.mock("@grpc/grpc-js", () => ({
+vi.mock('@grpc/grpc-js', () => ({
   Server: vi.fn(() => ({
     addService,
     bindAsync,
@@ -25,15 +25,15 @@ vi.mock("@grpc/grpc-js", () => ({
   })),
 }));
 
-vi.mock("@grpc/proto-loader", () => ({
+vi.mock('@grpc/proto-loader', () => ({
   loadSync: vi.fn(() => ({})),
 }));
 
-vi.mock("@grpc/grpc-js/package.json", () => ({}));
+vi.mock('@grpc/grpc-js/package.json', () => ({}));
 
-vi.mock("@grpc/grpc-js/build/src/constants", () => ({}));
+vi.mock('@grpc/grpc-js/build/src/constants', () => ({}));
 
-vi.mock("../../src/api/grpc/handlers", () => ({
+vi.mock('../../src/api/grpc/handlers', () => ({
   handlers: {
     GetProfile: vi.fn(),
     GetProfiles: vi.fn(),
@@ -48,38 +48,44 @@ vi.mock("../../src/api/grpc/handlers", () => ({
   },
 }));
 
-vi.mock("../../src/api/grpc/health", () => ({
+vi.mock('../../src/api/grpc/health', () => ({
   createHealthHandlers: vi.fn(() => ({
     check: vi.fn(),
     watch: vi.fn(),
   })),
 }));
 
-vi.mock("../../src/observability/logger", () => ({
+vi.mock('../../src/observability/logger', () => ({
   default: {
     info: vi.fn(),
   },
 }));
 
-describe("gRPC server lifecycle", () => {
+describe('gRPC server lifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    bindAsync.mockImplementation((_addr: string, _creds: unknown, cb: (err: Error | null, port: number) => void) => {
-      cb(null, 50052);
-    });
+    bindAsync.mockImplementation(
+      (_addr: string, _creds: unknown, cb: (err: Error | null, port: number) => void) => {
+        cb(null, 50052);
+      },
+    );
   });
 
-  it("starts and registers services", async () => {
-    const grpc = await import("../../src/api/grpc/server");
+  it('starts and registers services', async () => {
+    const grpc = await import('../../src/api/grpc/server');
 
     await grpc.startGrpcServer(50052);
 
     expect(addService).toHaveBeenCalledTimes(2);
-    expect(bindAsync).toHaveBeenCalledWith("0.0.0.0:50052", expect.any(Object), expect.any(Function));
+    expect(bindAsync).toHaveBeenCalledWith(
+      '0.0.0.0:50052',
+      expect.any(Object),
+      expect.any(Function),
+    );
   });
 
-  it("stops the server gracefully", async () => {
-    const grpc = await import("../../src/api/grpc/server");
+  it('stops the server gracefully', async () => {
+    const grpc = await import('../../src/api/grpc/server');
 
     await grpc.startGrpcServer(50052);
     grpc.stopGrpcServer();

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const app = { use: vi.fn() };
 const server = {
@@ -10,60 +10,60 @@ const wss = {
   close: vi.fn((cb: () => void) => cb()),
 };
 
-vi.mock("express", () => ({
+vi.mock('express', () => ({
   default: vi.fn(() => app),
 }));
 
-vi.mock("cors", () => ({
+vi.mock('cors', () => ({
   default: vi.fn(() => (_req: unknown, _res: unknown, next: () => void) => next()),
 }));
 
-vi.mock("http", () => ({
+vi.mock('http', () => ({
   createServer: vi.fn(() => server),
 }));
 
-vi.mock("../../src/config", () => ({
-  getConfig: () => ({ port: 4000, corsOrigin: "*" }),
+vi.mock('../../src/config', () => ({
+  getConfig: () => ({ port: 4000, corsOrigin: '*' }),
 }));
 
-vi.mock("../../src/http/router", () => ({
+vi.mock('../../src/http/router', () => ({
   createRouter: () => (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
-vi.mock("../../src/ws/server", () => ({
+vi.mock('../../src/ws/server', () => ({
   initWsServer: vi.fn().mockResolvedValue(wss),
 }));
 
-vi.mock("../../src/observability/otel", () => ({
+vi.mock('../../src/observability/otel', () => ({
   initOTEL: vi.fn(),
   shutdownOTEL: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("../../src/ws/pubsub", () => ({
+vi.mock('../../src/ws/pubsub', () => ({
   closeWsPubSub: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("../../src/storage/instanceRegistry", () => ({
+vi.mock('../../src/storage/instanceRegistry', () => ({
   registerInstance: vi.fn().mockResolvedValue(undefined),
   unregisterInstance: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("../../src/storage/redisClient", () => ({
+vi.mock('../../src/storage/redisClient', () => ({
   closeRedisClient: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("prom-client", () => ({
+vi.mock('prom-client', () => ({
   collectDefaultMetrics: vi.fn(),
 }));
 
-vi.mock("../../src/observability/logger", () => ({
+vi.mock('../../src/observability/logger', () => ({
   default: {
     info: vi.fn(),
     error: vi.fn(),
   },
 }));
 
-describe("Gateway server startup", () => {
+describe('Gateway server startup', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
@@ -71,14 +71,14 @@ describe("Gateway server startup", () => {
 
   afterEach(() => {});
 
-  it("boots services and listens for shutdown", async () => {
-    const logger = (await import("../../src/observability/logger")).default;
-    const { startServer, shutdown } = await import("../../src/server");
+  it('boots services and listens for shutdown', async () => {
+    const logger = (await import('../../src/observability/logger')).default;
+    const { startServer, shutdown } = await import('../../src/server');
 
     await startServer();
 
     expect(server.listen).toHaveBeenCalledWith(4000, expect.any(Function));
-    expect(logger.info).toHaveBeenCalledWith({ port: 4000 }, "Gateway service started");
+    expect(logger.info).toHaveBeenCalledWith({ port: 4000 }, 'Gateway service started');
 
     await shutdown();
     expect(server.close).toHaveBeenCalled();

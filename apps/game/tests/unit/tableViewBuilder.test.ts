@@ -1,13 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from 'vitest';
 
-import { Table, TableState } from "../../src/domain/types";
-import { buildTableStateView, redactTableState } from "../../src/services/table/tableViewBuilder";
+import type { Table, TableState } from '../../src/domain/types';
+import { buildTableStateView, redactTableState } from '../../src/services/table/tableViewBuilder';
 
-describe("tableViewBuilder", () => {
+describe('tableViewBuilder', () => {
   const table: Table = {
-    tableId: "table-1",
-    name: "Test Table",
-    ownerId: "owner-1",
+    tableId: 'table-1',
+    name: 'Test Table',
+    ownerId: 'owner-1',
     config: {
       smallBlind: 1,
       bigBlind: 2,
@@ -16,7 +16,7 @@ describe("tableViewBuilder", () => {
       startingStack: 200,
       turnTimerSeconds: 20,
     },
-    status: "WAITING",
+    status: 'WAITING',
     createdAt: new Date().toISOString(),
   };
 
@@ -25,19 +25,19 @@ describe("tableViewBuilder", () => {
     seats: [
       {
         seatId: 0,
-        userId: "user-1",
+        userId: 'user-1',
         stack: 0,
-        status: "RESERVED",
+        status: 'RESERVED',
         holeCards: [
-          { rank: "A", suit: "spades" },
-          { rank: "K", suit: "hearts" },
+          { rank: 'A', suit: 'spades' },
+          { rank: 'K', suit: 'hearts' },
         ],
-        reservationId: "reservation-1",
+        reservationId: 'reservation-1',
         pendingBuyInAmount: 200,
-        buyInIdempotencyKey: "buyin-key-1",
+        buyInIdempotencyKey: 'buyin-key-1',
         lastAction: new Date().toISOString(),
       },
-      { seatId: 1, userId: null, stack: 0, status: "EMPTY", holeCards: null },
+      { seatId: 1, userId: null, stack: 0, status: 'EMPTY', holeCards: null },
     ],
     spectators: [],
     hand: null,
@@ -46,24 +46,23 @@ describe("tableViewBuilder", () => {
     updatedAt: new Date().toISOString(),
   };
 
-  it("does not leak internal seat fields in table broadcasts", () => {
+  it('does not leak internal seat fields in table broadcasts', () => {
     const view = buildTableStateView(table, state);
     const seatView = view.seats[0] as Record<string, unknown>;
 
     expect(seatView.holeCards).toBeNull();
-    expect(seatView).not.toHaveProperty("reservationId");
-    expect(seatView).not.toHaveProperty("pendingBuyInAmount");
-    expect(seatView).not.toHaveProperty("buyInIdempotencyKey");
+    expect(seatView).not.toHaveProperty('reservationId');
+    expect(seatView).not.toHaveProperty('pendingBuyInAmount');
+    expect(seatView).not.toHaveProperty('buyInIdempotencyKey');
   });
 
-  it("redacts internal fields when returning table state", () => {
+  it('redacts internal fields when returning table state', () => {
     const redacted = redactTableState(state);
     const seatView = redacted.seats[0] as Record<string, unknown>;
 
     expect(seatView.holeCards).toBeNull();
-    expect(seatView).not.toHaveProperty("reservationId");
-    expect(seatView).not.toHaveProperty("pendingBuyInAmount");
-    expect(seatView).not.toHaveProperty("buyInIdempotencyKey");
+    expect(seatView).not.toHaveProperty('reservationId');
+    expect(seatView).not.toHaveProperty('pendingBuyInAmount');
+    expect(seatView).not.toHaveProperty('buyInIdempotencyKey');
   });
 });
-

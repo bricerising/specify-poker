@@ -1,6 +1,6 @@
-import pino from "pino";
-import { context, trace } from "@opentelemetry/api";
-import { getConfig } from "../config";
+import pino from 'pino';
+import { context, trace } from '@opentelemetry/api';
+import { getConfig } from '../config';
 
 const logger = pino({
   level: getConfig().logLevel,

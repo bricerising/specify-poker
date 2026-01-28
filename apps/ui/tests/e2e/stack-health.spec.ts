@@ -1,11 +1,11 @@
-import { expect, test } from "@playwright/test";
-import { urls } from "./helpers/urls";
-import { expectHealthy } from "./helpers/http";
+import { expect, test } from '@playwright/test';
+import { urls } from './helpers/urls';
+import { expectHealthy } from './helpers/http';
 
-test.describe("Quickstart Stack Health", () => {
+test.describe('Quickstart Stack Health', () => {
   test.setTimeout(60_000);
 
-  test("exposes the documented local URLs", async ({ request }) => {
+  test('exposes the documented local URLs', async ({ request }) => {
     await expectHealthy(request);
 
     const ui = await request.get(urls.ui);

@@ -1,18 +1,18 @@
-import { createHash } from "crypto";
-import { LedgerEntry } from "../domain/types";
-import logger from "../observability/logger";
-import { tryJsonParse } from "../utils/json";
-import { getRedisClient } from "./redisClient";
+import { createHash } from 'crypto';
+import type { LedgerEntry } from '../domain/types';
+import logger from '../observability/logger';
+import { tryJsonParse } from '../utils/json';
+import { getRedisClient } from './redisClient';
 
-const LEDGER_PREFIX = "balance:ledger:";
-const LEDGER_CHECKSUM_PREFIX = "balance:ledger:latest-checksum:";
-const LEDGER_GLOBAL_KEY = "balance:ledger:global";
+const LEDGER_PREFIX = 'balance:ledger:';
+const LEDGER_CHECKSUM_PREFIX = 'balance:ledger:latest-checksum:';
+const LEDGER_GLOBAL_KEY = 'balance:ledger:global';
 
 // In-memory cache
 const ledgerByAccount = new Map<string, LedgerEntry[]>();
 const latestChecksums = new Map<string, string>();
 
-function computeChecksum(entry: Omit<LedgerEntry, "checksum">, previousChecksum: string): string {
+function computeChecksum(entry: Omit<LedgerEntry, 'checksum'>, previousChecksum: string): string {
   const data = JSON.stringify({
     entryId: entry.entryId,
     transactionId: entry.transactionId,
@@ -25,7 +25,7 @@ function computeChecksum(entry: Omit<LedgerEntry, "checksum">, previousChecksum:
     timestamp: entry.timestamp,
     previousChecksum,
   });
-  return createHash("sha256").update(data).digest("hex");
+  return createHash('sha256').update(data).digest('hex');
 }
 
 export async function getLatestChecksum(accountId: string): Promise<string> {
@@ -43,11 +43,11 @@ export async function getLatestChecksum(accountId: string): Promise<string> {
     }
   }
 
-  return "GENESIS";
+  return 'GENESIS';
 }
 
 export async function appendLedgerEntry(
-  entry: Omit<LedgerEntry, "checksum" | "previousChecksum">
+  entry: Omit<LedgerEntry, 'checksum' | 'previousChecksum'>,
 ): Promise<LedgerEntry> {
   const previousChecksum = await getLatestChecksum(entry.accountId);
   const checksum = computeChecksum({ ...entry, previousChecksum }, previousChecksum);
@@ -83,7 +83,7 @@ export async function appendLedgerEntry(
 
 export async function getLedgerEntries(
   accountId: string,
-  options: { limit?: number; from?: string; to?: string } = {}
+  options: { limit?: number; from?: string; to?: string } = {},
 ): Promise<{ entries: LedgerEntry[]; total: number; latestChecksum: string }> {
   const { limit = 50, from, to } = options;
 
@@ -96,7 +96,7 @@ export async function getLedgerEntries(
     for (const raw of rawEntries) {
       const parsed = tryJsonParse<LedgerEntry>(raw);
       if (!parsed.ok) {
-        logger.warn({ err: parsed.error, accountId }, "ledgerStore.parse.failed");
+        logger.warn({ err: parsed.error, accountId }, 'ledgerStore.parse.failed');
         continue;
       }
       parsedEntries.push(parsed.value);
@@ -154,8 +154,8 @@ export async function verifyLedgerIntegrity(accountId: string): Promise<{
       const raw = rawEntries[i];
       const parsed = tryJsonParse<LedgerEntry>(raw);
       if (!parsed.ok) {
-        logger.error({ err: parsed.error, accountId, index: i }, "ledgerStore.parse.failed");
-        return { valid: false, entriesChecked: i, firstInvalidEntry: "PARSE_FAILED" };
+        logger.error({ err: parsed.error, accountId, index: i }, 'ledgerStore.parse.failed');
+        return { valid: false, entriesChecked: i, firstInvalidEntry: 'PARSE_FAILED' };
       }
       entries.push(parsed.value);
     }
@@ -167,7 +167,7 @@ export async function verifyLedgerIntegrity(accountId: string): Promise<{
     return { valid: true, entriesChecked: 0 };
   }
 
-  let previousChecksum = "GENESIS";
+  let previousChecksum = 'GENESIS';
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
     if (entry.previousChecksum !== previousChecksum) {
@@ -191,7 +191,7 @@ export async function verifyLedgerIntegrity(accountId: string): Promise<{
         timestamp: entry.timestamp,
         previousChecksum: entry.previousChecksum,
       },
-      previousChecksum
+      previousChecksum,
     );
 
     if (entry.checksum !== expectedChecksum) {

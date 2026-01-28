@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
 
-import { apiFetch } from "../services/apiClient";
-import { TableSeat } from "../state/tableStore";
-import { testIds } from "../utils/testIds";
+import { apiFetch } from '../services/apiClient';
+import type { TableSeat } from '../state/tableStore';
+import { testIds } from '../utils/testIds';
 
 interface ModerationMenuProps {
   tableId: string;
@@ -17,14 +17,14 @@ export function ModerationMenu({ tableId, seats, onModeration }: ModerationMenuP
   const request = async (path: string, seatId: number) => {
     try {
       await apiFetch(`/api/tables/${tableId}/moderation/${path}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ seatId }),
       });
       setError(null);
       onModeration?.();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Moderation failed";
+      const message = err instanceof Error ? err.message : 'Moderation failed';
       setError(message);
     }
   };
@@ -38,13 +38,14 @@ export function ModerationMenu({ tableId, seats, onModeration }: ModerationMenuP
         seated.map((seat) => (
           <div key={seat.seatId} className="moderation-seat">
             <div>
-              <strong>Seat {seat.seatId + 1}</strong>: {seat.username ?? `Player ${seat.seatId + 1}`}
+              <strong>Seat {seat.seatId + 1}</strong>:{' '}
+              {seat.username ?? `Player ${seat.seatId + 1}`}
             </div>
             <div className="action-buttons">
               <button
                 type="button"
                 className="btn btn-quiet"
-                onClick={() => request("kick", seat.seatId)}
+                onClick={() => request('kick', seat.seatId)}
                 data-testid={testIds.moderation.kick}
                 data-seat-id={seat.seatId}
                 data-seat-number={seat.seatId + 1}
@@ -54,7 +55,7 @@ export function ModerationMenu({ tableId, seats, onModeration }: ModerationMenuP
               <button
                 type="button"
                 className="btn"
-                onClick={() => request("mute", seat.seatId)}
+                onClick={() => request('mute', seat.seatId)}
                 data-testid={testIds.moderation.mute}
                 data-seat-id={seat.seatId}
                 data-seat-number={seat.seatId + 1}

@@ -1,8 +1,11 @@
 function decodeBase64Url(input: string): string | null {
-  const base64 = input.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(input.length / 4) * 4, "=");
+  const base64 = input
+    .replace(/-/g, '+')
+    .replace(/_/g, '/')
+    .padEnd(Math.ceil(input.length / 4) * 4, '=');
 
   try {
-    if (typeof globalThis.atob === "function") {
+    if (typeof globalThis.atob === 'function') {
       return globalThis.atob(base64);
     }
   } catch {
@@ -10,8 +13,8 @@ function decodeBase64Url(input: string): string | null {
   }
 
   try {
-    if (typeof Buffer !== "undefined") {
-      return Buffer.from(base64, "base64").toString("utf8");
+    if (typeof Buffer !== 'undefined') {
+      return Buffer.from(base64, 'base64').toString('utf8');
     }
   } catch {
     // Ignore.
@@ -21,7 +24,7 @@ function decodeBase64Url(input: string): string | null {
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  return typeof value === 'object' && value !== null;
 }
 
 /**
@@ -30,7 +33,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * Note: this does not validate the token or signature.
  */
 export function readJwtHeaderKid(token: string): string | null {
-  const [headerSegment] = token.split(".");
+  const [headerSegment] = token.split('.');
   if (!headerSegment) {
     return null;
   }
@@ -46,9 +49,8 @@ export function readJwtHeaderKid(token: string): string | null {
       return null;
     }
 
-    return typeof header.kid === "string" ? header.kid : null;
+    return typeof header.kid === 'string' ? header.kid : null;
   } catch {
     return null;
   }
 }
-

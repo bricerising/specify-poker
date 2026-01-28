@@ -1,10 +1,10 @@
-import * as profileRepository from "../storage/profileRepository";
-import * as friendsRepository from "../storage/friendsRepository";
-import * as profileCache from "../storage/profileCache";
-import * as friendsCache from "../storage/friendsCache";
-import * as statisticsCache from "../storage/statisticsCache";
-import * as deletedCache from "../storage/deletedCache";
-import * as statisticsRepository from "../storage/statisticsRepository";
+import * as profileRepository from '../storage/profileRepository';
+import * as friendsRepository from '../storage/friendsRepository';
+import * as profileCache from '../storage/profileCache';
+import * as friendsCache from '../storage/friendsCache';
+import * as statisticsCache from '../storage/statisticsCache';
+import * as deletedCache from '../storage/deletedCache';
+import * as statisticsRepository from '../storage/statisticsRepository';
 
 export async function requestDeletion(userId: string): Promise<void> {
   const existing = await profileRepository.findById(userId, true);

@@ -1,9 +1,9 @@
-import { createPeriodicTask, type PeriodicTask } from "@specify-poker/shared";
+import { createPeriodicTask, type PeriodicTask } from '@specify-poker/shared';
 
-import { query } from "../storage/db";
-import * as deletionService from "../services/deletionService";
-import logger from "../observability/logger";
-import { getConfig } from "../config";
+import { query } from '../storage/db';
+import * as deletionService from '../services/deletionService';
+import logger from '../observability/logger';
+import { getConfig } from '../config';
 
 let task: PeriodicTask | null = null;
 
@@ -22,7 +22,7 @@ async function getExpiredDeletions(): Promise<DeletedProfile[]> {
     `SELECT user_id, deleted_at FROM profiles
      WHERE deleted_at IS NOT NULL
        AND deleted_at < $1`,
-    [cutoffDate]
+    [cutoffDate],
   );
 
   return result.rows;
@@ -43,13 +43,10 @@ async function processExpiredDeletions(): Promise<number> {
       processed += 1;
       logger.info(
         { userId: profile.user_id, deletedAt: profile.deleted_at },
-        "Hard deleted user profile after grace period"
+        'Hard deleted user profile after grace period',
       );
     } catch (error) {
-      logger.error(
-        { err: error, userId: profile.user_id },
-        "Failed to hard delete user profile"
-      );
+      logger.error({ err: error, userId: profile.user_id }, 'Failed to hard delete user profile');
     }
   }
 
@@ -60,14 +57,14 @@ export function startDeletionProcessor(): void {
   const config = getConfig();
   const intervalMs = config.deletionProcessorIntervalMs || 60 * 60 * 1000; // Default: 1 hour
 
-  logger.info({ intervalMs }, "Starting deletion processor job");
+  logger.info({ intervalMs }, 'Starting deletion processor job');
 
   task?.stop();
 
   let isFirstRun = true;
 
   task = createPeriodicTask({
-    name: "player.deletion_processor",
+    name: 'player.deletion_processor',
     intervalMs,
     runOnStart: true,
     logger,
@@ -75,12 +72,12 @@ export function startDeletionProcessor(): void {
       try {
         const deletedCount = await processExpiredDeletions();
         if (deletedCount > 0) {
-          logger.info({ deletedCount }, "Processed expired profile deletions");
+          logger.info({ deletedCount }, 'Processed expired profile deletions');
         }
       } catch (error) {
         logger.error(
           { err: error },
-          isFirstRun ? "Deletion processor initial run failed" : "Deletion processor job error",
+          isFirstRun ? 'Deletion processor initial run failed' : 'Deletion processor job error',
         );
       } finally {
         isFirstRun = false;
@@ -98,5 +95,5 @@ export function stopDeletionProcessor(): void {
 
   task.stop();
   task = null;
-  logger.info("Stopped deletion processor job");
+  logger.info('Stopped deletion processor job');
 }

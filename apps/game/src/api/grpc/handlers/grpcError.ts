@@ -1,5 +1,10 @@
-import * as grpc from "@grpc/grpc-js";
-import { asGrpcServiceError, createGrpcServiceError, ensureError, isGrpcServiceErrorLike } from "@specify-poker/shared";
+import * as grpc from '@grpc/grpc-js';
+import {
+  asGrpcServiceError,
+  createGrpcServiceError,
+  ensureError,
+  isGrpcServiceErrorLike,
+} from '@specify-poker/shared';
 
 const messageToStatus: Partial<Record<string, grpc.status>> = {
   TABLE_NOT_FOUND: grpc.status.NOT_FOUND,
@@ -8,11 +13,14 @@ const messageToStatus: Partial<Record<string, grpc.status>> = {
 
 export function toServiceError(error: unknown): grpc.ServiceError {
   if (isGrpcServiceErrorLike(error)) {
-    return asGrpcServiceError(error, { code: grpc.status.INTERNAL, message: "INTERNAL" }) as grpc.ServiceError;
+    return asGrpcServiceError(error, {
+      code: grpc.status.INTERNAL,
+      message: 'INTERNAL',
+    }) as grpc.ServiceError;
   }
 
-  const baseError = ensureError(error, "INTERNAL");
-  const message = baseError.message || "INTERNAL";
+  const baseError = ensureError(error, 'INTERNAL');
+  const message = baseError.message || 'INTERNAL';
   const code = messageToStatus[message] ?? grpc.status.INTERNAL;
 
   return createGrpcServiceError(code, message, error) as grpc.ServiceError;

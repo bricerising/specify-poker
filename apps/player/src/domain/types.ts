@@ -1,4 +1,4 @@
-export type ThemePreference = "light" | "dark" | "auto";
+export type ThemePreference = 'light' | 'dark' | 'auto';
 
 export interface UserPreferences {
   soundEnabled: boolean;
@@ -48,5 +48,5 @@ export interface FriendProfile {
   userId: string;
   nickname: string;
   avatarUrl: string | null;
-  status?: "online" | "offline";
+  status?: 'online' | 'offline';
 }

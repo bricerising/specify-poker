@@ -1,9 +1,9 @@
-import { createPeriodicTask, type PeriodicTask } from "@specify-poker/shared";
+import { createPeriodicTask, type PeriodicTask } from '@specify-poker/shared';
 
-import { verifyAllLedgers } from "../services/ledgerService";
-import { listAccounts } from "../storage/accountStore";
-import { getConfig } from "../config";
-import logger from "../observability/logger";
+import { verifyAllLedgers } from '../services/ledgerService';
+import { listAccounts } from '../storage/accountStore';
+import { getConfig } from '../config';
+import logger from '../observability/logger';
 
 let task: PeriodicTask | null = null;
 
@@ -11,11 +11,11 @@ export function startLedgerVerificationJob(): void {
   const config = getConfig();
   const intervalMs = config.ledgerVerificationIntervalMs;
 
-  logger.info({ intervalMs }, "Starting ledger verification job");
+  logger.info({ intervalMs }, 'Starting ledger verification job');
 
   task?.stop();
   task = createPeriodicTask({
-    name: "balance.ledger_verification",
+    name: 'balance.ledger_verification',
     intervalMs,
     logger,
     run: async () => {
@@ -39,11 +39,11 @@ export function startLedgerVerificationJob(): void {
                   firstInvalidEntry: r.firstInvalidEntry,
                 })),
             },
-            "Ledger integrity check failed",
+            'Ledger integrity check failed',
           );
         }
       } catch (error) {
-        logger.error({ err: error }, "Ledger verification job error");
+        logger.error({ err: error }, 'Ledger verification job error');
       }
     },
   });

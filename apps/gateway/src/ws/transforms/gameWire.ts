@@ -1,26 +1,26 @@
 type UnknownRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is UnknownRecord {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }
 
 function toNumber(value: unknown, fallback = 0): number {
-  if (typeof value === "number" && Number.isFinite(value)) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
   }
-  if (typeof value === "string") {
+  if (typeof value === 'string') {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
   }
   return fallback;
 }
 
-function toString(value: unknown, fallback = ""): string {
-  return typeof value === "string" ? value : fallback;
+function toString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback;
 }
 
 function timestampToIso(value: unknown): string {
-  if (typeof value === "string") {
+  if (typeof value === 'string') {
     return value;
   }
   if (!isRecord(value)) {
@@ -38,7 +38,7 @@ export interface WireTableConfig {
   ante?: number | null;
   maxPlayers: number;
   startingStack: number;
-  bettingStructure: "NoLimit";
+  bettingStructure: 'NoLimit';
   turnTimerSeconds?: number;
 }
 
@@ -123,8 +123,10 @@ export function toWireTableConfig(value: unknown): WireTableConfig {
     ante,
     maxPlayers: toNumber(record.max_players ?? record.maxPlayers, 6),
     startingStack: toNumber(record.starting_stack ?? record.startingStack, 200),
-    bettingStructure: "NoLimit",
-    turnTimerSeconds: isRecord(record) ? toNumber(record.turn_timer_seconds ?? record.turnTimerSeconds, 20) : 20,
+    bettingStructure: 'NoLimit',
+    turnTimerSeconds: isRecord(record)
+      ? toNumber(record.turn_timer_seconds ?? record.turnTimerSeconds, 20)
+      : 20,
   };
 }
 
@@ -132,12 +134,12 @@ export function toWireTableSummary(value: unknown): WireTableSummary {
   const record = isRecord(value) ? value : {};
   return {
     tableId: toString(record.table_id ?? record.tableId),
-    name: toString(record.name ?? "Table"),
+    name: toString(record.name ?? 'Table'),
     ownerId: toString(record.owner_id ?? record.ownerId),
     config: toWireTableConfig(record.config),
     seatsTaken: toNumber(record.seats_taken ?? record.seatsTaken, 0),
-    occupiedSeatIds: ((record.occupied_seat_ids ?? record.occupiedSeatIds ?? []) as unknown[]).map((entry) =>
-      toNumber(entry, 0),
+    occupiedSeatIds: ((record.occupied_seat_ids ?? record.occupiedSeatIds ?? []) as unknown[]).map(
+      (entry) => toNumber(entry, 0),
     ),
     inProgress: Boolean(record.in_progress ?? record.inProgress),
     spectatorCount: toNumber(record.spectator_count ?? record.spectatorCount, 0),
@@ -147,12 +149,12 @@ export function toWireTableSummary(value: unknown): WireTableSummary {
 export function toWireSeatView(value: unknown): WireSeatView {
   const record = isRecord(value) ? value : {};
   const userRaw = record.user_id ?? record.userId;
-  const userId = typeof userRaw === "string" && userRaw.trim().length > 0 ? userRaw : null;
+  const userId = typeof userRaw === 'string' && userRaw.trim().length > 0 ? userRaw : null;
   return {
     seatId: toNumber(record.seat_id ?? record.seatId, 0),
     userId,
     stack: toNumber(record.stack, 0),
-    status: toString(record.status ?? "EMPTY"),
+    status: toString(record.status ?? 'EMPTY'),
   };
 }
 
@@ -160,7 +162,7 @@ export function toWireSpectatorView(value: unknown): WireSpectatorView {
   const record = isRecord(value) ? value : {};
   return {
     userId: toString(record.user_id ?? record.userId),
-    status: toString(record.status ?? "active"),
+    status: toString(record.status ?? 'active'),
     joinedAt: timestampToIso(record.joined_at ?? record.joinedAt),
   };
 }
@@ -170,10 +172,12 @@ function toWirePotView(value: unknown): WirePotView {
   const winnersRaw = record.winners;
   return {
     amount: toNumber(record.amount, 0),
-    eligibleSeatIds: ((record.eligible_seat_ids ?? record.eligibleSeatIds ?? []) as unknown[]).map((entry) =>
-      toNumber(entry, 0),
+    eligibleSeatIds: ((record.eligible_seat_ids ?? record.eligibleSeatIds ?? []) as unknown[]).map(
+      (entry) => toNumber(entry, 0),
     ),
-    ...(Array.isArray(winnersRaw) ? { winners: winnersRaw.map((entry) => toNumber(entry, 0)) } : {}),
+    ...(Array.isArray(winnersRaw)
+      ? { winners: winnersRaw.map((entry) => toNumber(entry, 0)) }
+      : {}),
   };
 }
 
@@ -208,7 +212,7 @@ export function toWireHandStateView(value: unknown): WireHandStateView | null {
   return {
     handId: toString(record.hand_id ?? record.handId),
     tableId: toString(record.table_id ?? record.tableId),
-    street: toString(record.street ?? "PREFLOP"),
+    street: toString(record.street ?? 'PREFLOP'),
     communityCards: communityCardsRaw,
     pots: potsRaw.map(toWirePotView),
     currentBet: toNumber(record.current_bet ?? record.currentBet, 0),
@@ -229,11 +233,13 @@ export function toWireTableStateView(table: unknown, state: unknown): WireTableS
   const spectatorsRaw = Array.isArray(stateRecord.spectators) ? stateRecord.spectators : [];
 
   return {
-    tableId: toString(tableRecord.table_id ?? tableRecord.tableId) || toString(stateRecord.table_id ?? stateRecord.tableId),
-    name: toString(tableRecord.name ?? "Table"),
+    tableId:
+      toString(tableRecord.table_id ?? tableRecord.tableId) ||
+      toString(stateRecord.table_id ?? stateRecord.tableId),
+    name: toString(tableRecord.name ?? 'Table'),
     ownerId: toString(tableRecord.owner_id ?? tableRecord.ownerId),
     config: toWireTableConfig(tableRecord.config),
-    status: toString(tableRecord.status ?? "UNKNOWN"),
+    status: toString(tableRecord.status ?? 'UNKNOWN'),
     hand: toWireHandStateView(stateRecord.hand),
     version: toNumber(stateRecord.version, 0),
     seats: seatsRaw.map(toWireSeatView),
@@ -242,4 +248,3 @@ export function toWireTableStateView(table: unknown, state: unknown): WireTableS
     button: toNumber(stateRecord.button, 0),
   };
 }
-

@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
 
-import { testIds } from "../utils/testIds";
+import { testIds } from '../utils/testIds';
 
-const CHAT_COLLAPSED_STORAGE_KEY = "poker.ui.chat.collapsed";
+const CHAT_COLLAPSED_STORAGE_KEY = 'poker.ui.chat.collapsed';
 
 export interface ChatMessage {
   id: string;
@@ -20,13 +20,13 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ messages, onSend, error, onCollapseChange }: ChatPanelProps) {
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(() => {
-    if (typeof window === "undefined") {
+    if (typeof window === 'undefined') {
       return false;
     }
     try {
-      return window.localStorage.getItem(CHAT_COLLAPSED_STORAGE_KEY) === "1";
+      return window.localStorage.getItem(CHAT_COLLAPSED_STORAGE_KEY) === '1';
     } catch {
       return false;
     }
@@ -34,7 +34,7 @@ export function ChatPanel({ messages, onSend, error, onCollapseChange }: ChatPan
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(CHAT_COLLAPSED_STORAGE_KEY, isCollapsed ? "1" : "0");
+      window.localStorage.setItem(CHAT_COLLAPSED_STORAGE_KEY, isCollapsed ? '1' : '0');
     } catch {
       // ignore persistence failures
     }
@@ -48,11 +48,11 @@ export function ChatPanel({ messages, onSend, error, onCollapseChange }: ChatPan
       return;
     }
     onSend(trimmed);
-    setMessage("");
+    setMessage('');
   };
 
   return (
-    <section className={`card chat-panel${isCollapsed ? " chat-panel-collapsed" : ""}`}>
+    <section className={`card chat-panel${isCollapsed ? ' chat-panel-collapsed' : ''}`}>
       <header className="chat-panel-header">
         <h3>Table Chat</h3>
         <button
@@ -60,10 +60,10 @@ export function ChatPanel({ messages, onSend, error, onCollapseChange }: ChatPan
           className="btn btn-ghost btn-chat-toggle"
           onClick={() => setIsCollapsed((current) => !current)}
           aria-expanded={!isCollapsed}
-          aria-label={isCollapsed ? "Expand chat" : "Collapse chat"}
+          aria-label={isCollapsed ? 'Expand chat' : 'Collapse chat'}
           data-testid={testIds.chat.toggle}
         >
-          {isCollapsed ? "Expand" : "Collapse"}
+          {isCollapsed ? 'Expand' : 'Collapse'}
           <span className="chat-panel-count" aria-hidden="true">
             {messages.length}
           </span>

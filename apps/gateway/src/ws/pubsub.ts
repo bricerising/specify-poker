@@ -1,10 +1,11 @@
-import { randomUUID } from "crypto";
-import { createClient, RedisClientType } from "redis";
-import { getConfig } from "../config";
-import logger from "../observability/logger";
-import { isRecord, safeJsonParseRecord } from "../utils/json";
+import { randomUUID } from 'crypto';
+import type { RedisClientType } from 'redis';
+import { createClient } from 'redis';
+import { getConfig } from '../config';
+import logger from '../observability/logger';
+import { isRecord, safeJsonParseRecord } from '../utils/json';
 
-type WsChannel = "table" | "chat" | "timer" | "lobby";
+type WsChannel = 'table' | 'chat' | 'timer' | 'lobby';
 
 export type WsPubSubMessage = {
   channel: WsChannel;
@@ -13,9 +14,9 @@ export type WsPubSubMessage = {
   sourceId: string;
 };
 
-const PUBSUB_CHANNEL = "gateway:ws:events";
+const PUBSUB_CHANNEL = 'gateway:ws:events';
 
-type Logger = Pick<typeof logger, "info" | "warn" | "error">;
+type Logger = Pick<typeof logger, 'info' | 'warn' | 'error'>;
 
 type WsPubSubHandlers = {
   onTableEvent: (message: WsPubSubMessage) => void;
@@ -49,12 +50,12 @@ function parseWsPubSubMessage(raw: string): WsPubSubMessage | null {
   }
 
   const channel = record.channel;
-  if (channel !== "table" && channel !== "chat" && channel !== "timer" && channel !== "lobby") {
+  if (channel !== 'table' && channel !== 'chat' && channel !== 'timer' && channel !== 'lobby') {
     return null;
   }
 
-  const tableId = typeof record.tableId === "string" ? record.tableId : "";
-  const sourceId = typeof record.sourceId === "string" ? record.sourceId : "";
+  const tableId = typeof record.tableId === 'string' ? record.tableId : '';
+  const sourceId = typeof record.sourceId === 'string' ? record.sourceId : '';
   const payload = record.payload;
   if (!tableId || !sourceId || !isRecord(payload)) {
     return null;
@@ -95,11 +96,11 @@ export function createWsPubSub(options: CreateWsPubSubOptions): WsPubSub {
       pubClient = createRedisClient({ url: options.redisUrl });
       subClient = pubClient.duplicate();
 
-      pubClient.on("error", (error) => {
-        log.error({ err: error }, "Redis pubClient error");
+      pubClient.on('error', (error) => {
+        log.error({ err: error }, 'Redis pubClient error');
       });
-      subClient.on("error", (error) => {
-        log.error({ err: error }, "Redis subClient error");
+      subClient.on('error', (error) => {
+        log.error({ err: error }, 'Redis subClient error');
       });
 
       await pubClient.connect();
@@ -125,7 +126,7 @@ export function createWsPubSub(options: CreateWsPubSubOptions): WsPubSub {
       });
 
       initialized = true;
-      log.info("WebSocket Pub/Sub initialized");
+      log.info('WebSocket Pub/Sub initialized');
       return true;
     })().finally(() => {
       initPromise = null;
@@ -146,12 +147,15 @@ export function createWsPubSub(options: CreateWsPubSubOptions): WsPubSub {
       try {
         await client.quit();
       } catch (err: unknown) {
-        log.warn({ err, label }, "Redis quit failed; forcing disconnect");
+        log.warn({ err, label }, 'Redis quit failed; forcing disconnect');
         client.disconnect();
       }
     };
 
-    closePromise = Promise.all([closeClient(subClient, "subClient"), closeClient(pubClient, "pubClient")])
+    closePromise = Promise.all([
+      closeClient(subClient, 'subClient'),
+      closeClient(pubClient, 'pubClient'),
+    ])
       .then(() => undefined)
       .finally(() => {
         pubClient = null;
@@ -163,7 +167,7 @@ export function createWsPubSub(options: CreateWsPubSubOptions): WsPubSub {
     return closePromise;
   };
 
-  const publish = async (message: Omit<WsPubSubMessage, "sourceId">): Promise<boolean> => {
+  const publish = async (message: Omit<WsPubSubMessage, 'sourceId'>): Promise<boolean> => {
     if (!pubClient) {
       return false;
     }
@@ -176,10 +180,11 @@ export function createWsPubSub(options: CreateWsPubSubOptions): WsPubSub {
     getInstanceId: () => instanceId,
     init,
     close,
-    publishTableEvent: (tableId, payload) => publish({ channel: "table", tableId, payload }),
-    publishChatEvent: (tableId, payload) => publish({ channel: "chat", tableId, payload }),
-    publishTimerEvent: (tableId, payload) => publish({ channel: "timer", tableId, payload }),
-    publishLobbyEvent: (tables) => publish({ channel: "lobby", tableId: "lobby", payload: { tables } }),
+    publishTableEvent: (tableId, payload) => publish({ channel: 'table', tableId, payload }),
+    publishChatEvent: (tableId, payload) => publish({ channel: 'chat', tableId, payload }),
+    publishTimerEvent: (tableId, payload) => publish({ channel: 'timer', tableId, payload }),
+    publishLobbyEvent: (tables) =>
+      publish({ channel: 'lobby', tableId: 'lobby', payload: { tables } }),
   };
 }
 

@@ -1,9 +1,9 @@
-import pino from "pino";
-import { context, trace } from "@opentelemetry/api";
-import { config } from "../config";
+import pino from 'pino';
+import { context, trace } from '@opentelemetry/api';
+import { config } from '../config';
 
 const logger = pino({
-  level: process.env.NODE_ENV === "test" ? "silent" : config.logLevel,
+  level: process.env.NODE_ENV === 'test' ? 'silent' : config.logLevel,
   mixin() {
     const span = trace.getSpan(context.active());
     if (!span) {

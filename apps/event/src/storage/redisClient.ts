@@ -1,8 +1,8 @@
-import { createAsyncMethodProxy, createRedisClientManager } from "@specify-poker/shared/redis";
-import { config } from "../config";
-import logger from "../observability/logger";
+import { createAsyncMethodProxy, createRedisClientManager } from '@specify-poker/shared/redis';
+import { config } from '../config';
+import logger from '../observability/logger';
 
-const redis = createRedisClientManager({ url: config.redisUrl, log: logger, name: "event" });
+const redis = createRedisClientManager({ url: config.redisUrl, log: logger, name: 'event' });
 
 const client = createAsyncMethodProxy(() => redis.getClient());
 

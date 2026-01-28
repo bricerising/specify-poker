@@ -1,23 +1,31 @@
-import { createRedisClientManager as createSharedRedisClientManager } from "@specify-poker/shared/redis";
-import type { RedisClientLogger, RedisClientManager as SharedRedisClientManager } from "@specify-poker/shared/redis";
-import type { RedisClientType } from "redis";
-import { getConfig } from "../config";
-import logger from "../observability/logger";
+import { createRedisClientManager as createSharedRedisClientManager } from '@specify-poker/shared/redis';
+import type {
+  RedisClientLogger,
+  RedisClientManager as SharedRedisClientManager,
+} from '@specify-poker/shared/redis';
+import type { RedisClientType } from 'redis';
+import { getConfig } from '../config';
+import logger from '../observability/logger';
 
-export type RedisClientManager = Pick<SharedRedisClientManager, "getClient" | "getBlockingClient" | "close">;
+export type RedisClientManager = Pick<
+  SharedRedisClientManager,
+  'getClient' | 'getBlockingClient' | 'close'
+>;
 
 type CreateRedisClientManagerOptions = {
   url: string;
-  createClient?: Parameters<typeof createSharedRedisClientManager>[0]["createClient"];
+  createClient?: Parameters<typeof createSharedRedisClientManager>[0]['createClient'];
   log?: RedisClientLogger;
 };
 
-export function createRedisClientManager(options: CreateRedisClientManagerOptions): RedisClientManager {
+export function createRedisClientManager(
+  options: CreateRedisClientManagerOptions,
+): RedisClientManager {
   return createSharedRedisClientManager({
     url: options.url,
     createClient: options.createClient,
     log: options.log ?? logger,
-    name: "notify",
+    name: 'notify',
   });
 }
 

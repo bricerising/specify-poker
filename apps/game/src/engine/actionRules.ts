@@ -1,18 +1,16 @@
-import { ActionInput, ActionType, HandState, LegalAction, Seat } from "../domain/types";
+import type { ActionInput, ActionType, HandState, LegalAction, Seat } from '../domain/types';
 
-type ValidationResult =
-  | { ok: true }
-  | { ok: false; reason: ValidationReason };
+type ValidationResult = { ok: true } | { ok: false; reason: ValidationReason };
 
 type ValidationReason =
-  | "HAND_COMPLETE"
-  | "SEAT_INACTIVE"
-  | "ILLEGAL_ACTION"
-  | "MISSING_AMOUNT"
-  | "AMOUNT_TOO_SMALL"
-  | "AMOUNT_TOO_LARGE";
+  | 'HAND_COMPLETE'
+  | 'SEAT_INACTIVE'
+  | 'ILLEGAL_ACTION'
+  | 'MISSING_AMOUNT'
+  | 'AMOUNT_TOO_SMALL'
+  | 'AMOUNT_TOO_LARGE';
 
-const AMOUNT_REQUIRED_ACTIONS: ReadonlySet<ActionType> = new Set(["BET", "RAISE", "ALL_IN"]);
+const AMOUNT_REQUIRED_ACTIONS: ReadonlySet<ActionType> = new Set(['BET', 'RAISE', 'ALL_IN']);
 
 export function getCallAmount(hand: HandState, seat: Seat): number {
   const contributed = hand.roundContributions[seat.seatId] ?? 0;
@@ -20,7 +18,7 @@ export function getCallAmount(hand: HandState, seat: Seat): number {
 }
 
 export function deriveLegalActions(hand: HandState, seat: Seat): LegalAction[] {
-  if (seat.status !== "ACTIVE") {
+  if (seat.status !== 'ACTIVE') {
     return [];
   }
 
@@ -28,40 +26,40 @@ export function deriveLegalActions(hand: HandState, seat: Seat): LegalAction[] {
   const toCall = getCallAmount(hand, seat);
   const canRaise = !hand.raiseCapped || !hand.actedSeats.includes(seat.seatId);
 
-  actions.push({ type: "FOLD" });
+  actions.push({ type: 'FOLD' });
 
   const contributed = hand.roundContributions[seat.seatId] ?? 0;
   const maxTotal = seat.stack + contributed;
 
   if (toCall <= 0) {
-    actions.push({ type: "CHECK" });
+    actions.push({ type: 'CHECK' });
     if (seat.stack > 0) {
       if (hand.currentBet === 0) {
-        actions.push({ type: "BET", minAmount: hand.minRaise, maxAmount: seat.stack });
+        actions.push({ type: 'BET', minAmount: hand.minRaise, maxAmount: seat.stack });
       } else {
         if (canRaise && maxTotal > hand.currentBet) {
           const minRaise = Math.min(hand.currentBet + hand.minRaise, maxTotal);
           actions.push({
-            type: "RAISE",
+            type: 'RAISE',
             minAmount: minRaise,
             maxAmount: maxTotal,
           });
         }
       }
-      actions.push({ type: "ALL_IN", minAmount: maxTotal, maxAmount: maxTotal });
+      actions.push({ type: 'ALL_IN', minAmount: maxTotal, maxAmount: maxTotal });
     }
   } else {
-    actions.push({ type: "CALL", maxAmount: Math.min(toCall, seat.stack) });
+    actions.push({ type: 'CALL', maxAmount: Math.min(toCall, seat.stack) });
     if (canRaise && maxTotal > hand.currentBet) {
       const minRaise = Math.min(hand.currentBet + hand.minRaise, maxTotal);
       actions.push({
-        type: "RAISE",
+        type: 'RAISE',
         minAmount: minRaise,
         maxAmount: maxTotal,
       });
     }
     if (seat.stack > 0) {
-      actions.push({ type: "ALL_IN", minAmount: maxTotal, maxAmount: maxTotal });
+      actions.push({ type: 'ALL_IN', minAmount: maxTotal, maxAmount: maxTotal });
     }
   }
 
@@ -69,50 +67,43 @@ export function deriveLegalActions(hand: HandState, seat: Seat): LegalAction[] {
 }
 
 function isValidAmount(amount: unknown): amount is number {
-  return typeof amount === "number" && !Number.isNaN(amount);
+  return typeof amount === 'number' && !Number.isNaN(amount);
 }
 
-function validateAmountBounds(
-  action: ActionInput,
-  legal: LegalAction
-): ValidationResult {
+function validateAmountBounds(action: ActionInput, legal: LegalAction): ValidationResult {
   if (!AMOUNT_REQUIRED_ACTIONS.has(action.type)) {
     return { ok: true };
   }
 
   if (!isValidAmount(action.amount)) {
-    return { ok: false, reason: "MISSING_AMOUNT" };
+    return { ok: false, reason: 'MISSING_AMOUNT' };
   }
 
   if (legal.minAmount !== undefined && action.amount < legal.minAmount) {
-    return { ok: false, reason: "AMOUNT_TOO_SMALL" };
+    return { ok: false, reason: 'AMOUNT_TOO_SMALL' };
   }
 
   if (legal.maxAmount !== undefined && action.amount > legal.maxAmount) {
-    return { ok: false, reason: "AMOUNT_TOO_LARGE" };
+    return { ok: false, reason: 'AMOUNT_TOO_LARGE' };
   }
 
   return { ok: true };
 }
 
-export function validateAction(
-  hand: HandState,
-  seat: Seat,
-  action: ActionInput,
-): ValidationResult {
-  if (hand.street === "SHOWDOWN") {
-    return { ok: false, reason: "HAND_COMPLETE" };
+export function validateAction(hand: HandState, seat: Seat, action: ActionInput): ValidationResult {
+  if (hand.street === 'SHOWDOWN') {
+    return { ok: false, reason: 'HAND_COMPLETE' };
   }
 
-  if (seat.status !== "ACTIVE") {
-    return { ok: false, reason: "SEAT_INACTIVE" };
+  if (seat.status !== 'ACTIVE') {
+    return { ok: false, reason: 'SEAT_INACTIVE' };
   }
 
   const legalActions = deriveLegalActions(hand, seat);
   const matchingAction = legalActions.find((entry) => entry.type === action.type);
 
   if (!matchingAction) {
-    return { ok: false, reason: "ILLEGAL_ACTION" };
+    return { ok: false, reason: 'ILLEGAL_ACTION' };
   }
 
   return validateAmountBounds(action, matchingAction);

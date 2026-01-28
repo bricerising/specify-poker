@@ -10,19 +10,19 @@ export interface Account {
 
 // Transaction types
 export type TransactionType =
-  | "DEPOSIT"
-  | "WITHDRAW"
-  | "BUY_IN"
-  | "CASH_OUT"
-  | "BLIND"
-  | "BET"
-  | "POT_WIN"
-  | "RAKE"
-  | "BONUS"
-  | "REFERRAL"
-  | "REFUND";
+  | 'DEPOSIT'
+  | 'WITHDRAW'
+  | 'BUY_IN'
+  | 'CASH_OUT'
+  | 'BLIND'
+  | 'BET'
+  | 'POT_WIN'
+  | 'RAKE'
+  | 'BONUS'
+  | 'REFERRAL'
+  | 'REFUND';
 
-export type TransactionStatus = "PENDING" | "COMPLETED" | "FAILED";
+export type TransactionStatus = 'PENDING' | 'COMPLETED' | 'FAILED';
 
 export interface TransactionMetadata {
   tableId?: string;
@@ -48,7 +48,7 @@ export interface Transaction {
 }
 
 // Reservation - Two-phase buy-in
-export type ReservationStatus = "HELD" | "COMMITTED" | "RELEASED" | "EXPIRED";
+export type ReservationStatus = 'HELD' | 'COMMITTED' | 'RELEASED' | 'EXPIRED';
 
 export interface Reservation {
   reservationId: string;
@@ -64,7 +64,7 @@ export interface Reservation {
 }
 
 // Table Pot
-export type TablePotStatus = "ACTIVE" | "SETTLED" | "CANCELLED";
+export type TablePotStatus = 'ACTIVE' | 'SETTLED' | 'CANCELLED';
 
 export interface Pot {
   amount: number;
@@ -100,9 +100,7 @@ export interface LedgerEntry {
 }
 
 // Service operation results - discriminated union for type-safe error handling
-export type OperationResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: string };
+export type OperationResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
 export interface BalanceInfo {
   accountId: string;
@@ -120,9 +118,7 @@ export type CommitResult =
   | { ok: true; transactionId: string; newBalance?: number }
   | { ok: false; error: string };
 
-export type ReleaseResult =
-  | { ok: true; availableBalance?: number }
-  | { ok: false; error: string };
+export type ReleaseResult = { ok: true; availableBalance?: number } | { ok: false; error: string };
 
 export type CashOutResult =
   | { ok: true; transactionId: string; newBalance: number }

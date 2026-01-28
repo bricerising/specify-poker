@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createHandlers } from "../../src/api/grpc/handlers";
+import { createHandlers } from '../../src/api/grpc/handlers';
 
 describe('gRPC Handlers', () => {
   let handlers: unknown;
@@ -42,7 +42,10 @@ describe('gRPC Handlers', () => {
 
     await handlers.registerSubscription(call, callback);
 
-    expect(callback).toHaveBeenCalledWith(null, expect.objectContaining({ ok: false, error: 'MISSING_FIELDS' }));
+    expect(callback).toHaveBeenCalledWith(
+      null,
+      expect.objectContaining({ ok: false, error: 'MISSING_FIELDS' }),
+    );
   });
 
   it('unregisterSubscription should delete subscription', async () => {
@@ -56,7 +59,7 @@ describe('gRPC Handlers', () => {
 
     await handlers.unregisterSubscription(call, callback);
 
-    expect(subscriptionServiceMock.unregister).toHaveBeenCalledWith("u1", "e1");
+    expect(subscriptionServiceMock.unregister).toHaveBeenCalledWith('u1', 'e1');
     expect(callback).toHaveBeenCalledWith(null, { ok: true });
   });
 
@@ -66,7 +69,10 @@ describe('gRPC Handlers', () => {
 
     await handlers.unregisterSubscription(call, callback);
 
-    expect(callback).toHaveBeenCalledWith(null, expect.objectContaining({ ok: false, error: 'MISSING_FIELDS' }));
+    expect(callback).toHaveBeenCalledWith(
+      null,
+      expect.objectContaining({ ok: false, error: 'MISSING_FIELDS' }),
+    );
   });
 
   it('listSubscriptions should return subscriptions', async () => {
@@ -78,12 +84,13 @@ describe('gRPC Handlers', () => {
 
     await handlers.listSubscriptions(call, callback);
 
-    expect(subscriptionServiceMock.getSubscriptions).toHaveBeenCalledWith("u1");
-    expect(callback).toHaveBeenCalledWith(null, expect.objectContaining({
-      subscriptions: expect.arrayContaining([
-        expect.objectContaining({ endpoint: 'e1' }),
-      ]),
-    }));
+    expect(subscriptionServiceMock.getSubscriptions).toHaveBeenCalledWith('u1');
+    expect(callback).toHaveBeenCalledWith(
+      null,
+      expect.objectContaining({
+        subscriptions: expect.arrayContaining([expect.objectContaining({ endpoint: 'e1' })]),
+      }),
+    );
   });
 
   it('listSubscriptions should return empty array if userId is missing', async () => {
@@ -109,7 +116,10 @@ describe('gRPC Handlers', () => {
     await handlers.sendNotification(call, callback);
 
     expect(pushServiceMock.sendToUser).toHaveBeenCalled();
-    expect(callback).toHaveBeenCalledWith(null, expect.objectContaining({ ok: true, successCount: 1 }));
+    expect(callback).toHaveBeenCalledWith(
+      null,
+      expect.objectContaining({ ok: true, successCount: 1 }),
+    );
   });
 
   it('sendNotification should return error if fields are missing', async () => {
@@ -118,7 +128,10 @@ describe('gRPC Handlers', () => {
 
     await handlers.sendNotification(call, callback);
 
-    expect(callback).toHaveBeenCalledWith(null, expect.objectContaining({ ok: false, error: 'MISSING_FIELDS' }));
+    expect(callback).toHaveBeenCalledWith(
+      null,
+      expect.objectContaining({ ok: false, error: 'MISSING_FIELDS' }),
+    );
   });
 
   it('should handle errors in handlers', async () => {
@@ -132,10 +145,13 @@ describe('gRPC Handlers', () => {
       },
     };
     const callback = vi.fn();
-    subscriptionServiceMock.register.mockRejectedValue(new Error("Internal Error"));
+    subscriptionServiceMock.register.mockRejectedValue(new Error('Internal Error'));
 
     await handlers.registerSubscription(call, callback);
 
-    expect(callback).toHaveBeenCalledWith(null, expect.objectContaining({ ok: false, error: 'Internal Error' }));
+    expect(callback).toHaveBeenCalledWith(
+      null,
+      expect.objectContaining({ ok: false, error: 'Internal Error' }),
+    );
   });
 });

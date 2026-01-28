@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PushSenderService } from '../../src/services/pushSenderService';
-import { SubscriptionStore } from '../../src/storage/subscriptionStore';
+import type { SubscriptionStore } from '../../src/storage/subscriptionStore';
 import webpush from 'web-push';
 
 vi.mock('web-push', () => ({

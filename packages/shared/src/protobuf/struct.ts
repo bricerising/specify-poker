@@ -1,5 +1,5 @@
 export type StructValue =
-  | { nullValue: 0 | "NULL_VALUE" }
+  | { nullValue: 0 | 'NULL_VALUE' }
   | { boolValue: boolean }
   | { numberValue: number }
   | { stringValue: string }
@@ -28,28 +28,28 @@ export function toStructValue(value: unknown): StructValue {
   if (value === null || value === undefined) {
     return { nullValue: 0 };
   }
-  if (typeof value === "boolean") {
+  if (typeof value === 'boolean') {
     return { boolValue: value };
   }
-  if (typeof value === "number") {
+  if (typeof value === 'number') {
     return { numberValue: value };
   }
-  if (typeof value === "string") {
+  if (typeof value === 'string') {
     return { stringValue: value };
   }
   if (Array.isArray(value)) {
     return { listValue: { values: value.map(toStructValue) } };
   }
-  if (typeof value === "object") {
+  if (typeof value === 'object') {
     return { structValue: { fields: toStructFields(value as Record<string, unknown>) } };
   }
   return { stringValue: String(value) };
 }
 
 export function decodeStructLike(payload: unknown): Record<string, unknown> {
-  if (payload && typeof payload === "object") {
+  if (payload && typeof payload === 'object') {
     const record = payload as Record<string, unknown>;
-    if ("fields" in record && record.fields && typeof record.fields === "object") {
+    if ('fields' in record && record.fields && typeof record.fields === 'object') {
       return fromStruct(record as { fields: Record<string, unknown> });
     }
     return record;
@@ -66,21 +66,21 @@ export function fromStruct(struct: { fields: Record<string, unknown> }): Record<
 }
 
 export function fromStructValue(value: unknown): unknown {
-  if (!value || typeof value !== "object") {
+  if (!value || typeof value !== 'object') {
     return value;
   }
   const record = value as Record<string, unknown>;
-  if ("stringValue" in record) return record.stringValue as string;
-  if ("numberValue" in record) return record.numberValue as number;
-  if ("boolValue" in record) return record.boolValue as boolean;
-  if ("listValue" in record && record.listValue && typeof record.listValue === "object") {
+  if ('stringValue' in record) return record.stringValue as string;
+  if ('numberValue' in record) return record.numberValue as number;
+  if ('boolValue' in record) return record.boolValue as boolean;
+  if ('listValue' in record && record.listValue && typeof record.listValue === 'object') {
     const list = record.listValue as { values?: unknown[] };
     return (list.values ?? []).map(fromStructValue);
   }
-  if ("structValue" in record && record.structValue && typeof record.structValue === "object") {
+  if ('structValue' in record && record.structValue && typeof record.structValue === 'object') {
     const struct = record.structValue as { fields: Record<string, unknown> };
     return fromStruct(struct);
   }
-  if ("nullValue" in record) return null;
+  if ('nullValue' in record) return null;
   return value;
 }

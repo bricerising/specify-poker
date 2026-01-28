@@ -1,20 +1,20 @@
-import { defaultProfile } from "../domain/defaults";
-import { Profile, ProfileSummary, UserPreferences } from "../domain/types";
-import * as profileRepository from "../storage/profileRepository";
-import * as profileCache from "../storage/profileCache";
-import * as deletedCache from "../storage/deletedCache";
-import { publishEvent } from "./eventProducer";
-import { generateNickname, isAvailable, validateNickname } from "./nicknameService";
-import { incrementReferralCount } from "./statisticsService";
-import { requestDeletion } from "./deletionService";
-import { ConflictError, ValidationError } from "../domain/errors";
+import { defaultProfile } from '../domain/defaults';
+import type { Profile, ProfileSummary, UserPreferences } from '../domain/types';
+import * as profileRepository from '../storage/profileRepository';
+import * as profileCache from '../storage/profileCache';
+import * as deletedCache from '../storage/deletedCache';
+import { publishEvent } from './eventProducer';
+import { generateNickname, isAvailable, validateNickname } from './nicknameService';
+import { incrementReferralCount } from './statisticsService';
+import { requestDeletion } from './deletionService';
+import { ConflictError, ValidationError } from '../domain/errors';
 
-const DELETED_NICKNAME = "Deleted User";
+const DELETED_NICKNAME = 'Deleted User';
 
 function getProfileRefresh(
   profile: Profile,
   nowIso: string,
-  desiredUsername: string | null
+  desiredUsername: string | null,
 ): { updated: Profile | null; shouldPublishDailyLogin: boolean } {
   const shouldUpdateLogin = !sameDay(profile.lastLoginAt, nowIso);
   const shouldUpdateUsername = Boolean(desiredUsername) && desiredUsername !== profile.username;
@@ -53,7 +53,7 @@ function deletedProfile(userId: string): Profile {
       soundEnabled: false,
       chatEnabled: false,
       showHandStrength: false,
-      theme: "auto",
+      theme: 'auto',
     },
     lastLoginAt: null,
     referredBy: null,
@@ -67,27 +67,31 @@ function sameDay(isoA: string | null, isoB: string): boolean {
   if (!isoA) {
     return false;
   }
-  return isoA.split("T")[0] === isoB.split("T")[0];
+  return isoA.split('T')[0] === isoB.split('T')[0];
 }
 
 function isValidAvatarUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
+    return url.protocol === 'http:' || url.protocol === 'https:';
   } catch {
     return false;
   }
 }
 
 function normalizeUsername(value: string | undefined): string | null {
-  if (typeof value !== "string") {
+  if (typeof value !== 'string') {
     return null;
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
 }
 
-export async function getProfile(userId: string, referrerId?: string, username?: string): Promise<Profile> {
+export async function getProfile(
+  userId: string,
+  referrerId?: string,
+  username?: string,
+): Promise<Profile> {
   if (await deletedCache.isDeleted(userId)) {
     return deletedProfile(userId);
   }
@@ -104,7 +108,7 @@ export async function getProfile(userId: string, referrerId?: string, username?:
     const saved = await profileRepository.update(refresh.updated);
     await profileCache.set(saved);
     if (refresh.shouldPublishDailyLogin) {
-      await publishEvent("DAILY_LOGIN", { userId, date: nowIso.split("T")[0] }, userId);
+      await publishEvent('DAILY_LOGIN', { userId, date: nowIso.split('T')[0] }, userId);
     }
     return saved;
   }
@@ -121,7 +125,7 @@ export async function getProfile(userId: string, referrerId?: string, username?:
       const saved = await profileRepository.update(refresh.updated);
       await profileCache.set(saved);
       if (refresh.shouldPublishDailyLogin) {
-        await publishEvent("DAILY_LOGIN", { userId, date: nowIso.split("T")[0] }, userId);
+        await publishEvent('DAILY_LOGIN', { userId, date: nowIso.split('T')[0] }, userId);
       }
       return saved;
     }
@@ -132,7 +136,7 @@ export async function getProfile(userId: string, referrerId?: string, username?:
 
   const nickname = await generateNickname(userId);
   const now = new Date();
-  const profile = defaultProfile(userId, nickname, now, desiredUsername ?? "");
+  const profile = defaultProfile(userId, nickname, now, desiredUsername ?? '');
 
   if (referrerId && referrerId !== userId) {
     profile.referredBy = referrerId;
@@ -146,7 +150,7 @@ export async function getProfile(userId: string, referrerId?: string, username?:
 
   if (inserted && referrerId && referrerId !== userId) {
     await incrementReferralCount(referrerId, 1);
-    await publishEvent("REFERRAL_REWARD", { referrerId, referredId: userId }, referrerId);
+    await publishEvent('REFERRAL_REWARD', { referrerId, referredId: userId }, referrerId);
   }
 
   return created;
@@ -208,7 +212,7 @@ export async function updateProfile(
     nickname?: string;
     avatarUrl?: string | null;
     preferences?: Partial<UserPreferences>;
-  }
+  },
 ): Promise<Profile> {
   const current = await getProfile(userId);
   const previousNickname = current.nickname;
@@ -221,7 +225,7 @@ export async function updateProfile(
     if (updates.nickname !== current.nickname) {
       const available = await isAvailable(updates.nickname);
       if (!available) {
-        throw new ConflictError("Nickname is not available");
+        throw new ConflictError('Nickname is not available');
       }
     }
     nickname = updates.nickname;
@@ -229,7 +233,7 @@ export async function updateProfile(
 
   if (updates.avatarUrl !== undefined) {
     if (updates.avatarUrl && !isValidAvatarUrl(updates.avatarUrl)) {
-      throw new ValidationError("Avatar URL is invalid");
+      throw new ValidationError('Avatar URL is invalid');
     }
     avatarUrl = updates.avatarUrl ?? null;
   }

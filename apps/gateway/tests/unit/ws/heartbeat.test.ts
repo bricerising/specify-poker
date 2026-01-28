@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { EventEmitter } from "events";
-import WebSocket from "ws";
-import { setupHeartbeat } from "../../../src/ws/heartbeat";
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { EventEmitter } from 'events';
+import WebSocket from 'ws';
+import { setupHeartbeat } from '../../../src/ws/heartbeat';
 
 class MockSocket extends EventEmitter {
   ping = vi.fn();
@@ -9,7 +9,7 @@ class MockSocket extends EventEmitter {
   readyState = WebSocket.OPEN;
 }
 
-describe("WebSocket heartbeat", () => {
+describe('WebSocket heartbeat', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -18,7 +18,7 @@ describe("WebSocket heartbeat", () => {
     vi.useRealTimers();
   });
 
-  it("pings and terminates dead connections", () => {
+  it('pings and terminates dead connections', () => {
     const socket = new MockSocket();
     const onDead = vi.fn();
 
@@ -32,13 +32,13 @@ describe("WebSocket heartbeat", () => {
     expect(onDead).toHaveBeenCalled();
   });
 
-  it("resets liveness on pong", () => {
+  it('resets liveness on pong', () => {
     const socket = new MockSocket();
     const onDead = vi.fn();
 
     setupHeartbeat(socket as unknown as WebSocket, onDead);
 
-    socket.emit("pong");
+    socket.emit('pong');
     vi.advanceTimersByTime(30000);
 
     expect(socket.terminate).not.toHaveBeenCalled();

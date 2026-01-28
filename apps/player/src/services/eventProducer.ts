@@ -1,11 +1,11 @@
-import { randomUUID } from "crypto";
-import { getRedisClient } from "../storage/redisClient";
-import logger from "../observability/logger";
+import { randomUUID } from 'crypto';
+import { getRedisClient } from '../storage/redisClient';
+import logger from '../observability/logger';
 
 export async function publishEvent(type: string, payload: unknown, userId?: string): Promise<void> {
   const client = await getRedisClient();
   if (!client) {
-    logger.warn({ type }, "Redis not available, cannot publish event");
+    logger.warn({ type }, 'Redis not available, cannot publish event');
     return;
   }
 
@@ -18,11 +18,11 @@ export async function publishEvent(type: string, payload: unknown, userId?: stri
   };
 
   try {
-    await client.xAdd("events:all", "*", {
+    await client.xAdd('events:all', '*', {
       data: JSON.stringify(event),
     });
   } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : "unknown";
-    logger.error({ type, error: errorMessage }, "Failed to publish event to Redis");
+    const errorMessage = err instanceof Error ? err.message : 'unknown';
+    logger.error({ type, error: errorMessage }, 'Failed to publish event to Redis');
   }
 }

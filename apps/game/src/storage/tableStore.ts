@@ -1,9 +1,9 @@
-import redisClient from "./redisClient";
-import { Table } from "../domain/types";
+import redisClient from './redisClient';
+import type { Table } from '../domain/types';
 
-const TABLE_PREFIX = "game:tables:";
-const TABLE_IDS_KEY = "game:tables:ids";
-const TABLE_BY_OWNER_PREFIX = "game:tables:by-owner:";
+const TABLE_PREFIX = 'game:tables:';
+const TABLE_IDS_KEY = 'game:tables:ids';
+const TABLE_BY_OWNER_PREFIX = 'game:tables:by-owner:';
 
 export class TableStore {
   async save(table: Table): Promise<void> {

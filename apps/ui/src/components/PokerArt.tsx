@@ -1,11 +1,11 @@
-import React from "react";
+import React from 'react';
 
 interface PokerArtProps {
-  variant?: "hero" | "table";
+  variant?: 'hero' | 'table';
 }
 
-export function PokerArt({ variant = "hero" }: PokerArtProps) {
-  const size = variant === "hero" ? 280 : 220;
+export function PokerArt({ variant = 'hero' }: PokerArtProps) {
+  const size = variant === 'hero' ? 280 : 220;
   return (
     <svg
       className={`poker-art poker-art-${variant}`}

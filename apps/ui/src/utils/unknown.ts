@@ -1,7 +1,7 @@
 export type UnknownRecord = Record<string, unknown>;
 
 export function isRecord(value: unknown): value is UnknownRecord {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function asRecord(value: unknown): UnknownRecord | null {
@@ -13,11 +13,11 @@ export function hasOwn(record: UnknownRecord, key: string): boolean {
 }
 
 export function readString(value: unknown): string | null {
-  return typeof value === "string" ? value : null;
+  return typeof value === 'string' ? value : null;
 }
 
 export function readTrimmedString(value: unknown): string | null {
-  if (typeof value !== "string") {
+  if (typeof value !== 'string') {
     return null;
   }
   const trimmed = value.trim();
@@ -25,7 +25,7 @@ export function readTrimmedString(value: unknown): string | null {
 }
 
 export function readNumber(value: unknown): number | null {
-  const parsed = typeof value === "number" ? value : Number(value);
+  const parsed = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
@@ -41,4 +41,3 @@ export function readStringArray(value: unknown): string[] {
     .map((entry) => readTrimmedString(entry))
     .filter((entry): entry is string => Boolean(entry));
 }
-

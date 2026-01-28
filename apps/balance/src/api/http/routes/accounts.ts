@@ -1,30 +1,31 @@
-import { Router, Request, Response } from "express";
+import type { Request, Response } from 'express';
+import { Router } from 'express';
 import {
   getBalance,
   ensureAccount,
   processDeposit,
   processWithdrawal,
-} from "../../../services/accountService";
-import { getTransactionsByAccount } from "../../../storage/transactionStore";
-import { queryLedger } from "../../../services/ledgerService";
-import { toNonEmptyString, toNumber } from "../../validation";
+} from '../../../services/accountService';
+import { getTransactionsByAccount } from '../../../storage/transactionStore';
+import { queryLedger } from '../../../services/ledgerService';
+import { toNonEmptyString, toNumber } from '../../validation';
 
 const router = Router();
 
 // Get account balance
-router.get("/:accountId/balance", async (req: Request, res: Response) => {
+router.get('/:accountId/balance', async (req: Request, res: Response) => {
   const accountId = toNonEmptyString(req.params.accountId);
   if (!accountId) {
     return res.status(400).json({
-      error: "INVALID_ACCOUNT_ID",
-      message: "AccountId is required",
+      error: 'INVALID_ACCOUNT_ID',
+      message: 'AccountId is required',
     });
   }
 
   const balance = await getBalance(accountId);
   if (!balance) {
     return res.status(404).json({
-      error: "ACCOUNT_NOT_FOUND",
+      error: 'ACCOUNT_NOT_FOUND',
       message: `Account ${accountId} not found`,
     });
   }
@@ -33,20 +34,20 @@ router.get("/:accountId/balance", async (req: Request, res: Response) => {
 });
 
 // Ensure account exists (create if not)
-router.post("/:accountId", async (req: Request, res: Response) => {
+router.post('/:accountId', async (req: Request, res: Response) => {
   const accountId = toNonEmptyString(req.params.accountId);
   if (!accountId) {
     return res.status(400).json({
-      error: "INVALID_ACCOUNT_ID",
-      message: "AccountId is required",
+      error: 'INVALID_ACCOUNT_ID',
+      message: 'AccountId is required',
     });
   }
 
   const initialBalance = toNumber((req.body as { initialBalance?: unknown })?.initialBalance, 0);
   if (!Number.isFinite(initialBalance) || initialBalance < 0) {
     return res.status(400).json({
-      error: "INVALID_AMOUNT",
-      message: "initialBalance must be a non-negative number",
+      error: 'INVALID_AMOUNT',
+      message: 'initialBalance must be a non-negative number',
     });
   }
 
@@ -61,21 +62,21 @@ router.post("/:accountId", async (req: Request, res: Response) => {
 });
 
 // Deposit chips
-router.post("/:accountId/deposit", async (req: Request, res: Response) => {
+router.post('/:accountId/deposit', async (req: Request, res: Response) => {
   const accountId = toNonEmptyString(req.params.accountId);
   if (!accountId) {
     return res.status(400).json({
-      error: "INVALID_ACCOUNT_ID",
-      message: "AccountId is required",
+      error: 'INVALID_ACCOUNT_ID',
+      message: 'AccountId is required',
     });
   }
 
-  const idempotencyKey = toNonEmptyString(req.headers["idempotency-key"]);
+  const idempotencyKey = toNonEmptyString(req.headers['idempotency-key']);
 
   if (!idempotencyKey) {
     return res.status(400).json({
-      error: "MISSING_IDEMPOTENCY_KEY",
-      message: "Idempotency-Key header is required",
+      error: 'MISSING_IDEMPOTENCY_KEY',
+      message: 'Idempotency-Key header is required',
     });
   }
 
@@ -85,15 +86,15 @@ router.post("/:accountId/deposit", async (req: Request, res: Response) => {
 
   if (!Number.isFinite(amount) || amount <= 0) {
     return res.status(400).json({
-      error: "INVALID_AMOUNT",
-      message: "Amount must be a positive number",
+      error: 'INVALID_AMOUNT',
+      message: 'Amount must be a positive number',
     });
   }
 
   if (!source) {
     return res.status(400).json({
-      error: "MISSING_SOURCE",
-      message: "Source is required (FREEROLL, PURCHASE, ADMIN, BONUS)",
+      error: 'MISSING_SOURCE',
+      message: 'Source is required (FREEROLL, PURCHASE, ADMIN, BONUS)',
     });
   }
 
@@ -119,21 +120,21 @@ router.post("/:accountId/deposit", async (req: Request, res: Response) => {
 });
 
 // Withdraw chips
-router.post("/:accountId/withdraw", async (req: Request, res: Response) => {
+router.post('/:accountId/withdraw', async (req: Request, res: Response) => {
   const accountId = toNonEmptyString(req.params.accountId);
   if (!accountId) {
     return res.status(400).json({
-      error: "INVALID_ACCOUNT_ID",
-      message: "AccountId is required",
+      error: 'INVALID_ACCOUNT_ID',
+      message: 'AccountId is required',
     });
   }
 
-  const idempotencyKey = toNonEmptyString(req.headers["idempotency-key"]);
+  const idempotencyKey = toNonEmptyString(req.headers['idempotency-key']);
 
   if (!idempotencyKey) {
     return res.status(400).json({
-      error: "MISSING_IDEMPOTENCY_KEY",
-      message: "Idempotency-Key header is required",
+      error: 'MISSING_IDEMPOTENCY_KEY',
+      message: 'Idempotency-Key header is required',
     });
   }
 
@@ -143,15 +144,15 @@ router.post("/:accountId/withdraw", async (req: Request, res: Response) => {
 
   if (!Number.isFinite(amount) || amount <= 0) {
     return res.status(400).json({
-      error: "INVALID_AMOUNT",
-      message: "Amount must be a positive number",
+      error: 'INVALID_AMOUNT',
+      message: 'Amount must be a positive number',
     });
   }
 
   const result = await processWithdrawal(accountId, amount, idempotencyKey, reason);
 
   if (!result.ok) {
-    const status = result.error === "INSUFFICIENT_BALANCE" ? 400 : 400;
+    const status = result.error === 'INSUFFICIENT_BALANCE' ? 400 : 400;
     return res.status(status).json({
       error: result.error,
       message: `Withdrawal failed: ${result.error}`,
@@ -171,12 +172,12 @@ router.post("/:accountId/withdraw", async (req: Request, res: Response) => {
 });
 
 // Get transaction history
-router.get("/:accountId/transactions", async (req: Request, res: Response) => {
+router.get('/:accountId/transactions', async (req: Request, res: Response) => {
   const accountId = toNonEmptyString(req.params.accountId);
   if (!accountId) {
     return res.status(400).json({
-      error: "INVALID_ACCOUNT_ID",
-      message: "AccountId is required",
+      error: 'INVALID_ACCOUNT_ID',
+      message: 'AccountId is required',
     });
   }
 
@@ -207,12 +208,12 @@ router.get("/:accountId/transactions", async (req: Request, res: Response) => {
 });
 
 // Get ledger entries
-router.get("/:accountId/ledger", async (req: Request, res: Response) => {
+router.get('/:accountId/ledger', async (req: Request, res: Response) => {
   const accountId = toNonEmptyString(req.params.accountId);
   if (!accountId) {
     return res.status(400).json({
-      error: "INVALID_ACCOUNT_ID",
-      message: "AccountId is required",
+      error: 'INVALID_ACCOUNT_ID',
+      message: 'AccountId is required',
     });
   }
 

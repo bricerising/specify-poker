@@ -1,6 +1,6 @@
-import type { FullConfig } from "@playwright/test";
-import { generateToken } from "./helpers/auth";
-import { urls } from "./helpers/urls";
+import type { FullConfig } from '@playwright/test';
+import { generateToken } from './helpers/auth';
+import { urls } from './helpers/urls';
 
 async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -13,7 +13,7 @@ async function isStackReady(): Promise<boolean> {
   const ready = await fetch(`${urls.gateway}/ready`);
   if (!ready.ok) return false;
 
-  const token = generateToken("stack-ready", "StackReady");
+  const token = generateToken('stack-ready', 'StackReady');
   const tables = await fetch(`${urls.gateway}/api/tables`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -38,11 +38,12 @@ async function isStackReady(): Promise<boolean> {
 }
 
 export default async function globalSetup(_config: FullConfig) {
-  const useExternalServer = Boolean(process.env.PLAYWRIGHT_BASE_URL)
-    || process.env.PLAYWRIGHT_EXTERNAL === "1"
-    || Boolean(process.env.CI);
+  const useExternalServer =
+    Boolean(process.env.PLAYWRIGHT_BASE_URL) ||
+    process.env.PLAYWRIGHT_EXTERNAL === '1' ||
+    Boolean(process.env.CI);
 
-  if (!useExternalServer || process.env.PLAYWRIGHT_SKIP_STACK_WAIT === "1") {
+  if (!useExternalServer || process.env.PLAYWRIGHT_SKIP_STACK_WAIT === '1') {
     return;
   }
 

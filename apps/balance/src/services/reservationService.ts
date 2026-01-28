@@ -1,21 +1,16 @@
-import { randomUUID } from "crypto";
-import {
-  CommitResult,
-  ReleaseResult,
-  Reservation,
-  ReservationResult,
-} from "../domain/types";
-import { getBalance, debitBalance } from "./accountService";
-import { nowIso } from "../utils/time";
+import { randomUUID } from 'crypto';
+import type { CommitResult, ReleaseResult, Reservation, ReservationResult } from '../domain/types';
+import { getBalance, debitBalance } from './accountService';
+import { nowIso } from '../utils/time';
 import {
   getReservation,
   saveReservation,
   updateReservation,
   getActiveReservationsByAccount,
   getExpiredReservations,
-} from "../storage/reservationStore";
-import logger from "../observability/logger";
-import { withIdempotentResponse } from "../utils/idempotency";
+} from '../storage/reservationStore';
+import logger from '../observability/logger';
+import { withIdempotentResponse } from '../utils/idempotency';
 
 /** Default timeout for reservations in seconds */
 const DEFAULT_RESERVATION_TIMEOUT_SECONDS = 30;
@@ -25,24 +20,24 @@ export async function reserveForBuyIn(
   tableId: string,
   amount: number,
   idempotencyKey: string,
-  timeoutSeconds?: number
+  timeoutSeconds?: number,
 ): Promise<ReservationResult> {
   return withIdempotentResponse(idempotencyKey, async () => {
     if (amount <= 0) {
-      return { ok: false, error: "INVALID_AMOUNT" };
+      return { ok: false, error: 'INVALID_AMOUNT' };
     }
 
     // Get balance info
     const balanceInfo = await getBalance(accountId);
     if (!balanceInfo) {
-      return { ok: false, error: "ACCOUNT_NOT_FOUND" };
+      return { ok: false, error: 'ACCOUNT_NOT_FOUND' };
     }
 
     // Check available balance
     if (balanceInfo.availableBalance < amount) {
       return {
         ok: false,
-        error: "INSUFFICIENT_BALANCE",
+        error: 'INSUFFICIENT_BALANCE',
         availableBalance: balanceInfo.availableBalance,
       };
     }
@@ -58,7 +53,7 @@ export async function reserveForBuyIn(
       tableId,
       idempotencyKey,
       expiresAt,
-      status: "HELD",
+      status: 'HELD',
       createdAt: nowIso(),
       committedAt: null,
       releasedAt: null,
@@ -77,10 +72,10 @@ export async function reserveForBuyIn(
 export async function commitReservation(reservationId: string): Promise<CommitResult> {
   const reservation = await getReservation(reservationId);
   if (!reservation) {
-    return { ok: false, error: "RESERVATION_NOT_FOUND" };
+    return { ok: false, error: 'RESERVATION_NOT_FOUND' };
   }
 
-  if (reservation.status === "COMMITTED") {
+  if (reservation.status === 'COMMITTED') {
     // Already committed - return success (idempotent)
     const balanceInfo = await getBalance(reservation.accountId);
     return {
@@ -90,35 +85,35 @@ export async function commitReservation(reservationId: string): Promise<CommitRe
     };
   }
 
-  if (reservation.status === "EXPIRED") {
-    return { ok: false, error: "RESERVATION_EXPIRED" };
+  if (reservation.status === 'EXPIRED') {
+    return { ok: false, error: 'RESERVATION_EXPIRED' };
   }
 
-  if (reservation.status !== "HELD") {
-    return { ok: false, error: "RESERVATION_NOT_HELD" };
+  if (reservation.status !== 'HELD') {
+    return { ok: false, error: 'RESERVATION_NOT_HELD' };
   }
 
   // Check if expired
   if (new Date(reservation.expiresAt) < new Date()) {
     await updateReservation(reservationId, (r) => ({
       ...r,
-      status: "EXPIRED",
+      status: 'EXPIRED',
       releasedAt: nowIso(),
     }));
-    return { ok: false, error: "RESERVATION_EXPIRED" };
+    return { ok: false, error: 'RESERVATION_EXPIRED' };
   }
 
   // Debit the balance
   const debitResult = await debitBalance(
     reservation.accountId,
     reservation.amount,
-    "BUY_IN",
+    'BUY_IN',
     `commit-${reservationId}`,
     {
       tableId: reservation.tableId,
       reservationId: reservation.reservationId,
     },
-    { useAvailableBalance: false }
+    { useAvailableBalance: false },
   );
 
   if (!debitResult.ok) {
@@ -128,7 +123,7 @@ export async function commitReservation(reservationId: string): Promise<CommitRe
   // Mark reservation as committed
   await updateReservation(reservationId, (r) => ({
     ...r,
-    status: "COMMITTED",
+    status: 'COMMITTED',
     committedAt: nowIso(),
   }));
 
@@ -141,27 +136,27 @@ export async function commitReservation(reservationId: string): Promise<CommitRe
 
 export async function releaseReservation(
   reservationId: string,
-  _reason?: string
+  _reason?: string,
 ): Promise<ReleaseResult> {
   const reservation = await getReservation(reservationId);
   if (!reservation) {
-    return { ok: false, error: "RESERVATION_NOT_FOUND" };
+    return { ok: false, error: 'RESERVATION_NOT_FOUND' };
   }
 
-  if (reservation.status === "RELEASED" || reservation.status === "EXPIRED") {
+  if (reservation.status === 'RELEASED' || reservation.status === 'EXPIRED') {
     // Already released - return success (idempotent)
     const balanceInfo = await getBalance(reservation.accountId);
     return { ok: true, availableBalance: balanceInfo?.availableBalance };
   }
 
-  if (reservation.status === "COMMITTED") {
-    return { ok: false, error: "ALREADY_COMMITTED" };
+  if (reservation.status === 'COMMITTED') {
+    return { ok: false, error: 'ALREADY_COMMITTED' };
   }
 
   // Release the reservation
   await updateReservation(reservationId, (r) => ({
     ...r,
-    status: "RELEASED",
+    status: 'RELEASED',
     releasedAt: nowIso(),
   }));
 
@@ -174,18 +169,21 @@ export async function processExpiredReservations(): Promise<number> {
   let count = 0;
 
   for (const reservation of expired) {
-    if (reservation.status === "HELD") {
+    if (reservation.status === 'HELD') {
       await updateReservation(reservation.reservationId, (r) => ({
         ...r,
-        status: "EXPIRED",
+        status: 'EXPIRED',
         releasedAt: nowIso(),
       }));
       count++;
-      logger.info({
-        reservationId: reservation.reservationId,
-        accountId: reservation.accountId,
-        amount: reservation.amount,
-      }, "reservation.expired");
+      logger.info(
+        {
+          reservationId: reservation.reservationId,
+          accountId: reservation.accountId,
+          amount: reservation.amount,
+        },
+        'reservation.expired',
+      );
     }
   }
 

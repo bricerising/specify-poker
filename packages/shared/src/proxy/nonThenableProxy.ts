@@ -12,11 +12,11 @@ export function createNonThenableProxy<T extends object>(createProperty: Propert
     {},
     {
       get(_target, prop) {
-        if (typeof prop === "symbol") {
+        if (typeof prop === 'symbol') {
           return undefined;
         }
 
-        if (prop === "then") {
+        if (prop === 'then') {
           return undefined;
         }
 
@@ -25,4 +25,3 @@ export function createNonThenableProxy<T extends object>(createProperty: Propert
     },
   ) as unknown as T;
 }
-

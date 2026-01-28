@@ -1,10 +1,10 @@
-import { getConfig } from "../config";
-import logger from "../observability/logger";
-import { createKeyedLock } from "../utils/keyedLock";
-import { tryJsonParse } from "../utils/json";
-import { getRedisClient } from "./redisClient";
+import { getConfig } from '../config';
+import logger from '../observability/logger';
+import { createKeyedLock } from '../utils/keyedLock';
+import { tryJsonParse } from '../utils/json';
+import { getRedisClient } from './redisClient';
 
-const IDEMPOTENCY_PREFIX = "balance:transactions:idempotency:";
+const IDEMPOTENCY_PREFIX = 'balance:transactions:idempotency:';
 
 // In-memory cache with expiry
 const idempotencyCache = new Map<string, { response: string; expiresAt: number }>();
@@ -21,7 +21,7 @@ export async function getIdempotentResponse(key: string): Promise<unknown | null
     if (cached.expiresAt > Date.now()) {
       const parsed = tryJsonParse<unknown>(cached.response);
       if (!parsed.ok) {
-        logger.warn({ err: parsed.error, key }, "idempotencyStore.parse.failed");
+        logger.warn({ err: parsed.error, key }, 'idempotencyStore.parse.failed');
         idempotencyCache.delete(key);
         return null;
       }
@@ -36,7 +36,7 @@ export async function getIdempotentResponse(key: string): Promise<unknown | null
     if (response) {
       const parsed = tryJsonParse<unknown>(response);
       if (!parsed.ok) {
-        logger.warn({ err: parsed.error, key }, "idempotencyStore.parse.failed");
+        logger.warn({ err: parsed.error, key }, 'idempotencyStore.parse.failed');
         return null;
       }
       return parsed.value;

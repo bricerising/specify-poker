@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from 'react';
 
-import { testIds } from "../utils/testIds";
+import { testIds } from '../utils/testIds';
 
 interface ProfileFormProps {
   username: string;
@@ -9,11 +9,11 @@ interface ProfileFormProps {
 }
 
 export function ProfileForm({ username, initialAvatarUrl, onSave }: ProfileFormProps) {
-  const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl ?? "");
+  const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl ?? '');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setAvatarUrl(initialAvatarUrl ?? "");
+    setAvatarUrl(initialAvatarUrl ?? '');
   }, [initialAvatarUrl]);
 
   const isValid = useMemo(() => {
@@ -23,7 +23,7 @@ export function ProfileForm({ username, initialAvatarUrl, onSave }: ProfileFormP
     }
     try {
       const url = new URL(trimmed);
-      return url.protocol === "http:" || url.protocol === "https:";
+      return url.protocol === 'http:' || url.protocol === 'https:';
     } catch {
       return false;
     }
@@ -32,7 +32,7 @@ export function ProfileForm({ username, initialAvatarUrl, onSave }: ProfileFormP
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!isValid) {
-      setError("Avatar URL must be a valid http(s) URL.");
+      setError('Avatar URL must be a valid http(s) URL.');
       return;
     }
     setError(null);

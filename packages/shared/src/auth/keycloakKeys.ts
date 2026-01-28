@@ -1,4 +1,7 @@
-type FetchLike = (input: string, init?: { signal?: AbortSignal }) => Promise<{
+type FetchLike = (
+  input: string,
+  init?: { signal?: AbortSignal },
+) => Promise<{
   ok: boolean;
   status: number;
   json: () => Promise<unknown>;
@@ -16,8 +19,11 @@ export type CreateKeycloakKeyProviderOptions = {
   fetch?: FetchLike;
 };
 
-export function createKeycloakKeyProvider(options: CreateKeycloakKeyProviderOptions): KeycloakKeyProvider {
-  const fetchFn: FetchLike = options.fetch ?? (globalThis.fetch as FetchLike | undefined) ?? missingFetch();
+export function createKeycloakKeyProvider(
+  options: CreateKeycloakKeyProviderOptions,
+): KeycloakKeyProvider {
+  const fetchFn: FetchLike =
+    options.fetch ?? (globalThis.fetch as FetchLike | undefined) ?? missingFetch();
   const timeoutMs = options.timeoutMs ?? 2_000;
 
   let cachedRealmPublicKey: string | null = null;
@@ -38,9 +44,9 @@ export function createKeycloakKeyProvider(options: CreateKeycloakKeyProviderOpti
       if (!realmPublicKeyInFlight) {
         realmPublicKeyInFlight = (async () => {
           const payload = await fetchJson(realmConfigUrl, fetchFn, timeoutMs);
-          const publicKey = readStringField(payload, "public_key");
+          const publicKey = readStringField(payload, 'public_key');
           if (!publicKey) {
-            throw new Error("Keycloak realm public key missing");
+            throw new Error('Keycloak realm public key missing');
           }
           const formatted = formatPublicKeyPem(publicKey);
           cachedRealmPublicKey = formatted;
@@ -66,10 +72,10 @@ export function createKeycloakKeyProvider(options: CreateKeycloakKeyProviderOpti
 
       const promise = (async () => {
         const payload = await fetchJson(jwksUrl, fetchFn, timeoutMs);
-        const keys = readArrayField(payload, "keys");
+        const keys = readArrayField(payload, 'keys');
         const cert = findJwksX5cCert(keys, kid);
         if (!cert) {
-          throw new Error("Keycloak JWKS does not include matching certificate");
+          throw new Error('Keycloak JWKS does not include matching certificate');
         }
 
         const formatted = formatCertificatePem(cert);
@@ -86,16 +92,16 @@ export function createKeycloakKeyProvider(options: CreateKeycloakKeyProviderOpti
 }
 
 export function formatPublicKeyPem(input: string): string {
-  return formatPemBlock("PUBLIC KEY", input);
+  return formatPemBlock('PUBLIC KEY', input);
 }
 
 export function formatCertificatePem(input: string): string {
-  return formatPemBlock("CERTIFICATE", input);
+  return formatPemBlock('CERTIFICATE', input);
 }
 
 function missingFetch(): FetchLike {
   return () => {
-    throw new Error("fetch is not available in this environment");
+    throw new Error('fetch is not available in this environment');
   };
 }
 
@@ -123,11 +129,11 @@ function formatPemBlock(blockType: string, input: string): string {
 }
 
 function wrapPemLines(input: string): string {
-  return input.match(/.{1,64}/g)?.join("\n") ?? input;
+  return input.match(/.{1,64}/g)?.join('\n') ?? input;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  return typeof value === 'object' && value !== null;
 }
 
 function readStringField(value: unknown, field: string): string | null {
@@ -135,7 +141,7 @@ function readStringField(value: unknown, field: string): string | null {
     return null;
   }
   const candidate = value[field];
-  return typeof candidate === "string" ? candidate : null;
+  return typeof candidate === 'string' ? candidate : null;
 }
 
 function readArrayField(value: unknown, field: string): unknown[] {
@@ -151,10 +157,10 @@ function findJwksX5cCert(keys: unknown[], kid: string): string | null {
     if (!isRecord(key)) {
       continue;
     }
-    if (typeof key.kid !== "string" || key.kid !== kid) {
+    if (typeof key.kid !== 'string' || key.kid !== kid) {
       continue;
     }
-    if (!Array.isArray(key.x5c) || typeof key.x5c[0] !== "string") {
+    if (!Array.isArray(key.x5c) || typeof key.x5c[0] !== 'string') {
       return null;
     }
     return key.x5c[0];
@@ -162,4 +168,3 @@ function findJwksX5cCert(keys: unknown[], kid: string): string | null {
 
   return null;
 }
-

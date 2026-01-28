@@ -7,28 +7,21 @@ export interface TableConfig {
   turnTimerSeconds: number;
 }
 
-export type TableStatus = "WAITING" | "PLAYING" | "PAUSED" | "CLOSED";
+export type TableStatus = 'WAITING' | 'PLAYING' | 'PAUSED' | 'CLOSED';
 
 export type SeatStatus =
-  | "EMPTY"
-  | "RESERVED"
-  | "SEATED"
-  | "ACTIVE"
-  | "FOLDED"
-  | "ALL_IN"
-  | "SITTING_OUT"
-  | "DISCONNECTED";
+  | 'EMPTY'
+  | 'RESERVED'
+  | 'SEATED'
+  | 'ACTIVE'
+  | 'FOLDED'
+  | 'ALL_IN'
+  | 'SITTING_OUT'
+  | 'DISCONNECTED';
 
-export type HandStreet = "PREFLOP" | "FLOP" | "TURN" | "RIVER" | "SHOWDOWN";
+export type HandStreet = 'PREFLOP' | 'FLOP' | 'TURN' | 'RIVER' | 'SHOWDOWN';
 
-export type ActionType =
-  | "POST_BLIND"
-  | "FOLD"
-  | "CHECK"
-  | "CALL"
-  | "BET"
-  | "RAISE"
-  | "ALL_IN";
+export type ActionType = 'POST_BLIND' | 'FOLD' | 'CHECK' | 'CALL' | 'BET' | 'RAISE' | 'ALL_IN';
 
 export interface Card {
   rank: string;
@@ -58,7 +51,7 @@ export interface Seat {
 
 export interface Spectator {
   userId: string;
-  status: "ACTIVE" | "DISCONNECTED";
+  status: 'ACTIVE' | 'DISCONNECTED';
   joinedAt: string;
 }
 
@@ -138,7 +131,7 @@ export interface LegalAction {
 // ============================================================================
 
 /** Seat statuses that indicate the seat is participating in the current hand */
-export const IN_HAND_STATUSES = ["ACTIVE", "FOLDED", "ALL_IN", "DISCONNECTED"] as const;
+export const IN_HAND_STATUSES = ['ACTIVE', 'FOLDED', 'ALL_IN', 'DISCONNECTED'] as const;
 export type InHandStatus = (typeof IN_HAND_STATUSES)[number];
 
 /** Type guard for checking if a seat status indicates participation in hand */
@@ -147,10 +140,10 @@ export function isInHandStatus(status: SeatStatus): status is InHandStatus {
 }
 
 /** Seat statuses that can still act in the current betting round */
-export const ACTIONABLE_STATUSES = ["ACTIVE"] as const;
+export const ACTIONABLE_STATUSES = ['ACTIVE'] as const;
 export type ActionableStatus = (typeof ACTIONABLE_STATUSES)[number];
 
 /** Type guard for checking if a seat can take actions */
 export function isActionableStatus(status: SeatStatus): status is ActionableStatus {
-  return status === "ACTIVE";
+  return status === 'ACTIVE';
 }

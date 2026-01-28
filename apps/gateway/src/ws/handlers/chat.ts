@@ -1,18 +1,18 @@
-import { randomUUID } from "crypto";
-import WebSocket from "ws";
-import type { z } from "zod";
-import { wsClientMessageSchema } from "@specify-poker/shared";
+import { randomUUID } from 'crypto';
+import type WebSocket from 'ws';
+import type { z } from 'zod';
+import { wsClientMessageSchema } from '@specify-poker/shared';
 
-import { grpc } from "../../grpc/unaryClients";
-import { WsPubSubMessage } from "../pubsub";
-import { checkWsRateLimit, parseChatMessage, parseTableId } from "../validators";
-import { subscribeToChannel, unsubscribeFromChannel, unsubscribeAll } from "../subscriptions";
-import { getLocalConnectionMeta, sendToLocal } from "../localRegistry";
-import { deliverToSubscribers } from "../delivery";
-import { broadcastToChannel } from "../../services/broadcastService";
-import { saveChatMessage, getChatHistory } from "../../storage/chatStore";
-import { parseJsonWithSchema } from "../messageParsing";
-import { attachWsRouter } from "../router";
+import { grpc } from '../../grpc/unaryClients';
+import type { WsPubSubMessage } from '../pubsub';
+import { checkWsRateLimit, parseChatMessage, parseTableId } from '../validators';
+import { subscribeToChannel, unsubscribeFromChannel, unsubscribeAll } from '../subscriptions';
+import { getLocalConnectionMeta, sendToLocal } from '../localRegistry';
+import { deliverToSubscribers } from '../delivery';
+import { broadcastToChannel } from '../../services/broadcastService';
+import { saveChatMessage, getChatHistory } from '../../storage/chatStore';
+import { parseJsonWithSchema } from '../messageParsing';
+import { attachWsRouter } from '../router';
 
 type WsClientMessage = z.infer<typeof wsClientMessageSchema>;
 
@@ -21,19 +21,23 @@ function parseClientMessage(data: WebSocket.RawData): WsClientMessage | null {
 }
 
 export async function handleChatPubSubEvent(message: WsPubSubMessage) {
-  if (message.channel !== "chat") {
+  if (message.channel !== 'chat') {
     return;
   }
   await deliverToSubscribers(`chat:${message.tableId}`, message.payload);
 }
 
-async function getMembership(tableId: string, userId: string): Promise<{ seated: boolean; spectator: boolean }> {
+async function getMembership(
+  tableId: string,
+  userId: string,
+): Promise<{ seated: boolean; spectator: boolean }> {
   try {
     const response = await grpc.game.GetTableState({
       table_id: tableId,
       user_id: userId,
     });
-    const seated = response.state?.seats?.some((s) => s.user_id === userId && s.status !== "empty") || false;
+    const seated =
+      response.state?.seats?.some((s) => s.user_id === userId && s.status !== 'empty') || false;
     const spectator = response.state?.spectators?.some((s) => s.user_id === userId) || false;
     return { seated, spectator };
   } catch {
@@ -57,12 +61,12 @@ async function getUsername(userId: string): Promise<string> {
   try {
     const response = await grpc.player.GetProfile({ user_id: userId });
     const username = (response.profile as { username?: unknown } | undefined)?.username;
-    if (typeof username === "string" && username.trim().length > 0) {
+    if (typeof username === 'string' && username.trim().length > 0) {
       return username;
     }
-    return "Unknown";
+    return 'Unknown';
   } catch {
-    return "Unknown";
+    return 'Unknown';
   }
 }
 
@@ -71,7 +75,7 @@ async function handleSubscribe(connectionId: string, tableId: string) {
   await subscribeToChannel(connectionId, channel);
 
   const history = await getChatHistory(tableId);
-  sendToLocal(connectionId, { type: "ChatSubscribed", tableId, history });
+  sendToLocal(connectionId, { type: 'ChatSubscribed', tableId, history });
 }
 
 async function handleUnsubscribe(connectionId: string, tableId: string) {
@@ -87,25 +91,25 @@ async function handleChatSend(
   const tableId = payload.tableId;
   const parsed = parseChatMessage(payload.message);
   if (!parsed.ok) {
-    sendToLocal(connectionId, { type: "ChatError", tableId, reason: parsed.reason });
+    sendToLocal(connectionId, { type: 'ChatError', tableId, reason: parsed.reason });
     return;
   }
 
   const meta = getLocalConnectionMeta(connectionId);
-  const ip = meta?.ip ?? "unknown";
-  if (!(await checkWsRateLimit(userId, ip, "chat")).ok) {
-    sendToLocal(connectionId, { type: "ChatError", tableId, reason: "rate_limited" });
+  const ip = meta?.ip ?? 'unknown';
+  if (!(await checkWsRateLimit(userId, ip, 'chat')).ok) {
+    sendToLocal(connectionId, { type: 'ChatError', tableId, reason: 'rate_limited' });
     return;
   }
 
   const { seated, spectator } = await getMembership(tableId, userId);
   if (!seated && !spectator) {
-    sendToLocal(connectionId, { type: "ChatError", tableId, reason: "not_seated" });
+    sendToLocal(connectionId, { type: 'ChatError', tableId, reason: 'not_seated' });
     return;
   }
 
   if (await isMuted(tableId, userId)) {
-    sendToLocal(connectionId, { type: "ChatError", tableId, reason: "muted" });
+    sendToLocal(connectionId, { type: 'ChatError', tableId, reason: 'muted' });
     return;
   }
 
@@ -120,7 +124,7 @@ async function handleChatSend(
 
   await saveChatMessage(tableId, chatMessage);
   await broadcastToChannel(`chat:${tableId}`, {
-    type: "ChatMessage",
+    type: 'ChatMessage',
     tableId,
     message: chatMessage,
   });
@@ -128,11 +132,11 @@ async function handleChatSend(
 
 export function attachChatHub(socket: WebSocket, userId: string, connectionId: string) {
   attachWsRouter(socket, {
-    hubName: "chat",
+    hubName: 'chat',
     parseMessage: parseClientMessage,
     getAttributes: (message): Record<string, string> => {
-      if ("tableId" in message && typeof message.tableId === "string") {
-        return { "poker.table_id": message.tableId };
+      if ('tableId' in message && typeof message.tableId === 'string') {
+        return { 'poker.table_id': message.tableId };
       }
       return {};
     },

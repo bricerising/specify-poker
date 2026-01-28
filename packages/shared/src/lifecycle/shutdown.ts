@@ -18,7 +18,7 @@ export function createShutdownManager(options: { logger?: ShutdownLogger } = {})
       try {
         await step.action();
       } catch (err: unknown) {
-        options.logger?.error?.({ err, step: step.name }, "shutdown.step.failed");
+        options.logger?.error?.({ err, step: step.name }, 'shutdown.step.failed');
       }
     }
   };
@@ -35,4 +35,3 @@ export function createShutdownManager(options: { logger?: ShutdownLogger } = {})
     },
   };
 }
-

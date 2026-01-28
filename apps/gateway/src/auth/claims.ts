@@ -1,4 +1,6 @@
-export function normalizeUsernameFromClaims(claims: Record<string, unknown> | undefined): string | null {
+export function normalizeUsernameFromClaims(
+  claims: Record<string, unknown> | undefined,
+): string | null {
   const candidates = [
     claims?.preferred_username,
     claims?.username,
@@ -7,7 +9,7 @@ export function normalizeUsernameFromClaims(claims: Record<string, unknown> | un
   ];
 
   for (const candidate of candidates) {
-    if (typeof candidate !== "string") {
+    if (typeof candidate !== 'string') {
       continue;
     }
     const trimmed = candidate.trim();
@@ -18,4 +20,3 @@ export function normalizeUsernameFromClaims(claims: Record<string, unknown> | un
 
   return null;
 }
-

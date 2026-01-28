@@ -36,7 +36,10 @@ export function createGrpcServiceClientFactory<TProto, TClient, TCredentials = u
       return cachedConstructor;
     }
 
-    const packageDefinition = options.protoLoader.loadSync(options.protoPath, options.protoLoaderOptions);
+    const packageDefinition = options.protoLoader.loadSync(
+      options.protoPath,
+      options.protoLoaderOptions,
+    );
     const loaded = options.grpc.loadPackageDefinition(packageDefinition);
     const proto = loadProto(loaded);
 

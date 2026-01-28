@@ -1,10 +1,10 @@
-import pool from "./pgClient";
-import logger from "../observability/logger";
+import pool from './pgClient';
+import logger from '../observability/logger';
 
 export async function runMigrations() {
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
+    await client.query('BEGIN');
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS events (
@@ -64,21 +64,31 @@ export async function runMigrations() {
       );
     `);
 
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_events_table ON events(table_id, timestamp);`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_events_hand ON events(hand_id, sequence) WHERE hand_id IS NOT NULL;`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_events_user ON events(user_id, timestamp) WHERE user_id IS NOT NULL;`);
+    await client.query(
+      `CREATE INDEX IF NOT EXISTS idx_events_table ON events(table_id, timestamp);`,
+    );
+    await client.query(
+      `CREATE INDEX IF NOT EXISTS idx_events_hand ON events(hand_id, sequence) WHERE hand_id IS NOT NULL;`,
+    );
+    await client.query(
+      `CREATE INDEX IF NOT EXISTS idx_events_user ON events(user_id, timestamp) WHERE user_id IS NOT NULL;`,
+    );
     await client.query(`CREATE INDEX IF NOT EXISTS idx_events_type ON events(type, timestamp);`);
 
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_hand_records_table ON hand_records(table_id, completed_at DESC);`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_hand_records_participants ON hand_records USING GIN ((participants));`);
+    await client.query(
+      `CREATE INDEX IF NOT EXISTS idx_hand_records_table ON hand_records(table_id, completed_at DESC);`,
+    );
+    await client.query(
+      `CREATE INDEX IF NOT EXISTS idx_hand_records_participants ON hand_records USING GIN ((participants));`,
+    );
 
     await client.query(`CREATE INDEX IF NOT EXISTS idx_cursors_stream ON cursors(stream_id);`);
 
-    await client.query("COMMIT");
-    logger.info("Migrations completed successfully");
+    await client.query('COMMIT');
+    logger.info('Migrations completed successfully');
   } catch (err) {
-    await client.query("ROLLBACK");
-    logger.error({ error: err }, "Migration failed");
+    await client.query('ROLLBACK');
+    logger.error({ error: err }, 'Migration failed');
     throw err;
   } finally {
     client.release();

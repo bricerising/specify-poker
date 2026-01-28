@@ -41,10 +41,10 @@ describe('gRPC Server', () => {
   it('should start and stop gRPC server', async () => {
     const subscriptionServiceMock = {} as unknown;
     const pushMock = {} as unknown;
-    
+
     await startGrpcServer(50055, subscriptionServiceMock, pushMock);
     expect(grpc.Server).toHaveBeenCalled();
-    
+
     stopGrpcServer();
   });
 });

@@ -1,4 +1,4 @@
-import { getRedisClient } from "./redisClient";
+import { getRedisClient } from './redisClient';
 
 const DELETED_TTL_SECONDS = 30 * 24 * 60 * 60;
 
@@ -11,7 +11,7 @@ export async function markDeleted(userId: string): Promise<void> {
   if (!redis) {
     return;
   }
-  await redis.set(deletedKey(userId), "1", { EX: DELETED_TTL_SECONDS });
+  await redis.set(deletedKey(userId), '1', { EX: DELETED_TTL_SECONDS });
 }
 
 export async function isDeleted(userId: string): Promise<boolean> {
@@ -20,7 +20,7 @@ export async function isDeleted(userId: string): Promise<boolean> {
     return false;
   }
   const value = await redis.get(deletedKey(userId));
-  return value === "1";
+  return value === '1';
 }
 
 export async function clearDeleted(userId: string): Promise<void> {

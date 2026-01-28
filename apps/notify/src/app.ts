@@ -1,14 +1,14 @@
-import { closeHttpServer } from "@specify-poker/shared";
-import type { Config } from "./config";
-import { createGrpcServer } from "./api/grpc/server";
-import logger from "./observability/logger";
-import { startMetricsServer } from "./observability/metrics";
-import { EventConsumer } from "./services/eventConsumer";
-import { PushSenderService } from "./services/pushSenderService";
-import { configureVapid, createWebPushClient } from "./services/webPushClient";
-import { SubscriptionService } from "./services/subscriptionService";
-import { createRedisClientManager, type RedisClientManager } from "./storage/redisClient";
-import { SubscriptionStore } from "./storage/subscriptionStore";
+import { closeHttpServer } from '@specify-poker/shared';
+import type { Config } from './config';
+import { createGrpcServer } from './api/grpc/server';
+import logger from './observability/logger';
+import { startMetricsServer } from './observability/metrics';
+import { EventConsumer } from './services/eventConsumer';
+import { PushSenderService } from './services/pushSenderService';
+import { configureVapid, createWebPushClient } from './services/webPushClient';
+import { SubscriptionService } from './services/subscriptionService';
+import { createRedisClientManager, type RedisClientManager } from './storage/redisClient';
+import { SubscriptionStore } from './storage/subscriptionStore';
 
 export type NotifyApp = {
   services: {
@@ -27,7 +27,8 @@ export type CreateNotifyAppOptions = {
 };
 
 export function createNotifyApp(options: CreateNotifyAppOptions): NotifyApp {
-  const redis = options.redis ?? createRedisClientManager({ url: options.config.redisUrl, log: logger });
+  const redis =
+    options.redis ?? createRedisClientManager({ url: options.config.redisUrl, log: logger });
   const subscriptionStore = new SubscriptionStore({ getClient: redis.getClient });
   const subscriptionService = new SubscriptionService(subscriptionStore);
 

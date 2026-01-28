@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { getSpan, pinoFactory } = vi.hoisted(() => ({
   getSpan: vi.fn(),
@@ -9,7 +9,7 @@ const { getSpan, pinoFactory } = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock("@opentelemetry/api", () => ({
+vi.mock('@opentelemetry/api', () => ({
   context: {
     active: vi.fn(() => ({})),
   },
@@ -18,22 +18,22 @@ vi.mock("@opentelemetry/api", () => ({
   },
 }));
 
-vi.mock("pino", () => ({ default: pinoFactory }));
+vi.mock('pino', () => ({ default: pinoFactory }));
 
-vi.mock("../../config", () => ({
+vi.mock('../../config', () => ({
   config: {
-    logLevel: "info",
+    logLevel: 'info',
   },
 }));
 
-import logger from "../logger";
+import logger from '../logger';
 
-describe("logger mixin", () => {
+describe('logger mixin', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("returns empty mixin when no span", () => {
+  it('returns empty mixin when no span', () => {
     getSpan.mockReturnValue(null);
 
     const mixin = (logger as { _mixin: () => Record<string, unknown> })._mixin();
@@ -41,13 +41,13 @@ describe("logger mixin", () => {
     expect(mixin).toEqual({});
   });
 
-  it("includes trace fields when span exists", () => {
+  it('includes trace fields when span exists', () => {
     getSpan.mockReturnValue({
-      spanContext: () => ({ traceId: "trace-1", spanId: "span-1" }),
+      spanContext: () => ({ traceId: 'trace-1', spanId: 'span-1' }),
     });
 
     const mixin = (logger as { _mixin: () => Record<string, unknown> })._mixin();
 
-    expect(mixin).toEqual({ traceId: "trace-1", spanId: "span-1" });
+    expect(mixin).toEqual({ traceId: 'trace-1', spanId: 'span-1' });
   });
 });

@@ -1,10 +1,10 @@
-import { defaultProfile, defaultStatistics } from "../domain/defaults";
-import { Statistics } from "../domain/types";
-import * as statisticsRepository from "../storage/statisticsRepository";
-import * as statisticsCache from "../storage/statisticsCache";
-import * as profileRepository from "../storage/profileRepository";
-import * as profileCache from "../storage/profileCache";
-import { generateNickname } from "./nicknameService";
+import { defaultProfile, defaultStatistics } from '../domain/defaults';
+import type { Statistics } from '../domain/types';
+import * as statisticsRepository from '../storage/statisticsRepository';
+import * as statisticsCache from '../storage/statisticsCache';
+import * as profileRepository from '../storage/profileRepository';
+import * as profileCache from '../storage/profileCache';
+import { generateNickname } from './nicknameService';
 
 async function ensureProfile(userId: string) {
   const existing = await profileRepository.findById(userId, true);
@@ -19,13 +19,13 @@ async function ensureProfile(userId: string) {
 }
 
 export enum StatisticType {
-  HandsPlayed = "hands_played",
-  Wins = "wins",
-  Vpip = "vpip",
-  Pfr = "pfr",
-  AllIn = "all_in",
-  BiggestPot = "biggest_pot",
-  ReferralCount = "referral_count",
+  HandsPlayed = 'hands_played',
+  Wins = 'wins',
+  Vpip = 'vpip',
+  Pfr = 'pfr',
+  AllIn = 'all_in',
+  BiggestPot = 'biggest_pot',
+  ReferralCount = 'referral_count',
 }
 
 type StatisticUpdater = (stats: Statistics, amount: number) => void;
@@ -74,7 +74,7 @@ export async function getStatistics(userId: string): Promise<Statistics> {
 export async function incrementStatistic(
   userId: string,
   type: StatisticType,
-  amount: number
+  amount: number,
 ): Promise<Statistics> {
   const stats = await getStatistics(userId);
   statisticUpdaters[type](stats, amount);

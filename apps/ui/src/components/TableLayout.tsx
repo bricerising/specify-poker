@@ -1,7 +1,7 @@
-import React from "react";
+import React from 'react';
 
-import { SeatDisplay } from "./SeatDisplay";
-import { TableSeat } from "../state/tableStore";
+import { SeatDisplay } from './SeatDisplay';
+import type { TableSeat } from '../state/tableStore';
 
 interface TableLayoutProps {
   seats: TableSeat[];
@@ -25,10 +25,10 @@ export function TableLayout({
 
   const seatPosition = (seatId: number) => {
     if (seatCount <= 0) {
-      return { left: "50%", top: "50%" };
+      return { left: '50%', top: '50%' };
     }
     const normalizedSeatId = ((seatId % seatCount) + seatCount) % seatCount;
-    const relative = ((normalizedSeatId - anchorSeatId) % seatCount + seatCount) % seatCount;
+    const relative = (((normalizedSeatId - anchorSeatId) % seatCount) + seatCount) % seatCount;
     const step = (Math.PI * 2) / seatCount;
     const angle = Math.PI / 2 - relative * step;
 
@@ -53,7 +53,7 @@ export function TableLayout({
           return (
             <div
               key={seat.seatId}
-              className={`seat-slot${isCurrentUser ? " is-you" : ""}${isCurrentTurn ? " is-turn" : ""}`}
+              className={`seat-slot${isCurrentUser ? ' is-you' : ''}${isCurrentTurn ? ' is-turn' : ''}`}
               style={seatPosition(seat.seatId)}
             >
               <SeatDisplay

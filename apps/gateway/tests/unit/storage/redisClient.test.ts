@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const redisClient = {
   on: vi.fn(),
@@ -6,22 +6,22 @@ const redisClient = {
   quit: vi.fn(),
 };
 
-vi.mock("redis", () => ({
+vi.mock('redis', () => ({
   createClient: vi.fn(() => redisClient),
 }));
 
-vi.mock("../../../src/config", () => ({
-  getConfig: () => ({ redisUrl: "redis://localhost:6379" }),
+vi.mock('../../../src/config', () => ({
+  getConfig: () => ({ redisUrl: 'redis://localhost:6379' }),
 }));
 
-vi.mock("../../../src/observability/logger", () => ({
+vi.mock('../../../src/observability/logger', () => ({
   default: {
     info: vi.fn(),
     error: vi.fn(),
   },
 }));
 
-describe("Redis client", () => {
+describe('Redis client', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
@@ -29,8 +29,8 @@ describe("Redis client", () => {
     redisClient.quit.mockResolvedValue(undefined);
   });
 
-  it("creates and caches a redis client", async () => {
-    const { getRedisClient } = await import("../../../src/storage/redisClient");
+  it('creates and caches a redis client', async () => {
+    const { getRedisClient } = await import('../../../src/storage/redisClient');
     const clientA = await getRedisClient();
     const clientB = await getRedisClient();
 
@@ -39,16 +39,16 @@ describe("Redis client", () => {
     expect(redisClient.connect).toHaveBeenCalledTimes(1);
   });
 
-  it("returns null when connection fails", async () => {
-    redisClient.connect.mockRejectedValueOnce(new Error("down"));
-    const { getRedisClient } = await import("../../../src/storage/redisClient");
+  it('returns null when connection fails', async () => {
+    redisClient.connect.mockRejectedValueOnce(new Error('down'));
+    const { getRedisClient } = await import('../../../src/storage/redisClient');
     const client = await getRedisClient();
 
     expect(client).toBeNull();
   });
 
-  it("closes the redis client", async () => {
-    const { getRedisClient, closeRedisClient } = await import("../../../src/storage/redisClient");
+  it('closes the redis client', async () => {
+    const { getRedisClient, closeRedisClient } = await import('../../../src/storage/redisClient');
     await getRedisClient();
     await closeRedisClient();
 

@@ -1,13 +1,18 @@
-import { Profile, Statistics, UserPreferences } from "./types";
+import type { Profile, Statistics, UserPreferences } from './types';
 
 export const defaultPreferences: UserPreferences = {
   soundEnabled: true,
   chatEnabled: true,
   showHandStrength: true,
-  theme: "auto",
+  theme: 'auto',
 };
 
-export function defaultProfile(userId: string, nickname: string, now: Date, username = ""): Profile {
+export function defaultProfile(
+  userId: string,
+  nickname: string,
+  now: Date,
+  username = '',
+): Profile {
   const timestamp = now.toISOString();
   return {
     userId,

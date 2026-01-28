@@ -4,12 +4,12 @@ vi.mock('../../src/observability', () => ({
   startObservability: vi.fn(),
 }));
 
-vi.mock("../../src/app", () => ({
+vi.mock('../../src/app', () => ({
   createNotifyApp: vi.fn(),
 }));
 
-import { main } from "../../src/server";
-import { createNotifyApp } from "../../src/app";
+import { main } from '../../src/server';
+import { createNotifyApp } from '../../src/app';
 
 describe('Server main', () => {
   it('should initialize and start services', async () => {
@@ -26,7 +26,7 @@ describe('Server main', () => {
 
   it('should throw error if start fails', async () => {
     const appMock = {
-      start: vi.fn().mockRejectedValue(new Error("Start failed")),
+      start: vi.fn().mockRejectedValue(new Error('Start failed')),
       stop: vi.fn().mockResolvedValue(undefined),
       services: {},
     };

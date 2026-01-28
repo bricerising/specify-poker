@@ -1,7 +1,7 @@
-import redisClient, { blockingRedisClient } from "./redisClient";
-import { GameEvent } from "../domain/types";
+import redisClient, { blockingRedisClient } from './redisClient';
+import type { GameEvent } from '../domain/types';
 
-const STREAM_PREFIX = "event:streams";
+const STREAM_PREFIX = 'event:streams';
 
 export interface StreamMessage {
   id: string;
@@ -19,14 +19,14 @@ export function streamKey(streamId: string): string {
 
 export class StreamStore {
   async publish(streamId: string, event: GameEvent): Promise<void> {
-    await redisClient.xAdd(streamKey(streamId), "*", {
+    await redisClient.xAdd(streamKey(streamId), '*', {
       data: JSON.stringify(event),
     });
   }
 
   async publishEvent(event: GameEvent): Promise<void> {
     const streamIds = [
-      "all",
+      'all',
       `table:${event.tableId}`,
       event.handId ? `hand:${event.handId}` : null,
       event.userId ? `user:${event.userId}` : null,
@@ -41,12 +41,12 @@ export class StreamStore {
     streamId: string,
     lastId: string,
     count = 10,
-    blockMs = 5000
+    blockMs = 5000,
   ): Promise<StreamResponse[] | null> {
-    const result = await blockingRedisClient.xRead(
-      [{ key: streamKey(streamId), id: lastId }],
-      { COUNT: count, BLOCK: blockMs }
-    );
+    const result = await blockingRedisClient.xRead([{ key: streamKey(streamId), id: lastId }], {
+      COUNT: count,
+      BLOCK: blockMs,
+    });
     return result ? (result as StreamResponse[]) : null;
   }
 }

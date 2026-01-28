@@ -1,6 +1,6 @@
-import { createNonThenableProxy } from "../proxy/nonThenableProxy";
-import { getFunctionProperty } from "../proxy/functionProperty";
-import type { UnaryCallOptions, UnaryClientMethod } from "./call";
+import { createNonThenableProxy } from '../proxy/nonThenableProxy';
+import { getFunctionProperty } from '../proxy/functionProperty';
+import type { UnaryCallOptions, UnaryClientMethod } from './call';
 
 type AnyUnaryClientMethod = UnaryClientMethod<unknown, unknown>;
 

@@ -1,4 +1,4 @@
-export type ActionType = "Fold" | "Check" | "Call" | "Bet" | "Raise";
+export type ActionType = 'Fold' | 'Check' | 'Call' | 'Bet' | 'Raise';
 
 export interface TableSeat {
   seatId: number;
@@ -35,7 +35,7 @@ export function deriveLegalActions(table: TableState, seatId: number): LegalActi
   }
   const seat = table.seats.find((entry) => entry.seatId === seatId);
   const normalizedStatus = seat?.status.trim().toLowerCase();
-  if (!seat || normalizedStatus !== "active") {
+  if (!seat || normalizedStatus !== 'active') {
     return [];
   }
   if (hand.currentTurnSeat !== seatId) {
@@ -45,25 +45,25 @@ export function deriveLegalActions(table: TableState, seatId: number): LegalActi
   const contributed = hand.roundContributions[seatId] ?? 0;
   const toCall = Math.max(0, hand.currentBet - contributed);
   const canRaise = !hand.raiseCapped || !hand.actedSeats.includes(seatId);
-  const actions: LegalAction[] = [{ type: "Fold" }];
+  const actions: LegalAction[] = [{ type: 'Fold' }];
 
   if (toCall <= 0) {
-    actions.push({ type: "Check" });
+    actions.push({ type: 'Check' });
     if (hand.currentBet === 0) {
-      actions.push({ type: "Bet", minAmount: hand.bigBlind, maxAmount: seat.stack });
+      actions.push({ type: 'Bet', minAmount: hand.bigBlind, maxAmount: seat.stack });
     } else {
       const maxTotal = seat.stack + contributed;
       if (canRaise && maxTotal > hand.currentBet) {
         const minRaise = Math.min(hand.currentBet + hand.minRaise, maxTotal);
-        actions.push({ type: "Raise", minAmount: minRaise, maxAmount: maxTotal });
+        actions.push({ type: 'Raise', minAmount: minRaise, maxAmount: maxTotal });
       }
     }
   } else {
-    actions.push({ type: "Call", maxAmount: Math.min(toCall, seat.stack) });
+    actions.push({ type: 'Call', maxAmount: Math.min(toCall, seat.stack) });
     const maxTotal = seat.stack + contributed;
     if (canRaise && maxTotal > hand.currentBet) {
       const minRaise = Math.min(hand.currentBet + hand.minRaise, maxTotal);
-      actions.push({ type: "Raise", minAmount: minRaise, maxAmount: maxTotal });
+      actions.push({ type: 'Raise', minAmount: minRaise, maxAmount: maxTotal });
     }
   }
 

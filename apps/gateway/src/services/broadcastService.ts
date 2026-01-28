@@ -1,23 +1,23 @@
-import { deliverToSubscribers } from "../ws/delivery";
-import * as pubsub from "../ws/pubsub";
-import logger from "../observability/logger";
+import { deliverToSubscribers } from '../ws/delivery';
+import * as pubsub from '../ws/pubsub';
+import logger from '../observability/logger';
 
 type BroadcastChannel =
-  | { kind: "table"; tableId: string }
-  | { kind: "chat"; tableId: string }
-  | { kind: "lobby" };
+  | { kind: 'table'; tableId: string }
+  | { kind: 'chat'; tableId: string }
+  | { kind: 'lobby' };
 
 function parseBroadcastChannel(channel: string): BroadcastChannel | null {
-  if (channel === "lobby") {
-    return { kind: "lobby" };
+  if (channel === 'lobby') {
+    return { kind: 'lobby' };
   }
 
-  const [prefix, tableId] = channel.split(":");
-  if (prefix === "table" && tableId) {
-    return { kind: "table", tableId };
+  const [prefix, tableId] = channel.split(':');
+  if (prefix === 'table' && tableId) {
+    return { kind: 'table', tableId };
   }
-  if (prefix === "chat" && tableId) {
-    return { kind: "chat", tableId };
+  if (prefix === 'chat' && tableId) {
+    return { kind: 'chat', tableId };
   }
 
   return null;
@@ -33,18 +33,18 @@ export async function broadcastToChannel(channel: string, payload: Record<string
     // Our pubsub implementation currently uses specific methods.
     const parsedChannel = parseBroadcastChannel(channel);
     if (!parsedChannel) {
-      logger.warn({ channel }, "Failed to publish to unknown channel");
+      logger.warn({ channel }, 'Failed to publish to unknown channel');
       return;
     }
 
     switch (parsedChannel.kind) {
-      case "table":
+      case 'table':
         await pubsub.publishTableEvent(parsedChannel.tableId, payload);
         break;
-      case "chat":
+      case 'chat':
         await pubsub.publishChatEvent(parsedChannel.tableId, payload);
         break;
-      case "lobby": {
+      case 'lobby': {
         const tables = payload.tables;
         if (Array.isArray(tables)) {
           await pubsub.publishLobbyEvent(tables);
@@ -53,7 +53,7 @@ export async function broadcastToChannel(channel: string, payload: Record<string
       }
     }
   } catch (err) {
-    logger.error({ err, channel }, "Failed to broadcast to channel");
+    logger.error({ err, channel }, 'Failed to broadcast to channel');
   }
 }
 

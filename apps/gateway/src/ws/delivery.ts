@@ -1,6 +1,6 @@
-import logger from "../observability/logger";
-import { getSubscribers } from "./subscriptions";
-import { sendToLocalText } from "./localRegistry";
+import logger from '../observability/logger';
+import { getSubscribers } from './subscriptions';
+import { sendToLocalText } from './localRegistry';
 
 export async function deliverToSubscribers(channel: string, message: unknown): Promise<void> {
   const connectionIds = await getSubscribers(channel);
@@ -12,7 +12,7 @@ export async function deliverToSubscribers(channel: string, message: unknown): P
   try {
     payloadText = JSON.stringify(message);
   } catch (err) {
-    logger.error({ err, channel }, "ws.delivery.serialize.failed");
+    logger.error({ err, channel }, 'ws.delivery.serialize.failed');
     return;
   }
 
@@ -20,4 +20,3 @@ export async function deliverToSubscribers(channel: string, message: unknown): P
     sendToLocalText(connectionId, payloadText);
   }
 }
-

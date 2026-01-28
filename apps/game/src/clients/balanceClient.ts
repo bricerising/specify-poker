@@ -1,6 +1,6 @@
-import { createLazyUnaryCallResultProxy } from "@specify-poker/shared";
-import { getBalanceClient } from "../api/grpc/clients";
-import logger from "../observability/logger";
+import { createLazyUnaryCallResultProxy } from '@specify-poker/shared';
+import { getBalanceClient } from '../api/grpc/clients';
+import logger from '../observability/logger';
 
 type NumericString = string | number;
 
@@ -8,7 +8,7 @@ function parseNumeric(value: NumericString | undefined): number {
   if (value === undefined) {
     return 0;
   }
-  const parsed = typeof value === "number" ? value : Number.parseInt(value, 10);
+  const parsed = typeof value === 'number' ? value : Number.parseInt(value, 10);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
@@ -57,7 +57,7 @@ export async function reserveForBuyIn(
   accountId: string,
   tableId: string,
   amount: number,
-  idempotencyKey: string
+  idempotencyKey: string,
 ): Promise<ReserveResult> {
   const call = await unaryBalanceClient.ReserveForBuyIn({
     account_id: accountId,
@@ -68,8 +68,8 @@ export async function reserveForBuyIn(
   });
 
   if (!call.ok) {
-    logger.error({ err: call.error, accountId, tableId }, "Balance reserve failed");
-    return { ok: false, error: "INTERNAL_ERROR" };
+    logger.error({ err: call.error, accountId, tableId }, 'Balance reserve failed');
+    return { ok: false, error: 'INTERNAL_ERROR' };
   }
 
   const response = call.value;
@@ -87,8 +87,8 @@ export async function commitReservation(reservationId: string): Promise<CommitRe
   });
 
   if (!call.ok) {
-    logger.error({ err: call.error, reservationId }, "Balance commit failed");
-    return { ok: false, error: "INTERNAL_ERROR" };
+    logger.error({ err: call.error, reservationId }, 'Balance commit failed');
+    return { ok: false, error: 'INTERNAL_ERROR' };
   }
 
   const response = call.value;
@@ -102,7 +102,7 @@ export async function commitReservation(reservationId: string): Promise<CommitRe
 
 export async function releaseReservation(
   reservationId: string,
-  reason?: string
+  reason?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const call = await unaryBalanceClient.ReleaseReservation({
     reservation_id: reservationId,
@@ -110,8 +110,8 @@ export async function releaseReservation(
   });
 
   if (!call.ok) {
-    logger.error({ err: call.error, reservationId }, "Balance release failed");
-    return { ok: false, error: "INTERNAL_ERROR" };
+    logger.error({ err: call.error, reservationId }, 'Balance release failed');
+    return { ok: false, error: 'INTERNAL_ERROR' };
   }
 
   const response = call.value;
@@ -124,7 +124,7 @@ export async function processCashOut(
   seatId: number,
   amount: number,
   idempotencyKey: string,
-  handId?: string
+  handId?: string,
 ): Promise<CashOutResult> {
   const call = await unaryBalanceClient.ProcessCashOut({
     account_id: accountId,
@@ -136,8 +136,8 @@ export async function processCashOut(
   });
 
   if (!call.ok) {
-    logger.error({ err: call.error, accountId, tableId }, "Balance cash out failed");
-    return { ok: false, error: "INTERNAL_ERROR" };
+    logger.error({ err: call.error, accountId, tableId }, 'Balance cash out failed');
+    return { ok: false, error: 'INTERNAL_ERROR' };
   }
 
   const response = call.value;
@@ -156,7 +156,7 @@ export async function recordContribution(
   accountId: string,
   amount: number,
   contributionType: string,
-  idempotencyKey: string
+  idempotencyKey: string,
 ): Promise<ContributionResult> {
   const call = await unaryBalanceClient.RecordContribution({
     table_id: tableId,
@@ -169,8 +169,8 @@ export async function recordContribution(
   });
 
   if (!call.ok) {
-    logger.error({ err: call.error, tableId, handId }, "Balance contribution failed");
-    return { ok: false, error: "INTERNAL_ERROR" };
+    logger.error({ err: call.error, tableId, handId }, 'Balance contribution failed');
+    return { ok: false, error: 'INTERNAL_ERROR' };
   }
 
   const response = call.value;
@@ -186,7 +186,7 @@ export async function settlePot(
   tableId: string,
   handId: string,
   winners: Array<{ seatId: number; accountId: string; amount: number }>,
-  idempotencyKey: string
+  idempotencyKey: string,
 ): Promise<SettlementResult> {
   const call = await unaryBalanceClient.SettlePot({
     table_id: tableId,
@@ -200,8 +200,8 @@ export async function settlePot(
   });
 
   if (!call.ok) {
-    logger.error({ err: call.error, tableId, handId }, "Balance settle failed");
-    return { ok: false, error: "INTERNAL_ERROR" };
+    logger.error({ err: call.error, tableId, handId }, 'Balance settle failed');
+    return { ok: false, error: 'INTERNAL_ERROR' };
   }
 
   const response = call.value;
@@ -220,7 +220,7 @@ export async function settlePot(
 export async function cancelPot(
   tableId: string,
   handId: string,
-  reason: string
+  reason: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const call = await unaryBalanceClient.CancelPot({
     table_id: tableId,
@@ -229,8 +229,8 @@ export async function cancelPot(
   });
 
   if (!call.ok) {
-    logger.error({ err: call.error, tableId, handId }, "Balance cancel pot failed");
-    return { ok: false, error: "INTERNAL_ERROR" };
+    logger.error({ err: call.error, tableId, handId }, 'Balance cancel pot failed');
+    return { ok: false, error: 'INTERNAL_ERROR' };
   }
 
   const response = call.value;

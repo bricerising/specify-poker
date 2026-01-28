@@ -1,18 +1,18 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState } from 'react';
 
-import { CreateTableInput } from "../services/lobbyApi";
-import { testIds } from "../utils/testIds";
+import type { CreateTableInput } from '../services/lobbyApi';
+import { testIds } from '../utils/testIds';
 
 interface CreateTableFormProps {
   onCreate: (input: CreateTableInput) => Promise<void> | void;
 }
 
 export function CreateTableForm({ onCreate }: CreateTableFormProps) {
-  const [name, setName] = useState("");
-  const [smallBlind, setSmallBlind] = useState("5");
-  const [bigBlind, setBigBlind] = useState("10");
-  const [maxPlayers, setMaxPlayers] = useState("6");
-  const [startingStack, setStartingStack] = useState("500");
+  const [name, setName] = useState('');
+  const [smallBlind, setSmallBlind] = useState('5');
+  const [bigBlind, setBigBlind] = useState('10');
+  const [maxPlayers, setMaxPlayers] = useState('6');
+  const [startingStack, setStartingStack] = useState('500');
   const [error, setError] = useState<string | null>(null);
 
   const parsed = useMemo(() => {
@@ -46,7 +46,7 @@ export function CreateTableForm({ onCreate }: CreateTableFormProps) {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!isValid) {
-      setError("Please enter valid table settings.");
+      setError('Please enter valid table settings.');
       return;
     }
     setError(null);

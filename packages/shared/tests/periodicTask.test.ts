@@ -1,7 +1,7 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { createPeriodicTask } from "../src/lifecycle/periodicTask";
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { createPeriodicTask } from '../src/lifecycle/periodicTask';
 
-describe("createPeriodicTask", () => {
+describe('createPeriodicTask', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -11,9 +11,9 @@ describe("createPeriodicTask", () => {
     vi.restoreAllMocks();
   });
 
-  it("runs on the interval when runOnStart is false", async () => {
+  it('runs on the interval when runOnStart is false', async () => {
     const run = vi.fn();
-    const task = createPeriodicTask({ name: "test", intervalMs: 1000, run });
+    const task = createPeriodicTask({ name: 'test', intervalMs: 1000, run });
 
     task.start();
 
@@ -34,9 +34,9 @@ describe("createPeriodicTask", () => {
     expect(run).toHaveBeenCalledTimes(2);
   });
 
-  it("runs immediately when runOnStart is true", async () => {
+  it('runs immediately when runOnStart is true', async () => {
     const run = vi.fn();
-    const task = createPeriodicTask({ name: "test", intervalMs: 1000, run, runOnStart: true });
+    const task = createPeriodicTask({ name: 'test', intervalMs: 1000, run, runOnStart: true });
 
     task.start();
     expect(run).toHaveBeenCalledTimes(1);
@@ -45,9 +45,9 @@ describe("createPeriodicTask", () => {
     expect(run).toHaveBeenCalledTimes(2);
   });
 
-  it("start is idempotent", async () => {
+  it('start is idempotent', async () => {
     const run = vi.fn();
-    const task = createPeriodicTask({ name: "test", intervalMs: 1000, run });
+    const task = createPeriodicTask({ name: 'test', intervalMs: 1000, run });
 
     task.start();
     task.start();
@@ -56,4 +56,3 @@ describe("createPeriodicTask", () => {
     expect(run).toHaveBeenCalledTimes(1);
   });
 });
-

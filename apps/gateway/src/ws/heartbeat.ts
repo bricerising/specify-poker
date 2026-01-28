@@ -1,10 +1,9 @@
-import WebSocket from "ws";
-
+import type WebSocket from 'ws';
 
 export function setupHeartbeat(ws: WebSocket, onDead: () => void) {
   let isAlive = true;
 
-  ws.on("pong", () => {
+  ws.on('pong', () => {
     isAlive = true;
   });
 
@@ -19,11 +18,11 @@ export function setupHeartbeat(ws: WebSocket, onDead: () => void) {
     ws.ping();
   }, 30000);
 
-  ws.on("close", () => {
+  ws.on('close', () => {
     clearInterval(interval);
   });
 
-  ws.on("error", () => {
+  ws.on('error', () => {
     clearInterval(interval);
   });
 }

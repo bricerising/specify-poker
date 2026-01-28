@@ -1,4 +1,4 @@
-import { createNonThenableProxy } from "./nonThenableProxy";
+import { createNonThenableProxy } from './nonThenableProxy';
 
 /**
  * Proxy helper for lazily-created clients:
@@ -11,7 +11,7 @@ export function createBoundTargetProxy<TTarget extends object>(getTarget: () => 
     const target = getTarget();
     const value = (target as Record<string, unknown>)[prop];
 
-    if (typeof value === "function") {
+    if (typeof value === 'function') {
       return (value as (...args: unknown[]) => unknown).bind(target);
     }
 

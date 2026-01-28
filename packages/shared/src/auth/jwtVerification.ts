@@ -1,8 +1,8 @@
-import type { KeycloakKeyProvider } from "./keycloakKeys";
+import type { KeycloakKeyProvider } from './keycloakKeys';
 
 export type JwtVerificationMaterial = {
   key: string;
-  algorithms: ["HS256"] | ["RS256"];
+  algorithms: ['HS256'] | ['RS256'];
 };
 
 export async function resolveJwtVerificationMaterial(options: {
@@ -16,17 +16,16 @@ export async function resolveJwtVerificationMaterial(options: {
   const hs256Secret = options.hs256Secret ?? null;
 
   if (hs256Secret && !publicKeyPem && !kid) {
-    return { key: hs256Secret, algorithms: ["HS256"] };
+    return { key: hs256Secret, algorithms: ['HS256'] };
   }
 
   if (publicKeyPem) {
-    return { key: publicKeyPem, algorithms: ["RS256"] };
+    return { key: publicKeyPem, algorithms: ['RS256'] };
   }
 
   if (kid) {
-    return { key: await options.keyProvider.getJwksCertificatePem(kid), algorithms: ["RS256"] };
+    return { key: await options.keyProvider.getJwksCertificatePem(kid), algorithms: ['RS256'] };
   }
 
-  return { key: await options.keyProvider.getRealmPublicKeyPem(), algorithms: ["RS256"] };
+  return { key: await options.keyProvider.getRealmPublicKeyPem(), algorithms: ['RS256'] };
 }
-

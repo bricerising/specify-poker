@@ -1,8 +1,8 @@
-import { getRedisClient } from "../storage/redisClient";
-import logger from "../observability/logger";
+import { getRedisClient } from '../storage/redisClient';
+import logger from '../observability/logger';
 
-const SUBSCRIPTIONS_KEY = "gateway:subscriptions";
-const CONNECTION_SUBS_PREFIX = "conn_subs";
+const SUBSCRIPTIONS_KEY = 'gateway:subscriptions';
+const CONNECTION_SUBS_PREFIX = 'conn_subs';
 
 function channelKey(channel: string): string {
   return `${SUBSCRIPTIONS_KEY}:${channel}`;
@@ -19,7 +19,7 @@ async function withRedis<T>(
   operation: RedisOperation<T>,
   context: Record<string, unknown>,
   errorMessage: string,
-  fallback: T
+  fallback: T,
 ): Promise<T> {
   const redis = await getRedisClient();
   if (!redis) return fallback;
@@ -39,8 +39,8 @@ export async function subscribeToChannel(connectionId: string, channel: string):
       await redis.sAdd(connectionKey(connectionId), channel);
     },
     { connectionId, channel },
-    "Failed to subscribe to channel",
-    undefined
+    'Failed to subscribe to channel',
+    undefined,
   );
 }
 
@@ -51,8 +51,8 @@ export async function unsubscribeFromChannel(connectionId: string, channel: stri
       await redis.sRem(connectionKey(connectionId), channel);
     },
     { connectionId, channel },
-    "Failed to unsubscribe from channel",
-    undefined
+    'Failed to unsubscribe from channel',
+    undefined,
   );
 }
 
@@ -66,8 +66,8 @@ export async function unsubscribeAll(connectionId: string): Promise<void> {
       await redis.del(connectionKey(connectionId));
     },
     { connectionId },
-    "Failed to unsubscribe from all channels",
-    undefined
+    'Failed to unsubscribe from all channels',
+    undefined,
   );
 }
 
@@ -75,7 +75,7 @@ export async function getSubscribers(channel: string): Promise<string[]> {
   return withRedis(
     async (redis) => redis.sMembers(channelKey(channel)),
     { channel },
-    "Failed to get subscribers for channel",
-    []
+    'Failed to get subscribers for channel',
+    [],
   );
 }

@@ -1,12 +1,18 @@
-import { eventStore } from "../storage/eventStore";
-import { GameEvent, HandRecord } from "../domain/types";
+import { eventStore } from '../storage/eventStore';
+import type { GameEvent, HandRecord } from '../domain/types';
 
 function isParticipant(record: HandRecord, userId?: string): boolean {
-  return Boolean(userId && record.participants.some((participant) => participant.userId === userId));
+  return Boolean(
+    userId && record.participants.some((participant) => participant.userId === userId),
+  );
 }
 
 export class PrivacyService {
-  async filterHandRecord(record: HandRecord, requesterUserId?: string, isOperator = false): Promise<HandRecord> {
+  async filterHandRecord(
+    record: HandRecord,
+    requesterUserId?: string,
+    isOperator = false,
+  ): Promise<HandRecord> {
     if (isOperator) {
       return record;
     }
@@ -26,7 +32,8 @@ export class PrivacyService {
     return {
       ...record,
       participants: record.participants.map((participant) => {
-        const isVisible = participant.userId === requesterUserId || revealedSeats.has(participant.seatId);
+        const isVisible =
+          participant.userId === requesterUserId || revealedSeats.has(participant.seatId);
         return isVisible ? participant : { ...participant, holeCards: null };
       }),
     };
@@ -36,7 +43,7 @@ export class PrivacyService {
     event: GameEvent,
     requesterUserId?: string,
     isOperator = false,
-    participantUserIds?: Set<string>
+    participantUserIds?: Set<string>,
   ): GameEvent {
     if (isOperator) {
       return event;
@@ -47,7 +54,7 @@ export class PrivacyService {
       return this.redactEventForNonParticipant(event);
     }
 
-    if (event.type === "CARDS_DEALT" && requesterUserId && event.userId !== requesterUserId) {
+    if (event.type === 'CARDS_DEALT' && requesterUserId && event.userId !== requesterUserId) {
       return {
         ...event,
         payload: { ...(event.payload as Record<string, unknown>), cards: [] },
@@ -58,11 +65,13 @@ export class PrivacyService {
   }
 
   private redactEventForNonParticipant(event: GameEvent): GameEvent {
-    if (event.type === "CARDS_DEALT" || event.type === "CARDS_REVEALED") {
+    if (event.type === 'CARDS_DEALT' || event.type === 'CARDS_REVEALED') {
       return this.redactCardsPayload(event);
     }
-    if (event.type === "SHOWDOWN") {
-      const payload = event.payload as { reveals?: { seatId: number; cards?: unknown[]; handRank?: string }[] };
+    if (event.type === 'SHOWDOWN') {
+      const payload = event.payload as {
+        reveals?: { seatId: number; cards?: unknown[]; handRank?: string }[];
+      };
       const reveals = (payload.reveals || []).map((reveal) => ({
         ...reveal,
         cards: [],

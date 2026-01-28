@@ -1,8 +1,8 @@
-import { randomUUID } from "crypto";
-import { createLazyUnaryCallProxy, toStruct } from "@specify-poker/shared";
+import { randomUUID } from 'crypto';
+import { createLazyUnaryCallProxy, toStruct } from '@specify-poker/shared';
 
-import { getEventClient, type EventPublishResponse } from "../../api/grpc/clients";
-import logger from "../../observability/logger";
+import { getEventClient, type EventPublishResponse } from '../../api/grpc/clients';
+import logger from '../../observability/logger';
 
 const unaryEventClient = createLazyUnaryCallProxy(getEventClient);
 
@@ -29,13 +29,13 @@ export class GameEventPublisher {
       if (!response.success) {
         logger.error(
           { eventType: params.type, tableId: params.tableId, handId: params.handId },
-          "Failed to emit game event",
+          'Failed to emit game event',
         );
       }
     } catch (err) {
       logger.error(
         { err, eventType: params.type, tableId: params.tableId, handId: params.handId },
-        "Failed to emit game event",
+        'Failed to emit game event',
       );
     }
   }

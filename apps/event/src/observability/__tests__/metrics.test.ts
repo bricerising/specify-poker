@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   counterInstances,
@@ -15,7 +15,7 @@ const {
 } = vi.hoisted(() => {
   const counterInstances: { inc: ReturnType<typeof vi.fn> }[] = [];
   const histogramInstances: { observe: ReturnType<typeof vi.fn> }[] = [];
-  const metricsMock = vi.fn().mockResolvedValue("metrics");
+  const metricsMock = vi.fn().mockResolvedValue('metrics');
   const collectDefaultMetrics = vi.fn();
 
   const Counter = vi.fn(() => {
@@ -31,7 +31,7 @@ const {
   });
 
   class Registry {
-    contentType = "text/plain";
+    contentType = 'text/plain';
     metrics = metricsMock;
   }
 
@@ -65,7 +65,7 @@ const {
   };
 });
 
-vi.mock("prom-client", () => ({
+vi.mock('prom-client', () => ({
   default: {
     collectDefaultMetrics,
   },
@@ -74,14 +74,14 @@ vi.mock("prom-client", () => ({
   Registry,
 }));
 
-vi.mock("http", () => ({
+vi.mock('http', () => ({
   default: {
     createServer,
   },
   createServer,
 }));
 
-vi.mock("../logger", () => ({
+vi.mock('../logger', () => ({
   default: {
     info: loggerInfo,
   },
@@ -93,38 +93,38 @@ import {
   recordMaterializationLag,
   renderMetrics,
   startMetricsServer,
-} from "../metrics";
+} from '../metrics';
 
-describe("metrics", () => {
+describe('metrics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetRequestHandler();
   });
 
-  it("records ingestion counters", () => {
-    recordIngestion("HAND_STARTED");
+  it('records ingestion counters', () => {
+    recordIngestion('HAND_STARTED');
 
-    expect(counterInstances[0].inc).toHaveBeenCalledWith({ type: "HAND_STARTED" });
+    expect(counterInstances[0].inc).toHaveBeenCalledWith({ type: 'HAND_STARTED' });
   });
 
-  it("records query duration in seconds", () => {
-    recordQueryDuration("ok", 1200);
+  it('records query duration in seconds', () => {
+    recordQueryDuration('ok', 1200);
 
-    expect(histogramInstances[0].observe).toHaveBeenCalledWith({ status: "ok" }, 1.2);
+    expect(histogramInstances[0].observe).toHaveBeenCalledWith({ status: 'ok' }, 1.2);
   });
 
-  it("records materialization lag in seconds", () => {
+  it('records materialization lag in seconds', () => {
     recordMaterializationLag(5000);
 
     expect(histogramInstances[1].observe).toHaveBeenCalledWith(5);
   });
 
-  it("renders metrics from the registry", async () => {
-    await expect(renderMetrics()).resolves.toBe("metrics");
+  it('renders metrics from the registry', async () => {
+    await expect(renderMetrics()).resolves.toBe('metrics');
     expect(metricsMock).toHaveBeenCalledTimes(1);
   });
 
-  it("serves metrics and 404 responses", async () => {
+  it('serves metrics and 404 responses', async () => {
     startMetricsServer(9100);
 
     const handler = getRequestHandler();
@@ -133,20 +133,20 @@ describe("metrics", () => {
       setHeader: vi.fn(),
       end: vi.fn(),
     };
-    await handler?.({ url: "/metrics" }, okResponse);
+    await handler?.({ url: '/metrics' }, okResponse);
 
     expect(okResponse.statusCode).toBe(200);
-    expect(okResponse.setHeader).toHaveBeenCalledWith("Content-Type", "text/plain");
-    expect(okResponse.end).toHaveBeenCalledWith("metrics");
-    expect(loggerInfo).toHaveBeenCalledWith({ port: 9100 }, "Event metrics server listening");
+    expect(okResponse.setHeader).toHaveBeenCalledWith('Content-Type', 'text/plain');
+    expect(okResponse.end).toHaveBeenCalledWith('metrics');
+    expect(loggerInfo).toHaveBeenCalledWith({ port: 9100 }, 'Event metrics server listening');
 
     const notFoundResponse = {
       statusCode: 0,
       end: vi.fn(),
     };
-    await handler?.({ url: "/nope" }, notFoundResponse);
+    await handler?.({ url: '/nope' }, notFoundResponse);
 
     expect(notFoundResponse.statusCode).toBe(404);
-    expect(notFoundResponse.end).toHaveBeenCalledWith("Not Found");
+    expect(notFoundResponse.end).toHaveBeenCalledWith('Not Found');
   });
 });

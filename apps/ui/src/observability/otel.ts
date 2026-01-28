@@ -1,9 +1,9 @@
-import { trace, SpanStatusCode } from "@opentelemetry/api";
+import { trace, SpanStatusCode } from '@opentelemetry/api';
 import {
   BasicTracerProvider,
   ConsoleSpanExporter,
   SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
+} from '@opentelemetry/sdk-trace-base';
 
 let initialized = false;
 
@@ -19,10 +19,10 @@ export function initUiTelemetry() {
 }
 
 export function recordNavigation(path: string) {
-  const tracer = trace.getTracer("ui");
-  const span = tracer.startSpan("ui.navigation", {
+  const tracer = trace.getTracer('ui');
+  const span = tracer.startSpan('ui.navigation', {
     attributes: {
-      "ui.path": path,
+      'ui.path': path,
     },
   });
   span.end();
@@ -32,10 +32,10 @@ export function recordAction(
   actionType: string,
   attributes?: Record<string, string | number | boolean>,
 ) {
-  const tracer = trace.getTracer("ui");
+  const tracer = trace.getTracer('ui');
   const span = tracer.startSpan(`ui.action.${actionType}`, {
     attributes: {
-      "ui.action_type": actionType,
+      'ui.action_type': actionType,
       ...attributes,
     },
   });
@@ -46,14 +46,14 @@ export function recordError(
   error: Error | string,
   context?: Record<string, string | number | boolean>,
 ) {
-  const tracer = trace.getTracer("ui");
-  const errorMessage = typeof error === "string" ? error : error.message;
-  const errorStack = typeof error === "string" ? undefined : error.stack;
+  const tracer = trace.getTracer('ui');
+  const errorMessage = typeof error === 'string' ? error : error.message;
+  const errorStack = typeof error === 'string' ? undefined : error.stack;
 
-  const span = tracer.startSpan("ui.error", {
+  const span = tracer.startSpan('ui.error', {
     attributes: {
-      "error.message": errorMessage,
-      ...(errorStack ? { "error.stack": errorStack } : {}),
+      'error.message': errorMessage,
+      ...(errorStack ? { 'error.stack': errorStack } : {}),
       ...context,
     },
   });
@@ -67,13 +67,13 @@ export function recordApiCall(
   statusCode?: number,
   durationMs?: number,
 ) {
-  const tracer = trace.getTracer("ui");
-  const span = tracer.startSpan("ui.api_call", {
+  const tracer = trace.getTracer('ui');
+  const span = tracer.startSpan('ui.api_call', {
     attributes: {
-      "http.url": endpoint,
-      "http.method": method,
-      ...(statusCode !== undefined ? { "http.status_code": statusCode } : {}),
-      ...(durationMs !== undefined ? { "http.duration_ms": durationMs } : {}),
+      'http.url': endpoint,
+      'http.method': method,
+      ...(statusCode !== undefined ? { 'http.status_code': statusCode } : {}),
+      ...(durationMs !== undefined ? { 'http.duration_ms': durationMs } : {}),
     },
   });
   if (statusCode && statusCode >= 400) {
@@ -84,15 +84,15 @@ export function recordApiCall(
 
 export function recordWebSocketMessage(
   messageType: string,
-  direction: "sent" | "received",
+  direction: 'sent' | 'received',
   tableId?: string,
 ) {
-  const tracer = trace.getTracer("ui");
+  const tracer = trace.getTracer('ui');
   const span = tracer.startSpan(`ui.ws.${direction}`, {
     attributes: {
-      "ws.message_type": messageType,
-      "ws.direction": direction,
-      ...(tableId ? { "poker.table_id": tableId } : {}),
+      'ws.message_type': messageType,
+      'ws.direction': direction,
+      ...(tableId ? { 'poker.table_id': tableId } : {}),
     },
   });
   span.end();

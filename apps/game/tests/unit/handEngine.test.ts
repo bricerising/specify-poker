@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
-import { startHand } from "../../src/engine/handEngine";
-import { TableConfig, TableState } from "../../src/domain/types";
+import { describe, it, expect } from 'vitest';
+import { startHand } from '../../src/engine/handEngine';
+import type { TableConfig, TableState } from '../../src/domain/types';
 
-describe("handEngine", () => {
-  it("should start a hand correctly", () => {
+describe('handEngine', () => {
+  it('should start a hand correctly', () => {
     const tableConfig: TableConfig = {
       smallBlind: 10,
       bigBlind: 20,
@@ -13,10 +13,10 @@ describe("handEngine", () => {
       turnTimerSeconds: 20,
     };
     const tableState: TableState = {
-      tableId: "table-1",
+      tableId: 'table-1',
       seats: [
-        { seatId: 0, userId: "user-1", stack: 1000, status: "SEATED", holeCards: null },
-        { seatId: 1, userId: "user-2", stack: 1000, status: "SEATED", holeCards: null },
+        { seatId: 0, userId: 'user-1', stack: 1000, status: 'SEATED', holeCards: null },
+        { seatId: 1, userId: 'user-2', stack: 1000, status: 'SEATED', holeCards: null },
       ],
       spectators: [],
       hand: null,
@@ -28,7 +28,7 @@ describe("handEngine", () => {
     const updatedTable = startHand(tableState, tableConfig);
 
     expect(updatedTable.hand).toBeDefined();
-    expect(updatedTable.hand?.street).toBe("PREFLOP");
+    expect(updatedTable.hand?.street).toBe('PREFLOP');
     expect(updatedTable.seats[0].stack).toBeLessThan(1000);
     expect(updatedTable.seats[1].stack).toBeLessThan(1000);
   });

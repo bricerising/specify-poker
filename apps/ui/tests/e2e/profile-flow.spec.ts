@@ -1,26 +1,26 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from '@playwright/test';
 
-test("profile flow updates avatar url", async ({ page }) => {
+test('profile flow updates avatar url', async ({ page }) => {
   let profile = {
-    userId: "user-1",
-    username: "Ace",
+    userId: 'user-1',
+    username: 'Ace',
     avatarUrl: null as string | null,
     stats: { handsPlayed: 1, wins: 0 },
     friends: [],
   };
 
-  await page.route("**/api/me", async (route, request) => {
-    if (request.method() === "GET") {
+  await page.route('**/api/me', async (route, request) => {
+    if (request.method() === 'GET') {
       await route.fulfill({
         status: 200,
-        contentType: "application/json",
+        contentType: 'application/json',
         body: JSON.stringify(profile),
       });
       return;
     }
 
-    if (request.method() === "PUT") {
-      const payload = JSON.parse(request.postData() ?? "{}") as {
+    if (request.method() === 'PUT') {
+      const payload = JSON.parse(request.postData() ?? '{}') as {
         avatarUrl?: string | null;
       };
       profile = {
@@ -29,7 +29,7 @@ test("profile flow updates avatar url", async ({ page }) => {
       };
       await route.fulfill({
         status: 200,
-        contentType: "application/json",
+        contentType: 'application/json',
         body: JSON.stringify(profile),
       });
       return;
@@ -39,15 +39,18 @@ test("profile flow updates avatar url", async ({ page }) => {
   });
 
   await page.addInitScript(() => {
-    window.sessionStorage.setItem("poker.auth.token", "test-token");
+    window.sessionStorage.setItem('poker.auth.token', 'test-token');
   });
 
-  await page.goto("/");
-  await page.getByTestId("nav-profile").click();
+  await page.goto('/');
+  await page.getByTestId('nav-profile').click();
 
-  const avatarUrl = "https://example.com/avatar.png";
-  await page.getByTestId("profile-avatar-url").fill(avatarUrl);
-  await page.getByTestId("profile-save").click();
+  const avatarUrl = 'https://example.com/avatar.png';
+  await page.getByTestId('profile-avatar-url').fill(avatarUrl);
+  await page.getByTestId('profile-save').click();
 
-  await expect(page.locator('.profile-summary img[alt="Ace avatar"]')).toHaveAttribute("src", avatarUrl);
+  await expect(page.locator('.profile-summary img[alt="Ace avatar"]')).toHaveAttribute(
+    'src',
+    avatarUrl,
+  );
 });

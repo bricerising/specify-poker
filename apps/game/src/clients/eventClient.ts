@@ -1,9 +1,9 @@
-import { GameEventType } from "../domain/events";
-import logger from "../observability/logger";
-import { createLazyUnaryCallResultProxy, toStruct } from "@specify-poker/shared";
-import { getEventClient } from "../api/grpc/clients";
+import { GameEventType } from '../domain/events';
+import logger from '../observability/logger';
+import { createLazyUnaryCallResultProxy, toStruct } from '@specify-poker/shared';
+import { getEventClient } from '../api/grpc/clients';
 
-export { GameEventType as EventTypes } from "../domain/events";
+export { GameEventType as EventTypes } from '../domain/events';
 
 const unaryEventClient = createLazyUnaryCallResultProxy(getEventClient);
 
@@ -34,7 +34,7 @@ export async function publishEvent(event: GameEvent): Promise<PublishResult> {
   });
 
   if (!call.ok) {
-    logger.error({ err: call.error, event }, "Event publish failed");
+    logger.error({ err: call.error, event }, 'Event publish failed');
     return { success: false };
   }
 
@@ -42,7 +42,9 @@ export async function publishEvent(event: GameEvent): Promise<PublishResult> {
   return { success: response.success, eventId: response.event_id };
 }
 
-export async function publishEvents(events: GameEvent[]): Promise<{ success: boolean; eventIds?: string[] }> {
+export async function publishEvents(
+  events: GameEvent[],
+): Promise<{ success: boolean; eventIds?: string[] }> {
   const call = await unaryEventClient.PublishEvents({
     events: events.map((e) => ({
       type: e.type,
@@ -56,7 +58,7 @@ export async function publishEvents(events: GameEvent[]): Promise<{ success: boo
   });
 
   if (!call.ok) {
-    logger.error({ err: call.error }, "Batch event publish failed");
+    logger.error({ err: call.error }, 'Batch event publish failed');
     return { success: false };
   }
 
@@ -69,7 +71,7 @@ export async function emitTableCreated(
   tableId: string,
   ownerId: string,
   tableName: string,
-  config: Record<string, unknown>
+  config: Record<string, unknown>,
 ) {
   return publishEvent({
     type: GameEventType.TABLE_CREATED,
@@ -80,7 +82,12 @@ export async function emitTableCreated(
   });
 }
 
-export async function emitPlayerJoined(tableId: string, userId: string, seatId: number, buyInAmount: number) {
+export async function emitPlayerJoined(
+  tableId: string,
+  userId: string,
+  seatId: number,
+  buyInAmount: number,
+) {
   return publishEvent({
     type: GameEventType.PLAYER_JOINED,
     tableId,
@@ -91,7 +98,12 @@ export async function emitPlayerJoined(tableId: string, userId: string, seatId: 
   });
 }
 
-export async function emitPlayerLeft(tableId: string, userId: string, seatId: number, finalStack: number) {
+export async function emitPlayerLeft(
+  tableId: string,
+  userId: string,
+  seatId: number,
+  finalStack: number,
+) {
   return publishEvent({
     type: GameEventType.PLAYER_LEFT,
     tableId,
@@ -106,7 +118,7 @@ export async function emitHandStarted(
   tableId: string,
   handId: string,
   participants: Array<Record<string, unknown>>,
-  button: number
+  button: number,
 ) {
   return publishEvent({
     type: GameEventType.HAND_STARTED,
@@ -124,7 +136,7 @@ export async function emitActionTaken(
   seatId: number,
   action: string,
   amount: number,
-  street: string
+  street: string,
 ) {
   return publishEvent({
     type: GameEventType.ACTION_TAKEN,
@@ -142,7 +154,7 @@ export async function emitHandCompleted(
   handId: string,
   winners: Array<Record<string, unknown>>,
   communityCards: string[],
-  rake: number
+  rake: number,
 ) {
   return publishEvent({
     type: GameEventType.HAND_COMPLETED,

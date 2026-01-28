@@ -1,4 +1,4 @@
-import http from "http";
+import http from 'http';
 
 export type PrometheusRegistryLike = {
   contentType: string;
@@ -19,11 +19,11 @@ export type StartPrometheusMetricsServerOptions = {
 };
 
 function getPathname(url: unknown): string | null {
-  if (typeof url !== "string") {
+  if (typeof url !== 'string') {
     return null;
   }
   try {
-    return new URL(url, "http://localhost").pathname;
+    return new URL(url, 'http://localhost').pathname;
   } catch {
     return null;
   }
@@ -35,32 +35,36 @@ function getPathname(url: unknown): string | null {
  * - sets the correct `Content-Type` based on the registry
  * - handles async errors without unhandled rejections
  */
-export function startPrometheusMetricsServer(options: StartPrometheusMetricsServerOptions): http.Server {
-  const path = options.path ?? "/metrics";
+export function startPrometheusMetricsServer(
+  options: StartPrometheusMetricsServerOptions,
+): http.Server {
+  const path = options.path ?? '/metrics';
 
   const server = http.createServer(async (req, res) => {
     if (getPathname(req.url) !== path) {
       res.statusCode = 404;
-      res.end("Not Found");
+      res.end('Not Found');
       return;
     }
 
     try {
       const body = await Promise.resolve(options.registry.metrics());
       res.statusCode = 200;
-      res.setHeader("Content-Type", options.registry.contentType);
+      res.setHeader('Content-Type', options.registry.contentType);
       res.end(body);
     } catch (err: unknown) {
-      options.logger?.error?.({ err }, "Failed to render metrics");
+      options.logger?.error?.({ err }, 'Failed to render metrics');
       res.statusCode = 500;
-      res.end("Internal Server Error");
+      res.end('Internal Server Error');
     }
   });
 
   server.listen(options.port, () => {
-    options.logger?.info?.({ port: options.port }, options.logMessage ?? "Metrics server listening");
+    options.logger?.info?.(
+      { port: options.port },
+      options.logMessage ?? 'Metrics server listening',
+    );
   });
 
   return server;
 }
-

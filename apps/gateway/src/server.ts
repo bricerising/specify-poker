@@ -1,15 +1,18 @@
-import { closeHttpServer, createShutdownManager, runServiceMain, type ShutdownManager } from "@specify-poker/shared";
-import { collectDefaultMetrics } from "prom-client";
-import { getConfig } from "./config";
-import logger from "./observability/logger";
-import { initOTEL, shutdownOTEL } from "./observability/otel";
+import {
+  closeHttpServer,
+  createShutdownManager,
+  runServiceMain,
+  type ShutdownManager,
+} from '@specify-poker/shared';
+import { collectDefaultMetrics } from 'prom-client';
+import { getConfig } from './config';
+import logger from './observability/logger';
+import { initOTEL, shutdownOTEL } from './observability/otel';
 
 const isDirectRun =
-  typeof require !== "undefined" &&
-  typeof module !== "undefined" &&
-  require.main === module;
+  typeof require !== 'undefined' && typeof module !== 'undefined' && require.main === module;
 
-const isTestEnv = process.env.NODE_ENV === "test";
+const isTestEnv = process.env.NODE_ENV === 'test';
 
 let runningShutdown: ShutdownManager | null = null;
 
@@ -31,14 +34,14 @@ export async function startServer(): Promise<void> {
     { registerInstance, unregisterInstance },
     { closeRedisClient },
   ] = await Promise.all([
-    import("express"),
-    import("cors"),
-    import("http"),
-    import("./http/router"),
-    import("./ws/server"),
-    import("./ws/pubsub"),
-    import("./storage/instanceRegistry"),
-    import("./storage/redisClient"),
+    import('express'),
+    import('cors'),
+    import('http'),
+    import('./http/router'),
+    import('./ws/server'),
+    import('./ws/pubsub'),
+    import('./storage/instanceRegistry'),
+    import('./storage/redisClient'),
   ]);
 
   const app = express();
@@ -46,24 +49,24 @@ export async function startServer(): Promise<void> {
 
   const shutdown = createShutdownManager({ logger });
   runningShutdown = shutdown;
-  shutdown.add("otel.shutdown", async () => {
+  shutdown.add('otel.shutdown', async () => {
     if (!isTestEnv) {
       await shutdownOTEL();
     }
   });
-  shutdown.add("redis.close", async () => {
+  shutdown.add('redis.close', async () => {
     await closeRedisClient();
   });
-  shutdown.add("ws.pubsub.close", async () => {
+  shutdown.add('ws.pubsub.close', async () => {
     await closeWsPubSub();
   });
-  shutdown.add("http.close", async () => {
+  shutdown.add('http.close', async () => {
     await closeHttpServer(server);
   });
 
   // Instance Registry
   await registerInstance();
-  shutdown.add("instanceRegistry.unregister", async () => {
+  shutdown.add('instanceRegistry.unregister', async () => {
     await unregisterInstance();
   });
 
@@ -83,7 +86,7 @@ export async function startServer(): Promise<void> {
 
   // WebSocket Server
   const wss = await initWsServer(server);
-  shutdown.add("ws.close", async () => {
+  shutdown.add('ws.close', async () => {
     for (const client of wss.clients) {
       try {
         client.terminate();
@@ -96,7 +99,7 @@ export async function startServer(): Promise<void> {
 
   await new Promise<void>((resolve) => {
     server.listen(config.port, () => {
-      logger.info({ port: config.port }, "Gateway service started");
+      logger.info({ port: config.port }, 'Gateway service started');
       resolve();
     });
   });

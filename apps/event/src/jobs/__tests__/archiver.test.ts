@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Archiver } from "../archiver";
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Archiver } from '../archiver';
 
 const ONE_HOUR_MS = 3600 * 1000;
 
@@ -7,13 +7,13 @@ const { loggerInfo } = vi.hoisted(() => ({
   loggerInfo: vi.fn(),
 }));
 
-vi.mock("../../observability/logger", () => ({
+vi.mock('../../observability/logger', () => ({
   default: {
     info: loggerInfo,
   },
 }));
 
-describe("Archiver", () => {
+describe('Archiver', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
@@ -24,19 +24,21 @@ describe("Archiver", () => {
     vi.restoreAllMocks();
   });
 
-  it("starts and schedules runs", async () => {
+  it('starts and schedules runs', async () => {
     const archiver = new Archiver();
 
     await archiver.start();
 
-    expect(loggerInfo).toHaveBeenCalledWith("Archiver started");
+    expect(loggerInfo).toHaveBeenCalledWith('Archiver started');
 
     await vi.advanceTimersByTimeAsync(ONE_HOUR_MS);
 
-    expect(loggerInfo).toHaveBeenCalledWith("Archiver: Checking for events older than retention period...");
+    expect(loggerInfo).toHaveBeenCalledWith(
+      'Archiver: Checking for events older than retention period...',
+    );
   });
 
-  it("does not run after stop", async () => {
+  it('does not run after stop', async () => {
     const archiver = new Archiver();
 
     await archiver.start();

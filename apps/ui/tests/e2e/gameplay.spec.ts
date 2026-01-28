@@ -1,18 +1,18 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from '@playwright/test';
 
-test.describe("gameplay flow", () => {
+test.describe('gameplay flow', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
-      window.sessionStorage.setItem("poker.auth.token", "test-token");
+      window.sessionStorage.setItem('poker.auth.token', 'test-token');
     });
 
-    await page.route("**/api/me", async (route) => {
+    await page.route('**/api/me', async (route) => {
       await route.fulfill({
         status: 200,
-        contentType: "application/json",
+        contentType: 'application/json',
         body: JSON.stringify({
-          userId: "user-1",
-          username: "TestPlayer",
+          userId: 'user-1',
+          username: 'TestPlayer',
           avatarUrl: null,
           stats: { handsPlayed: 10, wins: 3 },
           friends: [],
@@ -20,22 +20,22 @@ test.describe("gameplay flow", () => {
       });
     });
 
-    await page.route("**/api/tables", async (route, request) => {
-      if (request.method() === "GET") {
+    await page.route('**/api/tables', async (route, request) => {
+      if (request.method() === 'GET') {
         await route.fulfill({
           status: 200,
-          contentType: "application/json",
+          contentType: 'application/json',
           body: JSON.stringify([
             {
-              tableId: "table-1",
-              name: "Test Table",
-              ownerId: "owner-1",
+              tableId: 'table-1',
+              name: 'Test Table',
+              ownerId: 'owner-1',
               config: {
                 smallBlind: 5,
                 bigBlind: 10,
                 maxPlayers: 6,
                 startingStack: 500,
-                bettingStructure: "NoLimit",
+                bettingStructure: 'NoLimit',
               },
               seatsTaken: 1,
               occupiedSeatIds: [0],
@@ -49,11 +49,11 @@ test.describe("gameplay flow", () => {
       await route.continue();
     });
 
-    await page.route("**/api/tables/*/join", async (route) => {
+    await page.route('**/api/tables/*/join', async (route) => {
       await route.fulfill({
         status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ tableId: "table-1", seatId: 1, wsUrl: "ws://mock" }),
+        contentType: 'application/json',
+        body: JSON.stringify({ tableId: 'table-1', seatId: 1, wsUrl: 'ws://mock' }),
       });
     });
 
@@ -69,9 +69,9 @@ test.describe("gameplay flow", () => {
         };
 
         handState = {
-          handId: "hand-1",
-          tableId: "table-1",
-          street: "preflop",
+          handId: 'hand-1',
+          tableId: 'table-1',
+          street: 'preflop',
           turn: 1,
           lastAggressor: 0,
           currentBet: 10,
@@ -87,22 +87,22 @@ test.describe("gameplay flow", () => {
         };
 
         tableState = {
-          tableId: "table-1",
-          name: "Test Table",
-          ownerId: "owner-1",
+          tableId: 'table-1',
+          name: 'Test Table',
+          ownerId: 'owner-1',
           config: {
             smallBlind: 5,
             bigBlind: 10,
             maxPlayers: 6,
             startingStack: 500,
-            bettingStructure: "NoLimit",
+            bettingStructure: 'NoLimit',
           },
           seats: [
-            { seatId: 0, userId: "owner-1", username: "Owner", stack: 495, status: "active" },
-            { seatId: 1, userId: "user-1", username: "TestPlayer", stack: 490, status: "active" },
+            { seatId: 0, userId: 'owner-1', username: 'Owner', stack: 495, status: 'active' },
+            { seatId: 1, userId: 'user-1', username: 'TestPlayer', stack: 490, status: 'active' },
           ],
           spectators: [],
-          status: "in_hand",
+          status: 'in_hand',
           hand: this.handState,
           version: 1,
           button: 0,
@@ -111,7 +111,7 @@ test.describe("gameplay flow", () => {
 
         constructor(url: string) {
           this.url = url;
-          setTimeout(() => this.emit("open"), 0);
+          setTimeout(() => this.emit('open'), 0);
         }
 
         addEventListener(type: string, callback: (event: { data?: string }) => void) {
@@ -134,43 +134,48 @@ test.describe("gameplay flow", () => {
 
         send(data: string) {
           const message = JSON.parse(data) as { type: string };
-          if (message.type === "SubscribeTable") {
-            this.emit("message", {
-              data: JSON.stringify({ type: "TableSnapshot", tableState: this.tableState }),
+          if (message.type === 'SubscribeTable') {
+            this.emit('message', {
+              data: JSON.stringify({ type: 'TableSnapshot', tableState: this.tableState }),
             });
             setTimeout(() => {
-              this.emit("message", {
+              this.emit('message', {
                 data: JSON.stringify({
-                  type: "HoleCards",
-                  tableId: "table-1",
-                  handId: "hand-1",
+                  type: 'HoleCards',
+                  tableId: 'table-1',
+                  handId: 'hand-1',
                   seatId: 1,
-                  cards: ["Ah", "Kd"],
+                  cards: ['Ah', 'Kd'],
                 }),
               });
             }, 50);
           }
-          if (message.type === "Action") {
+          if (message.type === 'Action') {
             this.tableState = {
               ...this.tableState,
               hand: {
                 ...this.handState,
-                street: "flop",
-                communityCards: ["Qs", "Jh", "Tc"],
+                street: 'flop',
+                communityCards: ['Qs', 'Jh', 'Tc'],
                 turn: 0,
               },
               version: this.tableState.version + 1,
               updatedAt: new Date().toISOString(),
             };
-            this.emit("message", {
-              data: JSON.stringify({ type: "TablePatch", tableId: "table-1", handId: "hand-1", patch: this.tableState }),
+            this.emit('message', {
+              data: JSON.stringify({
+                type: 'TablePatch',
+                tableId: 'table-1',
+                handId: 'hand-1',
+                patch: this.tableState,
+              }),
             });
           }
         }
 
         close() {
           this.readyState = 3;
-          this.emit("close");
+          this.emit('close');
         }
       }
 
@@ -179,16 +184,16 @@ test.describe("gameplay flow", () => {
     });
   });
 
-  test("player can see hole cards after joining", async ({ page }) => {
-    await page.goto("/");
+  test('player can see hole cards after joining', async ({ page }) => {
+    await page.goto('/');
     await page.locator('[data-testid="lobby-join-seat"][data-seat-number="2"]').click();
 
-    await expect(page.getByLabel("A of hearts")).toBeVisible();
-    await expect(page.getByLabel("K of diamonds")).toBeVisible();
+    await expect(page.getByLabel('A of hearts')).toBeVisible();
+    await expect(page.getByLabel('K of diamonds')).toBeVisible();
   });
 
-  test("player can take action when it is their turn", async ({ page }) => {
-    await page.goto("/");
+  test('player can take action when it is their turn', async ({ page }) => {
+    await page.goto('/');
     await page.locator('[data-testid="lobby-join-seat"][data-seat-number="2"]').click();
 
     await expect(page.locator('[data-testid="action-submit"][data-action="Check"]')).toBeVisible();
@@ -196,48 +201,48 @@ test.describe("gameplay flow", () => {
     await expect(page.locator('[data-testid="action-submit"][data-action="Fold"]')).toBeVisible();
   });
 
-  test("action progresses the hand to next street", async ({ page }) => {
-    await page.goto("/");
+  test('action progresses the hand to next street', async ({ page }) => {
+    await page.goto('/');
     await page.locator('[data-testid="lobby-join-seat"][data-seat-number="2"]').click();
 
     await page.locator('[data-testid="action-submit"][data-action="Check"]').click();
 
-    await expect(page.getByText("Street")).toBeVisible();
-    await expect(page.getByText("flop")).toBeVisible();
+    await expect(page.getByText('Street')).toBeVisible();
+    await expect(page.getByText('flop')).toBeVisible();
   });
 
-  test("community cards appear after flop", async ({ page }) => {
-    await page.goto("/");
+  test('community cards appear after flop', async ({ page }) => {
+    await page.goto('/');
     await page.locator('[data-testid="lobby-join-seat"][data-seat-number="2"]').click();
     await page.locator('[data-testid="action-submit"][data-action="Check"]').click();
 
-    await expect(page.getByLabel("Q of spades")).toBeVisible();
-    await expect(page.getByLabel("J of hearts")).toBeVisible();
-    await expect(page.getByLabel("10 of clubs")).toBeVisible();
+    await expect(page.getByLabel('Q of spades')).toBeVisible();
+    await expect(page.getByLabel('J of hearts')).toBeVisible();
+    await expect(page.getByLabel('10 of clubs')).toBeVisible();
   });
 
-  test("pot amount is displayed", async ({ page }) => {
-    await page.goto("/");
+  test('pot amount is displayed', async ({ page }) => {
+    await page.goto('/');
     await page.locator('[data-testid="lobby-join-seat"][data-seat-number="2"]').click();
 
-    const potFact = page.locator(".table-facts .fact").filter({ hasText: "Pot" });
-    await expect(potFact).toContainText("15");
+    const potFact = page.locator('.table-facts .fact').filter({ hasText: 'Pot' });
+    await expect(potFact).toContainText('15');
   });
 });
 
-test.describe("timer display", () => {
-  test("timer shows countdown", async ({ page }) => {
+test.describe('timer display', () => {
+  test('timer shows countdown', async ({ page }) => {
     await page.addInitScript(() => {
-      window.sessionStorage.setItem("poker.auth.token", "test-token");
+      window.sessionStorage.setItem('poker.auth.token', 'test-token');
     });
 
-    await page.route("**/api/me", async (route) => {
+    await page.route('**/api/me', async (route) => {
       await route.fulfill({
         status: 200,
-        contentType: "application/json",
+        contentType: 'application/json',
         body: JSON.stringify({
-          userId: "user-1",
-          username: "TestPlayer",
+          userId: 'user-1',
+          username: 'TestPlayer',
           avatarUrl: null,
           stats: { handsPlayed: 0, wins: 0 },
           friends: [],
@@ -245,21 +250,21 @@ test.describe("timer display", () => {
       });
     });
 
-    await page.route("**/api/tables", async (route) => {
+    await page.route('**/api/tables', async (route) => {
       await route.fulfill({
         status: 200,
-        contentType: "application/json",
+        contentType: 'application/json',
         body: JSON.stringify([
           {
-            tableId: "table-1",
-            name: "Timer Table",
-            ownerId: "owner-1",
+            tableId: 'table-1',
+            name: 'Timer Table',
+            ownerId: 'owner-1',
             config: {
               smallBlind: 5,
               bigBlind: 10,
               maxPlayers: 2,
               startingStack: 500,
-              bettingStructure: "NoLimit",
+              bettingStructure: 'NoLimit',
             },
             seatsTaken: 1,
             occupiedSeatIds: [0],
@@ -269,11 +274,11 @@ test.describe("timer display", () => {
       });
     });
 
-    await page.route("**/api/tables/*/join", async (route) => {
+    await page.route('**/api/tables/*/join', async (route) => {
       await route.fulfill({
         status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ tableId: "table-1", seatId: 1, wsUrl: "ws://mock" }),
+        contentType: 'application/json',
+        body: JSON.stringify({ tableId: 'table-1', seatId: 1, wsUrl: 'ws://mock' }),
       });
     });
 
@@ -290,7 +295,7 @@ test.describe("timer display", () => {
 
         constructor(url: string) {
           this.url = url;
-          setTimeout(() => this.emit("open"), 0);
+          setTimeout(() => this.emit('open'), 0);
         }
 
         addEventListener(type: string, callback: (event: { data?: string }) => void) {
@@ -307,30 +312,30 @@ test.describe("timer display", () => {
 
         send(data: string) {
           const message = JSON.parse(data) as { type: string };
-          if (message.type === "SubscribeTable") {
-            this.emit("message", {
+          if (message.type === 'SubscribeTable') {
+            this.emit('message', {
               data: JSON.stringify({
-                type: "TableSnapshot",
+                type: 'TableSnapshot',
                 tableState: {
-                  tableId: "table-1",
-                  name: "Timer Table",
-                  ownerId: "owner-1",
+                  tableId: 'table-1',
+                  name: 'Timer Table',
+                  ownerId: 'owner-1',
                   config: {
                     smallBlind: 5,
                     bigBlind: 10,
                     maxPlayers: 2,
                     startingStack: 500,
-                    bettingStructure: "NoLimit",
+                    bettingStructure: 'NoLimit',
                   },
                   seats: [
-                    { seatId: 0, userId: "owner-1", stack: 500, status: "active" },
-                    { seatId: 1, userId: "user-1", stack: 500, status: "active" },
+                    { seatId: 0, userId: 'owner-1', stack: 500, status: 'active' },
+                    { seatId: 1, userId: 'user-1', stack: 500, status: 'active' },
                   ],
-                  status: "in_hand",
+                  status: 'in_hand',
                   hand: {
-                    handId: "hand-1",
-                    tableId: "table-1",
-                    street: "preflop",
+                    handId: 'hand-1',
+                    tableId: 'table-1',
+                    street: 'preflop',
                     turn: 1,
                     lastAggressor: 0,
                     currentBet: 10,
@@ -362,9 +367,9 @@ test.describe("timer display", () => {
       window.WebSocket = MockWebSocket;
     });
 
-    await page.goto("/");
+    await page.goto('/');
     await page.locator('[data-testid="lobby-join-seat"][data-seat-number="2"]').click();
 
-    await expect(page.getByText("Action Timer")).toBeVisible();
+    await expect(page.getByText('Action Timer')).toBeVisible();
   });
 });

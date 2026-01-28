@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from "react";
-import { trace } from "@opentelemetry/api";
+import React, { useMemo, useState } from 'react';
+import { trace } from '@opentelemetry/api';
 
-import { ActionType, LegalAction } from "../state/deriveLegalActions";
-import { testIds } from "../utils/testIds";
+import type { ActionType, LegalAction } from '../state/deriveLegalActions';
+import { testIds } from '../utils/testIds';
 
 interface ActionBarProps {
   actions: LegalAction[];
@@ -11,7 +11,7 @@ interface ActionBarProps {
 }
 
 export function ActionBar({ actions, pot, onAction }: ActionBarProps) {
-  const [amount, setAmount] = useState("0");
+  const [amount, setAmount] = useState('0');
 
   const actionable = useMemo(() => actions.map((action) => action.type), [actions]);
   const constraints = useMemo(() => {
@@ -22,7 +22,7 @@ export function ActionBar({ actions, pot, onAction }: ActionBarProps) {
     return map;
   }, [actions]);
 
-  const betLimits = constraints.get("Raise") ?? constraints.get("Bet");
+  const betLimits = constraints.get('Raise') ?? constraints.get('Bet');
   const rangeMin = betLimits?.min ?? 0;
   const rangeMax = betLimits?.max ?? 0;
 
@@ -38,8 +38,8 @@ export function ActionBar({ actions, pot, onAction }: ActionBarProps) {
   };
 
   React.useEffect(() => {
-    const raise = actions.find((action) => action.type === "Raise");
-    const bet = actions.find((action) => action.type === "Bet");
+    const raise = actions.find((action) => action.type === 'Raise');
+    const bet = actions.find((action) => action.type === 'Bet');
     const preferred = raise?.minAmount ?? bet?.minAmount;
     if (preferred !== undefined) {
       setAmount(String(preferred));
@@ -47,10 +47,10 @@ export function ActionBar({ actions, pot, onAction }: ActionBarProps) {
   }, [actions]);
 
   const handleAction = (type: ActionType) => {
-    const tracer = trace.getTracer("ui");
-    const span = tracer.startSpan("ui.action.submit", {
+    const tracer = trace.getTracer('ui');
+    const span = tracer.startSpan('ui.action.submit', {
       attributes: {
-        "poker.action": type,
+        'poker.action': type,
       },
     });
     span.end();
@@ -58,12 +58,16 @@ export function ActionBar({ actions, pot, onAction }: ActionBarProps) {
     const value = Number(amount);
     const limits = constraints.get(type);
     let resolved = Number.isNaN(value) ? undefined : value;
-    if ((type === "Bet" || type === "Raise") && limits?.min !== undefined) {
+    if ((type === 'Bet' || type === 'Raise') && limits?.min !== undefined) {
       if (resolved === undefined || resolved < limits.min) {
         resolved = limits.min;
       }
     }
-    if ((type === "Bet" || type === "Raise") && limits?.max !== undefined && resolved !== undefined) {
+    if (
+      (type === 'Bet' || type === 'Raise') &&
+      limits?.max !== undefined &&
+      resolved !== undefined
+    ) {
       resolved = Math.min(resolved, limits.max);
     }
     onAction({ type, amount: resolved });
@@ -74,30 +78,30 @@ export function ActionBar({ actions, pot, onAction }: ActionBarProps) {
   }
 
   const actionClass = (action: ActionType) => {
-    if (action === "Fold") {
-      return "btn btn-action btn-action-fold";
+    if (action === 'Fold') {
+      return 'btn btn-action btn-action-fold';
     }
-    if (action === "Check" || action === "Call") {
-      return "btn btn-action btn-action-check";
+    if (action === 'Check' || action === 'Call') {
+      return 'btn btn-action btn-action-check';
     }
-    if (action === "Raise" || action === "Bet") {
-      return "btn btn-action btn-action-raise";
+    if (action === 'Raise' || action === 'Bet') {
+      return 'btn btn-action btn-action-raise';
     }
-    return "btn btn-action";
+    return 'btn btn-action';
   };
 
   const actionLabel = (action: ActionType) => {
-    if (action === "Call") {
-      const callAmount = constraints.get("Call")?.max;
-      return callAmount ? `Call ${callAmount}` : "Call";
+    if (action === 'Call') {
+      const callAmount = constraints.get('Call')?.max;
+      return callAmount ? `Call ${callAmount}` : 'Call';
     }
-    if (action === "Raise") {
+    if (action === 'Raise') {
       const resolved = clampAmount(Number(amount));
-      return resolved > 0 ? `Raise ${resolved}` : "Raise";
+      return resolved > 0 ? `Raise ${resolved}` : 'Raise';
     }
-    if (action === "Bet") {
+    if (action === 'Bet') {
       const resolved = clampAmount(Number(amount));
-      return resolved > 0 ? `Bet ${resolved}` : "Bet";
+      return resolved > 0 ? `Bet ${resolved}` : 'Bet';
     }
     return action;
   };

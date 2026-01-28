@@ -1,33 +1,33 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock database
 const mockQuery = vi.fn();
-vi.mock("../../../src/storage/db", () => ({
+vi.mock('../../../src/storage/db', () => ({
   query: mockQuery,
 }));
 
 // Mock deletion service
 const mockHardDelete = vi.fn();
-vi.mock("../../../src/services/deletionService", () => ({
+vi.mock('../../../src/services/deletionService', () => ({
   hardDelete: mockHardDelete,
 }));
 
 // Mock config
-vi.mock("../../../src/config", () => ({
+vi.mock('../../../src/config', () => ({
   getConfig: vi.fn(() => ({
     deletionProcessorIntervalMs: 60000, // 1 minute
   })),
 }));
 
 // Mock logger
-vi.mock("../../../src/observability/logger", () => ({
+vi.mock('../../../src/observability/logger', () => ({
   default: {
     info: vi.fn(),
     error: vi.fn(),
   },
 }));
 
-describe("Deletion Processor Job", () => {
+describe('Deletion Processor Job', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockQuery.mockReset();
@@ -38,14 +38,14 @@ describe("Deletion Processor Job", () => {
     vi.clearAllTimers();
   });
 
-  describe("processExpiredDeletions logic", () => {
-    it("should query for expired deletions", async () => {
-      const { query } = await import("../../../src/storage/db");
+  describe('processExpiredDeletions logic', () => {
+    it('should query for expired deletions', async () => {
+      const { query } = await import('../../../src/storage/db');
 
       mockQuery.mockResolvedValueOnce({
         rows: [],
         rowCount: 0,
-        command: "SELECT",
+        command: 'SELECT',
         oid: 0,
         fields: [],
       });
@@ -58,29 +58,29 @@ describe("Deletion Processor Job", () => {
         `SELECT user_id, deleted_at FROM profiles
          WHERE deleted_at IS NOT NULL
            AND deleted_at < $1`,
-        [cutoffDate]
+        [cutoffDate],
       );
 
       expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining("deleted_at IS NOT NULL"),
-        expect.any(Array)
+        expect.stringContaining('deleted_at IS NOT NULL'),
+        expect.any(Array),
       );
     });
 
-    it("should call hardDelete for each expired user", async () => {
-      const deletionService = await import("../../../src/services/deletionService");
+    it('should call hardDelete for each expired user', async () => {
+      const deletionService = await import('../../../src/services/deletionService');
 
       mockHardDelete.mockResolvedValue(undefined);
 
-      await deletionService.hardDelete("user-1");
-      await deletionService.hardDelete("user-2");
+      await deletionService.hardDelete('user-1');
+      await deletionService.hardDelete('user-2');
 
-      expect(mockHardDelete).toHaveBeenCalledWith("user-1");
-      expect(mockHardDelete).toHaveBeenCalledWith("user-2");
+      expect(mockHardDelete).toHaveBeenCalledWith('user-1');
+      expect(mockHardDelete).toHaveBeenCalledWith('user-2');
       expect(mockHardDelete).toHaveBeenCalledTimes(2);
     });
 
-    it("should not delete users within grace period", async () => {
+    it('should not delete users within grace period', async () => {
       // This tests the cutoff date calculation
       const gracePeriodDays = 30;
       const gracePeriodMs = gracePeriodDays * 24 * 60 * 60 * 1000;
@@ -96,23 +96,23 @@ describe("Deletion Processor Job", () => {
     });
   });
 
-  describe("error handling", () => {
-    it("should handle database errors gracefully", async () => {
-      const error = new Error("Database connection failed");
+  describe('error handling', () => {
+    it('should handle database errors gracefully', async () => {
+      const error = new Error('Database connection failed');
       mockQuery.mockRejectedValueOnce(error);
 
-      const { query } = await import("../../../src/storage/db");
+      const { query } = await import('../../../src/storage/db');
 
-      await expect(query("SELECT 1", [])).rejects.toThrow("Database connection failed");
+      await expect(query('SELECT 1', [])).rejects.toThrow('Database connection failed');
     });
 
-    it("should handle deletion service errors gracefully", async () => {
-      const error = new Error("Deletion failed");
+    it('should handle deletion service errors gracefully', async () => {
+      const error = new Error('Deletion failed');
       mockHardDelete.mockRejectedValueOnce(error);
 
-      const deletionService = await import("../../../src/services/deletionService");
+      const deletionService = await import('../../../src/services/deletionService');
 
-      await expect(deletionService.hardDelete("user-1")).rejects.toThrow("Deletion failed");
+      await expect(deletionService.hardDelete('user-1')).rejects.toThrow('Deletion failed');
     });
   });
 });

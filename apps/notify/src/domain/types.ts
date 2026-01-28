@@ -11,7 +11,7 @@ export interface UserPushSubscription extends PushSubscription {
   createdAt: string;
 }
 
-export type NotificationType = "turn_alert" | "game_invite" | "system";
+export type NotificationType = 'turn_alert' | 'game_invite' | 'system';
 
 export interface NotificationPayload {
   title: string;

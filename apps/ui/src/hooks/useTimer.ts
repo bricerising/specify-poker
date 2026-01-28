@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
 export interface TimerState {
   remainingMs: number;
@@ -27,7 +27,7 @@ export function useTimer(deadlineTs: string | null): TimerState {
       isExpired: true,
       isUrgent: false,
       isCritical: false,
-      formatted: "--:--",
+      formatted: '--:--',
     };
   }
 
@@ -36,7 +36,7 @@ export function useTimer(deadlineTs: string | null): TimerState {
   const remainingSeconds = Math.ceil(remainingMs / 1000);
   const minutes = Math.floor(remainingSeconds / 60);
   const seconds = remainingSeconds % 60;
-  const formatted = `${minutes}:${String(seconds).padStart(2, "0")}`;
+  const formatted = `${minutes}:${String(seconds).padStart(2, '0')}`;
 
   return {
     remainingMs,

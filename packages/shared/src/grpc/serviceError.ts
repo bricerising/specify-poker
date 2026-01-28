@@ -1,4 +1,4 @@
-import { ensureError } from "../errors/ensureError";
+import { ensureError } from '../errors/ensureError';
 
 export type GrpcServiceError = Error & { code: number; details?: string };
 
@@ -6,14 +6,18 @@ export type GrpcServiceErrorLike = { code: number; message?: unknown; details?: 
 
 export function isGrpcServiceErrorLike(error: unknown): error is GrpcServiceErrorLike {
   return (
-    typeof error === "object" &&
+    typeof error === 'object' &&
     error !== null &&
-    "code" in error &&
-    typeof (error as { code?: unknown }).code === "number"
+    'code' in error &&
+    typeof (error as { code?: unknown }).code === 'number'
   );
 }
 
-export function createGrpcServiceError(code: number, message: string, cause?: unknown): GrpcServiceError {
+export function createGrpcServiceError(
+  code: number,
+  message: string,
+  cause?: unknown,
+): GrpcServiceError {
   const error = new Error(message, cause !== undefined ? { cause } : undefined) as GrpcServiceError;
   error.code = code;
   error.details = message;
@@ -22,7 +26,7 @@ export function createGrpcServiceError(code: number, message: string, cause?: un
 
 export function asGrpcServiceError(
   error: unknown,
-  fallback: { code: number; message: string }
+  fallback: { code: number; message: string },
 ): GrpcServiceError {
   if (!isGrpcServiceErrorLike(error)) {
     const baseError = ensureError(error, fallback.message);
@@ -32,12 +36,12 @@ export function asGrpcServiceError(
   const message =
     error instanceof Error
       ? error.message
-      : typeof (error as { message?: unknown }).message === "string"
+      : typeof (error as { message?: unknown }).message === 'string'
         ? (error as { message: string }).message
         : fallback.message;
 
   const details =
-    typeof (error as { details?: unknown }).details === "string"
+    typeof (error as { details?: unknown }).details === 'string'
       ? (error as { details: string }).details
       : message;
 
@@ -50,4 +54,3 @@ export function asGrpcServiceError(
   serviceError.details = details;
   return serviceError;
 }
-
