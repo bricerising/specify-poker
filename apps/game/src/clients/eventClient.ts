@@ -1,18 +1,11 @@
 import { GameEventType } from "../domain/events";
 import logger from "../observability/logger";
-import { createUnaryCallResultProxy, toStruct, type UnaryCallResultProxy } from "@specify-poker/shared";
-import { getEventClient, type EventServiceClient } from "../api/grpc/clients";
+import { createLazyUnaryCallResultProxy, toStruct } from "@specify-poker/shared";
+import { getEventClient } from "../api/grpc/clients";
 
 export { GameEventType as EventTypes } from "../domain/events";
 
-let unary: UnaryCallResultProxy<EventServiceClient> | null = null;
-
-function getUnaryEventClient(): UnaryCallResultProxy<EventServiceClient> {
-  if (!unary) {
-    unary = createUnaryCallResultProxy(getEventClient());
-  }
-  return unary;
-}
+const unaryEventClient = createLazyUnaryCallResultProxy(getEventClient);
 
 export interface GameEvent {
   type: string;
@@ -30,7 +23,7 @@ export interface PublishResult {
 }
 
 export async function publishEvent(event: GameEvent): Promise<PublishResult> {
-  const call = await getUnaryEventClient().PublishEvent({
+  const call = await unaryEventClient.PublishEvent({
     type: event.type,
     table_id: event.tableId,
     hand_id: event.handId,
@@ -50,7 +43,7 @@ export async function publishEvent(event: GameEvent): Promise<PublishResult> {
 }
 
 export async function publishEvents(events: GameEvent[]): Promise<{ success: boolean; eventIds?: string[] }> {
-  const call = await getUnaryEventClient().PublishEvents({
+  const call = await unaryEventClient.PublishEvents({
     events: events.map((e) => ({
       type: e.type,
       table_id: e.tableId,

@@ -1,21 +1,13 @@
-import { createUnaryCallProxy, type UnaryCallProxy } from "@specify-poker/shared";
+import { createLazyUnaryCallProxy } from "@specify-poker/shared";
 import {
   BalanceCashOutResponse,
   BalanceCommitResponse,
   BalanceReservationResponse,
-  type BalanceServiceClient,
   BalanceSettleResponse,
   getBalanceClient,
 } from "../../api/grpc/clients";
 
-let unaryBalanceClient: UnaryCallProxy<BalanceServiceClient> | null = null;
-
-function getUnaryBalanceClient(): UnaryCallProxy<BalanceServiceClient> {
-  if (!unaryBalanceClient) {
-    unaryBalanceClient = createUnaryCallProxy(getBalanceClient());
-  }
-  return unaryBalanceClient;
-}
+const unaryBalanceClient = createLazyUnaryCallProxy(getBalanceClient);
 
 export type BalanceCall<TResponse> =
   | { type: "available"; response: TResponse }
@@ -45,18 +37,18 @@ export class BalanceClientAdapter {
     timeout_seconds: number;
   }) {
     return callWithAvailability(
-      getUnaryBalanceClient().ReserveForBuyIn(request),
+      unaryBalanceClient.ReserveForBuyIn(request),
     );
   }
 
   commitReservation(request: { reservation_id: string }) {
     return callWithAvailability(
-      getUnaryBalanceClient().CommitReservation(request),
+      unaryBalanceClient.CommitReservation(request),
     );
   }
 
   releaseReservation(request: { reservation_id: string; reason?: string }) {
-    void getUnaryBalanceClient().ReleaseReservation(request).catch(() => undefined);
+    void unaryBalanceClient.ReleaseReservation(request).catch(() => undefined);
   }
 
   processCashOut(request: {
@@ -68,7 +60,7 @@ export class BalanceClientAdapter {
     hand_id?: string;
   }) {
     return callWithAvailability(
-      getUnaryBalanceClient().ProcessCashOut(request),
+      unaryBalanceClient.ProcessCashOut(request),
     );
   }
 
@@ -79,7 +71,7 @@ export class BalanceClientAdapter {
     idempotency_key: string;
   }) {
     return callWithAvailability(
-      getUnaryBalanceClient().SettlePot(request),
+      unaryBalanceClient.SettlePot(request),
     );
   }
 }

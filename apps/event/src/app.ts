@@ -1,4 +1,4 @@
-import { createShutdownManager, type ShutdownManager } from "@specify-poker/shared";
+import { closeHttpServer, createShutdownManager, type ShutdownManager } from "@specify-poker/shared";
 import type { Server as HttpServer } from "http";
 import type { Config } from "./config";
 import { startObservability, stopObservability } from "./observability";
@@ -13,18 +13,6 @@ export type CreateEventAppOptions = {
   config: Config;
   isTest: boolean;
 };
-
-function closeHttpServer(server: HttpServer): Promise<void> {
-  return new Promise((resolve, reject) => {
-    server.close((err) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve();
-    });
-  });
-}
 
 export function createEventApp(options: CreateEventAppOptions): EventApp {
   let shutdownManager: ShutdownManager | null = null;

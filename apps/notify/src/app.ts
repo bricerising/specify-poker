@@ -1,3 +1,4 @@
+import { closeHttpServer } from "@specify-poker/shared";
 import type { Config } from "./config";
 import { createGrpcServer } from "./api/grpc/server";
 import logger from "./observability/logger";
@@ -55,7 +56,7 @@ export function createNotifyApp(options: CreateNotifyAppOptions): NotifyApp {
     grpcServer.stop();
     await eventConsumer.stop();
     if (metricsServer) {
-      metricsServer.close();
+      await closeHttpServer(metricsServer);
       metricsServer = null;
     }
     await redis.close();

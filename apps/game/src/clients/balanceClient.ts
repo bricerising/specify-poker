@@ -1,5 +1,5 @@
-import { createUnaryCallResultProxy, type UnaryCallResultProxy } from "@specify-poker/shared";
-import { getBalanceClient, type BalanceServiceClient } from "../api/grpc/clients";
+import { createLazyUnaryCallResultProxy } from "@specify-poker/shared";
+import { getBalanceClient } from "../api/grpc/clients";
 import logger from "../observability/logger";
 
 type NumericString = string | number;
@@ -12,14 +12,7 @@ function parseNumeric(value: NumericString | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-let unary: UnaryCallResultProxy<BalanceServiceClient> | null = null;
-
-function getUnaryBalanceClient(): UnaryCallResultProxy<BalanceServiceClient> {
-  if (!unary) {
-    unary = createUnaryCallResultProxy(getBalanceClient());
-  }
-  return unary;
-}
+const unaryBalanceClient = createLazyUnaryCallResultProxy(getBalanceClient);
 
 export interface ReserveResult {
   ok: boolean;
@@ -66,7 +59,7 @@ export async function reserveForBuyIn(
   amount: number,
   idempotencyKey: string
 ): Promise<ReserveResult> {
-  const call = await getUnaryBalanceClient().ReserveForBuyIn({
+  const call = await unaryBalanceClient.ReserveForBuyIn({
     account_id: accountId,
     table_id: tableId,
     amount,
@@ -89,7 +82,7 @@ export async function reserveForBuyIn(
 }
 
 export async function commitReservation(reservationId: string): Promise<CommitResult> {
-  const call = await getUnaryBalanceClient().CommitReservation({
+  const call = await unaryBalanceClient.CommitReservation({
     reservation_id: reservationId,
   });
 
@@ -111,7 +104,7 @@ export async function releaseReservation(
   reservationId: string,
   reason?: string
 ): Promise<{ ok: boolean; error?: string }> {
-  const call = await getUnaryBalanceClient().ReleaseReservation({
+  const call = await unaryBalanceClient.ReleaseReservation({
     reservation_id: reservationId,
     reason,
   });
@@ -133,7 +126,7 @@ export async function processCashOut(
   idempotencyKey: string,
   handId?: string
 ): Promise<CashOutResult> {
-  const call = await getUnaryBalanceClient().ProcessCashOut({
+  const call = await unaryBalanceClient.ProcessCashOut({
     account_id: accountId,
     table_id: tableId,
     seat_id: seatId,
@@ -165,7 +158,7 @@ export async function recordContribution(
   contributionType: string,
   idempotencyKey: string
 ): Promise<ContributionResult> {
-  const call = await getUnaryBalanceClient().RecordContribution({
+  const call = await unaryBalanceClient.RecordContribution({
     table_id: tableId,
     hand_id: handId,
     seat_id: seatId,
@@ -195,7 +188,7 @@ export async function settlePot(
   winners: Array<{ seatId: number; accountId: string; amount: number }>,
   idempotencyKey: string
 ): Promise<SettlementResult> {
-  const call = await getUnaryBalanceClient().SettlePot({
+  const call = await unaryBalanceClient.SettlePot({
     table_id: tableId,
     hand_id: handId,
     winners: winners.map((w) => ({
@@ -229,7 +222,7 @@ export async function cancelPot(
   handId: string,
   reason: string
 ): Promise<{ ok: boolean; error?: string }> {
-  const call = await getUnaryBalanceClient().CancelPot({
+  const call = await unaryBalanceClient.CancelPot({
     table_id: tableId,
     hand_id: handId,
     reason,

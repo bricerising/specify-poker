@@ -1,7 +1,7 @@
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
 import * as path from "path";
-import { createGrpcServiceClientFactory } from "@specify-poker/shared";
+import { createBoundTargetProxy, createGrpcServiceClientFactory } from "@specify-poker/shared";
 import { getConfig, type Config } from "../config";
 import type { BalanceServiceClient, EventServiceClient, GameServiceClient, NotifyServiceClient, PlayerServiceClient } from "../types";
 
@@ -29,45 +29,24 @@ type BalanceProto = { balance: { BalanceService: GrpcClientConstructor<BalanceSe
 type EventProto = { event: { EventService: GrpcClientConstructor<EventServiceClient> } };
 type NotifyProto = { notify: { NotifyService: GrpcClientConstructor<NotifyServiceClient> } };
 
-const gameClientFactory = createGrpcServiceClientFactory<GameProto, GameServiceClient, grpc.ChannelCredentials>({
-  grpc,
-  protoLoader,
-  protoPath: resolveProtoPath("game"),
-  protoLoaderOptions: PROTO_LOADER_OPTIONS,
-  getServiceConstructor: (proto) => proto.game.GameService,
-});
+function createClientFactory<TProto, TClient>(
+  protoName: ProtoName,
+  getServiceConstructor: (proto: TProto) => GrpcClientConstructor<TClient>,
+) {
+  return createGrpcServiceClientFactory<TProto, TClient, grpc.ChannelCredentials>({
+    grpc,
+    protoLoader,
+    protoPath: resolveProtoPath(protoName),
+    protoLoaderOptions: PROTO_LOADER_OPTIONS,
+    getServiceConstructor,
+  });
+}
 
-const playerClientFactory = createGrpcServiceClientFactory<PlayerProto, PlayerServiceClient, grpc.ChannelCredentials>({
-  grpc,
-  protoLoader,
-  protoPath: resolveProtoPath("player"),
-  protoLoaderOptions: PROTO_LOADER_OPTIONS,
-  getServiceConstructor: (proto) => proto.player.PlayerService,
-});
-
-const balanceClientFactory = createGrpcServiceClientFactory<BalanceProto, BalanceServiceClient, grpc.ChannelCredentials>({
-  grpc,
-  protoLoader,
-  protoPath: resolveProtoPath("balance"),
-  protoLoaderOptions: PROTO_LOADER_OPTIONS,
-  getServiceConstructor: (proto) => proto.balance.BalanceService,
-});
-
-const eventClientFactory = createGrpcServiceClientFactory<EventProto, EventServiceClient, grpc.ChannelCredentials>({
-  grpc,
-  protoLoader,
-  protoPath: resolveProtoPath("event"),
-  protoLoaderOptions: PROTO_LOADER_OPTIONS,
-  getServiceConstructor: (proto) => proto.event.EventService,
-});
-
-const notifyClientFactory = createGrpcServiceClientFactory<NotifyProto, NotifyServiceClient, grpc.ChannelCredentials>({
-  grpc,
-  protoLoader,
-  protoPath: resolveProtoPath("notify"),
-  protoLoaderOptions: PROTO_LOADER_OPTIONS,
-  getServiceConstructor: (proto) => proto.notify.NotifyService,
-});
+const gameClientFactory = createClientFactory<GameProto, GameServiceClient>("game", (proto) => proto.game.GameService);
+const playerClientFactory = createClientFactory<PlayerProto, PlayerServiceClient>("player", (proto) => proto.player.PlayerService);
+const balanceClientFactory = createClientFactory<BalanceProto, BalanceServiceClient>("balance", (proto) => proto.balance.BalanceService);
+const eventClientFactory = createClientFactory<EventProto, EventServiceClient>("event", (proto) => proto.event.EventService);
+const notifyClientFactory = createClientFactory<NotifyProto, NotifyServiceClient>("notify", (proto) => proto.notify.NotifyService);
 
 type GrpcClientsConfig = Pick<
   Config,
@@ -93,32 +72,6 @@ export function createGrpcClients(config: GrpcClientsConfig): GrpcClients {
   };
 }
 
-function createLazyGrpcClient<TClient extends object>(getClient: () => TClient): TClient {
-  return new Proxy(
-    {},
-    {
-      get(_target, prop) {
-        if (typeof prop === "symbol") {
-          return undefined;
-        }
-
-        if (prop === "then") {
-          return undefined;
-        }
-
-        const client = getClient() as Record<string, unknown>;
-        const value = client[prop];
-
-        if (typeof value === "function") {
-          return (value as (...args: unknown[]) => unknown).bind(client);
-        }
-
-        return value;
-      },
-    },
-  ) as unknown as TClient;
-}
-
 let credentials: grpc.ChannelCredentials | null = null;
 
 function getCredentials(): grpc.ChannelCredentials {
@@ -128,11 +81,27 @@ function getCredentials(): grpc.ChannelCredentials {
   return credentials;
 }
 
-let cachedGameClient: GameServiceClient | null = null;
-let cachedPlayerClient: PlayerServiceClient | null = null;
-let cachedBalanceClient: BalanceServiceClient | null = null;
-let cachedEventClient: EventServiceClient | null = null;
-let cachedNotifyClient: NotifyServiceClient | null = null;
+type ClientCache<TClient> = {
+  get(): TClient;
+  reset(): void;
+};
+
+function createClientCache<TClient>(createClient: () => TClient): ClientCache<TClient> {
+  let client: TClient | null = null;
+
+  return {
+    get: () => {
+      if (client) {
+        return client;
+      }
+      client = createClient();
+      return client;
+    },
+    reset: () => {
+      client = null;
+    },
+  };
+}
 
 function createDefaultGameClient(): GameServiceClient {
   const config = getConfig();
@@ -159,46 +128,23 @@ function createDefaultNotifyClient(): NotifyServiceClient {
   return notifyClientFactory.createClient({ address: config.notifyServiceUrl, credentials: getCredentials() });
 }
 
-export const gameClient = createLazyGrpcClient(() => {
-  if (!cachedGameClient) {
-    cachedGameClient = createDefaultGameClient();
-  }
-  return cachedGameClient;
-});
+const gameClientCache = createClientCache(createDefaultGameClient);
+const playerClientCache = createClientCache(createDefaultPlayerClient);
+const balanceClientCache = createClientCache(createDefaultBalanceClient);
+const eventClientCache = createClientCache(createDefaultEventClient);
+const notifyClientCache = createClientCache(createDefaultNotifyClient);
 
-export const playerClient = createLazyGrpcClient(() => {
-  if (!cachedPlayerClient) {
-    cachedPlayerClient = createDefaultPlayerClient();
-  }
-  return cachedPlayerClient;
-});
-
-export const balanceClient = createLazyGrpcClient(() => {
-  if (!cachedBalanceClient) {
-    cachedBalanceClient = createDefaultBalanceClient();
-  }
-  return cachedBalanceClient;
-});
-
-export const eventClient = createLazyGrpcClient(() => {
-  if (!cachedEventClient) {
-    cachedEventClient = createDefaultEventClient();
-  }
-  return cachedEventClient;
-});
-
-export const notifyClient = createLazyGrpcClient(() => {
-  if (!cachedNotifyClient) {
-    cachedNotifyClient = createDefaultNotifyClient();
-  }
-  return cachedNotifyClient;
-});
+export const gameClient = createBoundTargetProxy(gameClientCache.get);
+export const playerClient = createBoundTargetProxy(playerClientCache.get);
+export const balanceClient = createBoundTargetProxy(balanceClientCache.get);
+export const eventClient = createBoundTargetProxy(eventClientCache.get);
+export const notifyClient = createBoundTargetProxy(notifyClientCache.get);
 
 export function resetGrpcClientsForTests(): void {
   credentials = null;
-  cachedGameClient = null;
-  cachedPlayerClient = null;
-  cachedBalanceClient = null;
-  cachedEventClient = null;
-  cachedNotifyClient = null;
+  gameClientCache.reset();
+  playerClientCache.reset();
+  balanceClientCache.reset();
+  eventClientCache.reset();
+  notifyClientCache.reset();
 }

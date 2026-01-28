@@ -1,17 +1,10 @@
 import { randomUUID } from "crypto";
-import { createUnaryCallProxy, toStruct, type UnaryCallProxy } from "@specify-poker/shared";
+import { createLazyUnaryCallProxy, toStruct } from "@specify-poker/shared";
 
-import { getEventClient, type EventPublishResponse, type EventServiceClient } from "../../api/grpc/clients";
+import { getEventClient, type EventPublishResponse } from "../../api/grpc/clients";
 import logger from "../../observability/logger";
 
-let unaryEventClient: UnaryCallProxy<EventServiceClient> | null = null;
-
-function getUnaryEventClient(): UnaryCallProxy<EventServiceClient> {
-  if (!unaryEventClient) {
-    unaryEventClient = createUnaryCallProxy(getEventClient());
-  }
-  return unaryEventClient;
-}
+const unaryEventClient = createLazyUnaryCallProxy(getEventClient);
 
 export class GameEventPublisher {
   async publish(params: {
@@ -24,7 +17,7 @@ export class GameEventPublisher {
     idempotencyKey?: string;
   }) {
     try {
-      const response: EventPublishResponse = await getUnaryEventClient().PublishEvent({
+      const response: EventPublishResponse = await unaryEventClient.PublishEvent({
         type: params.type,
         table_id: params.tableId,
         hand_id: params.handId,

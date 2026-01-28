@@ -1,4 +1,4 @@
-import { createShutdownManager, type ShutdownManager } from "@specify-poker/shared";
+import { closeHttpServer, createShutdownManager, type ShutdownManager } from "@specify-poker/shared";
 import express from "express";
 import type { Server as HttpServer } from "http";
 import type { Config } from "./config";
@@ -20,18 +20,6 @@ export type CreateBalanceAppOptions = {
   config: Config;
   stopObservability?: () => Promise<void>;
 };
-
-function closeHttpServer(server: HttpServer): Promise<void> {
-  return new Promise((resolve, reject) => {
-    server.close((err) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve();
-    });
-  });
-}
 
 function createBalanceExpressApp(): express.Express {
   const app = express();
@@ -161,4 +149,3 @@ export function createBalanceApp(options: CreateBalanceAppOptions): BalanceApp {
 
   return { expressApp, start, stop };
 }
-

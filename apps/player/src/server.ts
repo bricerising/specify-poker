@@ -1,8 +1,9 @@
-import { createShutdownManager, runServiceMain, type ShutdownManager } from "@specify-poker/shared";
+import { closeHttpServer, createShutdownManager, runServiceMain, type ShutdownManager } from "@specify-poker/shared";
+import type { Server as HttpServer } from "http";
 import { startObservability, stopObservability } from "./observability";
 import logger from "./observability/logger";
 
-let metricsServer: { close(): void } | null = null;
+let metricsServer: HttpServer | null = null;
 let eventConsumerInstance: { stop(): Promise<void> } | null = null;
 let runningShutdown: ShutdownManager | null = null;
 
@@ -45,8 +46,11 @@ export async function main() {
     });
 
     const { startMetricsServer } = await import("./observability/metrics");
-    shutdownManager.add("metrics.close", () => {
-      metricsServer?.close();
+    shutdownManager.add("metrics.close", async () => {
+      if (!metricsServer) {
+        return;
+      }
+      await closeHttpServer(metricsServer);
       metricsServer = null;
     });
 

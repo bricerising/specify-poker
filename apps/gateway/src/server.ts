@@ -1,5 +1,4 @@
-import { createShutdownManager, runServiceMain, type ShutdownManager } from "@specify-poker/shared";
-import type { Server } from "http";
+import { closeHttpServer, createShutdownManager, runServiceMain, type ShutdownManager } from "@specify-poker/shared";
 import { collectDefaultMetrics } from "prom-client";
 import { getConfig } from "./config";
 import logger from "./observability/logger";
@@ -11,18 +10,6 @@ const isDirectRun =
   require.main === module;
 
 const isTestEnv = process.env.NODE_ENV === "test";
-
-function closeHttpServer(server: Server): Promise<void> {
-  return new Promise((resolve, reject) => {
-    server.close((err) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve();
-    });
-  });
-}
 
 let runningShutdown: ShutdownManager | null = null;
 

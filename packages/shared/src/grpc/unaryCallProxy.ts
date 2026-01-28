@@ -1,5 +1,6 @@
 import { unaryCall, type UnaryCallOptions, type UnaryClientMethod } from "./call";
 import { createUnaryClientProxy } from "./unaryClientProxy";
+import { createBoundTargetProxy } from "../proxy/boundTargetProxy";
 
 type PromisifiedUnaryMethod<TMethod> = TMethod extends UnaryClientMethod<
   infer Request,
@@ -20,4 +21,12 @@ export function createUnaryCallProxy<TClient extends object>(client: TClient): U
     onNonFunctionProperty: (prop) =>
       Promise.reject(new Error(`unary_call_proxy.non_function_property:${String(prop)}`)),
   });
+}
+
+/**
+ * Convenience: combines {@link createBoundTargetProxy} + {@link createUnaryCallProxy}
+ * to support lazily-created/swappable clients (e.g. tests that reset clients).
+ */
+export function createLazyUnaryCallProxy<TClient extends object>(getClient: () => TClient): UnaryCallProxy<TClient> {
+  return createUnaryCallProxy(createBoundTargetProxy(getClient));
 }

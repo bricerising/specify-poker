@@ -1,4 +1,4 @@
-import { createUnaryCallProxy, type UnaryCallProxy } from "@specify-poker/shared";
+import { createLazyUnaryCallProxy, type UnaryCallProxy } from "@specify-poker/shared";
 
 import type { EventServiceClient, GameServiceClient, NotifyServiceClient, PlayerServiceClient } from "../types";
 import * as clients from "./clients";
@@ -21,32 +21,11 @@ export type LazyGatewayGrpcClients = {
 };
 
 export function createGatewayGrpc(clientByKey: LazyGatewayGrpcClients): GatewayGrpc {
-  const cache: Partial<GatewayGrpc> = {};
-
-  function getGrpcClient<K extends GatewayGrpcKey>(key: K): GatewayGrpc[K] {
-    const existing = cache[key];
-    if (existing) {
-      return existing;
-    }
-
-    const proxy = createUnaryCallProxy(clientByKey[key]()) as GatewayGrpc[K];
-    cache[key] = proxy;
-    return proxy;
-  }
-
   return {
-    get game() {
-      return getGrpcClient("game");
-    },
-    get player() {
-      return getGrpcClient("player");
-    },
-    get event() {
-      return getGrpcClient("event");
-    },
-    get notify() {
-      return getGrpcClient("notify");
-    },
+    game: createLazyUnaryCallProxy(clientByKey.game),
+    player: createLazyUnaryCallProxy(clientByKey.player),
+    event: createLazyUnaryCallProxy(clientByKey.event),
+    notify: createLazyUnaryCallProxy(clientByKey.notify),
   };
 }
 

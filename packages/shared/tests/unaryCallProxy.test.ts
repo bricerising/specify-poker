@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createUnaryCallProxy } from "../src/grpc/unaryCallProxy";
+import { createLazyUnaryCallProxy, createUnaryCallProxy } from "../src/grpc/unaryCallProxy";
 
 describe("createUnaryCallProxy", () => {
   it("adapts unary callback methods to Promises", async () => {
@@ -60,5 +60,34 @@ describe("createUnaryCallProxy", () => {
     await expect(promise).rejects.toMatchObject({ name: "AbortError" });
     expect(client.Ping).toHaveBeenCalledTimes(1);
   });
-});
 
+  it("supports lazy/swappable clients via createLazyUnaryCallProxy", async () => {
+    const clientA = {
+      prefix: "a:",
+      Ping(request: string, callback: (err: Error | null, response: string) => void) {
+        callback(null, `pong:${this.prefix}${request}`);
+      },
+    };
+
+    const clientB = {
+      prefix: "b:",
+      Ping(request: string, callback: (err: Error | null, response: string) => void) {
+        callback(null, `pong:${this.prefix}${request}`);
+      },
+    };
+
+    let current = clientA;
+    const getClient = vi.fn(() => current);
+
+    const proxy = createLazyUnaryCallProxy(getClient);
+    expect(getClient).toHaveBeenCalledTimes(0);
+
+    const ping = proxy.Ping;
+    expect(getClient).toHaveBeenCalledTimes(0);
+
+    await expect(ping("one")).resolves.toBe("pong:a:one");
+    current = clientB;
+    await expect(proxy.Ping("two")).resolves.toBe("pong:b:two");
+    expect(getClient).toHaveBeenCalledTimes(2);
+  });
+});

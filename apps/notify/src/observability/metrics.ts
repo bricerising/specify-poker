@@ -1,4 +1,5 @@
-import http from "http";
+import { startPrometheusMetricsServer } from "@specify-poker/shared";
+import type { Server } from "http";
 import client, { Counter, Histogram, Registry } from "prom-client";
 import logger from "./logger";
 
@@ -44,30 +45,11 @@ export async function renderMetrics(): Promise<string> {
   return registry.metrics();
 }
 
-export function startMetricsServer(port: number): http.Server {
-  const server = http.createServer((req, res) => {
-    if (req.url === "/metrics") {
-      void renderMetrics()
-        .then((body) => {
-          res.statusCode = 200;
-          res.setHeader("Content-Type", registry.contentType);
-          res.end(body);
-        })
-        .catch((err: unknown) => {
-          logger.error({ err }, "Failed to render metrics");
-          res.statusCode = 500;
-          res.end("Internal Server Error");
-        });
-      return;
-    }
-
-    res.statusCode = 404;
-    res.end("Not Found");
+export function startMetricsServer(port: number): Server {
+  return startPrometheusMetricsServer({
+    port,
+    registry,
+    logger,
+    logMessage: "Notify metrics server listening",
   });
-
-  server.listen(port, () => {
-    logger.info({ port }, "Notify metrics server listening");
-  });
-
-  return server;
 }

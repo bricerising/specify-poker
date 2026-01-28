@@ -5,7 +5,11 @@ const serverState = vi.hoisted(() => ({
   closeRedisClient: vi.fn(async () => undefined),
   startGrpcServer: vi.fn(async () => undefined),
   stopGrpcServer: vi.fn(),
-  startMetricsServer: vi.fn(() => ({ close: vi.fn() })),
+  startMetricsServer: vi.fn(() => ({
+    close: vi.fn((callback?: (err?: Error) => void) => {
+      callback?.();
+    }),
+  })),
   stopObservability: vi.fn(async () => undefined),
   startObservability: vi.fn(),
   logger: { info: vi.fn(), error: vi.fn() },

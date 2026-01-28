@@ -1,4 +1,5 @@
 import { err } from "../result";
+import { createBoundTargetProxy } from "../proxy/boundTargetProxy";
 import { unaryCallResult, type UnaryCallOptions, type UnaryCallResult, type UnaryClientMethod } from "./call";
 import { createUnaryClientProxy } from "./unaryClientProxy";
 
@@ -17,4 +18,14 @@ export function createUnaryCallResultProxy<TClient extends object>(client: TClie
     onNonFunctionProperty: (prop) =>
       Promise.resolve(err(new Error(`unary_call_result_proxy.non_function_property:${String(prop)}`))),
   });
+}
+
+/**
+ * Convenience: combines {@link createBoundTargetProxy} + {@link createUnaryCallResultProxy}
+ * to support lazily-created/swappable clients (e.g. tests that reset clients).
+ */
+export function createLazyUnaryCallResultProxy<TClient extends object>(
+  getClient: () => TClient,
+): UnaryCallResultProxy<TClient> {
+  return createUnaryCallResultProxy(createBoundTargetProxy(getClient));
 }
