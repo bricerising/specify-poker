@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const serverState = vi.hoisted(() => ({
   connectRedis: vi.fn(async () => undefined),
@@ -39,9 +39,16 @@ vi.mock("../../src/config", () => ({
 }));
 
 describe("server lifecycle", () => {
+  const originalEnv = process.env.NODE_ENV;
+
+  afterEach(() => {
+    process.env.NODE_ENV = originalEnv;
+  });
+
   it("starts services and shuts down cleanly", async () => {
     const server = await import("../../src/server");
 
+    process.env.NODE_ENV = "production";
     await server.main();
     expect(serverState.connectRedis).toHaveBeenCalledTimes(1);
     expect(serverState.startGrpcServer).toHaveBeenCalledWith(50053);

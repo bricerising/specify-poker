@@ -1,4 +1,7 @@
+import dotenv from "dotenv";
 import { createConfigBuilder } from "@specify-poker/shared";
+
+dotenv.config();
 
 export interface Config {
   grpcPort: number;

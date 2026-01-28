@@ -1,8 +1,8 @@
-import type { RedisClientType } from "redis";
 import { getBlockingRedisClient } from "../storage/redisClient";
 import logger from "../observability/logger";
 import { getConfig } from "../config";
 import { getErrorMessage } from "../shared/errors";
+import { runRedisStreamConsumer, type RedisStreamConsumerClient } from "@specify-poker/shared/redis";
 import {
   createGameEventHandlers,
   decodeGameEvent,
@@ -12,13 +12,11 @@ import {
   type PushSender,
 } from "./gameEventHandlers";
 
-type RedisStreamClient = Pick<RedisClientType, "xGroupCreate" | "xReadGroup" | "xAck">;
-
 type EventConsumerOptions = {
   streamKey?: string;
   groupName?: string;
   consumerName?: string;
-  getRedisClient?: () => Promise<RedisStreamClient>;
+  getRedisClient?: () => Promise<RedisStreamConsumerClient>;
   blockMs?: number;
   readCount?: number;
   sleep?: (ms: number) => Promise<void>;
@@ -30,12 +28,13 @@ export class EventConsumer {
   private readonly streamKey: string;
   private readonly groupName: string;
   private readonly consumerName: string;
-  private readonly getClient: () => Promise<RedisStreamClient>;
+  private readonly getClient: () => Promise<RedisStreamConsumerClient>;
   private readonly blockMs: number;
   private readonly readCount: number;
   private readonly sleep: (ms: number) => Promise<void>;
   private pollPromise: Promise<void> | null = null;
   private readonly handlers: GameEventHandlers;
+  private abortController: AbortController | null = null;
 
   constructor(pushSender: PushSender, options: EventConsumerOptions = {}) {
     this.pushSender = pushSender;
@@ -56,49 +55,25 @@ export class EventConsumer {
     this.isRunning = true;
     logger.info({ streamKey: this.streamKey }, "EventConsumer starting");
 
-    this.pollPromise = this.poll().catch((error: unknown) => {
+    const controller = new AbortController();
+    this.abortController = controller;
+
+    this.pollPromise = runRedisStreamConsumer(controller.signal, {
+      streamKey: this.streamKey,
+      groupName: this.groupName,
+      consumerName: this.consumerName,
+      getClient: this.getClient,
+      onMessage: async ({ fields }) => {
+        await this.handleEvent(fields);
+      },
+      blockMs: this.blockMs,
+      readCount: this.readCount,
+      sleep: this.sleep,
+      logger,
+      isBusyGroupError: (error: unknown) => getErrorMessage(error).includes("BUSYGROUP"),
+    }).catch((error: unknown) => {
       logger.error({ err: error }, "EventConsumer poll loop crashed");
     });
-  }
-
-  private async poll(): Promise<void> {
-    while (this.isRunning) {
-      try {
-        const client = await this.getClient();
-
-        try {
-          await client.xGroupCreate(this.streamKey, this.groupName, "0", { MKSTREAM: true });
-        } catch (error: unknown) {
-          const message = getErrorMessage(error);
-          if (!message.includes("BUSYGROUP")) {
-            logger.warn({ err: error }, "Error creating consumer group; retrying");
-            await this.sleep(1000);
-            continue;
-          }
-        }
-
-        const streams = await client.xReadGroup(
-          this.groupName,
-          this.consumerName,
-          [{ key: this.streamKey, id: ">" }],
-          { COUNT: this.readCount, BLOCK: this.blockMs }
-        );
-
-        if (!streams) {
-          continue;
-        }
-
-        for (const stream of streams) {
-          for (const message of stream.messages) {
-            await this.handleEvent(message.message);
-            await client.xAck(this.streamKey, this.groupName, message.id);
-          }
-        }
-      } catch (err) {
-        logger.warn({ err }, "Error polling events; retrying");
-        await this.sleep(1000);
-      }
-    }
   }
 
   private async handleEvent(message: unknown): Promise<void> {
@@ -130,9 +105,11 @@ export class EventConsumer {
 
   async stop(): Promise<void> {
     this.isRunning = false;
+    this.abortController?.abort();
     if (this.pollPromise) {
       await this.pollPromise;
       this.pollPromise = null;
     }
+    this.abortController = null;
   }
 }

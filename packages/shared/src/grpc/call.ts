@@ -1,3 +1,6 @@
+import type { Result } from "../result";
+import { err, ok } from "../result";
+
 export type UnaryClientCallback<Response, CallbackError extends Error = Error> = (
   error: CallbackError | null,
   response: Response,
@@ -68,7 +71,7 @@ export function unaryCall<Request, Response, CallbackError extends Error = Error
   });
 }
 
-export type UnaryCallResult<T> = { ok: true; value: T } | { ok: false; error: unknown };
+export type UnaryCallResult<T> = Result<T, unknown>;
 
 export async function unaryCallResult<Request, Response, CallbackError extends Error = Error>(
   method: UnaryClientMethod<Request, Response, CallbackError>,
@@ -76,9 +79,9 @@ export async function unaryCallResult<Request, Response, CallbackError extends E
   options?: UnaryCallOptions,
 ): Promise<UnaryCallResult<Response>> {
   try {
-    return { ok: true, value: await unaryCall(method, request, options) };
+    return ok(await unaryCall(method, request, options));
   } catch (error: unknown) {
-    return { ok: false, error };
+    return err(error);
   }
 }
 

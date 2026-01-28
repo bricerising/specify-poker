@@ -1,40 +1,49 @@
-import { startObservability, stopObservability } from "./observability";
-// Start observability before other imports to ensure auto-instrumentation works
-startObservability();
-
-import { createShutdownManager } from "@specify-poker/shared";
+import { createShutdownManager, runServiceMain, type ShutdownManager } from "@specify-poker/shared";
 import { config } from "./config";
-import { startGrpcServer, stopGrpcServer } from "./api/grpc/server";
-import { connectRedis, closeRedisClient } from "./storage/redisClient";
-import { startMetricsServer } from "./observability/metrics";
+import { startObservability, stopObservability } from "./observability";
 import logger from "./observability/logger";
 
-let metricsServer: ReturnType<typeof startMetricsServer> | null = null;
-
-const shutdownManager = createShutdownManager({ logger });
-shutdownManager.add("otel.shutdown", async () => {
-  await stopObservability();
-});
-shutdownManager.add("redis.close", async () => {
-  await closeRedisClient();
-});
-shutdownManager.add("grpc.stop", () => {
-  stopGrpcServer();
-});
-shutdownManager.add("metrics.close", () => {
-  if (metricsServer) {
-    metricsServer.close();
-    metricsServer = null;
-  }
-});
+let metricsServer: { close(): void } | null = null;
+let runningShutdown: ShutdownManager | null = null;
 
 export async function main() {
+  const isTestEnv = process.env.NODE_ENV === "test";
+
+  // Initialize OpenTelemetry before loading instrumented modules (grpc, redis, http, etc.).
+  if (!isTestEnv) {
+    startObservability();
+  }
+
+  const shutdownManager = createShutdownManager({ logger });
+  runningShutdown = shutdownManager;
+  shutdownManager.add("otel.shutdown", async () => {
+    if (!isTestEnv) {
+      await stopObservability();
+    }
+  });
+
   try {
+    const { closeRedisClient, connectRedis } = await import("./storage/redisClient");
+    shutdownManager.add("redis.close", async () => {
+      await closeRedisClient();
+    });
+
     await connectRedis();
     logger.info("Connected to Redis");
 
+    const { startGrpcServer, stopGrpcServer } = await import("./api/grpc/server");
+    shutdownManager.add("grpc.stop", () => {
+      stopGrpcServer();
+    });
+
     await startGrpcServer(config.port);
     logger.info({ port: config.port }, "Game Service gRPC server started");
+
+    const { startMetricsServer } = await import("./observability/metrics");
+    shutdownManager.add("metrics.close", () => {
+      metricsServer?.close();
+      metricsServer = null;
+    });
 
     metricsServer = startMetricsServer(config.metricsPort);
 
@@ -42,13 +51,15 @@ export async function main() {
   } catch (err: unknown) {
     logger.error({ err }, "Failed to start Game Service");
     await shutdownManager.run();
+    runningShutdown = null;
     throw err;
   }
 }
 
 export async function shutdown() {
   logger.info("Shutting down Game Service");
-  await shutdownManager.run();
+  await runningShutdown?.run();
+  runningShutdown = null;
 }
 
 const isDirectRun =
@@ -57,20 +68,5 @@ const isDirectRun =
   require.main === module;
 
 if (isDirectRun && process.env.NODE_ENV !== "test") {
-  const handleFatal = (error: unknown) => {
-    logger.error({ err: error }, "Game Service failed");
-    shutdown().finally(() => process.exit(1));
-  };
-
-  process.on("uncaughtException", handleFatal);
-  process.on("unhandledRejection", handleFatal);
-
-  process.on("SIGINT", () => {
-    shutdown().finally(() => process.exit(0));
-  });
-  process.on("SIGTERM", () => {
-    shutdown().finally(() => process.exit(0));
-  });
-
-  main().catch(handleFatal);
+  runServiceMain({ logger, main, shutdown });
 }

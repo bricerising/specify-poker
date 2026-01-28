@@ -1,30 +1,16 @@
+import { createShutdownManager, runServiceMain, type ShutdownManager } from "@specify-poker/shared";
+import type { Server } from "http";
+import { collectDefaultMetrics } from "prom-client";
+import { getConfig } from "./config";
+import logger from "./observability/logger";
 import { initOTEL, shutdownOTEL } from "./observability/otel";
 
-const IS_DIRECT_RUN =
+const isDirectRun =
   typeof require !== "undefined" &&
   typeof module !== "undefined" &&
   require.main === module;
 
-const IS_TEST_ENV = process.env.NODE_ENV === "test";
-
-// Initialize OpenTelemetry before loading instrumented modules.
-if (IS_DIRECT_RUN && !IS_TEST_ENV) {
-  initOTEL();
-}
-
-import { createShutdownManager, type ShutdownManager } from "@specify-poker/shared";
-import express from "express";
-import cors from "cors";
-import { createServer } from "http";
-import type { Server } from "http";
-import { getConfig } from "./config";
-import { createRouter } from "./http/router";
-import { initWsServer } from "./ws/server";
-import { closeWsPubSub } from "./ws/pubsub";
-import { registerInstance, unregisterInstance } from "./storage/instanceRegistry";
-import { closeRedisClient } from "./storage/redisClient";
-import logger from "./observability/logger";
-import { collectDefaultMetrics } from "prom-client";
+const isTestEnv = process.env.NODE_ENV === "test";
 
 function closeHttpServer(server: Server): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -42,13 +28,41 @@ let runningShutdown: ShutdownManager | null = null;
 
 export async function startServer(): Promise<void> {
   const config = getConfig();
+
+  // Initialize OpenTelemetry before importing instrumented modules (http/express/ws/redis/etc.).
+  if (!isTestEnv) {
+    initOTEL();
+  }
+
+  const [
+    { default: express },
+    { default: cors },
+    http,
+    { createRouter },
+    { initWsServer },
+    { closeWsPubSub },
+    { registerInstance, unregisterInstance },
+    { closeRedisClient },
+  ] = await Promise.all([
+    import("express"),
+    import("cors"),
+    import("http"),
+    import("./http/router"),
+    import("./ws/server"),
+    import("./ws/pubsub"),
+    import("./storage/instanceRegistry"),
+    import("./storage/redisClient"),
+  ]);
+
   const app = express();
-  const server = createServer(app);
+  const server = http.createServer(app);
 
   const shutdown = createShutdownManager({ logger });
   runningShutdown = shutdown;
   shutdown.add("otel.shutdown", async () => {
-    await shutdownOTEL();
+    if (!isTestEnv) {
+      await shutdownOTEL();
+    }
   });
   shutdown.add("redis.close", async () => {
     await closeRedisClient();
@@ -70,10 +84,12 @@ export async function startServer(): Promise<void> {
   collectDefaultMetrics();
 
   // Security
-  app.use(cors({
-    origin: config.corsOrigin,
-    credentials: true,
-  }));
+  app.use(
+    cors({
+      origin: config.corsOrigin,
+      credentials: true,
+    }),
+  );
 
   // Router
   app.use(createRouter());
@@ -104,23 +120,6 @@ export async function shutdown(): Promise<void> {
   runningShutdown = null;
 }
 
-if (IS_DIRECT_RUN && !IS_TEST_ENV) {
-  const handleFatal = (error: unknown) => {
-    logger.error({ err: error }, "Gateway service failed");
-    shutdown().finally(() => process.exit(1));
-  };
-
-  process.on("uncaughtException", handleFatal);
-  process.on("unhandledRejection", handleFatal);
-
-  process.on("SIGINT", () => {
-    logger.info("Shutting down gateway...");
-    shutdown().finally(() => process.exit(0));
-  });
-  process.on("SIGTERM", () => {
-    logger.info("Shutting down gateway...");
-    shutdown().finally(() => process.exit(0));
-  });
-
-  startServer().catch(handleFatal);
+if (isDirectRun && !isTestEnv) {
+  runServiceMain({ logger, main: startServer, shutdown });
 }

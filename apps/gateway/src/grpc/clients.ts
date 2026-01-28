@@ -93,5 +93,112 @@ export function createGrpcClients(config: GrpcClientsConfig): GrpcClients {
   };
 }
 
-const config = getConfig();
-export const { gameClient, playerClient, balanceClient, eventClient, notifyClient } = createGrpcClients(config);
+function createLazyGrpcClient<TClient extends object>(getClient: () => TClient): TClient {
+  return new Proxy(
+    {},
+    {
+      get(_target, prop) {
+        if (typeof prop === "symbol") {
+          return undefined;
+        }
+
+        if (prop === "then") {
+          return undefined;
+        }
+
+        const client = getClient() as Record<string, unknown>;
+        const value = client[prop];
+
+        if (typeof value === "function") {
+          return (value as (...args: unknown[]) => unknown).bind(client);
+        }
+
+        return value;
+      },
+    },
+  ) as unknown as TClient;
+}
+
+let credentials: grpc.ChannelCredentials | null = null;
+
+function getCredentials(): grpc.ChannelCredentials {
+  if (!credentials) {
+    credentials = grpc.credentials.createInsecure();
+  }
+  return credentials;
+}
+
+let cachedGameClient: GameServiceClient | null = null;
+let cachedPlayerClient: PlayerServiceClient | null = null;
+let cachedBalanceClient: BalanceServiceClient | null = null;
+let cachedEventClient: EventServiceClient | null = null;
+let cachedNotifyClient: NotifyServiceClient | null = null;
+
+function createDefaultGameClient(): GameServiceClient {
+  const config = getConfig();
+  return gameClientFactory.createClient({ address: config.gameServiceUrl, credentials: getCredentials() });
+}
+
+function createDefaultPlayerClient(): PlayerServiceClient {
+  const config = getConfig();
+  return playerClientFactory.createClient({ address: config.playerServiceUrl, credentials: getCredentials() });
+}
+
+function createDefaultBalanceClient(): BalanceServiceClient {
+  const config = getConfig();
+  return balanceClientFactory.createClient({ address: config.balanceServiceUrl, credentials: getCredentials() });
+}
+
+function createDefaultEventClient(): EventServiceClient {
+  const config = getConfig();
+  return eventClientFactory.createClient({ address: config.eventServiceUrl, credentials: getCredentials() });
+}
+
+function createDefaultNotifyClient(): NotifyServiceClient {
+  const config = getConfig();
+  return notifyClientFactory.createClient({ address: config.notifyServiceUrl, credentials: getCredentials() });
+}
+
+export const gameClient = createLazyGrpcClient(() => {
+  if (!cachedGameClient) {
+    cachedGameClient = createDefaultGameClient();
+  }
+  return cachedGameClient;
+});
+
+export const playerClient = createLazyGrpcClient(() => {
+  if (!cachedPlayerClient) {
+    cachedPlayerClient = createDefaultPlayerClient();
+  }
+  return cachedPlayerClient;
+});
+
+export const balanceClient = createLazyGrpcClient(() => {
+  if (!cachedBalanceClient) {
+    cachedBalanceClient = createDefaultBalanceClient();
+  }
+  return cachedBalanceClient;
+});
+
+export const eventClient = createLazyGrpcClient(() => {
+  if (!cachedEventClient) {
+    cachedEventClient = createDefaultEventClient();
+  }
+  return cachedEventClient;
+});
+
+export const notifyClient = createLazyGrpcClient(() => {
+  if (!cachedNotifyClient) {
+    cachedNotifyClient = createDefaultNotifyClient();
+  }
+  return cachedNotifyClient;
+});
+
+export function resetGrpcClientsForTests(): void {
+  credentials = null;
+  cachedGameClient = null;
+  cachedPlayerClient = null;
+  cachedBalanceClient = null;
+  cachedEventClient = null;
+  cachedNotifyClient = null;
+}

@@ -1,4 +1,7 @@
+import dotenv from "dotenv";
 import { createConfigBuilder } from "@specify-poker/shared";
+
+dotenv.config();
 
 export interface Config {
   grpcPort: number;
@@ -8,6 +11,8 @@ export interface Config {
   vapidPrivateKey: string | null;
   vapidSubject: string;
   eventStreamKey: string;
+  logLevel: string;
+  otelExporterEndpoint: string;
 }
 
 export function loadConfig(): Config {
@@ -19,6 +24,8 @@ export function loadConfig(): Config {
     .nullableString("vapidPrivateKey", "VAPID_PRIVATE_KEY")
     .string("vapidSubject", "VAPID_SUBJECT", "mailto:admin@example.com")
     .string("eventStreamKey", "EVENT_STREAM_KEY", "events:game")
+    .string("logLevel", "LOG_LEVEL", "info")
+    .string("otelExporterEndpoint", "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
     .build();
 
   return config;

@@ -1,34 +1,42 @@
 import { startObservability, stopObservability } from "./observability";
+import { runServiceMain } from "@specify-poker/shared";
+import type { BalanceApp } from "./app";
+
 const isDirectRun =
   typeof require !== "undefined" &&
   typeof module !== "undefined" &&
   require.main === module;
 
-if (isDirectRun) {
-  startObservability();
-}
+const isTestEnv = process.env.NODE_ENV === "test";
 
-import { getConfig } from "./config";
-import { createBalanceApp, type BalanceApp } from "./app";
 import logger from "./observability/logger";
 
 let runningApp: BalanceApp | null = null;
 
-function getOrCreateApp(): BalanceApp {
+async function getOrCreateApp(): Promise<BalanceApp> {
   if (runningApp) {
     return runningApp;
   }
 
+  const [{ getConfig }, { createBalanceApp }] = await Promise.all([
+    import("./config"),
+    import("./app"),
+  ]);
+
   runningApp = createBalanceApp({
     config: getConfig(),
-    stopObservability: isDirectRun ? stopObservability : undefined,
+    stopObservability: isTestEnv ? undefined : stopObservability,
   });
 
   return runningApp;
 }
 
 export async function start() {
-  await getOrCreateApp().start();
+  if (!isTestEnv) {
+    // Start OTel before importing instrumented modules (express/http/redis/grpc/etc.).
+    startObservability();
+  }
+  await (await getOrCreateApp()).start();
 }
 
 export async function shutdown() {
@@ -40,25 +48,6 @@ export async function shutdown() {
 }
 
 // Only start if this is the main module
-if (isDirectRun) {
-  const handleFatal = (error: unknown) => {
-    logger.error({ err: error }, "Balance service failed");
-    shutdown().finally(() => process.exit(1));
-  };
-
-  process.on("uncaughtException", handleFatal);
-  process.on("unhandledRejection", handleFatal);
-
-  // Handle shutdown signals
-  process.on("SIGINT", () => {
-    shutdown().finally(() => process.exit(0));
-  });
-  process.on("SIGTERM", () => {
-    shutdown().finally(() => process.exit(0));
-  });
-
-  // Start the service
-  start().catch(handleFatal);
+if (isDirectRun && !isTestEnv) {
+  runServiceMain({ logger, main: start, shutdown });
 }
-
-export const app = getOrCreateApp().expressApp;

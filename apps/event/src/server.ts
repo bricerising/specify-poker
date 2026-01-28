@@ -1,6 +1,7 @@
 import { config } from "./config";
 import logger from "./observability/logger";
 import { createEventApp, type EventApp } from "./app";
+import { runServiceMain } from "@specify-poker/shared";
 
 let runningApp: EventApp | null = null;
 
@@ -40,20 +41,5 @@ const isDirectRun =
   require.main === module;
 
 if (isDirectRun && !isTestEnv()) {
-  const handleFatal = (error: unknown) => {
-    logger.error({ err: error }, "Event Service failed");
-    shutdown().finally(() => process.exit(1));
-  };
-
-  process.on("uncaughtException", handleFatal);
-  process.on("unhandledRejection", handleFatal);
-
-  process.on("SIGINT", () => {
-    shutdown().finally(() => process.exit(0));
-  });
-  process.on("SIGTERM", () => {
-    shutdown().finally(() => process.exit(0));
-  });
-
-  main().catch(handleFatal);
+  runServiceMain({ logger, main, shutdown });
 }

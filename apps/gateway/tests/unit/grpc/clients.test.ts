@@ -41,6 +41,14 @@ describe("gRPC clients", () => {
 
     const module = await import("../../../src/grpc/clients");
 
+    const clients = module.createGrpcClients({
+      gameServiceUrl: "game:1234",
+      playerServiceUrl: "player:1234",
+      balanceServiceUrl: "balance:1234",
+      eventServiceUrl: "event:1234",
+      notifyServiceUrl: "notify:1234",
+    });
+
     expect(loadSync).toHaveBeenCalledTimes(5);
     expect(createInsecure).toHaveBeenCalledTimes(1);
     expect(ctor).toHaveBeenCalledWith("game:1234", "creds");
@@ -48,10 +56,32 @@ describe("gRPC clients", () => {
     expect(ctor).toHaveBeenCalledWith("balance:1234", "creds");
     expect(ctor).toHaveBeenCalledWith("event:1234", "creds");
     expect(ctor).toHaveBeenCalledWith("notify:1234", "creds");
-    expect(module.gameClient).toBeDefined();
-    expect(module.playerClient).toBeDefined();
-    expect(module.balanceClient).toBeDefined();
-    expect(module.eventClient).toBeDefined();
-    expect(module.notifyClient).toBeDefined();
+    expect(clients.gameClient).toBeDefined();
+    expect(clients.playerClient).toBeDefined();
+    expect(clients.balanceClient).toBeDefined();
+    expect(clients.eventClient).toBeDefined();
+    expect(clients.notifyClient).toBeDefined();
+  });
+
+  it("lazily constructs default clients on first use", async () => {
+    const ctor = vi.fn();
+    loadPackageDefinition.mockReturnValue({
+      game: { GameService: ctor },
+      player: { PlayerService: ctor },
+      balance: { BalanceService: ctor },
+      event: { EventService: ctor },
+      notify: { NotifyService: ctor },
+    });
+
+    const module = await import("../../../src/grpc/clients");
+
+    expect(loadSync).toHaveBeenCalledTimes(0);
+    expect(createInsecure).toHaveBeenCalledTimes(0);
+
+    void (module.gameClient as unknown as { ListTables?: unknown }).ListTables;
+
+    expect(loadSync).toHaveBeenCalledTimes(1);
+    expect(createInsecure).toHaveBeenCalledTimes(1);
+    expect(ctor).toHaveBeenCalledWith("game:1234", "creds");
   });
 });

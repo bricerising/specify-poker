@@ -1,4 +1,9 @@
-import { createRedisClientManager } from "@specify-poker/shared/redis";
+import {
+  createRedisClientManager,
+  runRedisStreamConsumer,
+  type RedisStreamConsumerClient,
+  type RedisStreamConsumerMessage,
+} from "@specify-poker/shared/redis";
 import { incrementHandsPlayed, incrementWins } from "./statisticsService";
 import logger from "../observability/logger";
 import { decodeStructLike } from "@specify-poker/shared";
@@ -50,24 +55,13 @@ export function createHandEventHandlers(statisticsService: StatisticsService): H
   };
 }
 
-type RedisStreamClient = {
-  xGroupCreate: (streamKey: string, groupName: string, id: string, options: { MKSTREAM: boolean }) => Promise<unknown>;
-  xReadGroup: (
-    groupName: string,
-    consumerName: string,
-    streams: Array<{ key: string; id: string }>,
-    options: { COUNT: number; BLOCK: number },
-  ) => Promise<Array<{ messages: Array<{ id: string; message: Record<string, unknown> }> }> | null>;
-  xAck: (streamKey: string, groupName: string, messageId: string) => Promise<unknown>;
-};
-
 type SleepFn = (ms: number) => Promise<void>;
 
 type EventConsumerOptions = {
   streamKey?: string;
   groupName?: string;
   consumerName?: string;
-  getRedisClient?: () => Promise<RedisStreamClient | null>;
+  getRedisClient?: () => Promise<RedisStreamConsumerClient | null>;
   closeRedisClient?: () => Promise<void>;
   blockMs?: number;
   readCount?: number;
@@ -81,13 +75,14 @@ export class EventConsumer {
   private readonly streamKey: string;
   private readonly groupName: string;
   private readonly consumerName: string;
-  private readonly getClient: () => Promise<RedisStreamClient | null>;
+  private readonly getClient: () => Promise<RedisStreamConsumerClient | null>;
   private readonly closeClient: () => Promise<void>;
   private readonly blockMs: number;
   private readonly readCount: number;
   private readonly sleep: SleepFn;
   private pollPromise: Promise<void> | null = null;
   private readonly handlers: HandEventHandlers;
+  private abortController: AbortController | null = null;
 
   constructor(options: EventConsumerOptions = {}) {
     this.streamKey = options.streamKey ?? "events:all";
@@ -117,7 +112,7 @@ export class EventConsumer {
     };
 
     this.getClient = async () => {
-      return (await getManager().getBlockingClientOrNull()) as unknown as RedisStreamClient | null;
+      return (await getManager().getBlockingClientOrNull()) as unknown as RedisStreamConsumerClient | null;
     };
 
     this.closeClient = async () => {
@@ -140,19 +135,31 @@ export class EventConsumer {
       return;
     }
 
-    try {
-      await client.xGroupCreate(this.streamKey, this.groupName, "0", { MKSTREAM: true });
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "";
-      if (!message.includes("BUSYGROUP")) {
-        logger.warn({ message }, "Error creating consumer group");
-      }
-    }
-
     this.isRunning = true;
     logger.info("Player EventConsumer started");
 
-    this.pollPromise = this.poll(client).catch((error: unknown) => {
+    const controller = new AbortController();
+    this.abortController = controller;
+
+    this.pollPromise = runRedisStreamConsumer(controller.signal, {
+      streamKey: this.streamKey,
+      groupName: this.groupName,
+      consumerName: this.consumerName,
+      getClient: async () => {
+        const nextClient = await this.getClient();
+        if (!nextClient) {
+          throw new Error("player_event_consumer.redis_not_available");
+        }
+        return nextClient;
+      },
+      onMessage: async (message) => {
+        await this.handleStreamMessage(message);
+      },
+      blockMs: this.blockMs,
+      readCount: this.readCount,
+      sleep: this.sleep,
+      logger,
+    }).catch((error: unknown) => {
       if (!this.isRunning) {
         return;
       }
@@ -160,66 +167,20 @@ export class EventConsumer {
     });
   }
 
-  private async poll(client: RedisStreamClient): Promise<void> {
-    while (this.isRunning) {
-      try {
-        const streams = await client.xReadGroup(
-          this.groupName,
-          this.consumerName,
-          [{ key: this.streamKey, id: ">" }],
-          { COUNT: this.readCount, BLOCK: this.blockMs }
-        );
-
-        if (!streams) {
-          continue;
-        }
-
-        for (const stream of streams) {
-          for (const message of stream.messages) {
-            await this.processMessage(client, message);
-          }
-        }
-      } catch (error: unknown) {
-        if (!this.isRunning) {
-          return;
-        }
-
-        const message = error instanceof Error ? error.message : "unknown";
-        logger.error({ message }, "Error polling events");
-        await this.sleep(1000);
-      }
+  private async handleStreamMessage(message: RedisStreamConsumerMessage): Promise<void> {
+    const rawData = message.fields.data;
+    if (typeof rawData !== "string") {
+      logger.warn({ messageId: message.id }, "eventConsumer.invalidMessage");
+      return;
     }
-  }
 
-  private async processMessage(
-    client: RedisStreamClient,
-    message: { id: string; message: Record<string, unknown> },
-  ): Promise<void> {
-    try {
-      const rawData = message.message.data;
-      if (typeof rawData !== "string") {
-        logger.warn({ messageId: message.id }, "eventConsumer.invalidMessage");
-        return;
-      }
-
-      const parsed = safeJsonParse(rawData);
-      if (!parsed) {
-        logger.warn({ messageId: message.id }, "eventConsumer.invalidJson");
-        return;
-      }
-
-      await this.handleEvent(parsed);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "unknown";
-      logger.error({ message }, "Error processing event message");
-    } finally {
-      try {
-        await client.xAck(this.streamKey, this.groupName, message.id);
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : "unknown";
-        logger.error({ message }, "Error acknowledging event message");
-      }
+    const parsed = safeJsonParse(rawData);
+    if (!parsed) {
+      logger.warn({ messageId: message.id }, "eventConsumer.invalidJson");
+      return;
     }
+
+    await this.handleEvent(parsed);
   }
 
   async handleEvent(event: unknown): Promise<void> {
@@ -243,10 +204,12 @@ export class EventConsumer {
 
   async stop(): Promise<void> {
     this.isRunning = false;
+    this.abortController?.abort();
     await this.closeClient();
     if (this.pollPromise) {
       await this.pollPromise.catch(() => undefined);
       this.pollPromise = null;
     }
+    this.abortController = null;
   }
 }

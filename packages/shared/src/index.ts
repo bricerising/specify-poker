@@ -2,6 +2,7 @@ export * from "./schemas/index";
 export * from "./types/index";
 export * from "./protobuf/struct";
 export * from "./lifecycle/shutdown";
+export * from "./lifecycle/serviceRunner";
 export * from "./errors/index";
 export * from "./result/index";
 export * from "./grpc/call";
