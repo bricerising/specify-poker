@@ -1,5 +1,5 @@
 import WebSocket from "ws";
-import { gameClient } from "../../grpc/clients";
+import { grpc } from "../../grpc/unaryClients";
 import { WsPubSubMessage } from "../pubsub";
 import { subscribeToChannel, unsubscribeFromChannel } from "../subscriptions";
 import { sendToLocal } from "../localRegistry";
@@ -26,11 +26,12 @@ export async function attachLobbyHub(socket: WebSocket, connectionId: string) {
   await subscribeToChannel(connectionId, LOBBY_CHANNEL);
 
   // Send initial snapshot
-  gameClient.ListTables({}, (err, response) => {
-    if (!err && response && response.tables) {
-      sendToLocal(connectionId, { type: "LobbyTablesUpdated", tables: response.tables.map(toWireTableSummary) });
-    }
-  });
+  void grpc.game
+    .ListTables({})
+    .then((response) => {
+      sendToLocal(connectionId, { type: "LobbyTablesUpdated", tables: (response.tables ?? []).map(toWireTableSummary) });
+    })
+    .catch(() => undefined);
 
   socket.on(
     "close",

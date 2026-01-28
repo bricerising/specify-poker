@@ -1,11 +1,21 @@
+import { createUnaryCallProxy, type UnaryCallProxy } from "@specify-poker/shared";
 import {
-  balanceClient,
   BalanceCashOutResponse,
   BalanceCommitResponse,
   BalanceReservationResponse,
+  type BalanceServiceClient,
   BalanceSettleResponse,
+  getBalanceClient,
 } from "../../api/grpc/clients";
-import { unaryCall } from "./grpcUnary";
+
+let unaryBalanceClient: UnaryCallProxy<BalanceServiceClient> | null = null;
+
+function getUnaryBalanceClient(): UnaryCallProxy<BalanceServiceClient> {
+  if (!unaryBalanceClient) {
+    unaryBalanceClient = createUnaryCallProxy(getBalanceClient());
+  }
+  return unaryBalanceClient;
+}
 
 export type BalanceCall<TResponse> =
   | { type: "available"; response: TResponse }
@@ -35,18 +45,18 @@ export class BalanceClientAdapter {
     timeout_seconds: number;
   }) {
     return callWithAvailability(
-      unaryCall<typeof request, BalanceReservation>(balanceClient.ReserveForBuyIn.bind(balanceClient), request),
+      getUnaryBalanceClient().ReserveForBuyIn(request),
     );
   }
 
   commitReservation(request: { reservation_id: string }) {
     return callWithAvailability(
-      unaryCall<typeof request, BalanceCommit>(balanceClient.CommitReservation.bind(balanceClient), request),
+      getUnaryBalanceClient().CommitReservation(request),
     );
   }
 
   releaseReservation(request: { reservation_id: string; reason?: string }) {
-    balanceClient.ReleaseReservation(request, () => undefined);
+    void getUnaryBalanceClient().ReleaseReservation(request).catch(() => undefined);
   }
 
   processCashOut(request: {
@@ -58,7 +68,7 @@ export class BalanceClientAdapter {
     hand_id?: string;
   }) {
     return callWithAvailability(
-      unaryCall<typeof request, BalanceCashOut>(balanceClient.ProcessCashOut.bind(balanceClient), request),
+      getUnaryBalanceClient().ProcessCashOut(request),
     );
   }
 
@@ -69,7 +79,7 @@ export class BalanceClientAdapter {
     idempotency_key: string;
   }) {
     return callWithAvailability(
-      unaryCall<typeof request, BalanceSettle>(balanceClient.SettlePot.bind(balanceClient), request),
+      getUnaryBalanceClient().SettlePot(request),
     );
   }
 }

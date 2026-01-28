@@ -14,11 +14,33 @@ export type WsPubSubMessage = {
 };
 
 const PUBSUB_CHANNEL = "gateway:ws:events";
-const instanceId = randomUUID();
-let pubClient: RedisClientType | null = null;
-let subClient: RedisClientType | null = null;
-let initialized = false;
-let closePromise: Promise<void> | null = null;
+
+type Logger = Pick<typeof logger, "info" | "warn" | "error">;
+
+type WsPubSubHandlers = {
+  onTableEvent: (message: WsPubSubMessage) => void;
+  onChatEvent: (message: WsPubSubMessage) => void;
+  onTimerEvent: (message: WsPubSubMessage) => void;
+  onLobbyEvent: (message: WsPubSubMessage) => void;
+};
+
+export type WsPubSub = {
+  getInstanceId(): string;
+  init(handlers: WsPubSubHandlers): Promise<boolean>;
+  close(): Promise<void>;
+  publishTableEvent(tableId: string, payload: Record<string, unknown>): Promise<boolean>;
+  publishChatEvent(tableId: string, payload: Record<string, unknown>): Promise<boolean>;
+  publishTimerEvent(tableId: string, payload: Record<string, unknown>): Promise<boolean>;
+  publishLobbyEvent(tables: unknown[]): Promise<boolean>;
+};
+
+type CreateWsPubSubOptions = {
+  redisUrl: string;
+  channel?: string;
+  instanceId?: string;
+  createClient?: typeof createClient;
+  logger?: Logger;
+};
 
 function parseWsPubSubMessage(raw: string): WsPubSubMessage | null {
   const record = safeJsonParseRecord(raw);
@@ -42,109 +64,161 @@ function parseWsPubSubMessage(raw: string): WsPubSubMessage | null {
 }
 
 export function getWsInstanceId() {
-  return instanceId;
+  return getDefaultPubSub().getInstanceId();
 }
 
-export async function initWsPubSub(handlers: {
-  onTableEvent: (message: WsPubSubMessage) => void;
-  onChatEvent: (message: WsPubSubMessage) => void;
-  onTimerEvent: (message: WsPubSubMessage) => void;
-  onLobbyEvent: (message: WsPubSubMessage) => void;
-}) {
-  const config = getConfig();
-  const url = config.redisUrl;
+export function createWsPubSub(options: CreateWsPubSubOptions): WsPubSub {
+  const channel = options.channel ?? PUBSUB_CHANNEL;
+  const instanceId = options.instanceId ?? randomUUID();
+  const log = options.logger ?? logger;
+  const createRedisClient = options.createClient ?? createClient;
 
-  if (initialized) {
-    return true;
-  }
+  let pubClient: RedisClientType | null = null;
+  let subClient: RedisClientType | null = null;
+  let initialized = false;
+  let initPromise: Promise<boolean> | null = null;
+  let closePromise: Promise<void> | null = null;
 
-  pubClient = createClient({ url });
-  subClient = pubClient.duplicate();
+  const init = async (handlers: WsPubSubHandlers): Promise<boolean> => {
+    if (initialized) {
+      return true;
+    }
+    if (initPromise) {
+      return initPromise;
+    }
 
-  pubClient.on("error", (error) => {
-    logger.error({ err: error }, "Redis pubClient error");
-  });
-  subClient.on("error", (error) => {
-    logger.error({ err: error }, "Redis subClient error");
-  });
+    initPromise = (async () => {
+      if (closePromise) {
+        await closePromise;
+      }
 
-  await pubClient.connect();
-  await subClient.connect();
+      pubClient = createRedisClient({ url: options.redisUrl });
+      subClient = pubClient.duplicate();
 
-  const handlerByChannel: Record<WsChannel, (message: WsPubSubMessage) => void> = {
-    table: handlers.onTableEvent,
-    chat: handlers.onChatEvent,
-    timer: handlers.onTimerEvent,
-    lobby: handlers.onLobbyEvent,
+      pubClient.on("error", (error) => {
+        log.error({ err: error }, "Redis pubClient error");
+      });
+      subClient.on("error", (error) => {
+        log.error({ err: error }, "Redis subClient error");
+      });
+
+      await pubClient.connect();
+      await subClient.connect();
+
+      const handlerByChannel: Record<WsChannel, (message: WsPubSubMessage) => void> = {
+        table: handlers.onTableEvent,
+        chat: handlers.onChatEvent,
+        timer: handlers.onTimerEvent,
+        lobby: handlers.onLobbyEvent,
+      };
+
+      await subClient.subscribe(channel, (message) => {
+        const parsed = parseWsPubSubMessage(message);
+        if (!parsed) {
+          return;
+        }
+        if (parsed.sourceId === instanceId) {
+          return;
+        }
+
+        handlerByChannel[parsed.channel](parsed);
+      });
+
+      initialized = true;
+      log.info("WebSocket Pub/Sub initialized");
+      return true;
+    })().finally(() => {
+      initPromise = null;
+    });
+
+    return initPromise;
   };
 
-  await subClient.subscribe(PUBSUB_CHANNEL, (message) => {
-    const parsed = parseWsPubSubMessage(message);
-    if (!parsed) {
-      return;
-    }
-    if (parsed.sourceId === instanceId) {
-      return;
+  const close = async (): Promise<void> => {
+    if (closePromise) {
+      return closePromise;
     }
 
-    handlerByChannel[parsed.channel](parsed);
-  });
+    const closeClient = async (client: RedisClientType | null, label: string) => {
+      if (!client?.isOpen) {
+        return;
+      }
+      try {
+        await client.quit();
+      } catch (err: unknown) {
+        log.warn({ err, label }, "Redis quit failed; forcing disconnect");
+        client.disconnect();
+      }
+    };
 
-  initialized = true;
-  logger.info("WebSocket Pub/Sub initialized");
-  return true;
+    closePromise = Promise.all([closeClient(subClient, "subClient"), closeClient(pubClient, "pubClient")])
+      .then(() => undefined)
+      .finally(() => {
+        pubClient = null;
+        subClient = null;
+        initialized = false;
+        closePromise = null;
+      });
+
+    return closePromise;
+  };
+
+  const publish = async (message: Omit<WsPubSubMessage, "sourceId">): Promise<boolean> => {
+    if (!pubClient) {
+      return false;
+    }
+    const payload: WsPubSubMessage = { ...message, sourceId: instanceId };
+    await pubClient.publish(channel, JSON.stringify(payload));
+    return true;
+  };
+
+  return {
+    getInstanceId: () => instanceId,
+    init,
+    close,
+    publishTableEvent: (tableId, payload) => publish({ channel: "table", tableId, payload }),
+    publishChatEvent: (tableId, payload) => publish({ channel: "chat", tableId, payload }),
+    publishTimerEvent: (tableId, payload) => publish({ channel: "timer", tableId, payload }),
+    publishLobbyEvent: (tables) => publish({ channel: "lobby", tableId: "lobby", payload: { tables } }),
+  };
 }
 
 export async function closeWsPubSub(): Promise<void> {
-  if (closePromise) {
-    return closePromise;
+  if (!defaultPubSub) {
+    return;
   }
 
-  const closeClient = async (client: RedisClientType | null, label: string) => {
-    if (!client?.isOpen) {
-      return;
-    }
-    try {
-      await client.quit();
-    } catch (err: unknown) {
-      logger.warn({ err, label }, "Redis quit failed; forcing disconnect");
-      client.disconnect();
-    }
-  };
-
-  closePromise = Promise.all([closeClient(subClient, "subClient"), closeClient(pubClient, "pubClient")])
-    .then(() => undefined)
-    .finally(() => {
-      pubClient = null;
-      subClient = null;
-      initialized = false;
-      closePromise = null;
-    });
-
-  return closePromise;
-}
-
-async function publish(message: Omit<WsPubSubMessage, "sourceId">) {
-  if (!pubClient) {
-    return false;
-  }
-  const payload: WsPubSubMessage = { ...message, sourceId: instanceId };
-  await pubClient.publish(PUBSUB_CHANNEL, JSON.stringify(payload));
-  return true;
+  const server = defaultPubSub;
+  defaultPubSub = null;
+  await server.close();
 }
 
 export async function publishTableEvent(tableId: string, payload: Record<string, unknown>) {
-  return publish({ channel: "table", tableId, payload });
+  return getDefaultPubSub().publishTableEvent(tableId, payload);
 }
 
 export async function publishChatEvent(tableId: string, payload: Record<string, unknown>) {
-  return publish({ channel: "chat", tableId, payload });
+  return getDefaultPubSub().publishChatEvent(tableId, payload);
 }
 
 export async function publishTimerEvent(tableId: string, payload: Record<string, unknown>) {
-  return publish({ channel: "timer", tableId, payload });
+  return getDefaultPubSub().publishTimerEvent(tableId, payload);
 }
 
 export async function publishLobbyEvent(tables: unknown[]) {
-  return publish({ channel: "lobby", tableId: "lobby", payload: { tables } });
+  return getDefaultPubSub().publishLobbyEvent(tables);
+}
+
+let defaultPubSub: WsPubSub | null = null;
+
+function getDefaultPubSub(): WsPubSub {
+  if (!defaultPubSub) {
+    defaultPubSub = createWsPubSub({ redisUrl: getConfig().redisUrl, logger });
+  }
+
+  return defaultPubSub;
+}
+
+export async function initWsPubSub(handlers: WsPubSubHandlers): Promise<boolean> {
+  return getDefaultPubSub().init(handlers);
 }

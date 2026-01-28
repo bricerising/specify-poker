@@ -1,22 +1,22 @@
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
 import * as path from "path";
+import { createGrpcServiceClientFactory } from "@specify-poker/shared";
 
 import { config } from "../../config";
 
 const BALANCE_PROTO_PATH = path.resolve(__dirname, "../../../../balance/proto/balance.proto");
 const EVENT_PROTO_PATH = path.resolve(__dirname, "../../../../event/proto/event.proto");
 
-function loadProto(protoPath: string) {
-  const packageDefinition = protoLoader.loadSync(protoPath, {
-    keepCase: true,
-    longs: Number,
-    enums: String,
-    defaults: true,
-    oneofs: true,
-  });
-  return grpc.loadPackageDefinition(packageDefinition);
-}
+type NumericString = number | string;
+
+const PROTO_LOADER_OPTIONS: protoLoader.Options = {
+  keepCase: true,
+  longs: String,
+  enums: String,
+  defaults: true,
+  oneofs: true,
+};
 
 type UnaryCallback<TResponse> = (err: grpc.ServiceError | null, response: TResponse) => void;
 
@@ -28,29 +28,50 @@ export interface BalanceReservationResponse {
   ok: boolean;
   reservation_id?: string;
   error?: string;
-  available_balance?: number;
+  available_balance?: NumericString;
 }
 
 export interface BalanceCommitResponse {
   ok: boolean;
   error?: string;
   transaction_id?: string;
-  new_balance?: number;
+  new_balance?: NumericString;
 }
 
 export interface BalanceReleaseResponse {
   ok: boolean;
   error?: string;
+  available_balance?: NumericString;
 }
 
 export interface BalanceCashOutResponse {
   ok: boolean;
   error?: string;
   transaction_id?: string;
-  new_balance?: number;
+  new_balance?: NumericString;
+}
+
+export interface BalanceRecordContributionResponse {
+  ok: boolean;
+  error?: string;
+  total_pot?: NumericString;
+  seat_contribution?: NumericString;
+}
+
+export interface BalanceSettlementResult {
+  account_id: string;
+  transaction_id: string;
+  amount: NumericString;
+  new_balance: NumericString;
 }
 
 export interface BalanceSettleResponse {
+  ok: boolean;
+  error?: string;
+  results?: BalanceSettlementResult[];
+}
+
+export interface BalanceCancelPotResponse {
   ok: boolean;
   error?: string;
 }
@@ -58,6 +79,11 @@ export interface BalanceSettleResponse {
 export interface EventPublishResponse {
   success: boolean;
   event_id?: string;
+}
+
+export interface EventPublishEventsResponse {
+  success: boolean;
+  event_ids?: string[];
 }
 
 // ============================================================================
@@ -94,6 +120,18 @@ export interface BalanceServiceClient {
     },
     callback: UnaryCallback<BalanceCashOutResponse>,
   ): void;
+  RecordContribution(
+    request: {
+      table_id: string;
+      hand_id: string;
+      seat_id: number;
+      account_id: string;
+      amount: number;
+      contribution_type: string;
+      idempotency_key: string;
+    },
+    callback: UnaryCallback<BalanceRecordContributionResponse>,
+  ): void;
   SettlePot(
     request: {
       table_id: string;
@@ -102,6 +140,10 @@ export interface BalanceServiceClient {
       idempotency_key: string;
     },
     callback: UnaryCallback<BalanceSettleResponse>,
+  ): void;
+  CancelPot(
+    request: { table_id: string; hand_id: string; reason: string },
+    callback: UnaryCallback<BalanceCancelPotResponse>,
   ): void;
 }
 
@@ -118,15 +160,26 @@ export interface EventServiceClient {
     },
     callback: UnaryCallback<EventPublishResponse>,
   ): void;
+  PublishEvents(
+    request: {
+      events: Array<{
+        type: string;
+        table_id: string;
+        hand_id?: string;
+        user_id?: string;
+        seat_id?: number;
+        payload: unknown;
+        idempotency_key: string;
+      }>;
+    },
+    callback: UnaryCallback<EventPublishEventsResponse>,
+  ): void;
 }
 
 type GrpcClientConstructor<TClient> = new (address: string, credentials: grpc.ChannelCredentials) => TClient;
 
 type BalanceProto = { balance: { BalanceService: GrpcClientConstructor<BalanceServiceClient> } };
 type EventProto = { event: { EventService: GrpcClientConstructor<EventServiceClient> } };
-
-const balanceProto = loadProto(BALANCE_PROTO_PATH) as unknown as BalanceProto;
-const eventProto = loadProto(EVENT_PROTO_PATH) as unknown as EventProto;
 
 type GrpcClientsConfig = Pick<typeof config, "balanceServiceAddr" | "eventServiceAddr">;
 
@@ -135,18 +188,63 @@ export interface GrpcClients {
   eventClient: EventServiceClient;
 }
 
+const balanceClientFactory = createGrpcServiceClientFactory<BalanceProto, BalanceServiceClient, grpc.ChannelCredentials>({
+  grpc,
+  protoLoader,
+  protoPath: BALANCE_PROTO_PATH,
+  protoLoaderOptions: PROTO_LOADER_OPTIONS,
+  getServiceConstructor: (proto) => proto.balance.BalanceService,
+});
+
+const eventClientFactory = createGrpcServiceClientFactory<EventProto, EventServiceClient, grpc.ChannelCredentials>({
+  grpc,
+  protoLoader,
+  protoPath: EVENT_PROTO_PATH,
+  protoLoaderOptions: PROTO_LOADER_OPTIONS,
+  getServiceConstructor: (proto) => proto.event.EventService,
+});
+
+type CreateGrpcServiceClientOptions = {
+  address: string;
+  credentials?: grpc.ChannelCredentials;
+};
+
+export function createBalanceClient(options: CreateGrpcServiceClientOptions): BalanceServiceClient {
+  const credentials = options.credentials ?? grpc.credentials.createInsecure();
+  return balanceClientFactory.createClient({ address: options.address, credentials });
+}
+
+export function createEventClient(options: CreateGrpcServiceClientOptions): EventServiceClient {
+  const credentials = options.credentials ?? grpc.credentials.createInsecure();
+  return eventClientFactory.createClient({ address: options.address, credentials });
+}
+
 export function createGrpcClients(configOverride: GrpcClientsConfig = config): GrpcClients {
   const credentials = grpc.credentials.createInsecure();
   return {
-    balanceClient: new balanceProto.balance.BalanceService(
-      configOverride.balanceServiceAddr,
-      credentials,
-    ),
-    eventClient: new eventProto.event.EventService(
-      configOverride.eventServiceAddr,
-      credentials,
-    ),
+    balanceClient: createBalanceClient({ address: configOverride.balanceServiceAddr, credentials }),
+    eventClient: createEventClient({ address: configOverride.eventServiceAddr, credentials }),
   };
 }
 
-export const { balanceClient, eventClient } = createGrpcClients();
+let defaultBalanceClient: BalanceServiceClient | null = null;
+let defaultEventClient: EventServiceClient | null = null;
+
+export function getBalanceClient(): BalanceServiceClient {
+  if (!defaultBalanceClient) {
+    defaultBalanceClient = createBalanceClient({ address: config.balanceServiceAddr });
+  }
+  return defaultBalanceClient;
+}
+
+export function getEventClient(): EventServiceClient {
+  if (!defaultEventClient) {
+    defaultEventClient = createEventClient({ address: config.eventServiceAddr });
+  }
+  return defaultEventClient;
+}
+
+export function resetGrpcClientsForTests(): void {
+  defaultBalanceClient = null;
+  defaultEventClient = null;
+}

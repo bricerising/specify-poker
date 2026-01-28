@@ -1,7 +1,6 @@
 import { Router, Request, Response } from "express";
 import { seatIdSchema, tableCreateRequestInputSchema, tableJoinSeatRequestSchema } from "@specify-poker/shared";
-import { gameClient } from "../../grpc/clients";
-import { grpcCall } from "../../grpc/grpcCall";
+import { grpc } from "../../grpc/unaryClients";
 import logger from "../../observability/logger";
 import { getConfig } from "../../config";
 import { requireUserId } from "../utils/requireUserId";
@@ -98,10 +97,10 @@ async function joinSeatWithDailyBonus(request: {
   seat_id: number;
   buy_in_amount: number;
 }): Promise<JoinSeatResponse> {
-  let response = (await grpcCall(gameClient.JoinSeat.bind(gameClient), request)) as JoinSeatResponse;
+  let response = (await grpc.game.JoinSeat(request)) as JoinSeatResponse;
   if (!response.ok && DAILY_LOGIN_BONUS_ERRORS.has(response.error ?? "")) {
     await ensureDailyLoginBonus(request.user_id);
-    response = (await grpcCall(gameClient.JoinSeat.bind(gameClient), request)) as JoinSeatResponse;
+    response = (await grpc.game.JoinSeat(request)) as JoinSeatResponse;
   }
   return response;
 }
@@ -111,7 +110,7 @@ async function resolveTargetUserIdBySeatId(params: {
   ownerId: string;
   seatId: number;
 }): Promise<string | null> {
-  const stateResponse = await grpcCall(gameClient.GetTableState.bind(gameClient), {
+  const stateResponse = await grpc.game.GetTableState({
     table_id: params.tableId,
     user_id: params.ownerId,
   });
@@ -152,7 +151,7 @@ async function handleOkGrpcResponse(res: Response, response: GrpcOkResponse, fal
 
 function createModerationHandler(options: {
   action: "kick" | "mute" | "unmute";
-  method: (request: { table_id: string; owner_id: string; target_user_id: string }, callback: (err: Error | null, response: unknown) => void) => unknown;
+  method: (request: { table_id: string; owner_id: string; target_user_id: string }) => Promise<unknown>;
 }) {
   return async (req: Request, res: Response) => {
     try {
@@ -165,7 +164,7 @@ function createModerationHandler(options: {
         return res.status(400).json({ error: "targetUserId is required" });
       }
 
-      await grpcCall(options.method, {
+      await options.method({
         table_id: tableId,
         owner_id: ownerId,
         target_user_id: targetUserId,
@@ -181,23 +180,23 @@ function createModerationHandler(options: {
 
 const handleKickByTargetUserId = createModerationHandler({
   action: "kick",
-  method: gameClient.KickPlayer.bind(gameClient),
+  method: grpc.game.KickPlayer,
 });
 
 const handleMuteByTargetUserId = createModerationHandler({
   action: "mute",
-  method: gameClient.MutePlayer.bind(gameClient),
+  method: grpc.game.MutePlayer,
 });
 
 const handleUnmuteByTargetUserId = createModerationHandler({
   action: "unmute",
-  method: gameClient.UnmutePlayer.bind(gameClient),
+  method: grpc.game.UnmutePlayer,
 });
 
 // GET /api/tables - List all tables
 router.get("/", async (_req: Request, res: Response) => {
   try {
-    const response = await grpcCall(gameClient.ListTables.bind(gameClient), {});
+    const response = await grpc.game.ListTables({});
     res.json(response.tables || []);
   } catch (err) {
     logger.error({ err }, "Failed to list tables");
@@ -217,7 +216,7 @@ router.post("/", async (req: Request, res: Response) => {
     const ownerId = requireUserId(req, res);
     if (!ownerId) return;
 
-    const response = await grpcCall(gameClient.CreateTable.bind(gameClient), {
+    const response = await grpc.game.CreateTable({
       name,
       owner_id: ownerId,
       config: {
@@ -240,7 +239,7 @@ router.post("/", async (req: Request, res: Response) => {
 router.get("/:tableId", async (req: Request, res: Response) => {
   try {
     const { tableId } = req.params;
-    const response = await grpcCall(gameClient.GetTable.bind(gameClient), { table_id: tableId });
+    const response = await grpc.game.GetTable({ table_id: tableId });
     res.json(response);
   } catch (err) {
     logger.error({ err, tableId: req.params.tableId }, "Failed to get table");
@@ -252,7 +251,7 @@ router.get("/:tableId", async (req: Request, res: Response) => {
 router.delete("/:tableId", async (req: Request, res: Response) => {
   try {
     const { tableId } = req.params;
-    await grpcCall(gameClient.DeleteTable.bind(gameClient), { table_id: tableId });
+    await grpc.game.DeleteTable({ table_id: tableId });
     res.status(204).send();
   } catch (err) {
     logger.error({ err, tableId: req.params.tableId }, "Failed to delete table");
@@ -265,7 +264,7 @@ router.get("/:tableId/state", async (req: Request, res: Response) => {
   try {
     const { tableId } = req.params;
     const userId = req.auth?.userId ?? "";
-    const response = await grpcCall(gameClient.GetTableState.bind(gameClient), {
+    const response = await grpc.game.GetTableState({
       table_id: tableId,
       user_id: userId,
     });
@@ -320,7 +319,7 @@ router.post("/:tableId/leave", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const response = (await grpcCall(gameClient.LeaveSeat.bind(gameClient), {
+    const response = (await grpc.game.LeaveSeat({
       table_id: tableId,
       user_id: userId,
     })) as GrpcOkResponse;
@@ -339,7 +338,7 @@ router.post("/:tableId/spectate", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const response = (await grpcCall(gameClient.JoinSpectator.bind(gameClient), {
+    const response = (await grpc.game.JoinSpectator({
       table_id: tableId,
       user_id: userId,
     })) as GrpcOkResponse;
@@ -358,7 +357,7 @@ router.post("/:tableId/spectate/leave", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const response = (await grpcCall(gameClient.LeaveSpectator.bind(gameClient), {
+    const response = (await grpc.game.LeaveSpectator({
       table_id: tableId,
       user_id: userId,
     })) as GrpcOkResponse;
@@ -378,7 +377,7 @@ router.post("/:tableId/action", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const response = (await grpcCall(gameClient.SubmitAction.bind(gameClient), {
+    const response = (await grpc.game.SubmitAction({
       table_id: tableId,
       user_id: userId,
       action_type: actionType,
@@ -410,13 +409,13 @@ router.post("/:tableId/moderation/kick", async (req: Request, res: Response) => 
       return res.status(404).json({ error: "Seat not occupied" });
     }
 
-    await grpcCall(gameClient.KickPlayer.bind(gameClient), {
+    await grpc.game.KickPlayer({
       table_id: tableId,
       owner_id: ownerId,
       target_user_id: targetUserId,
     });
 
-    const updated = await grpcCall(gameClient.GetTableState.bind(gameClient), {
+    const updated = await grpc.game.GetTableState({
       table_id: tableId,
       user_id: ownerId,
     });
@@ -452,7 +451,7 @@ router.post("/:tableId/moderation/mute", async (req: Request, res: Response) => 
       return res.status(404).json({ error: "Seat not occupied" });
     }
 
-    await grpcCall(gameClient.MutePlayer.bind(gameClient), {
+    await grpc.game.MutePlayer({
       table_id: tableId,
       owner_id: ownerId,
       target_user_id: targetUserId,

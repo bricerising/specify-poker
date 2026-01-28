@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import { createConfigBuilder } from "@specify-poker/shared";
 
 dotenv.config();
 
@@ -11,39 +12,21 @@ export type Config = {
   otelExporterEndpoint: string;
 };
 
-function parsePositiveInt(envName: string, fallback: number): number {
-  const raw = process.env[envName];
-  if (!raw) {
-    return fallback;
-  }
-  const parsed = Number(raw);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error(`${envName} must be a positive integer (got ${raw})`);
-  }
-  return parsed;
-}
-
-function parseNonEmptyString(envName: string, fallback: string): string {
-  const raw = process.env[envName];
-  if (!raw) {
-    return fallback;
-  }
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) {
-    throw new Error(`${envName} must be a non-empty string`);
-  }
-  return trimmed;
-}
-
 export function loadConfig(): Config {
-  return {
-    grpcPort: parsePositiveInt("GRPC_PORT", 50054),
-    metricsPort: parsePositiveInt("METRICS_PORT", 9104),
-    databaseUrl: parseNonEmptyString("DATABASE_URL", "postgresql://event:event@event-db:5432/event"),
-    redisUrl: parseNonEmptyString("REDIS_URL", "redis://redis:6379"),
-    logLevel: parseNonEmptyString("LOG_LEVEL", "info"),
-    otelExporterEndpoint: parseNonEmptyString("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317"),
-  };
+  const config: Config = createConfigBuilder(process.env)
+    .int("grpcPort", "GRPC_PORT", 50054, { min: 1, max: 65535, onInvalid: "throw" })
+    .int("metricsPort", "METRICS_PORT", 9104, { min: 1, max: 65535, onInvalid: "throw" })
+    .string("databaseUrl", "DATABASE_URL", "postgresql://event:event@event-db:5432/event", {
+      onEmpty: "throw",
+    })
+    .string("redisUrl", "REDIS_URL", "redis://redis:6379", { onEmpty: "throw" })
+    .string("logLevel", "LOG_LEVEL", "info", { onEmpty: "throw" })
+    .string("otelExporterEndpoint", "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317", {
+      onEmpty: "throw",
+    })
+    .build();
+
+  return config;
 }
 
 export const config = loadConfig();

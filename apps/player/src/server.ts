@@ -38,8 +38,9 @@ shutdownManager.add("metrics.close", () => {
   }
 });
 shutdownManager.add("eventConsumer.stop", () => {
-  eventConsumerInstance?.stop();
+  const consumer = eventConsumerInstance;
   eventConsumerInstance = null;
+  return consumer?.stop();
 });
 shutdownManager.add("deletionProcessor.stop", () => {
   stopDeletionProcessor();

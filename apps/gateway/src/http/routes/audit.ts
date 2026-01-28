@@ -1,6 +1,5 @@
 import { Router, Request, Response } from "express";
-import { eventClient } from "../../grpc/clients";
-import { grpcCall } from "../../grpc/grpcCall";
+import { grpc } from "../../grpc/unaryClients";
 import { requireUserId } from "../utils/requireUserId";
 import logger from "../../observability/logger";
 
@@ -12,7 +11,7 @@ router.get("/events", async (req: Request, res: Response) => {
     const { tableId, handId, userId, types, startTime, endTime, limit, offset, cursor } =
       req.query;
 
-    const response = await grpcCall(eventClient.QueryEvents.bind(eventClient), {
+    const response = await grpc.event.QueryEvents({
       table_id: tableId as string | undefined,
       hand_id: handId as string | undefined,
       user_id: userId as string | undefined,
@@ -40,7 +39,7 @@ router.get("/events", async (req: Request, res: Response) => {
 router.get("/events/:eventId", async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
-    const response = await grpcCall(eventClient.GetEvent.bind(eventClient), { event_id: eventId });
+    const response = await grpc.event.GetEvent({ event_id: eventId });
     res.json(response);
   } catch (err) {
     logger.error({ err, eventId: req.params.eventId }, "Failed to get event");
@@ -53,7 +52,7 @@ router.get("/hands/:handId", async (req: Request, res: Response) => {
   try {
     const { handId } = req.params;
     const requesterId = req.auth?.userId;
-    const response = await grpcCall(eventClient.GetHandRecord.bind(eventClient), {
+    const response = await grpc.event.GetHandRecord({
       hand_id: handId,
       requester_id: requesterId,
     });
@@ -68,7 +67,7 @@ router.get("/hands/:handId", async (req: Request, res: Response) => {
 router.get("/hands/:handId/replay", async (req: Request, res: Response) => {
   try {
     const { handId } = req.params;
-    const response = await grpcCall(eventClient.GetHandReplay.bind(eventClient), { hand_id: handId });
+    const response = await grpc.event.GetHandReplay({ hand_id: handId });
     res.json({
       handId: response.hand_id,
       events: response.events || [],
@@ -86,7 +85,7 @@ router.get("/tables/:tableId/hands", async (req: Request, res: Response) => {
     const { limit, offset } = req.query;
     const requesterId = req.auth?.userId;
 
-    const response = await grpcCall(eventClient.GetHandHistory.bind(eventClient), {
+    const response = await grpc.event.GetHandHistory({
       table_id: tableId,
       limit: limit ? parseInt(limit as string, 10) : 20,
       offset: offset ? parseInt(offset as string, 10) : 0,
@@ -115,7 +114,7 @@ router.get("/users/:userId/hands", async (req: Request, res: Response) => {
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    const response = await grpcCall(eventClient.GetHandsForUser.bind(eventClient), {
+    const response = await grpc.event.GetHandsForUser({
       user_id: userId,
       limit: limit ? parseInt(limit as string, 10) : 20,
       offset: offset ? parseInt(offset as string, 10) : 0,
@@ -139,7 +138,7 @@ router.get("/my-hands", async (req: Request, res: Response) => {
 
     const { limit, offset } = req.query;
 
-    const response = await grpcCall(eventClient.GetHandsForUser.bind(eventClient), {
+    const response = await grpc.event.GetHandsForUser({
       user_id: userId,
       limit: limit ? parseInt(limit as string, 10) : 20,
       offset: offset ? parseInt(offset as string, 10) : 0,

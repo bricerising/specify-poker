@@ -1,3 +1,5 @@
+import { createConfigBuilder } from "@specify-poker/shared";
+
 export interface Config {
   grpcPort: number;
   metricsPort: number;
@@ -9,15 +11,17 @@ export interface Config {
 }
 
 export function loadConfig(): Config {
-  return {
-    grpcPort: parseInt(process.env.GRPC_PORT ?? "50052", 10),
-    metricsPort: parseInt(process.env.METRICS_PORT ?? "9106", 10),
-    databaseUrl: process.env.DATABASE_URL ?? "postgresql://player:player@player-db:5432/player",
-    redisUrl: process.env.REDIS_URL?.trim() || null,
-    logLevel: process.env.LOG_LEVEL ?? "info",
-    otelExporterEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "http://localhost:4317",
-    deletionProcessorIntervalMs: parseInt(process.env.DELETION_PROCESSOR_INTERVAL_MS ?? "3600000", 10), // Default: 1 hour
-  };
+  const config: Config = createConfigBuilder(process.env)
+    .int("grpcPort", "GRPC_PORT", 50052, { min: 1, max: 65535 })
+    .int("metricsPort", "METRICS_PORT", 9106, { min: 1, max: 65535 })
+    .string("databaseUrl", "DATABASE_URL", "postgresql://player:player@player-db:5432/player")
+    .nullableString("redisUrl", "REDIS_URL")
+    .string("logLevel", "LOG_LEVEL", "info")
+    .string("otelExporterEndpoint", "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+    .int("deletionProcessorIntervalMs", "DELETION_PROCESSOR_INTERVAL_MS", 3_600_000, { min: 0 })
+    .build();
+
+  return config;
 }
 
 let config: Config | null = null;
@@ -27,4 +31,8 @@ export function getConfig(): Config {
     config = loadConfig();
   }
   return config;
+}
+
+export function resetConfigForTests(): void {
+  config = null;
 }

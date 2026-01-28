@@ -13,7 +13,7 @@ RUN npm ci --omit=dev -w @specify-poker/shared -w @specify-poker/ui
 RUN mkdir -p /app/build-deps \
   && cd /app/build-deps \
   && npm init -y \
-  && npm install --no-package-lock typescript@5.9.3 @types/react@18.3.27 @types/react-dom@18.3.7 \
+  && npm install --no-package-lock typescript@5.9.3 @types/node@20.19.27 @types/react@18.3.27 @types/react-dom@18.3.7 redis@4.7.1 \
   && cp -R node_modules/* /app/node_modules/ \
   && rm -rf /app/build-deps
 

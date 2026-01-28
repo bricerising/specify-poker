@@ -1,6 +1,5 @@
 import { Router, Request, Response } from "express";
-import { playerClient } from "../../grpc/clients";
-import { grpcCall } from "../../grpc/grpcCall";
+import { grpc } from "../../grpc/unaryClients";
 import { normalizeUsernameFromClaims } from "../../auth/claims";
 import { requireUserId } from "../utils/requireUserId";
 import logger from "../../observability/logger";
@@ -57,9 +56,9 @@ router.get("/me", async (req: Request, res: Response) => {
     const username = normalizeUsernameFromClaims(req.auth?.claims ?? undefined);
 
     const [profileResponse, statsResponse, friendsResponse] = await Promise.all([
-      grpcCall(playerClient.GetProfile.bind(playerClient), { user_id: userId, ...(username ? { username } : {}) }),
-      grpcCall(playerClient.GetStatistics.bind(playerClient), { user_id: userId }),
-      grpcCall(playerClient.GetFriends.bind(playerClient), { user_id: userId }),
+      grpc.player.GetProfile({ user_id: userId, ...(username ? { username } : {}) }),
+      grpc.player.GetStatistics({ user_id: userId }),
+      grpc.player.GetFriends({ user_id: userId }),
     ]);
 
     const profile = normalizeProfile((profileResponse.profile || {}) as UnknownRecord, userId);
@@ -118,11 +117,11 @@ router.put("/me", async (req: Request, res: Response) => {
       };
     }
 
-    const updateResponse = await grpcCall(playerClient.UpdateProfile.bind(playerClient), updateRequest);
+    const updateResponse = await grpc.player.UpdateProfile(updateRequest);
 
     const [statsResponse, friendsResponse] = await Promise.all([
-      grpcCall(playerClient.GetStatistics.bind(playerClient), { user_id: userId }),
-      grpcCall(playerClient.GetFriends.bind(playerClient), { user_id: userId }),
+      grpc.player.GetStatistics({ user_id: userId }),
+      grpc.player.GetFriends({ user_id: userId }),
     ]);
 
     const profile = normalizeProfile((updateResponse.profile || {}) as UnknownRecord, userId);
@@ -158,11 +157,11 @@ router.post("/profile", async (req: Request, res: Response) => {
       updateRequest.avatar_url = avatarUrl;
     }
 
-    const updateResponse = await grpcCall(playerClient.UpdateProfile.bind(playerClient), updateRequest);
+    const updateResponse = await grpc.player.UpdateProfile(updateRequest);
 
     const [statsResponse, friendsResponse] = await Promise.all([
-      grpcCall(playerClient.GetStatistics.bind(playerClient), { user_id: userId }),
-      grpcCall(playerClient.GetFriends.bind(playerClient), { user_id: userId }),
+      grpc.player.GetStatistics({ user_id: userId }),
+      grpc.player.GetFriends({ user_id: userId }),
     ]);
 
     const profile = normalizeProfile((updateResponse.profile || {}) as UnknownRecord, userId);
@@ -183,7 +182,7 @@ router.delete("/me", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const response = await grpcCall(playerClient.DeleteProfile.bind(playerClient), {
+    const response = await grpc.player.DeleteProfile({
       user_id: userId,
     });
     if (!response.success) {
@@ -202,7 +201,7 @@ router.get("/me/statistics", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const response = await grpcCall(playerClient.GetStatistics.bind(playerClient), {
+    const response = await grpc.player.GetStatistics({
       user_id: userId,
     });
     return res.json(response.statistics);
@@ -216,7 +215,7 @@ router.get("/me/statistics", async (req: Request, res: Response) => {
 router.get("/profile/:userId", async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
-    const response = await grpcCall(playerClient.GetProfile.bind(playerClient), {
+    const response = await grpc.player.GetProfile({
       user_id: userId,
     });
     const profile = normalizeProfile((response.profile || {}) as UnknownRecord, userId);
@@ -233,7 +232,7 @@ router.get("/friends", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const response = await grpcCall(playerClient.GetFriends.bind(playerClient), {
+    const response = await grpc.player.GetFriends({
       user_id: userId,
     });
     const friends = normalizeFriendIds((response as UnknownRecord).friends);
@@ -260,7 +259,7 @@ router.put("/friends", async (req: Request, res: Response) => {
       .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
       .filter((entry) => entry.length > 0 && entry !== userId);
 
-    const currentResponse = await grpcCall(playerClient.GetFriends.bind(playerClient), { user_id: userId });
+    const currentResponse = await grpc.player.GetFriends({ user_id: userId });
     const currentIds = new Set(normalizeFriendIds((currentResponse as UnknownRecord).friends));
     const desiredSet = new Set(desiredIds);
 
@@ -268,14 +267,14 @@ router.put("/friends", async (req: Request, res: Response) => {
       if (currentIds.has(friendId)) {
         continue;
       }
-      await grpcCall(playerClient.AddFriend.bind(playerClient), { user_id: userId, friend_id: friendId });
+      await grpc.player.AddFriend({ user_id: userId, friend_id: friendId });
     }
 
     for (const friendId of currentIds) {
       if (desiredSet.has(friendId)) {
         continue;
       }
-      await grpcCall(playerClient.RemoveFriend.bind(playerClient), { user_id: userId, friend_id: friendId });
+      await grpc.player.RemoveFriend({ user_id: userId, friend_id: friendId });
     }
 
     return res.json({ friends: Array.from(desiredSet.values()) });
@@ -296,7 +295,7 @@ router.post("/friends", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "friendId is required" });
     }
 
-    await grpcCall(playerClient.AddFriend.bind(playerClient), {
+    await grpc.player.AddFriend({
       user_id: userId,
       friend_id: friendId,
     });
@@ -314,7 +313,7 @@ router.delete("/friends/:friendId", async (req: Request, res: Response) => {
     if (!userId) return;
 
     const { friendId } = req.params;
-    await grpcCall(playerClient.RemoveFriend.bind(playerClient), {
+    await grpc.player.RemoveFriend({
       user_id: userId,
       friend_id: friendId,
     });
@@ -333,7 +332,7 @@ router.post("/nicknames", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "userIds array is required" });
     }
 
-    const response = await grpcCall(playerClient.GetNicknames.bind(playerClient), {
+    const response = await grpc.player.GetNicknames({
       user_ids: userIds,
     });
     return res.json({ nicknames: response.nicknames || [] });

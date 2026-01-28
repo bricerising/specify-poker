@@ -7,3 +7,8 @@ export * from "./result/index";
 export * from "./grpc/call";
 export * from "./grpc/unary";
 export * from "./grpc/serviceError";
+export * from "./grpc/unaryCallProxy";
+export * from "./grpc/unaryCallResultProxy";
+export * from "./grpc/clientFactory";
+export * from "./grpc/serverLifecycle";
+export * from "./config/index";

@@ -31,7 +31,11 @@ vi.mock("@grpc/proto-loader", () => ({
 
 describe("gRPC clients module", () => {
   it("creates balance and event clients with configured addresses", async () => {
-    await import("../../src/api/grpc/clients");
+    const clients = await import("../../src/api/grpc/clients");
+
+    clients.resetGrpcClientsForTests();
+    clients.getBalanceClient();
+    clients.getEventClient();
 
     expect(clientState.balanceArgs[0]).toBe("localhost:50051");
     expect(clientState.eventArgs[0]).toBe("localhost:50054");

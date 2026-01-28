@@ -1,5 +1,5 @@
 import { incrementRateLimit } from "../storage/rateLimitStore";
-import { readIntEnv } from "../utils/env";
+import { readIntEnv } from "@specify-poker/shared";
 
 const allowedActions = {
   Fold: "FOLD",
@@ -13,8 +13,8 @@ const maxChatLength = 500;
 const seatMin = 0;
 const seatMax = 8;
 
-const wsWindowMs = readIntEnv("WS_RATE_LIMIT_WINDOW_MS", 10_000, { min: 1 });
-const wsMax = readIntEnv("WS_RATE_LIMIT_MAX", 20, { min: 1 });
+const wsWindowMs = readIntEnv(process.env, "WS_RATE_LIMIT_WINDOW_MS", 10_000, { min: 1 });
+const wsMax = readIntEnv(process.env, "WS_RATE_LIMIT_MAX", 20, { min: 1 });
 
 export async function checkWsRateLimit(
   userId: string,

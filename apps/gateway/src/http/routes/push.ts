@@ -1,6 +1,5 @@
 import { Request, Response, Router } from "express";
-import { notifyClient } from "../../grpc/clients";
-import { grpcCall } from "../../grpc/grpcCall";
+import { grpc } from "../../grpc/unaryClients";
 import { requireUserId } from "../utils/requireUserId";
 import logger from "../../observability/logger";
 
@@ -57,7 +56,7 @@ router.post("/subscribe", async (req: Request, res: Response) => {
       return res.status(400).json({ error: parsed.error });
     }
 
-    const response = await grpcCall(notifyClient.RegisterSubscription.bind(notifyClient), {
+    const response = await grpc.notify.RegisterSubscription({
       user_id: userId,
       subscription: parsed.subscription,
     });
@@ -83,7 +82,7 @@ router.delete("/subscribe", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "endpoint is required" });
     }
 
-    const response = await grpcCall(notifyClient.UnregisterSubscription.bind(notifyClient), {
+    const response = await grpc.notify.UnregisterSubscription({
       user_id: userId,
       endpoint,
     });

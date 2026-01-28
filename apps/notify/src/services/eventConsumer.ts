@@ -53,31 +53,30 @@ export class EventConsumer {
     if (this.isRunning) {
       return;
     }
-
-    const client = await this.getClient();
     this.isRunning = true;
+    logger.info({ streamKey: this.streamKey }, "EventConsumer starting");
 
-    try {
-      await client.xGroupCreate(this.streamKey, this.groupName, "0", { MKSTREAM: true });
-    } catch (error: unknown) {
-      const message = getErrorMessage(error);
-      if (!message.includes("BUSYGROUP")) {
-        logger.error({ err: error }, "Error creating consumer group");
-        this.isRunning = false;
-        throw error;
-      }
-    }
-
-    logger.info({ streamKey: this.streamKey }, "EventConsumer started");
     this.pollPromise = this.poll().catch((error: unknown) => {
       logger.error({ err: error }, "EventConsumer poll loop crashed");
     });
   }
 
   private async poll(): Promise<void> {
-    const client = await this.getClient();
     while (this.isRunning) {
       try {
+        const client = await this.getClient();
+
+        try {
+          await client.xGroupCreate(this.streamKey, this.groupName, "0", { MKSTREAM: true });
+        } catch (error: unknown) {
+          const message = getErrorMessage(error);
+          if (!message.includes("BUSYGROUP")) {
+            logger.warn({ err: error }, "Error creating consumer group; retrying");
+            await this.sleep(1000);
+            continue;
+          }
+        }
+
         const streams = await client.xReadGroup(
           this.groupName,
           this.consumerName,
@@ -96,7 +95,7 @@ export class EventConsumer {
           }
         }
       } catch (err) {
-        logger.error({ err }, "Error polling events");
+        logger.warn({ err }, "Error polling events; retrying");
         await this.sleep(1000);
       }
     }

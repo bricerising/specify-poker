@@ -9,7 +9,7 @@ import { initWsPubSub } from "./pubsub";
 import { attachTableHub, handleTablePubSubEvent } from "./handlers/table";
 import { attachLobbyHub, handleLobbyPubSubEvent } from "./handlers/lobby";
 import { attachChatHub, handleChatPubSubEvent } from "./handlers/chat";
-import { eventClient, playerClient } from "../grpc/clients";
+import { grpc } from "../grpc/unaryClients";
 import { updatePresence } from "../storage/sessionStore";
 import { getConnectionsByUser } from "../storage/connectionStore";
 import { setupHeartbeat } from "./heartbeat";
@@ -29,20 +29,22 @@ const sessionMeta = new Map<string, { startedAt: number; clientType: ClientType 
 const authTimeoutMs = 5000;
 
 function emitSessionEvent(type: string, userId: string, payload: Record<string, unknown>) {
-  eventClient.PublishEvent(
-    {
+  void grpc.event
+    .PublishEvent({
       type,
       table_id: "lobby",
       user_id: userId,
       payload: toStruct(payload),
       idempotency_key: randomUUID(),
-    },
-    (err, response) => {
-      if (err || !response?.success) {
-        logger.error({ err, type, userId }, "Failed to emit session event");
+    })
+    .then((response) => {
+      if (!response.success) {
+        logger.error({ type, userId }, "Failed to emit session event");
       }
-    },
-  );
+    })
+    .catch((err: unknown) => {
+      logger.error({ err, type, userId }, "Failed to emit session event");
+    });
 }
 
 function getClientIp(request: IncomingMessage) {
@@ -131,10 +133,8 @@ export async function initWsServer(server: Server) {
           logger.info({ userId, connectionId }, "WS connection established");
 
           if (typeof username === "string" && username.trim().length > 0) {
-            playerClient.GetProfile({ user_id: userId, username }, (err) => {
-              if (err) {
-                logger.warn({ err, userId }, "Failed to sync username on websocket connect");
-              }
+            void grpc.player.GetProfile({ user_id: userId, username }).catch((err: unknown) => {
+              logger.warn({ err, userId }, "Failed to sync username on websocket connect");
             });
           }
 

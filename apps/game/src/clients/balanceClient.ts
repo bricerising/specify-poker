@@ -1,19 +1,6 @@
-import * as grpc from "@grpc/grpc-js";
-import * as protoLoader from "@grpc/proto-loader";
-import * as path from "path";
-import { unaryCallResult } from "@specify-poker/shared";
-import { config } from "../config";
+import { createUnaryCallResultProxy, type UnaryCallResultProxy } from "@specify-poker/shared";
+import { getBalanceClient, type BalanceServiceClient } from "../api/grpc/clients";
 import logger from "../observability/logger";
-
-const PROTO_PATH = path.resolve(__dirname, "../../proto/balance.proto");
-
-const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
-  keepCase: true,
-  longs: Number,
-  enums: String,
-  defaults: true,
-  oneofs: true,
-});
 
 type NumericString = string | number;
 
@@ -25,126 +12,14 @@ function parseNumeric(value: NumericString | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-interface ReserveForBuyInResponse {
-  ok: boolean;
-  reservation_id?: string;
-  error?: string;
-  available_balance?: NumericString;
+let unary: UnaryCallResultProxy<BalanceServiceClient> | null = null;
+
+function getUnaryBalanceClient(): UnaryCallResultProxy<BalanceServiceClient> {
+  if (!unary) {
+    unary = createUnaryCallResultProxy(getBalanceClient());
+  }
+  return unary;
 }
-
-interface CommitReservationResponse {
-  ok: boolean;
-  transaction_id?: string;
-  error?: string;
-  new_balance?: NumericString;
-}
-
-interface ReleaseReservationResponse {
-  ok: boolean;
-  error?: string;
-}
-
-interface ProcessCashOutResponse {
-  ok: boolean;
-  transaction_id?: string;
-  error?: string;
-  new_balance?: NumericString;
-}
-
-interface RecordContributionResponse {
-  ok: boolean;
-  error?: string;
-  total_pot?: NumericString;
-  seat_contribution?: NumericString;
-}
-
-interface SettlePotResult {
-  account_id: string;
-  transaction_id: string;
-  amount: NumericString;
-  new_balance: NumericString;
-}
-
-interface SettlePotResponse {
-  ok: boolean;
-  error?: string;
-  results?: SettlePotResult[];
-}
-
-interface CancelPotResponse {
-  ok: boolean;
-  error?: string;
-}
-
-interface BalanceServiceClient {
-  ReserveForBuyIn(
-    request: {
-      account_id: string;
-      table_id: string;
-      amount: number;
-      idempotency_key: string;
-      timeout_seconds: number;
-    },
-    callback: (err: grpc.ServiceError | null, response: ReserveForBuyInResponse) => void
-  ): void;
-  CommitReservation(
-    request: { reservation_id: string },
-    callback: (err: grpc.ServiceError | null, response: CommitReservationResponse) => void
-  ): void;
-  ReleaseReservation(
-    request: { reservation_id: string; reason?: string },
-    callback: (err: grpc.ServiceError | null, response: ReleaseReservationResponse) => void
-  ): void;
-  ProcessCashOut(
-    request: {
-      account_id: string;
-      table_id: string;
-      seat_id: number;
-      amount: number;
-      idempotency_key: string;
-      hand_id?: string;
-    },
-    callback: (err: grpc.ServiceError | null, response: ProcessCashOutResponse) => void
-  ): void;
-  RecordContribution(
-    request: {
-      table_id: string;
-      hand_id: string;
-      seat_id: number;
-      account_id: string;
-      amount: number;
-      contribution_type: string;
-      idempotency_key: string;
-    },
-    callback: (err: grpc.ServiceError | null, response: RecordContributionResponse) => void
-  ): void;
-  SettlePot(
-    request: {
-      table_id: string;
-      hand_id: string;
-      winners: Array<{ seat_id: number; account_id: string; amount: number }>;
-      idempotency_key: string;
-    },
-    callback: (err: grpc.ServiceError | null, response: SettlePotResponse) => void
-  ): void;
-  CancelPot(
-    request: { table_id: string; hand_id: string; reason: string },
-    callback: (err: grpc.ServiceError | null, response: CancelPotResponse) => void
-  ): void;
-}
-
-type BalanceProto = {
-  balance: {
-    BalanceService: new (addr: string, creds: grpc.ChannelCredentials) => BalanceServiceClient;
-  };
-};
-
-const proto = grpc.loadPackageDefinition(packageDefinition) as unknown as BalanceProto;
-
-const client = new proto.balance.BalanceService(
-  config.balanceServiceAddr,
-  grpc.credentials.createInsecure()
-);
 
 export interface ReserveResult {
   ok: boolean;
@@ -191,7 +66,7 @@ export async function reserveForBuyIn(
   amount: number,
   idempotencyKey: string
 ): Promise<ReserveResult> {
-  const call = await unaryCallResult(client.ReserveForBuyIn.bind(client), {
+  const call = await getUnaryBalanceClient().ReserveForBuyIn({
     account_id: accountId,
     table_id: tableId,
     amount,
@@ -214,7 +89,7 @@ export async function reserveForBuyIn(
 }
 
 export async function commitReservation(reservationId: string): Promise<CommitResult> {
-  const call = await unaryCallResult(client.CommitReservation.bind(client), {
+  const call = await getUnaryBalanceClient().CommitReservation({
     reservation_id: reservationId,
   });
 
@@ -236,7 +111,7 @@ export async function releaseReservation(
   reservationId: string,
   reason?: string
 ): Promise<{ ok: boolean; error?: string }> {
-  const call = await unaryCallResult(client.ReleaseReservation.bind(client), {
+  const call = await getUnaryBalanceClient().ReleaseReservation({
     reservation_id: reservationId,
     reason,
   });
@@ -258,7 +133,7 @@ export async function processCashOut(
   idempotencyKey: string,
   handId?: string
 ): Promise<CashOutResult> {
-  const call = await unaryCallResult(client.ProcessCashOut.bind(client), {
+  const call = await getUnaryBalanceClient().ProcessCashOut({
     account_id: accountId,
     table_id: tableId,
     seat_id: seatId,
@@ -290,7 +165,7 @@ export async function recordContribution(
   contributionType: string,
   idempotencyKey: string
 ): Promise<ContributionResult> {
-  const call = await unaryCallResult(client.RecordContribution.bind(client), {
+  const call = await getUnaryBalanceClient().RecordContribution({
     table_id: tableId,
     hand_id: handId,
     seat_id: seatId,
@@ -320,7 +195,7 @@ export async function settlePot(
   winners: Array<{ seatId: number; accountId: string; amount: number }>,
   idempotencyKey: string
 ): Promise<SettlementResult> {
-  const call = await unaryCallResult(client.SettlePot.bind(client), {
+  const call = await getUnaryBalanceClient().SettlePot({
     table_id: tableId,
     hand_id: handId,
     winners: winners.map((w) => ({
@@ -354,7 +229,7 @@ export async function cancelPot(
   handId: string,
   reason: string
 ): Promise<{ ok: boolean; error?: string }> {
-  const call = await unaryCallResult(client.CancelPot.bind(client), {
+  const call = await getUnaryBalanceClient().CancelPot({
     table_id: tableId,
     hand_id: handId,
     reason,

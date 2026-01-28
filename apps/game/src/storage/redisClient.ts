@@ -1,23 +1,17 @@
-import { createClient } from "redis";
+import { createAsyncMethodProxy, createRedisClientManager } from "@specify-poker/shared/redis";
 import { config } from "../config";
 import logger from "../observability/logger";
 
-const client = createClient({
-  url: config.redisUrl,
-});
+const redis = createRedisClientManager({ url: config.redisUrl, log: logger, name: "game" });
 
-client.on("error", (err) => logger.error({ err }, "Redis Client Error"));
+const client = createAsyncMethodProxy(() => redis.getClient());
 
 export const connectRedis = async () => {
-  if (!client.isOpen) {
-    await client.connect();
-  }
+  await redis.getClient();
 };
 
 export const closeRedisClient = async () => {
-  if (client.isOpen) {
-    await client.quit();
-  }
+  await redis.close();
 };
 
 export default client;

@@ -9,6 +9,16 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/cjs/index.js"
+    },
+    "./redis": {
+      "types": "./dist/redis/index.d.ts",
+      "import": "./dist/redis/index.js",
+      "require": "./dist/cjs/redis/index.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "redis": ["dist/redis/index.d.ts"]
     }
   },
   "scripts": {
@@ -16,5 +26,13 @@
   },
   "dependencies": {
     "zod": "^3.22.4"
+  },
+  "peerDependencies": {
+    "redis": "^4.6.13"
+  },
+  "peerDependenciesMeta": {
+    "redis": {
+      "optional": true
+    }
   }
 }

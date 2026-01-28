@@ -1,71 +1,18 @@
-import * as grpc from "@grpc/grpc-js";
-import * as protoLoader from "@grpc/proto-loader";
-import * as path from "path";
-import { config } from "../config";
+import { GameEventType } from "../domain/events";
 import logger from "../observability/logger";
-import { StructFields, toStructFields, unaryCallResult } from "@specify-poker/shared";
+import { createUnaryCallResultProxy, toStruct, type UnaryCallResultProxy } from "@specify-poker/shared";
+import { getEventClient, type EventServiceClient } from "../api/grpc/clients";
 
-const PROTO_PATH = path.resolve(__dirname, "../../proto/event.proto");
+export { GameEventType as EventTypes } from "../domain/events";
 
-const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
-  keepCase: true,
-  longs: String,
-  enums: String,
-  defaults: true,
-  oneofs: true,
-});
+let unary: UnaryCallResultProxy<EventServiceClient> | null = null;
 
-interface PublishEventResponse {
-  success: boolean;
-  event_id?: string;
+function getUnaryEventClient(): UnaryCallResultProxy<EventServiceClient> {
+  if (!unary) {
+    unary = createUnaryCallResultProxy(getEventClient());
+  }
+  return unary;
 }
-
-interface PublishEventsResponse {
-  success: boolean;
-  event_ids?: string[];
-}
-
-interface EventServiceClient {
-  PublishEvent(
-    request: {
-      type: string;
-      table_id: string;
-      hand_id?: string;
-      user_id?: string;
-      seat_id?: number;
-      payload: { fields: StructFields };
-      idempotency_key: string;
-    },
-    callback: (err: grpc.ServiceError | null, response: PublishEventResponse) => void
-  ): void;
-  PublishEvents(
-    request: {
-      events: Array<{
-        type: string;
-        table_id: string;
-        hand_id?: string;
-        user_id?: string;
-        seat_id?: number;
-        payload: { fields: StructFields };
-        idempotency_key: string;
-      }>;
-    },
-    callback: (err: grpc.ServiceError | null, response: PublishEventsResponse) => void
-  ): void;
-}
-
-type EventProto = {
-  event: {
-    EventService: new (addr: string, creds: grpc.ChannelCredentials) => EventServiceClient;
-  };
-};
-
-const proto = grpc.loadPackageDefinition(packageDefinition) as unknown as EventProto;
-
-const client = new proto.event.EventService(
-  config.eventServiceAddr,
-  grpc.credentials.createInsecure()
-);
 
 export interface GameEvent {
   type: string;
@@ -83,13 +30,13 @@ export interface PublishResult {
 }
 
 export async function publishEvent(event: GameEvent): Promise<PublishResult> {
-  const call = await unaryCallResult(client.PublishEvent.bind(client), {
+  const call = await getUnaryEventClient().PublishEvent({
     type: event.type,
     table_id: event.tableId,
     hand_id: event.handId,
     user_id: event.userId,
     seat_id: event.seatId,
-    payload: { fields: toStructFields(event.payload) },
+    payload: toStruct(event.payload),
     idempotency_key: event.idempotencyKey,
   });
 
@@ -103,14 +50,14 @@ export async function publishEvent(event: GameEvent): Promise<PublishResult> {
 }
 
 export async function publishEvents(events: GameEvent[]): Promise<{ success: boolean; eventIds?: string[] }> {
-  const call = await unaryCallResult(client.PublishEvents.bind(client), {
+  const call = await getUnaryEventClient().PublishEvents({
     events: events.map((e) => ({
       type: e.type,
       table_id: e.tableId,
       hand_id: e.handId,
       user_id: e.userId,
       seat_id: e.seatId,
-      payload: { fields: toStructFields(e.payload) },
+      payload: toStruct(e.payload),
       idempotency_key: e.idempotencyKey,
     })),
   });
@@ -124,13 +71,6 @@ export async function publishEvents(events: GameEvent[]): Promise<{ success: boo
   return { success: response.success, eventIds: response.event_ids };
 }
 
-// Import and re-export event types from the centralized domain constants
-import { GameEventType } from "../domain/events";
-export { GameEventType as EventTypes } from "../domain/events";
-
-// Use the imported constant for internal functions
-const EventTypes = GameEventType;
-
 // Convenience functions for common events
 export async function emitTableCreated(
   tableId: string,
@@ -139,7 +79,7 @@ export async function emitTableCreated(
   config: Record<string, unknown>
 ) {
   return publishEvent({
-    type: EventTypes.TABLE_CREATED,
+    type: GameEventType.TABLE_CREATED,
     tableId,
     userId: ownerId,
     payload: { tableName, config },
@@ -149,7 +89,7 @@ export async function emitTableCreated(
 
 export async function emitPlayerJoined(tableId: string, userId: string, seatId: number, buyInAmount: number) {
   return publishEvent({
-    type: EventTypes.PLAYER_JOINED,
+    type: GameEventType.PLAYER_JOINED,
     tableId,
     userId,
     seatId,
@@ -160,7 +100,7 @@ export async function emitPlayerJoined(tableId: string, userId: string, seatId: 
 
 export async function emitPlayerLeft(tableId: string, userId: string, seatId: number, finalStack: number) {
   return publishEvent({
-    type: EventTypes.PLAYER_LEFT,
+    type: GameEventType.PLAYER_LEFT,
     tableId,
     userId,
     seatId,
@@ -176,7 +116,7 @@ export async function emitHandStarted(
   button: number
 ) {
   return publishEvent({
-    type: EventTypes.HAND_STARTED,
+    type: GameEventType.HAND_STARTED,
     tableId,
     handId,
     payload: { participants, button },
@@ -194,7 +134,7 @@ export async function emitActionTaken(
   street: string
 ) {
   return publishEvent({
-    type: EventTypes.ACTION_TAKEN,
+    type: GameEventType.ACTION_TAKEN,
     tableId,
     handId,
     userId,
@@ -212,7 +152,7 @@ export async function emitHandCompleted(
   rake: number
 ) {
   return publishEvent({
-    type: EventTypes.HAND_COMPLETED,
+    type: GameEventType.HAND_COMPLETED,
     tableId,
     handId,
     payload: { winners, communityCards, rake },

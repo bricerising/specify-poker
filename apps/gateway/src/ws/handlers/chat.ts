@@ -3,8 +3,7 @@ import WebSocket from "ws";
 import type { z } from "zod";
 import { wsClientMessageSchema } from "@specify-poker/shared";
 
-import { gameClient, playerClient } from "../../grpc/clients";
-import { grpcCall } from "../../grpc/grpcCall";
+import { grpc } from "../../grpc/unaryClients";
 import { WsPubSubMessage } from "../pubsub";
 import { checkWsRateLimit, parseChatMessage, parseTableId } from "../validators";
 import { subscribeToChannel, unsubscribeFromChannel, unsubscribeAll } from "../subscriptions";
@@ -30,7 +29,7 @@ export async function handleChatPubSubEvent(message: WsPubSubMessage) {
 
 async function getMembership(tableId: string, userId: string): Promise<{ seated: boolean; spectator: boolean }> {
   try {
-    const response = await grpcCall(gameClient.GetTableState.bind(gameClient), {
+    const response = await grpc.game.GetTableState({
       table_id: tableId,
       user_id: userId,
     });
@@ -44,7 +43,7 @@ async function getMembership(tableId: string, userId: string): Promise<{ seated:
 
 async function isMuted(tableId: string, userId: string): Promise<boolean> {
   try {
-    const response = await grpcCall(gameClient.IsMuted.bind(gameClient), {
+    const response = await grpc.game.IsMuted({
       table_id: tableId,
       user_id: userId,
     });
@@ -56,7 +55,7 @@ async function isMuted(tableId: string, userId: string): Promise<boolean> {
 
 async function getUsername(userId: string): Promise<string> {
   try {
-    const response = await grpcCall(playerClient.GetProfile.bind(playerClient), { user_id: userId });
+    const response = await grpc.player.GetProfile({ user_id: userId });
     const username = (response.profile as { username?: unknown } | undefined)?.username;
     if (typeof username === "string" && username.trim().length > 0) {
       return username;

@@ -42,7 +42,7 @@ describe("gRPC clients", () => {
     const module = await import("../../../src/grpc/clients");
 
     expect(loadSync).toHaveBeenCalledTimes(5);
-    expect(createInsecure).toHaveBeenCalledTimes(5);
+    expect(createInsecure).toHaveBeenCalledTimes(1);
     expect(ctor).toHaveBeenCalledWith("game:1234", "creds");
     expect(ctor).toHaveBeenCalledWith("player:1234", "creds");
     expect(ctor).toHaveBeenCalledWith("balance:1234", "creds");

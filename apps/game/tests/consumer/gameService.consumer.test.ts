@@ -86,7 +86,7 @@ vi.mock("../../src/observability/logger", () => ({
 }));
 
 vi.mock("../../src/api/grpc/clients", () => ({
-  balanceClient: {
+  getBalanceClient: () => ({
     ReserveForBuyIn: (request: unknown, callback: (err: Error | null, response?: unknown) => void) => {
       grpcState.reserveCalls.push(request);
       if (grpcState.reserveError) {
@@ -123,13 +123,16 @@ vi.mock("../../src/api/grpc/clients", () => ({
       }
       callback(null, grpcState.settleResponse);
     },
-  },
-  eventClient: {
-    PublishEvent: (request: { type: string; payload: unknown }, callback: (err: Error | null, response?: unknown) => void) => {
+  }),
+  getEventClient: () => ({
+    PublishEvent: (
+      request: { type: string; payload: unknown },
+      callback: (err: Error | null, response?: unknown) => void
+    ) => {
       grpcState.publishedEvents.push({ type: request.type, payload: request.payload });
       callback(null, { success: true });
     },
-  },
+  }),
 }));
 
 import { createHandlers } from "../../src/api/grpc/handlers";

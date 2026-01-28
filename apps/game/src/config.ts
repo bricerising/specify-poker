@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 
-import { parseEnvInt, parseEnvString } from "./utils/coerce";
+import { createConfigBuilder } from "@specify-poker/shared";
 
 dotenv.config();
 
@@ -15,29 +15,25 @@ export type Config = {
   otelExporterEndpoint: string;
 };
 
-export const config: Config = {
-  port: parseEnvInt(process.env, ["GRPC_PORT", "PORT"], 50053),
-  metricsPort: parseEnvInt(process.env, ["METRICS_PORT"], 9105),
-  redisUrl: parseEnvString(process.env, ["REDIS_URL"], "redis://localhost:6379"),
-  balanceServiceAddr: parseEnvString(
-    process.env,
+export const config: Config = createConfigBuilder(process.env)
+  .int("port", ["GRPC_PORT", "PORT"], 50053, { min: 1, max: 65535 })
+  .int("metricsPort", "METRICS_PORT", 9105, { min: 1, max: 65535 })
+  .string("redisUrl", "REDIS_URL", "redis://localhost:6379")
+  .string(
+    "balanceServiceAddr",
     ["BALANCE_SERVICE_URL", "BALANCE_SERVICE_ADDR"],
     "localhost:50051",
-  ),
-  eventServiceAddr: parseEnvString(
-    process.env,
+  )
+  .string(
+    "eventServiceAddr",
     ["EVENT_SERVICE_URL", "EVENT_SERVICE_ADDR"],
     "localhost:50054",
-  ),
-  turnTimeout: parseEnvInt(process.env, ["TURN_TIMEOUT"], 20000),
-  logLevel: parseEnvString(process.env, ["LOG_LEVEL"], "info"),
-  otelExporterEndpoint: parseEnvString(
-    process.env,
-    ["OTEL_EXPORTER_OTLP_ENDPOINT"],
-    "http://localhost:4317",
-  ),
-};
+  )
+  .int("turnTimeout", "TURN_TIMEOUT", 20000, { min: 0 })
+  .string("logLevel", "LOG_LEVEL", "info")
+  .string("otelExporterEndpoint", "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+  .build();
 
-export function getConfig() {
+export function getConfig(): Config {
   return config;
 }

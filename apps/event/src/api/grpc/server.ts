@@ -1,62 +1,60 @@
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
 import * as path from "path";
+import { createGrpcServerLifecycle, type GrpcServerLifecycle } from "@specify-poker/shared";
 import { createHandlers } from "./handlers";
 import logger from "../../observability/logger";
 
 const PROTO_PATH = path.resolve(__dirname, "../../../proto/event.proto");
 
-let server: grpc.Server | null = null;
+type EventProto = {
+  event: { EventService: { service: grpc.ServiceDefinition } };
+};
+
+let lifecycle: GrpcServerLifecycle | null = null;
 
 export async function startGrpcServer(port: number): Promise<void> {
-  const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
-    keepCase: false,
-    longs: Number,
-    enums: String,
-    defaults: true,
-    oneofs: true,
+  lifecycle?.stop();
+  lifecycle = createGrpcServerLifecycle<EventProto>({
+    grpc,
+    protoLoader,
+    protoPath: PROTO_PATH,
+    protoLoaderOptions: {
+      keepCase: false,
+      longs: Number,
+      enums: String,
+      defaults: true,
+      oneofs: true,
+    },
+    port,
+    loadProto: (loaded) => loaded as EventProto,
+    register: (server, proto) => {
+      const handlers = createHandlers();
+      server.addService(
+        proto.event.EventService.service,
+        {
+          PublishEvent: handlers.publishEvent,
+          PublishEvents: handlers.publishEvents,
+          QueryEvents: handlers.queryEvents,
+          GetEvent: handlers.getEvent,
+          GetHandRecord: handlers.getHandRecord,
+          GetHandHistory: handlers.getHandHistory,
+          GetHandsForUser: handlers.getHandsForUser,
+          GetHandReplay: handlers.getHandReplay,
+          SubscribeToStream: handlers.subscribeToStream,
+          GetCursor: handlers.getCursor,
+          UpdateCursor: handlers.updateCursor,
+        } as unknown as grpc.UntypedServiceImplementation,
+      );
+    },
+    logger,
+    logMessage: "Event gRPC server listening",
   });
 
-  const proto = grpc.loadPackageDefinition(packageDefinition) as unknown as {
-    event: { EventService: { service: grpc.ServiceDefinition } };
-  };
-
-  const grpcServer = new grpc.Server();
-
-  const handlers = createHandlers();
-
-  grpcServer.addService(proto.event.EventService.service, {
-    PublishEvent: handlers.publishEvent,
-    PublishEvents: handlers.publishEvents,
-    QueryEvents: handlers.queryEvents,
-    GetEvent: handlers.getEvent,
-    GetHandRecord: handlers.getHandRecord,
-    GetHandHistory: handlers.getHandHistory,
-    GetHandsForUser: handlers.getHandsForUser,
-    GetHandReplay: handlers.getHandReplay,
-    SubscribeToStream: handlers.subscribeToStream,
-    GetCursor: handlers.getCursor,
-    UpdateCursor: handlers.updateCursor,
-  } as unknown as grpc.UntypedServiceImplementation);
-
-  await new Promise<void>((resolve, reject) => {
-    grpcServer.bindAsync(`0.0.0.0:${port}`, grpc.ServerCredentials.createInsecure(), (error, boundPort) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      grpcServer.start();
-      logger.info({ port: boundPort }, "Event gRPC server listening");
-      resolve();
-    });
-  });
-
-  server = grpcServer;
+  await lifecycle.start();
 }
 
 export function stopGrpcServer(): void {
-  if (server) {
-    server.forceShutdown();
-    server = null;
-  }
+  lifecycle?.stop();
+  lifecycle = null;
 }
