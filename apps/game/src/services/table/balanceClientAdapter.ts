@@ -2,6 +2,7 @@ import { createLazyUnaryCallProxy } from '@specify-poker/shared';
 import type {
   BalanceCashOutResponse,
   BalanceCommitResponse,
+  BalanceRecordContributionResponse,
   BalanceReservationResponse,
   BalanceSettleResponse,
 } from '../../api/grpc/clients';
@@ -17,6 +18,7 @@ export type BalanceCall<TResponse> =
 export type BalanceReservation = BalanceReservationResponse;
 export type BalanceCommit = BalanceCommitResponse;
 export type BalanceCashOut = BalanceCashOutResponse;
+export type BalanceRecordContribution = BalanceRecordContributionResponse;
 export type BalanceSettle = BalanceSettleResponse;
 
 async function callWithAvailability<TResponse>(
@@ -58,6 +60,18 @@ export class BalanceClientAdapter {
     hand_id?: string;
   }) {
     return callWithAvailability(unaryBalanceClient.ProcessCashOut(request));
+  }
+
+  recordContribution(request: {
+    table_id: string;
+    hand_id: string;
+    seat_id: number;
+    account_id: string;
+    amount: number;
+    contribution_type: string;
+    idempotency_key: string;
+  }) {
+    return callWithAvailability(unaryBalanceClient.RecordContribution(request));
   }
 
   settlePot(request: {

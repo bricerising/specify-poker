@@ -154,4 +154,37 @@ describe('handEngine applyAction', () => {
     expect(lastAction?.type).toBe('ALL_IN');
     expect(lastAction?.amount).toBe(expectedAllInTotal);
   });
+
+  it('applies rake when a hand ends by fold', () => {
+    const rakeConfig: TableConfig = {
+      smallBlind: 10,
+      bigBlind: 20,
+      ante: 0,
+      maxPlayers: 2,
+      startingStack: 1000,
+      turnTimerSeconds: 20,
+    };
+
+    const tableState = createTableState();
+    tableState.seats[0].stack = 1000;
+    tableState.seats[1].stack = 1000;
+
+    const started = startHand(tableState, rakeConfig, {
+      deck: makeDeck(),
+      now: () => '2026-01-01T00:00:00.000Z',
+    });
+
+    const foldSeatId = started.hand?.turn ?? 0;
+    const result = applyAction(
+      started,
+      foldSeatId,
+      { type: 'FOLD' },
+      { now: () => '2026-01-01T00:00:01.000Z' },
+    );
+
+    expect(result.accepted).toBe(true);
+    expect(result.handComplete).toBe(true);
+    expect(result.state.hand?.rakeAmount).toBe(1);
+    expect(result.state.seats.reduce((sum, seat) => sum + seat.stack, 0)).toBe(1999);
+  });
 });

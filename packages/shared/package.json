@@ -15,6 +15,11 @@
       "import": "./dist/schemas/index.js",
       "require": "./dist/cjs/schemas/index.js"
     },
+    "./pipeline": {
+      "types": "./dist/pipeline/index.d.ts",
+      "import": "./dist/pipeline/index.js",
+      "require": "./dist/cjs/pipeline/index.js"
+    },
     "./redis": {
       "types": "./dist/redis/index.d.ts",
       "import": "./dist/redis/index.js",
@@ -23,6 +28,7 @@
   },
   "typesVersions": {
     "*": {
+      "pipeline": ["dist/pipeline/index.d.ts"],
       "redis": ["dist/redis/index.d.ts"]
     }
   },

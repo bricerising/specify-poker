@@ -10,15 +10,18 @@ const grpcState = vi.hoisted(() => ({
   reserveResponse: { ok: true, reservation_id: 'reservation-1' },
   commitResponse: { ok: true },
   cashOutResponse: { ok: true },
+  contributionResponse: { ok: true },
   settleResponse: { ok: true },
   reserveError: null as Error | null,
   commitError: null as Error | null,
   cashOutError: null as Error | null,
+  contributionError: null as Error | null,
   settleError: null as Error | null,
   reserveCalls: [] as unknown[],
   commitCalls: [] as unknown[],
   releaseCalls: [] as unknown[],
   cashOutCalls: [] as unknown[],
+  contributionCalls: [] as unknown[],
   settleCalls: [] as unknown[],
   publishedEvents: [] as Array<{ type: string; payload: unknown }>,
 }));
@@ -127,6 +130,17 @@ vi.mock('../../src/api/grpc/clients', () => ({
       }
       callback(null, grpcState.cashOutResponse);
     },
+    RecordContribution: (
+      request: unknown,
+      callback: (err: Error | null, response?: unknown) => void,
+    ) => {
+      grpcState.contributionCalls.push(request);
+      if (grpcState.contributionError) {
+        callback(grpcState.contributionError);
+        return;
+      }
+      callback(null, grpcState.contributionResponse);
+    },
     SettlePot: (request: unknown, callback: (err: Error | null, response?: unknown) => void) => {
       grpcState.settleCalls.push(request);
       if (grpcState.settleError) {
@@ -157,15 +171,18 @@ const resetGrpcState = () => {
   grpcState.reserveResponse = { ok: true, reservation_id: 'reservation-1' };
   grpcState.commitResponse = { ok: true };
   grpcState.cashOutResponse = { ok: true };
+  grpcState.contributionResponse = { ok: true };
   grpcState.settleResponse = { ok: true };
   grpcState.reserveError = null;
   grpcState.commitError = null;
   grpcState.cashOutError = null;
+  grpcState.contributionError = null;
   grpcState.settleError = null;
   grpcState.reserveCalls.length = 0;
   grpcState.commitCalls.length = 0;
   grpcState.releaseCalls.length = 0;
   grpcState.cashOutCalls.length = 0;
+  grpcState.contributionCalls.length = 0;
   grpcState.settleCalls.length = 0;
   grpcState.publishedEvents.length = 0;
 };
@@ -350,6 +367,7 @@ describe('TableService consumer flows', () => {
 
     const state = await tableStateStore.get(table.tableId);
     expect(state?.hand).toBeDefined();
+    expect(grpcState.contributionCalls).toHaveLength(2);
 
     const activeTurn = state?.hand?.turn ?? 0;
     const seat = state?.seats[activeTurn];
@@ -357,6 +375,7 @@ describe('TableService consumer flows', () => {
 
     const result = await tableService.submitAction(table.tableId, seat!.userId!, { type: 'FOLD' });
     expect(result.ok).toBe(true);
+    expect(grpcState.settleCalls).toHaveLength(1);
 
     const updatedState = await tableStateStore.get(table.tableId);
     expect(updatedState?.hand).toBeNull();

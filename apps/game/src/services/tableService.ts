@@ -1,5 +1,7 @@
 import { randomUUID } from 'crypto';
 
+import { TimeoutRegistry } from '@specify-poker/shared';
+
 import { seatAt } from '../domain/seats';
 import type {
   ActionInput,
@@ -14,7 +16,6 @@ import { GameEventType } from '../domain/events';
 import { applyAction, startHand } from '../engine/handEngine';
 import { deriveLegalActions } from '../engine/actionRules';
 import { calculatePots } from '../engine/potCalculator';
-import { calculatePotPayouts } from '../engine/potSettlement';
 import { tableStore } from '../storage/tableStore';
 import { tableStateStore } from '../storage/tableStateStore';
 import logger from '../observability/logger';
@@ -36,6 +37,9 @@ import { gatewayWsPublisher } from './table/gatewayWsPublisher';
 import { gameEventPublisher } from './table/gameEventPublisher';
 import { redactTableState } from './table/tableViewBuilder';
 import { resolveSeatForUser as resolveSeatForUserInState } from './table/seatResolver';
+import { createBalanceTableEconomy } from './table/tableEconomy';
+
+const tableEconomy = createBalanceTableEconomy({ balanceClient: balanceClientAdapter });
 
 // ============================================================================
 // Constants
@@ -76,20 +80,14 @@ type FinalizeReservedSeatJoinResult =
   | { readonly type: 'balance_unavailable'; readonly error: unknown };
 
 export class TableService {
-  private turnTimers = new Map<string, NodeJS.Timeout>();
-  private nextHandTimers = new Map<string, NodeJS.Timeout>();
+  private turnTimers = new TimeoutRegistry<string>();
+  private nextHandTimers = new TimeoutRegistry<string>();
   private turnStartMeta = new Map<string, TurnStartMeta>();
   private handTimeoutMeta = new Map<string, HandTimeoutMeta>();
 
   shutdown(): void {
-    for (const timer of this.turnTimers.values()) {
-      clearTimeout(timer);
-    }
     this.turnTimers.clear();
 
-    for (const timer of this.nextHandTimers.values()) {
-      clearTimeout(timer);
-    }
     this.nextHandTimers.clear();
 
     this.turnStartMeta.clear();
@@ -116,10 +114,6 @@ export class TableService {
 
   private newIdempotencyKey(prefix: string) {
     return `${prefix}:${randomUUID()}`;
-  }
-
-  private settlePotIdempotencyKey(tableId: string, handId: string, potIndex: number) {
-    return `settle:${tableId}:${handId}:pot:${potIndex}`;
   }
 
   private cashOutIdempotencyKey(tableId: string, userId: string, seatId: number) {
@@ -732,6 +726,7 @@ export class TableService {
 
     const seat = this.resolveSeatForUser(state, userId);
     if (!seat) return { ok: false, error: 'PLAYER_NOT_AT_TABLE' };
+    const previousTotalContribution = state.hand.totalContributions[seat.seatId] ?? 0;
 
     const startedTurn = this.turnStartMeta.get(tableId);
     const turnDurationMs =
@@ -755,6 +750,37 @@ export class TableService {
 
     const hand = result.state.hand;
     const actionRecord = hand?.actions[hand.actions.length - 1];
+    const newTotalContribution = hand?.totalContributions[seat.seatId] ?? previousTotalContribution;
+    const contributionDelta = Math.max(0, newTotalContribution - previousTotalContribution);
+    if (hand && actionRecord && contributionDelta > 0) {
+      void tableEconomy
+        .recordActionContribution({
+          tableId,
+          handId: hand.handId,
+          action: actionRecord,
+          amount: contributionDelta,
+        })
+        .then((contributionResult) => {
+          if (contributionResult.type === 'unavailable') {
+            void this.emitGameEvent(
+              tableId,
+              hand.handId,
+              userId,
+              seat.seatId,
+              GameEventType.BALANCE_UNAVAILABLE,
+              { action: 'RECORD_CONTRIBUTION' },
+            );
+          } else if (contributionResult.type === 'error') {
+            logger.warn(
+              { tableId, handId: hand.handId, error: contributionResult.error },
+              'balance.contribution.failed',
+            );
+          }
+        })
+        .catch((err: unknown) => {
+          logger.warn({ err, tableId, handId: hand.handId }, 'balance.contribution.failed');
+        });
+    }
     const actedSeat = result.state.seats[seat.seatId];
     const isAllIn = actedSeat?.status === 'ALL_IN' || actionRecord?.type === 'ALL_IN';
     const requestedAmount =
@@ -803,6 +829,31 @@ export class TableService {
         handId: updatedState.hand.handId,
         hadTimeout: false,
       });
+
+      const contributionResult = await tableEconomy.recordHandStartContributions({
+        tableId: table.tableId,
+        handId: updatedState.hand.handId,
+        actions: updatedState.hand.actions,
+      });
+      if (contributionResult.type === 'unavailable') {
+        void this.emitGameEvent(
+          table.tableId,
+          updatedState.hand.handId,
+          undefined,
+          undefined,
+          GameEventType.BALANCE_UNAVAILABLE,
+          { action: 'RECORD_CONTRIBUTION' },
+        );
+      } else if (contributionResult.type === 'error') {
+        logger.warn(
+          {
+            tableId: table.tableId,
+            handId: updatedState.hand.handId,
+            error: contributionResult.error,
+          },
+          'balance.contribution.failed',
+        );
+      }
     }
 
     const participants = updatedState.seats
@@ -948,19 +999,11 @@ export class TableService {
   }
 
   private clearTurnTimer(tableId: string) {
-    const existing = this.turnTimers.get(tableId);
-    if (existing) {
-      clearTimeout(existing);
-      this.turnTimers.delete(tableId);
-    }
+    this.turnTimers.delete(tableId);
   }
 
   private clearNextHandTimer(tableId: string) {
-    const existing = this.nextHandTimers.get(tableId);
-    if (existing) {
-      clearTimeout(existing);
-      this.nextHandTimers.delete(tableId);
-    }
+    this.nextHandTimers.delete(tableId);
   }
 
   private scheduleNextHandStart(tableId: string, delayMs: number) {
@@ -1014,56 +1057,36 @@ export class TableService {
       },
     );
 
-    for (let potIndex = 0; potIndex < hand.pots.length; potIndex += 1) {
-      const pot = hand.pots[potIndex];
-      if (pot.amount > 0 && pot.winners && pot.winners.length > 0) {
-        const payouts = calculatePotPayouts({
-          amount: pot.amount,
-          winnerSeatIds: pot.winners,
-          buttonSeat: state.button,
-          seatCount: state.seats.length,
-        });
+    const settleResult = await tableEconomy.settleHand({
+      tableId: table.tableId,
+      handId: hand.handId,
+      buttonSeat: state.button,
+      seats: state.seats,
+      pots: hand.pots,
+    });
 
-        const winnersToSettle = payouts.map((payout) => ({
-          seat_id: payout.seatId,
-          account_id: state.seats[payout.seatId]?.userId ?? '',
-          amount: payout.amount,
-        }));
-
-        const settleCall = await balanceClientAdapter.settlePot({
-          table_id: table.tableId,
-          hand_id: hand.handId,
-          winners: winnersToSettle,
-          idempotency_key: this.settlePotIdempotencyKey(table.tableId, hand.handId, potIndex),
-        });
-
-        if (settleCall.type === 'unavailable') {
-          void this.emitGameEvent(
-            table.tableId,
-            hand.handId,
-            undefined,
-            undefined,
-            GameEventType.BALANCE_UNAVAILABLE,
-            {
-              action: 'SETTLE_POT',
-            },
-          );
-          continue;
-        }
-
-        if (!settleCall.response.ok) {
-          void this.emitGameEvent(
-            table.tableId,
-            hand.handId,
-            undefined,
-            undefined,
-            GameEventType.SETTLEMENT_FAILED,
-            {
-              error: settleCall.response.error || 'UNKNOWN',
-            },
-          );
-        }
-      }
+    if (settleResult.type === 'unavailable') {
+      void this.emitGameEvent(
+        table.tableId,
+        hand.handId,
+        undefined,
+        undefined,
+        GameEventType.BALANCE_UNAVAILABLE,
+        {
+          action: 'SETTLE_POT',
+        },
+      );
+    } else if (settleResult.type === 'error') {
+      void this.emitGameEvent(
+        table.tableId,
+        hand.handId,
+        undefined,
+        undefined,
+        GameEventType.SETTLEMENT_FAILED,
+        {
+          error: settleResult.error,
+        },
+      );
     }
 
     state.hand = null;

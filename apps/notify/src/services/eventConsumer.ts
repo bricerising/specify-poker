@@ -2,6 +2,7 @@ import { getBlockingRedisClient } from '../storage/redisClient';
 import logger from '../observability/logger';
 import { getConfig } from '../config';
 import { getErrorMessage } from '../shared/errors';
+import { dispatchByTypeNoCtx } from '@specify-poker/shared/pipeline';
 import {
   runRedisStreamConsumer,
   type RedisStreamConsumerClient,
@@ -102,8 +103,7 @@ export class EventConsumer {
   }
 
   private async dispatch(event: GameEvent): Promise<void> {
-    const handler = this.handlers[event.type];
-    await handler(event as never);
+    await dispatchByTypeNoCtx(this.handlers, event);
   }
 
   async stop(): Promise<void> {

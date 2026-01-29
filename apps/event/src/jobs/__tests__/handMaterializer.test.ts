@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handMaterializer } from '../handMaterializer';
 import { eventStore } from '../../storage/eventStore';
 import { handStore } from '../../storage/handStore';
+import type { GameEvent } from '../../domain/types';
 
 vi.mock('../../storage/eventStore');
 vi.mock('../../storage/handStore');
@@ -17,41 +18,57 @@ describe('HandMaterializer', () => {
     const tableId = 'table-456';
     const timestamp = new Date();
 
-    const mockEvents = [
+    const mockEvents: GameEvent[] = [
       {
+        eventId: 'event-1',
         type: 'HAND_STARTED',
-        handId,
         tableId,
+        handId,
+        userId: null,
+        seatId: null,
         payload: {
           tableName: 'Test Table',
           smallBlind: 10,
           bigBlind: 20,
           seats: [{ userId: 'user-1', nickname: 'Alice', seatId: 1, stack: 1000 }],
         },
+        sequence: 1,
         timestamp,
       },
       {
+        eventId: 'event-2',
         type: 'CARDS_DEALT',
+        tableId,
         handId,
         userId: 'user-1',
+        seatId: 1,
         payload: {
           cards: [
             { rank: 'A', suit: 's' },
             { rank: 'A', suit: 'd' },
           ],
         },
+        sequence: 2,
         timestamp,
       },
       {
+        eventId: 'event-3',
         type: 'ACTION_TAKEN',
+        tableId,
         handId,
         userId: 'user-1',
+        seatId: 1,
         payload: { street: 'PREFLOP', action: 'RAISE', amount: 50, isAllIn: false },
+        sequence: 3,
         timestamp,
       },
       {
+        eventId: 'event-4',
         type: 'STREET_ADVANCED',
+        tableId,
         handId,
+        userId: null,
+        seatId: null,
         payload: {
           communityCards: [
             { rank: 'K', suit: 's' },
@@ -59,32 +76,39 @@ describe('HandMaterializer', () => {
             { rank: 'J', suit: 's' },
           ],
         },
+        sequence: 4,
         timestamp,
       },
       {
+        eventId: 'event-5',
         type: 'POT_AWARDED',
+        tableId,
         handId,
+        userId: null,
+        seatId: null,
         payload: { amount: 100, winners: [{ userId: 'user-1', share: 100, seatId: 1 }] },
+        sequence: 5,
         timestamp,
       },
       {
+        eventId: 'event-6',
         type: 'HAND_COMPLETED',
-        handId,
         tableId,
+        handId,
+        userId: null,
+        seatId: null,
         payload: { playerEndStacks: { 'user-1': 1050 } },
+        sequence: 6,
         timestamp,
       },
     ];
 
     vi.mocked(eventStore.queryEvents).mockResolvedValue({
-      events: mockEvents as unknown as Record<string, unknown>[],
-      total: 6,
-    } as unknown as { events: unknown[]; total: number });
+      events: mockEvents,
+      total: mockEvents.length,
+    });
 
-    // Directly call the private method for testing or trigger it via handleEvent
-    await (
-      handMaterializer as unknown as { handleEvent: (e: Record<string, unknown>) => Promise<void> }
-    ).handleEvent({
+    await handMaterializer.handleEvent({
       type: 'HAND_COMPLETED',
       handId,
       tableId,

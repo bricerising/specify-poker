@@ -112,7 +112,7 @@ export class EventConsumer {
     };
 
     this.getClient = async () => {
-      return (await getManager().getBlockingClientOrNull()) as unknown as RedisStreamConsumerClient | null;
+      return await getManager().getBlockingClientOrNull();
     };
 
     this.closeClient = async () => {

@@ -5,6 +5,7 @@ import { recordWebSocketMessage } from '../observability/otel';
 import { decodeJwtUserId } from '../utils/jwt';
 import { asRecord, readTrimmedString } from '../utils/unknown';
 import type { z } from 'zod';
+import { dispatchByTypeNoCtx } from '@specify-poker/shared/pipeline';
 import { wsServerMessageSchema } from '@specify-poker/shared/schemas';
 
 import { applyTablePatch } from './tablePatching';
@@ -537,8 +538,7 @@ export function createTableStore(): TableStore {
   } satisfies WsHandlerMap;
 
   const handleWsServerMessage = (message: WsServerMessage) => {
-    const handler = wsHandlers[message.type] as (message: WsServerMessage) => void;
-    handler(message);
+    dispatchByTypeNoCtx(wsHandlers, message);
   };
 
   const tableIdForMessage = (message: WsServerMessage): string | undefined => {

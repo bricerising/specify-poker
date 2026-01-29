@@ -269,7 +269,9 @@ function settleWinners(
   potWinners?: Record<number, number[]>,
 ): void {
   const winnersSet = new Set<number>();
-  let remainingRake = MAX_RAKE;
+  const totalPot = hand.pots.reduce((sum, pot) => sum + Math.max(0, pot.amount), 0);
+  let remainingRake = calculateRake(totalPot, MAX_RAKE);
+  hand.rakeAmount = 0;
 
   for (let i = 0; i < hand.pots.length; i += 1) {
     const pot = hand.pots[i];
@@ -288,10 +290,10 @@ function settleWinners(
     pot.winners = currentPotWinners;
 
     let amountToDistribute = pot.amount;
-    if (pot.eligibleSeats.length > 1 && remainingRake > 0) {
-      const rake = calculateRake(amountToDistribute, remainingRake);
-      amountToDistribute -= rake;
+    if (amountToDistribute > 0 && remainingRake > 0) {
+      const rake = Math.min(amountToDistribute, remainingRake);
       remainingRake -= rake;
+      amountToDistribute -= rake;
       hand.rakeAmount += rake;
       pot.amount = amountToDistribute;
     }
