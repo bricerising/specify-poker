@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { grpc } from '../../grpc/unaryClients';
 import { requireUserId } from '../utils/requireUserId';
-import logger from '../../observability/logger';
+import { safeRoute } from '../utils/safeRoute';
 
 const router = Router();
 
@@ -47,56 +47,60 @@ router.get('/vapid', (req: Request, res: Response) => {
   return res.json({ publicKey });
 });
 
-router.post('/subscribe', async (req: Request, res: Response) => {
-  try {
-    const userId = requireUserId(req, res);
-    if (!userId) return;
+router.post(
+  '/subscribe',
+  safeRoute(
+    async (req: Request, res: Response) => {
+      const userId = requireUserId(req, res);
+      if (!userId) return;
 
-    const parsed = parseSubscription(req.body);
-    if (!parsed.ok) {
-      return res.status(400).json({ error: parsed.error });
-    }
+      const parsed = parseSubscription(req.body);
+      if (!parsed.ok) {
+        return res.status(400).json({ error: parsed.error });
+      }
 
-    const response = await grpc.notify.RegisterSubscription({
-      user_id: userId,
-      subscription: parsed.subscription,
-    });
+      const response = await grpc.notify.RegisterSubscription({
+        user_id: userId,
+        subscription: parsed.subscription,
+      });
 
-    if (!response.ok) {
-      return res.status(400).json({ error: response.error || 'Failed to register subscription' });
-    }
+      if (!response.ok) {
+        return res.status(400).json({ error: response.error || 'Failed to register subscription' });
+      }
 
-    return res.status(204).send();
-  } catch (err) {
-    logger.error({ err }, 'Failed to register push subscription');
-    return res.status(500).json({ error: 'Failed to register push subscription' });
-  }
-});
+      return res.status(204).send();
+    },
+    { logMessage: 'Failed to register push subscription' },
+  ),
+);
 
-router.delete('/subscribe', async (req: Request, res: Response) => {
-  try {
-    const userId = requireUserId(req, res);
-    if (!userId) return;
+router.delete(
+  '/subscribe',
+  safeRoute(
+    async (req: Request, res: Response) => {
+      const userId = requireUserId(req, res);
+      if (!userId) return;
 
-    const endpoint = typeof req.body?.endpoint === 'string' ? req.body.endpoint.trim() : '';
-    if (!endpoint) {
-      return res.status(400).json({ error: 'endpoint is required' });
-    }
+      const endpoint = typeof req.body?.endpoint === 'string' ? req.body.endpoint.trim() : '';
+      if (!endpoint) {
+        return res.status(400).json({ error: 'endpoint is required' });
+      }
 
-    const response = await grpc.notify.UnregisterSubscription({
-      user_id: userId,
-      endpoint,
-    });
+      const response = await grpc.notify.UnregisterSubscription({
+        user_id: userId,
+        endpoint,
+      });
 
-    if (!response.ok) {
-      return res.status(400).json({ error: response.error || 'Failed to unregister subscription' });
-    }
+      if (!response.ok) {
+        return res
+          .status(400)
+          .json({ error: response.error || 'Failed to unregister subscription' });
+      }
 
-    return res.status(204).send();
-  } catch (err) {
-    logger.error({ err }, 'Failed to unregister push subscription');
-    return res.status(500).json({ error: 'Failed to unregister push subscription' });
-  }
-});
+      return res.status(204).send();
+    },
+    { logMessage: 'Failed to unregister push subscription' },
+  ),
+);
 
 export default router;

@@ -63,10 +63,10 @@ describe('event gRPC server', () => {
     expect(addService).toHaveBeenCalledWith(
       { name: 'EventService' },
       expect.objectContaining({
-        PublishEvent: expect.any(Function),
-        PublishEvents: expect.any(Function),
-        QueryEvents: expect.any(Function),
-        GetEvent: expect.any(Function),
+        publishEvent: expect.any(Function),
+        publishEvents: expect.any(Function),
+        queryEvents: expect.any(Function),
+        getEvent: expect.any(Function),
       }),
     );
     expect(bindAsync).toHaveBeenCalledWith('0.0.0.0:50054', 'creds', expect.any(Function));

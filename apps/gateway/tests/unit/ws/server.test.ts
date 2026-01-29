@@ -91,10 +91,23 @@ const PublishEvent = vi.fn(
     cb(null, { success: true });
   },
 );
-vi.mock('../../../src/grpc/clients', () => ({
-  eventClient: { PublishEvent },
-  playerClient: { GetProfile: vi.fn() },
-}));
+vi.mock('../../../src/grpc/clients', () => {
+  const gameClient = {};
+  const notifyClient = {};
+  const eventClient = { PublishEvent };
+  const playerClient = { GetProfile: vi.fn() };
+
+  return {
+    gameClient,
+    notifyClient,
+    eventClient,
+    playerClient,
+    getGameClient: () => gameClient,
+    getNotifyClient: () => notifyClient,
+    getEventClient: () => eventClient,
+    getPlayerClient: () => playerClient,
+  };
+});
 
 vi.mock('crypto', () => ({
   randomUUID: () => 'conn-1',

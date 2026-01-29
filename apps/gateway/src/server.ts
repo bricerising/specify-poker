@@ -31,6 +31,7 @@ export async function startServer(): Promise<void> {
     { createRouter },
     { initWsServer },
     { closeWsPubSub },
+    { closeGrpcClients },
     { registerInstance, unregisterInstance },
     { closeRedisClient },
   ] = await Promise.all([
@@ -40,6 +41,7 @@ export async function startServer(): Promise<void> {
     import('./http/router'),
     import('./ws/server'),
     import('./ws/pubsub'),
+    import('./grpc/clients'),
     import('./storage/instanceRegistry'),
     import('./storage/redisClient'),
   ]);
@@ -59,6 +61,9 @@ export async function startServer(): Promise<void> {
   });
   shutdown.add('ws.pubsub.close', async () => {
     await closeWsPubSub();
+  });
+  shutdown.add('grpc.clients.close', () => {
+    closeGrpcClients();
   });
   shutdown.add('http.close', async () => {
     await closeHttpServer(server);

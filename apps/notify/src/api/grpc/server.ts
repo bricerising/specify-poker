@@ -1,7 +1,7 @@
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import * as path from 'path';
-import { createGrpcServerLifecycle } from '@specify-poker/shared';
+import { addGrpcService, createGrpcServerLifecycle } from '@specify-poker/shared';
 import { createHandlers } from './handlers';
 import { createHealthHandlers } from './health';
 import type { SubscriptionService } from '../../services/subscriptionService';
@@ -45,14 +45,19 @@ export function createGrpcServer(params: CreateGrpcServerParams): GrpcServer {
       const handlers = createHandlers(params.subscriptionService, params.pushService);
       const healthHandlers = createHealthHandlers();
 
-      server.addService(
-        proto.notify.NotifyService.service,
-        handlers as unknown as grpc.UntypedServiceImplementation,
-      );
-      server.addService(
-        proto.grpc.health.v1.Health.service,
-        healthHandlers as unknown as grpc.UntypedServiceImplementation,
-      );
+      addGrpcService({
+        server,
+        service: proto.notify.NotifyService.service,
+        handlers,
+        serviceName: 'NotifyService',
+      });
+
+      addGrpcService({
+        server,
+        service: proto.grpc.health.v1.Health.service,
+        handlers: healthHandlers,
+        serviceName: 'grpc.health.v1.Health',
+      });
     },
     logger,
     logMessage: 'Notify gRPC server listening',

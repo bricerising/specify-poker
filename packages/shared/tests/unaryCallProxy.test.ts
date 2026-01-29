@@ -51,6 +51,21 @@ describe('createUnaryCallProxy', () => {
     ).rejects.toThrow(/unary_call_proxy\.non_function_property/);
   });
 
+  it('rejects when calling Object.prototype methods like a unary RPC', async () => {
+    const proxy = createUnaryCallProxy({
+      Ping(
+        _request: Record<string, never>,
+        callback: (err: Error | null, response: string) => void,
+      ) {
+        callback(null, 'pong');
+      },
+    });
+
+    await expect(
+      (proxy as unknown as { toString: (request: unknown) => Promise<unknown> }).toString({}),
+    ).rejects.toThrow(/unary_call_proxy\.non_function_property/);
+  });
+
   it('passes AbortSignal through to unaryCall', async () => {
     const client = {
       Ping: vi.fn(

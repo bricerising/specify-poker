@@ -1,7 +1,7 @@
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import * as path from 'path';
-import { createGrpcServerLifecycle, type GrpcServerLifecycle } from '@specify-poker/shared';
+import { addGrpcService, createGrpcServerLifecycle, type GrpcServerLifecycle } from '@specify-poker/shared';
 import { handlers } from './handlers';
 import { createHealthHandlers } from './health';
 import logger from '../../observability/logger';
@@ -40,20 +40,19 @@ export async function startGrpcServer(port: number): Promise<void> {
     port,
     loadProto: (loaded) => loaded as PlayerProto,
     register: (server, proto) => {
-      server.addService(proto.player.PlayerService.service, {
-        GetProfile: handlers.GetProfile,
-        GetProfiles: handlers.GetProfiles,
-        UpdateProfile: handlers.UpdateProfile,
-        DeleteProfile: handlers.DeleteProfile,
-        GetStatistics: handlers.GetStatistics,
-        IncrementStatistic: handlers.IncrementStatistic,
-        GetFriends: handlers.GetFriends,
-        AddFriend: handlers.AddFriend,
-        RemoveFriend: handlers.RemoveFriend,
-        GetNicknames: handlers.GetNicknames,
+      addGrpcService({
+        server,
+        service: proto.player.PlayerService.service,
+        handlers,
+        serviceName: 'PlayerService',
       });
 
-      server.addService(proto.grpc.health.v1.Health.service, createHealthHandlers());
+      addGrpcService({
+        server,
+        service: proto.grpc.health.v1.Health.service,
+        handlers: createHealthHandlers(),
+        serviceName: 'grpc.health.v1.Health',
+      });
     },
     logger,
     logMessage: 'Player gRPC server listening',

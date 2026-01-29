@@ -3,8 +3,11 @@ import profileRouter from '../../../src/http/routes/profile';
 import { dispatchToRouter } from '../helpers/express';
 
 // Mock the gRPC client
-vi.mock('../../../src/grpc/clients', () => ({
-  playerClient: {
+vi.mock('../../../src/grpc/clients', () => {
+  const gameClient = {};
+  const notifyClient = {};
+  const eventClient = {};
+  const playerClient = {
     GetProfile: vi.fn(),
     UpdateProfile: vi.fn(),
     DeleteProfile: vi.fn(),
@@ -13,8 +16,19 @@ vi.mock('../../../src/grpc/clients', () => ({
     AddFriend: vi.fn(),
     RemoveFriend: vi.fn(),
     GetNicknames: vi.fn(),
-  },
-}));
+  };
+
+  return {
+    gameClient,
+    notifyClient,
+    eventClient,
+    playerClient,
+    getGameClient: () => gameClient,
+    getNotifyClient: () => notifyClient,
+    getEventClient: () => eventClient,
+    getPlayerClient: () => playerClient,
+  };
+});
 
 // Mock logger
 vi.mock('../../../src/observability/logger', () => ({

@@ -1,6 +1,5 @@
 import { createLazyUnaryCallResultProxy } from '@specify-poker/shared';
 import { getBalanceClient } from '../api/grpc/clients';
-import logger from '../observability/logger';
 
 type NumericString = string | number;
 
@@ -14,6 +13,18 @@ function parseNumeric(value: NumericString | undefined): number {
 
 const unaryBalanceClient = createLazyUnaryCallResultProxy(getBalanceClient);
 
+export type BalanceCall<TResponse> =
+  | { type: 'available'; response: TResponse }
+  | { type: 'unavailable'; error: unknown };
+
+function unavailable<TResponse>(error: unknown): BalanceCall<TResponse> {
+  return { type: 'unavailable', error };
+}
+
+function available<TResponse>(response: TResponse): BalanceCall<TResponse> {
+  return { type: 'available', response };
+}
+
 export interface ReserveResult {
   ok: boolean;
   reservationId?: string;
@@ -26,6 +37,11 @@ export interface CommitResult {
   transactionId?: string;
   error?: string;
   newBalance?: number;
+}
+
+export interface ReleaseResult {
+  ok: boolean;
+  error?: string;
 }
 
 export interface CashOutResult {
@@ -53,159 +69,186 @@ export interface SettlementResult {
   }>;
 }
 
+export interface ReserveForBuyInParams {
+  accountId: string;
+  tableId: string;
+  amount: number;
+  idempotencyKey: string;
+  timeoutSeconds?: number;
+}
+
+export interface CommitReservationParams {
+  reservationId: string;
+}
+
+export interface ReleaseReservationParams {
+  reservationId: string;
+  reason?: string;
+}
+
+export interface ProcessCashOutParams {
+  accountId: string;
+  tableId: string;
+  seatId: number;
+  amount: number;
+  idempotencyKey: string;
+  handId?: string;
+}
+
+export interface RecordContributionParams {
+  tableId: string;
+  handId: string;
+  seatId: number;
+  accountId: string;
+  amount: number;
+  contributionType: string;
+  idempotencyKey: string;
+}
+
+export interface SettlePotParams {
+  tableId: string;
+  handId: string;
+  winners: Array<{ seatId: number; accountId: string; amount: number }>;
+  idempotencyKey: string;
+}
+
+export interface CancelPotParams {
+  tableId: string;
+  handId: string;
+  reason: string;
+}
+
 export async function reserveForBuyIn(
-  accountId: string,
-  tableId: string,
-  amount: number,
-  idempotencyKey: string,
-): Promise<ReserveResult> {
+  params: ReserveForBuyInParams,
+): Promise<BalanceCall<ReserveResult>> {
   const call = await unaryBalanceClient.ReserveForBuyIn({
-    account_id: accountId,
-    table_id: tableId,
-    amount,
-    idempotency_key: idempotencyKey,
-    timeout_seconds: 30,
+    account_id: params.accountId,
+    table_id: params.tableId,
+    amount: params.amount,
+    idempotency_key: params.idempotencyKey,
+    timeout_seconds: params.timeoutSeconds ?? 30,
   });
 
   if (!call.ok) {
-    logger.error({ err: call.error, accountId, tableId }, 'Balance reserve failed');
-    return { ok: false, error: 'INTERNAL_ERROR' };
+    return unavailable(call.error);
   }
 
   const response = call.value;
-  return {
+  return available({
     ok: response.ok,
     reservationId: response.reservation_id,
     error: response.error,
     availableBalance: parseNumeric(response.available_balance),
-  };
+  });
 }
 
-export async function commitReservation(reservationId: string): Promise<CommitResult> {
+export async function commitReservation(
+  params: CommitReservationParams,
+): Promise<BalanceCall<CommitResult>> {
   const call = await unaryBalanceClient.CommitReservation({
-    reservation_id: reservationId,
+    reservation_id: params.reservationId,
   });
 
   if (!call.ok) {
-    logger.error({ err: call.error, reservationId }, 'Balance commit failed');
-    return { ok: false, error: 'INTERNAL_ERROR' };
+    return unavailable(call.error);
   }
 
   const response = call.value;
-  return {
+  return available({
     ok: response.ok,
     transactionId: response.transaction_id,
     error: response.error,
     newBalance: parseNumeric(response.new_balance),
-  };
+  });
 }
 
 export async function releaseReservation(
-  reservationId: string,
-  reason?: string,
-): Promise<{ ok: boolean; error?: string }> {
+  params: ReleaseReservationParams,
+): Promise<BalanceCall<ReleaseResult>> {
   const call = await unaryBalanceClient.ReleaseReservation({
-    reservation_id: reservationId,
-    reason,
+    reservation_id: params.reservationId,
+    reason: params.reason,
   });
 
   if (!call.ok) {
-    logger.error({ err: call.error, reservationId }, 'Balance release failed');
-    return { ok: false, error: 'INTERNAL_ERROR' };
+    return unavailable(call.error);
   }
 
   const response = call.value;
-  return { ok: response.ok, error: response.error };
+  return available({ ok: response.ok, error: response.error });
 }
 
 export async function processCashOut(
-  accountId: string,
-  tableId: string,
-  seatId: number,
-  amount: number,
-  idempotencyKey: string,
-  handId?: string,
-): Promise<CashOutResult> {
+  params: ProcessCashOutParams,
+): Promise<BalanceCall<CashOutResult>> {
   const call = await unaryBalanceClient.ProcessCashOut({
-    account_id: accountId,
-    table_id: tableId,
-    seat_id: seatId,
-    amount,
-    idempotency_key: idempotencyKey,
-    hand_id: handId,
+    account_id: params.accountId,
+    table_id: params.tableId,
+    seat_id: params.seatId,
+    amount: params.amount,
+    idempotency_key: params.idempotencyKey,
+    hand_id: params.handId,
   });
 
   if (!call.ok) {
-    logger.error({ err: call.error, accountId, tableId }, 'Balance cash out failed');
-    return { ok: false, error: 'INTERNAL_ERROR' };
+    return unavailable(call.error);
   }
 
   const response = call.value;
-  return {
+  return available({
     ok: response.ok,
     transactionId: response.transaction_id,
     error: response.error,
     newBalance: parseNumeric(response.new_balance),
-  };
+  });
 }
 
 export async function recordContribution(
-  tableId: string,
-  handId: string,
-  seatId: number,
-  accountId: string,
-  amount: number,
-  contributionType: string,
-  idempotencyKey: string,
-): Promise<ContributionResult> {
+  params: RecordContributionParams,
+): Promise<BalanceCall<ContributionResult>> {
   const call = await unaryBalanceClient.RecordContribution({
-    table_id: tableId,
-    hand_id: handId,
-    seat_id: seatId,
-    account_id: accountId,
-    amount,
-    contribution_type: contributionType,
-    idempotency_key: idempotencyKey,
+    table_id: params.tableId,
+    hand_id: params.handId,
+    seat_id: params.seatId,
+    account_id: params.accountId,
+    amount: params.amount,
+    contribution_type: params.contributionType,
+    idempotency_key: params.idempotencyKey,
   });
 
   if (!call.ok) {
-    logger.error({ err: call.error, tableId, handId }, 'Balance contribution failed');
-    return { ok: false, error: 'INTERNAL_ERROR' };
+    return unavailable(call.error);
   }
 
   const response = call.value;
-  return {
+  return available({
     ok: response.ok,
     error: response.error,
     totalPot: parseNumeric(response.total_pot),
     seatContribution: parseNumeric(response.seat_contribution),
-  };
+  });
 }
 
 export async function settlePot(
-  tableId: string,
-  handId: string,
-  winners: Array<{ seatId: number; accountId: string; amount: number }>,
-  idempotencyKey: string,
-): Promise<SettlementResult> {
+  params: SettlePotParams,
+): Promise<BalanceCall<SettlementResult>> {
   const call = await unaryBalanceClient.SettlePot({
-    table_id: tableId,
-    hand_id: handId,
-    winners: winners.map((w) => ({
-      seat_id: w.seatId,
-      account_id: w.accountId,
-      amount: w.amount,
+    table_id: params.tableId,
+    hand_id: params.handId,
+    winners: params.winners.map((winner) => ({
+      seat_id: winner.seatId,
+      account_id: winner.accountId,
+      amount: winner.amount,
     })),
-    idempotency_key: idempotencyKey,
+    idempotency_key: params.idempotencyKey,
   });
 
   if (!call.ok) {
-    logger.error({ err: call.error, tableId, handId }, 'Balance settle failed');
-    return { ok: false, error: 'INTERNAL_ERROR' };
+    return unavailable(call.error);
   }
 
   const response = call.value;
-  return {
+  return available({
     ok: response.ok,
     error: response.error,
     results: response.results?.map((r) => ({
@@ -214,25 +257,34 @@ export async function settlePot(
       amount: parseNumeric(r.amount),
       newBalance: parseNumeric(r.new_balance),
     })),
-  };
+  });
 }
 
 export async function cancelPot(
-  tableId: string,
-  handId: string,
-  reason: string,
-): Promise<{ ok: boolean; error?: string }> {
+  params: CancelPotParams,
+): Promise<BalanceCall<{ ok: boolean; error?: string }>> {
   const call = await unaryBalanceClient.CancelPot({
-    table_id: tableId,
-    hand_id: handId,
-    reason,
+    table_id: params.tableId,
+    hand_id: params.handId,
+    reason: params.reason,
   });
 
   if (!call.ok) {
-    logger.error({ err: call.error, tableId, handId }, 'Balance cancel pot failed');
-    return { ok: false, error: 'INTERNAL_ERROR' };
+    return unavailable(call.error);
   }
 
   const response = call.value;
-  return { ok: response.ok, error: response.error };
+  return available({ ok: response.ok, error: response.error });
 }
+
+export const balanceClient = {
+  reserveForBuyIn,
+  commitReservation,
+  releaseReservation,
+  processCashOut,
+  recordContribution,
+  settlePot,
+  cancelPot,
+};
+
+export type BalanceClient = typeof balanceClient;

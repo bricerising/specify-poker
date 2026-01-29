@@ -5,6 +5,7 @@ const serverState = vi.hoisted(() => ({
   closeRedisClient: vi.fn(async () => undefined),
   startGrpcServer: vi.fn(async () => undefined),
   stopGrpcServer: vi.fn(),
+  closeGrpcClients: vi.fn(),
   startMetricsServer: vi.fn(() => ({
     close: vi.fn((callback?: (err?: Error) => void) => {
       callback?.();
@@ -23,6 +24,12 @@ vi.mock('../../src/observability', () => ({
 vi.mock('../../src/api/grpc/server', () => ({
   startGrpcServer: serverState.startGrpcServer,
   stopGrpcServer: serverState.stopGrpcServer,
+}));
+
+vi.mock('../../src/api/grpc/clients', () => ({
+  getBalanceClient: () => ({}),
+  getEventClient: () => ({}),
+  closeGrpcClients: serverState.closeGrpcClients,
 }));
 
 vi.mock('../../src/storage/redisClient', () => ({
@@ -60,6 +67,7 @@ describe('server lifecycle', () => {
 
     await server.shutdown();
     expect(serverState.stopGrpcServer).toHaveBeenCalledTimes(1);
+    expect(serverState.closeGrpcClients).toHaveBeenCalledTimes(1);
     expect(serverState.closeRedisClient).toHaveBeenCalledTimes(1);
     expect(serverState.stopObservability).toHaveBeenCalledTimes(1);
   });

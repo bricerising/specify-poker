@@ -1,4 +1,4 @@
-import { apiFetch } from './apiClient';
+import { apiFetchDecoded } from './apiClient';
 import { asRecord, readStringArray } from '../utils/unknown';
 
 function decodeFriendsResponse(payload: unknown): string[] {
@@ -13,15 +13,13 @@ function decodeFriendsResponse(payload: unknown): string[] {
 }
 
 export async function fetchFriends() {
-  const response = await apiFetch('/api/friends');
-  return decodeFriendsResponse(await response.json());
+  return apiFetchDecoded('/api/friends', decodeFriendsResponse);
 }
 
 export async function updateFriends(friends: string[]) {
-  const response = await apiFetch('/api/friends', {
+  return apiFetchDecoded('/api/friends', decodeFriendsResponse, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ friends }),
   });
-  return decodeFriendsResponse(await response.json());
 }

@@ -1,3 +1,4 @@
+import { createLazyValue } from '@specify-poker/shared';
 import { createRedisClientManager as createSharedRedisClientManager } from '@specify-poker/shared/redis';
 import type {
   RedisClientLogger,
@@ -29,14 +30,12 @@ export function createRedisClientManager(
   });
 }
 
-let defaultManager: RedisClientManager | null = null;
+const defaultManager = createLazyValue(() =>
+  createRedisClientManager({ url: getConfig().redisUrl }),
+);
 
 function getDefaultManager(): RedisClientManager {
-  if (!defaultManager) {
-    defaultManager = createRedisClientManager({ url: getConfig().redisUrl });
-  }
-
-  return defaultManager;
+  return defaultManager.get();
 }
 
 export async function getRedisClient(): Promise<RedisClientType> {
@@ -48,10 +47,11 @@ export async function getBlockingRedisClient(): Promise<RedisClientType> {
 }
 
 export async function closeRedisClient(): Promise<void> {
-  if (!defaultManager) {
+  const manager = defaultManager.peek();
+  if (!manager) {
     return;
   }
 
-  await defaultManager.close();
-  defaultManager = null;
+  await manager.close();
+  defaultManager.reset();
 }

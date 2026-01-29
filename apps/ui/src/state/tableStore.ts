@@ -1,4 +1,4 @@
-import { apiFetch, getApiBaseUrl } from '../services/apiClient';
+import { apiFetch, apiFetchDecoded, getApiBaseUrl } from '../services/apiClient';
 import { getToken } from '../services/auth';
 import { isStaleVersion, requestResync, shouldResync } from '../services/wsClient';
 import { recordWebSocketMessage } from '../observability/otel';
@@ -194,14 +194,18 @@ export function createTableStore(): TableStore {
       return null;
     }
     try {
-      const response = await apiFetch(`/api/profile/${encodeURIComponent(userId)}`);
-      const payload = asRecord(await response.json());
-      const username = readTrimmedString(payload?.username ?? payload?.nickname);
-      if (!username) {
-        return null;
-      }
-      const avatarUrl = readTrimmedString(payload?.avatarUrl ?? payload?.avatar_url) ?? null;
-      return { username, avatarUrl };
+      return await apiFetchDecoded(
+        `/api/profile/${encodeURIComponent(userId)}`,
+        (payload): { username: string; avatarUrl: string | null } | null => {
+          const record = asRecord(payload);
+          const username = readTrimmedString(record?.username ?? record?.nickname);
+          if (!username) {
+            return null;
+          }
+          const avatarUrl = readTrimmedString(record?.avatarUrl ?? record?.avatar_url) ?? null;
+          return { username, avatarUrl };
+        },
+      );
     } catch {
       return null;
     }

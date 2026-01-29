@@ -3,11 +3,23 @@ import { EventEmitter } from 'events';
 import WebSocket from 'ws';
 import { attachLobbyHub, handleLobbyPubSubEvent } from '../../../src/ws/handlers/lobby';
 
-vi.mock('../../../src/grpc/clients', () => ({
-  gameClient: {
-    ListTables: vi.fn(),
-  },
-}));
+vi.mock('../../../src/grpc/clients', () => {
+  const gameClient = { ListTables: vi.fn() };
+  const eventClient = {};
+  const playerClient = {};
+  const notifyClient = {};
+
+  return {
+    gameClient,
+    eventClient,
+    playerClient,
+    notifyClient,
+    getGameClient: () => gameClient,
+    getEventClient: () => eventClient,
+    getPlayerClient: () => playerClient,
+    getNotifyClient: () => notifyClient,
+  };
+});
 
 vi.mock('../../../src/ws/subscriptions', () => ({
   subscribeToChannel: vi.fn(),

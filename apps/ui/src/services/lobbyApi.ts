@@ -1,4 +1,4 @@
-import { apiFetch } from './apiClient';
+import { apiFetchDecoded } from './apiClient';
 import { normalizeTableSummary } from '../state/tableNormalization';
 import type { TableSummary } from '../state/tableTypes';
 import { asRecord } from '../utils/unknown';
@@ -19,17 +19,19 @@ function decodeTableSummary(payload: unknown): TableSummary {
   return normalizeTableSummary(record);
 }
 
-export async function listTables() {
-  const response = await apiFetch('/api/tables');
-  const payload: unknown = await response.json();
+function decodeTableSummaries(payload: unknown): TableSummary[] {
   if (!Array.isArray(payload)) {
     throw new Error('Invalid tables response');
   }
   return payload.map(decodeTableSummary);
 }
 
+export async function listTables() {
+  return apiFetchDecoded('/api/tables', decodeTableSummaries);
+}
+
 export async function createTable(input: CreateTableInput) {
-  const response = await apiFetch('/api/tables', {
+  return apiFetchDecoded('/api/tables', decodeTableSummary, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -42,6 +44,4 @@ export async function createTable(input: CreateTableInput) {
       },
     }),
   });
-
-  return decodeTableSummary(await response.json());
 }

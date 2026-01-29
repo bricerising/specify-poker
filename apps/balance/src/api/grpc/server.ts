@@ -1,7 +1,7 @@
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import * as path from 'path';
-import { createGrpcServerLifecycle, type GrpcServerLifecycle } from '@specify-poker/shared';
+import { addGrpcService, createGrpcServerLifecycle, type GrpcServerLifecycle } from '@specify-poker/shared';
 import { handlers } from './handlers';
 import logger from '../../observability/logger';
 
@@ -33,16 +33,11 @@ export async function startGrpcServer(port: number): Promise<void> {
     port,
     loadProto: (loaded) => loaded as BalanceProto,
     register: (server, proto) => {
-      server.addService(proto.balance.BalanceService.service, {
-        GetBalance: handlers.GetBalance,
-        EnsureAccount: handlers.EnsureAccount,
-        ReserveForBuyIn: handlers.ReserveForBuyIn,
-        CommitReservation: handlers.CommitReservation,
-        ReleaseReservation: handlers.ReleaseReservation,
-        ProcessCashOut: handlers.ProcessCashOut,
-        RecordContribution: handlers.RecordContribution,
-        SettlePot: handlers.SettlePot,
-        CancelPot: handlers.CancelPot,
+      addGrpcService({
+        server,
+        service: proto.balance.BalanceService.service,
+        handlers,
+        serviceName: 'BalanceService',
       });
     },
     logger,

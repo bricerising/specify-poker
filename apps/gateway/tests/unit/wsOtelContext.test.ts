@@ -67,11 +67,23 @@ describe('WebSocket OTEL context isolation', () => {
       handleChatPubSubEvent: vi.fn(),
     }));
 
-    vi.doMock('../../src/grpc/clients', () => ({
-      eventClient: {
-        PublishEvent: vi.fn(),
-      },
-    }));
+    vi.doMock('../../src/grpc/clients', () => {
+      const gameClient = {};
+      const notifyClient = {};
+      const eventClient = { PublishEvent: vi.fn() };
+      const playerClient = {};
+
+      return {
+        gameClient,
+        notifyClient,
+        eventClient,
+        playerClient,
+        getGameClient: () => gameClient,
+        getNotifyClient: () => notifyClient,
+        getEventClient: () => eventClient,
+        getPlayerClient: () => playerClient,
+      };
+    });
 
     vi.doMock('../../src/storage/sessionStore', () => ({
       updatePresence: vi.fn().mockResolvedValue(undefined),

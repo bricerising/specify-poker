@@ -3,16 +3,30 @@ import auditRouter from '../../../src/http/routes/audit';
 import { dispatchToRouter } from '../helpers/express';
 
 // Mock the gRPC client
-vi.mock('../../../src/grpc/clients', () => ({
-  eventClient: {
+vi.mock('../../../src/grpc/clients', () => {
+  const gameClient = {};
+  const notifyClient = {};
+  const eventClient = {
     QueryEvents: vi.fn(),
     GetEvent: vi.fn(),
     GetHandRecord: vi.fn(),
     GetHandReplay: vi.fn(),
     GetHandHistory: vi.fn(),
     GetHandsForUser: vi.fn(),
-  },
-}));
+  };
+  const playerClient = {};
+
+  return {
+    gameClient,
+    notifyClient,
+    eventClient,
+    playerClient,
+    getGameClient: () => gameClient,
+    getNotifyClient: () => notifyClient,
+    getEventClient: () => eventClient,
+    getPlayerClient: () => playerClient,
+  };
+});
 
 // Mock logger
 vi.mock('../../../src/observability/logger', () => ({

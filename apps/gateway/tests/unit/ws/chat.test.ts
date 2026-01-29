@@ -3,15 +3,23 @@ import { EventEmitter } from 'events';
 import WebSocket from 'ws';
 import { attachChatHub } from '../../../src/ws/handlers/chat';
 
-vi.mock('../../../src/grpc/clients', () => ({
-  gameClient: {
-    GetTableState: vi.fn(),
-    IsMuted: vi.fn(),
-  },
-  playerClient: {
-    GetProfile: vi.fn(),
-  },
-}));
+vi.mock('../../../src/grpc/clients', () => {
+  const gameClient = { GetTableState: vi.fn(), IsMuted: vi.fn() };
+  const playerClient = { GetProfile: vi.fn() };
+  const eventClient = {};
+  const notifyClient = {};
+
+  return {
+    gameClient,
+    playerClient,
+    eventClient,
+    notifyClient,
+    getGameClient: () => gameClient,
+    getPlayerClient: () => playerClient,
+    getEventClient: () => eventClient,
+    getNotifyClient: () => notifyClient,
+  };
+});
 
 vi.mock('../../../src/ws/subscriptions', () => ({
   subscribeToChannel: vi.fn(),

@@ -102,49 +102,88 @@ describe('balance client', () => {
   it('maps successful responses from Balance gRPC', async () => {
     const client = await import('../../src/clients/balanceClient');
 
-    const reserve = await client.reserveForBuyIn('player-1', 'table-1', 50, 'key-1');
-    expect(reserve.ok).toBe(true);
-    expect(reserve.reservationId).toBe('res-1');
-    expect(reserve.availableBalance).toBe(500);
+    const reserveCall = await client.reserveForBuyIn({
+      accountId: 'player-1',
+      tableId: 'table-1',
+      amount: 50,
+      idempotencyKey: 'key-1',
+    });
+    expect(reserveCall.type).toBe('available');
+    if (reserveCall.type === 'available') {
+      expect(reserveCall.response.ok).toBe(true);
+      expect(reserveCall.response.reservationId).toBe('res-1');
+      expect(reserveCall.response.availableBalance).toBe(500);
+    }
 
-    const commit = await client.commitReservation('res-1');
-    expect(commit.ok).toBe(true);
-    expect(commit.transactionId).toBe('tx-1');
-    expect(commit.newBalance).toBe(450);
+    const commitCall = await client.commitReservation({ reservationId: 'res-1' });
+    expect(commitCall.type).toBe('available');
+    if (commitCall.type === 'available') {
+      expect(commitCall.response.ok).toBe(true);
+      expect(commitCall.response.transactionId).toBe('tx-1');
+      expect(commitCall.response.newBalance).toBe(450);
+    }
 
-    const release = await client.releaseReservation('res-1', 'timeout');
-    expect(release.ok).toBe(true);
+    const releaseCall = await client.releaseReservation({
+      reservationId: 'res-1',
+      reason: 'timeout',
+    });
+    expect(releaseCall.type).toBe('available');
+    if (releaseCall.type === 'available') {
+      expect(releaseCall.response.ok).toBe(true);
+    }
 
-    const cashOut = await client.processCashOut('player-1', 'table-1', 0, 20, 'key-2');
-    expect(cashOut.ok).toBe(true);
-    expect(cashOut.newBalance).toBe(600);
+    const cashOutCall = await client.processCashOut({
+      accountId: 'player-1',
+      tableId: 'table-1',
+      seatId: 0,
+      amount: 20,
+      idempotencyKey: 'key-2',
+    });
+    expect(cashOutCall.type).toBe('available');
+    if (cashOutCall.type === 'available') {
+      expect(cashOutCall.response.ok).toBe(true);
+      expect(cashOutCall.response.newBalance).toBe(600);
+    }
 
-    const contribution = await client.recordContribution(
-      'table-1',
-      'hand-1',
-      0,
-      'player-1',
-      10,
-      'BET',
-      'key-3',
-    );
-    expect(contribution.ok).toBe(true);
-    expect(contribution.totalPot).toBe(20);
+    const contributionCall = await client.recordContribution({
+      tableId: 'table-1',
+      handId: 'hand-1',
+      seatId: 0,
+      accountId: 'player-1',
+      amount: 10,
+      contributionType: 'BET',
+      idempotencyKey: 'key-3',
+    });
+    expect(contributionCall.type).toBe('available');
+    if (contributionCall.type === 'available') {
+      expect(contributionCall.response.ok).toBe(true);
+      expect(contributionCall.response.totalPot).toBe(20);
+    }
 
-    const settle = await client.settlePot(
-      'table-1',
-      'hand-1',
-      [{ seatId: 0, accountId: 'player-1', amount: 10 }],
-      'key-4',
-    );
-    expect(settle.ok).toBe(true);
-    expect(settle.results?.[0].newBalance).toBe(610);
+    const settleCall = await client.settlePot({
+      tableId: 'table-1',
+      handId: 'hand-1',
+      winners: [{ seatId: 0, accountId: 'player-1', amount: 10 }],
+      idempotencyKey: 'key-4',
+    });
+    expect(settleCall.type).toBe('available');
+    if (settleCall.type === 'available') {
+      expect(settleCall.response.ok).toBe(true);
+      expect(settleCall.response.results?.[0].newBalance).toBe(610);
+    }
 
-    const cancel = await client.cancelPot('table-1', 'hand-1', 'table_disbanded');
-    expect(cancel.ok).toBe(true);
+    const cancelCall = await client.cancelPot({
+      tableId: 'table-1',
+      handId: 'hand-1',
+      reason: 'table_disbanded',
+    });
+    expect(cancelCall.type).toBe('available');
+    if (cancelCall.type === 'available') {
+      expect(cancelCall.response.ok).toBe(true);
+    }
   });
 
-  it('returns internal errors when gRPC fails', async () => {
+  it('returns unavailable results when gRPC fails', async () => {
     const client = await import('../../src/clients/balanceClient');
     balanceState.reserveError = new Error('fail');
     balanceState.commitError = new Error('fail');
@@ -154,39 +193,56 @@ describe('balance client', () => {
     balanceState.settleError = new Error('fail');
     balanceState.cancelError = new Error('fail');
 
-    const reserve = await client.reserveForBuyIn('player-1', 'table-1', 50, 'key-1');
-    expect(reserve.ok).toBe(false);
-    expect(reserve.error).toBe('INTERNAL_ERROR');
+    const reserveCall = await client.reserveForBuyIn({
+      accountId: 'player-1',
+      tableId: 'table-1',
+      amount: 50,
+      idempotencyKey: 'key-1',
+    });
+    expect(reserveCall.type).toBe('unavailable');
 
-    const commit = await client.commitReservation('res-1');
-    expect(commit.ok).toBe(false);
+    const commitCall = await client.commitReservation({ reservationId: 'res-1' });
+    expect(commitCall.type).toBe('unavailable');
 
-    const release = await client.releaseReservation('res-1', 'timeout');
-    expect(release.ok).toBe(false);
+    const releaseCall = await client.releaseReservation({
+      reservationId: 'res-1',
+      reason: 'timeout',
+    });
+    expect(releaseCall.type).toBe('unavailable');
 
-    const cashOut = await client.processCashOut('player-1', 'table-1', 0, 20, 'key-2');
-    expect(cashOut.ok).toBe(false);
+    const cashOutCall = await client.processCashOut({
+      accountId: 'player-1',
+      tableId: 'table-1',
+      seatId: 0,
+      amount: 20,
+      idempotencyKey: 'key-2',
+    });
+    expect(cashOutCall.type).toBe('unavailable');
 
-    const contribution = await client.recordContribution(
-      'table-1',
-      'hand-1',
-      0,
-      'player-1',
-      10,
-      'BET',
-      'key-3',
-    );
-    expect(contribution.ok).toBe(false);
+    const contributionCall = await client.recordContribution({
+      tableId: 'table-1',
+      handId: 'hand-1',
+      seatId: 0,
+      accountId: 'player-1',
+      amount: 10,
+      contributionType: 'BET',
+      idempotencyKey: 'key-3',
+    });
+    expect(contributionCall.type).toBe('unavailable');
 
-    const settle = await client.settlePot(
-      'table-1',
-      'hand-1',
-      [{ seatId: 0, accountId: 'player-1', amount: 10 }],
-      'key-4',
-    );
-    expect(settle.ok).toBe(false);
+    const settleCall = await client.settlePot({
+      tableId: 'table-1',
+      handId: 'hand-1',
+      winners: [{ seatId: 0, accountId: 'player-1', amount: 10 }],
+      idempotencyKey: 'key-4',
+    });
+    expect(settleCall.type).toBe('unavailable');
 
-    const cancel = await client.cancelPot('table-1', 'hand-1', 'table_disbanded');
-    expect(cancel.ok).toBe(false);
+    const cancelCall = await client.cancelPot({
+      tableId: 'table-1',
+      handId: 'hand-1',
+      reason: 'table_disbanded',
+    });
+    expect(cancelCall.type).toBe('unavailable');
   });
 });

@@ -22,6 +22,14 @@ const queryDuration = new Histogram({
   registers: [registry],
 });
 
+const grpcDuration = new Histogram({
+  name: 'event_grpc_request_duration_seconds',
+  help: 'gRPC request duration in seconds.',
+  labelNames: ['method', 'status'],
+  buckets: [0.005, 0.01, 0.05, 0.1, 0.2, 0.5, 1, 2, 5],
+  registers: [registry],
+});
+
 const materializationLag = new Histogram({
   name: 'event_hand_materialization_lag_seconds',
   help: 'Lag between hand completion and materialization.',
@@ -35,6 +43,10 @@ export function recordIngestion(type: string) {
 
 export function recordQueryDuration(status: 'ok' | 'error', durationMs: number) {
   queryDuration.observe({ status }, durationMs / 1000);
+}
+
+export function recordGrpcRequest(method: string, status: 'ok' | 'error', durationMs: number) {
+  grpcDuration.observe({ method, status }, durationMs / 1000);
 }
 
 export function recordMaterializationLag(durationMs: number) {

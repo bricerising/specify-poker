@@ -43,6 +43,10 @@ vi.mock('../../src/ws/pubsub', () => ({
   closeWsPubSub: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../../src/grpc/clients', () => ({
+  closeGrpcClients: vi.fn(),
+}));
+
 vi.mock('../../src/storage/instanceRegistry', () => ({
   registerInstance: vi.fn().mockResolvedValue(undefined),
   unregisterInstance: vi.fn().mockResolvedValue(undefined),
@@ -73,6 +77,7 @@ describe('Gateway server startup', () => {
 
   it('boots services and listens for shutdown', async () => {
     const logger = (await import('../../src/observability/logger')).default;
+    const { closeGrpcClients } = await import('../../src/grpc/clients');
     const { startServer, shutdown } = await import('../../src/server');
 
     await startServer();
@@ -82,5 +87,6 @@ describe('Gateway server startup', () => {
 
     await shutdown();
     expect(server.close).toHaveBeenCalled();
+    expect(closeGrpcClients).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,4 +1,4 @@
-import { apiFetch } from './apiClient';
+import { apiFetchDecoded } from './apiClient';
 import { asRecord, readStringArray, readTrimmedString, toNumber } from '../utils/unknown';
 
 export interface UserProfile {
@@ -43,15 +43,13 @@ function decodeUserProfile(payload: unknown): UserProfile {
 }
 
 export async function fetchProfile() {
-  const response = await apiFetch('/api/me');
-  return decodeUserProfile(await response.json());
+  return apiFetchDecoded('/api/me', decodeUserProfile);
 }
 
 export async function updateProfile(input: { avatarUrl: string | null }) {
-  const response = await apiFetch('/api/me', {
+  return apiFetchDecoded('/api/me', decodeUserProfile, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   });
-  return decodeUserProfile(await response.json());
 }

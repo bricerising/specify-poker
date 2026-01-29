@@ -1,4 +1,4 @@
-import { createConfigBuilder } from '@specify-poker/shared';
+import { createConfigBuilder, createLazyValue } from '@specify-poker/shared';
 
 export interface Config {
   port: number;
@@ -32,15 +32,12 @@ export function loadConfig(): Config {
   return config;
 }
 
-let config: Config | null = null;
+const cachedConfig = createLazyValue(loadConfig);
 
 export function getConfig(): Config {
-  if (!config) {
-    config = loadConfig();
-  }
-  return config;
+  return cachedConfig.get();
 }
 
 export function resetConfigForTests(): void {
-  config = null;
+  cachedConfig.reset();
 }

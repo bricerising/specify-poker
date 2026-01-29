@@ -31,15 +31,20 @@ import {
   setSpectatorCount,
 } from '../observability/metrics';
 import { coerceNumber } from '../utils/coerce';
+import { balanceClient } from '../clients/balanceClient';
+import { publishEvent } from '../clients/eventClient';
 
-import { balanceClientAdapter } from './table/balanceClientAdapter';
 import { gatewayWsPublisher } from './table/gatewayWsPublisher';
-import { gameEventPublisher } from './table/gameEventPublisher';
 import { redactTableState } from './table/tableViewBuilder';
 import { resolveSeatForUser as resolveSeatForUserInState } from './table/seatResolver';
 import { createBalanceTableEconomy } from './table/tableEconomy';
+import { createTableQueries, type TableQueries } from './table/tableQueries';
 
-const tableEconomy = createBalanceTableEconomy({ balanceClient: balanceClientAdapter });
+const tableEconomy = createBalanceTableEconomy({ balanceClient });
+const defaultTableQueries = createTableQueries({
+  tableStore,
+  tableStateStore,
+});
 
 // ============================================================================
 // Constants
@@ -80,10 +85,15 @@ type FinalizeReservedSeatJoinResult =
   | { readonly type: 'balance_unavailable'; readonly error: unknown };
 
 export class TableService {
-  private turnTimers = new TimeoutRegistry<string>();
-  private nextHandTimers = new TimeoutRegistry<string>();
-  private turnStartMeta = new Map<string, TurnStartMeta>();
-  private handTimeoutMeta = new Map<string, HandTimeoutMeta>();
+  private readonly tableQueries: TableQueries;
+  private readonly turnTimers = new TimeoutRegistry<string>();
+  private readonly nextHandTimers = new TimeoutRegistry<string>();
+  private readonly turnStartMeta = new Map<string, TurnStartMeta>();
+  private readonly handTimeoutMeta = new Map<string, HandTimeoutMeta>();
+
+  constructor(options: { tableQueries?: TableQueries } = {}) {
+    this.tableQueries = options.tableQueries ?? defaultTableQueries;
+  }
 
   shutdown(): void {
     this.turnTimers.clear();
@@ -131,12 +141,12 @@ export class TableService {
     seatId: number;
     amount: number;
   }) {
-    const cashOutCall = await balanceClientAdapter.processCashOut({
-      account_id: userId,
-      table_id: tableId,
-      seat_id: seatId,
+    const cashOutCall = await balanceClient.processCashOut({
+      accountId: userId,
+      tableId,
+      seatId,
       amount,
-      idempotency_key: this.cashOutIdempotencyKey(tableId, userId, seatId),
+      idempotencyKey: this.cashOutIdempotencyKey(tableId, userId, seatId),
     });
 
     if (cashOutCall.type === 'unavailable') {
@@ -203,12 +213,7 @@ export class TableService {
   }
 
   private async loadTableAndState(tableId: string) {
-    const table = await tableStore.get(tableId);
-    const state = await tableStateStore.get(tableId);
-    if (!table || !state) {
-      return null;
-    }
-    return { table, state };
+    return this.tableQueries.loadTableAndState(tableId);
   }
 
   private async publishTableAndLobby(table: Table, state: TableState) {
@@ -271,42 +276,11 @@ export class TableService {
   }
 
   async listTableSummaries(): Promise<TableSummary[]> {
-    const tableIds = await tableStore.list();
-    const summaries: TableSummary[] = [];
-    let activeTableCount = 0;
-    let seatedPlayerCount = 0;
-    let spectatorTotal = 0;
-    for (const tableId of tableIds) {
-      const table = await tableStore.get(tableId);
-      const state = await tableStateStore.get(tableId);
-      if (!table || !state) {
-        continue;
-      }
-      const occupiedSeatIds = state.seats
-        .filter((seat) => seat.status !== 'EMPTY')
-        .map((seat) => seat.seatId);
-      seatedPlayerCount += state.seats.filter(
-        (seat) => Boolean(seat.userId) && seat.status !== 'EMPTY',
-      ).length;
-      spectatorTotal += state.spectators.length;
-      if (state.hand) {
-        activeTableCount += 1;
-      }
-      summaries.push({
-        tableId: table.tableId,
-        name: table.name,
-        ownerId: table.ownerId,
-        config: table.config,
-        seatsTaken: occupiedSeatIds.length,
-        occupiedSeatIds,
-        inProgress: state.hand !== null,
-        spectatorCount: state.spectators.length,
-      });
-    }
-    setActiveTables(activeTableCount);
-    setSeatedPlayers(seatedPlayerCount);
-    setSpectatorCount(spectatorTotal);
-    return summaries;
+    const snapshot = await this.tableQueries.listTableSummariesSnapshot();
+    setActiveTables(snapshot.activeTableCount);
+    setSeatedPlayers(snapshot.seatedPlayerCount);
+    setSpectatorCount(snapshot.spectatorTotal);
+    return snapshot.summaries;
   }
 
   async deleteTable(tableId: string): Promise<boolean> {
@@ -462,11 +436,12 @@ export class TableService {
 
     const pendingBuyInAmount = coerceNumber(reservedSeat.pendingBuyInAmount, fallbackBuyInAmount);
     const buyInAmount = pendingBuyInAmount > 0 ? pendingBuyInAmount : fallbackBuyInAmount;
+    const buyInIdempotencyKey =
+      reservedSeat.buyInIdempotencyKey ??
+      this.newIdempotencyKey(`buyin:${tableId}:${seatId}:${userId}`);
 
     if (!reservedSeat.buyInIdempotencyKey) {
-      reservedSeat.buyInIdempotencyKey = this.newIdempotencyKey(
-        `buyin:${tableId}:${seatId}:${userId}`,
-      );
+      reservedSeat.buyInIdempotencyKey = buyInIdempotencyKey;
       reservedSeat.pendingBuyInAmount = buyInAmount;
       this.touchState(reservedState);
       await tableStateStore.save(reservedState);
@@ -474,12 +449,12 @@ export class TableService {
 
     let reservationId = reservedSeat.reservationId;
     if (!reservationId) {
-      const reservationCall = await balanceClientAdapter.reserveForBuyIn({
-        account_id: userId,
-        table_id: tableId,
+      const reservationCall = await balanceClient.reserveForBuyIn({
+        accountId: userId,
+        tableId,
         amount: buyInAmount,
-        idempotency_key: reservedSeat.buyInIdempotencyKey,
-        timeout_seconds: 30,
+        idempotencyKey: buyInIdempotencyKey,
+        timeoutSeconds: 30,
       });
 
       if (reservationCall.type === 'unavailable') {
@@ -487,7 +462,7 @@ export class TableService {
       }
 
       const reservation = reservationCall.response;
-      reservationId = reservation.reservation_id;
+      reservationId = reservation.reservationId;
       if (!reservation.ok || !reservationId) {
         await this.rollbackSeat(tableId, seatId, userId);
         return { type: 'error', error: reservation.error || 'INSUFFICIENT_BALANCE' };
@@ -498,9 +473,7 @@ export class TableService {
       await tableStateStore.save(reservedState);
     }
 
-    const commitCall = await balanceClientAdapter.commitReservation({
-      reservation_id: reservationId,
-    });
+    const commitCall = await balanceClient.commitReservation({ reservationId });
     if (commitCall.type === 'unavailable') {
       return { type: 'balance_unavailable', error: commitCall.error };
     }
@@ -580,8 +553,8 @@ export class TableService {
     reservationId?: string,
   ) {
     if (reservationId) {
-      balanceClientAdapter.releaseReservation({
-        reservation_id: reservationId,
+      void balanceClient.releaseReservation({
+        reservationId,
         reason: 'buy_in_failed',
       });
     }
@@ -610,8 +583,8 @@ export class TableService {
     if (!seat) return { ok: false, error: 'PLAYER_NOT_AT_TABLE' };
 
     if (seat.status === 'RESERVED' && seat.reservationId) {
-      balanceClientAdapter.releaseReservation({
-        reservation_id: seat.reservationId,
+      void balanceClient.releaseReservation({
+        reservationId: seat.reservationId,
         reason: 'player_left',
       });
     }
@@ -1107,7 +1080,7 @@ export class TableService {
     type: string,
     payload: Record<string, unknown>,
   ) {
-    await gameEventPublisher.publish({
+    await publishEvent({
       type,
       tableId,
       handId,

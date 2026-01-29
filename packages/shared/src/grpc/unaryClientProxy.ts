@@ -14,12 +14,23 @@ export function createUnaryClientProxy<TProxy extends object, TResult>(
   options: CreateUnaryClientProxyOptions<TResult>,
 ): TProxy {
   const client = options.client;
+  const cachedWrappers = new Map<
+    string,
+    (request: unknown, callOptions?: UnaryCallOptions) => TResult
+  >();
 
-  return createNonThenableProxy<TProxy>((prop) => {
-    return (request: unknown, callOptions?: UnaryCallOptions) => {
-      const value = getFunctionProperty(client, prop);
+  const getOrCreateWrapper = (
+    methodName: string,
+  ): ((request: unknown, callOptions?: UnaryCallOptions) => TResult) => {
+    const cached = cachedWrappers.get(methodName);
+    if (cached) {
+      return cached;
+    }
+
+    const wrapper = (request: unknown, callOptions?: UnaryCallOptions) => {
+      const value = getFunctionProperty(client, methodName);
       if (!value) {
-        return options.onNonFunctionProperty(prop);
+        return options.onNonFunctionProperty(methodName);
       }
 
       const method = value as AnyUnaryClientMethod;
@@ -29,5 +40,10 @@ export function createUnaryClientProxy<TProxy extends object, TResult>(
         callOptions,
       );
     };
-  });
+
+    cachedWrappers.set(methodName, wrapper);
+    return wrapper;
+  };
+
+  return createNonThenableProxy<TProxy>(getOrCreateWrapper);
 }

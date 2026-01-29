@@ -56,6 +56,11 @@ export async function main() {
 
     metricsServer = startMetricsServer(config.metricsPort);
 
+    const { closeGrpcClients } = await import('./api/grpc/clients');
+    shutdownManager.add('grpc.clients.close', () => {
+      closeGrpcClients();
+    });
+
     const { tableService } = await import('./services/tableService');
     shutdownManager.add('tableService.shutdown', () => {
       tableService.shutdown();

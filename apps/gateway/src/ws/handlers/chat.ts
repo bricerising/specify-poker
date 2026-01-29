@@ -3,7 +3,7 @@ import type WebSocket from 'ws';
 import type { z } from 'zod';
 import { wsClientMessageSchema } from '@specify-poker/shared';
 
-import { grpc } from '../../grpc/unaryClients';
+import { grpcResult } from '../../grpc/unaryClients';
 import type { WsPubSubMessage } from '../pubsub';
 import { checkWsRateLimit, parseChatMessage, parseTableId } from '../validators';
 import { subscribeToChannel, unsubscribeFromChannel, unsubscribeAll } from '../subscriptions';
@@ -31,43 +31,46 @@ async function getMembership(
   tableId: string,
   userId: string,
 ): Promise<{ seated: boolean; spectator: boolean }> {
-  try {
-    const response = await grpc.game.GetTableState({
-      table_id: tableId,
-      user_id: userId,
-    });
-    const seated =
-      response.state?.seats?.some((s) => s.user_id === userId && s.status !== 'empty') || false;
-    const spectator = response.state?.spectators?.some((s) => s.user_id === userId) || false;
-    return { seated, spectator };
-  } catch {
+  const result = await grpcResult.game.GetTableState({
+    table_id: tableId,
+    user_id: userId,
+  });
+  if (!result.ok) {
     return { seated: false, spectator: false };
   }
+
+  const response = result.value;
+  const seated =
+    response.state?.seats?.some((seat) => seat.user_id === userId && seat.status !== 'empty') ??
+    false;
+  const spectator =
+    response.state?.spectators?.some((spectator) => spectator.user_id === userId) ?? false;
+  return { seated, spectator };
 }
 
 async function isMuted(tableId: string, userId: string): Promise<boolean> {
-  try {
-    const response = await grpc.game.IsMuted({
-      table_id: tableId,
-      user_id: userId,
-    });
-    return response.is_muted;
-  } catch {
+  const result = await grpcResult.game.IsMuted({
+    table_id: tableId,
+    user_id: userId,
+  });
+  if (!result.ok) {
     return false;
   }
+
+  return result.value.is_muted;
 }
 
 async function getUsername(userId: string): Promise<string> {
-  try {
-    const response = await grpc.player.GetProfile({ user_id: userId });
-    const username = (response.profile as { username?: unknown } | undefined)?.username;
-    if (typeof username === 'string' && username.trim().length > 0) {
-      return username;
-    }
-    return 'Unknown';
-  } catch {
+  const result = await grpcResult.player.GetProfile({ user_id: userId });
+  if (!result.ok) {
     return 'Unknown';
   }
+
+  const username = (result.value.profile as { username?: unknown } | undefined)?.username;
+  if (typeof username === 'string' && username.trim().length > 0) {
+    return username;
+  }
+  return 'Unknown';
 }
 
 async function handleSubscribe(connectionId: string, tableId: string) {

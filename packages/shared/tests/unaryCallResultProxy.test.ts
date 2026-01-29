@@ -57,6 +57,25 @@ describe('createUnaryCallResultProxy', () => {
     expect((error as Error).message).toMatch(/unary_call_result_proxy\.non_function_property/);
   });
 
+  it('returns an error result when calling Object.prototype methods like a unary RPC', async () => {
+    const proxy = createUnaryCallResultProxy({
+      Ping(
+        _request: Record<string, never>,
+        callback: (err: Error | null, response: string) => void,
+      ) {
+        callback(null, 'pong');
+      },
+    });
+
+    const result = await (proxy as unknown as { toString: (request: unknown) => Promise<unknown> })
+      .toString({});
+    expect(result).toMatchObject({ ok: false });
+
+    const error = (result as { ok: false; error: unknown }).error;
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/unary_call_result_proxy\.non_function_property/);
+  });
+
   it('passes AbortSignal through to unaryCallResult', async () => {
     const client = {
       Ping: vi.fn(

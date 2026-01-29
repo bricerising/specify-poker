@@ -13,6 +13,7 @@ export type UnaryClientMethod<Request, Response, CallbackError extends Error = E
 
 export type UnaryCallOptions = {
   signal?: AbortSignal;
+  timeoutMs?: number;
 };
 
 type CancelableCall = { cancel: () => void };
@@ -22,7 +23,8 @@ export function unaryCall<Request, Response, CallbackError extends Error = Error
   request: Request,
   options: UnaryCallOptions = {},
 ): Promise<Response> {
-  const { signal } = options;
+  const { signal, timeoutMs } = options;
+  const hasTimeout = typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0;
 
   if (signal?.aborted) {
     return Promise.reject(createAbortError());
@@ -31,9 +33,14 @@ export function unaryCall<Request, Response, CallbackError extends Error = Error
   return new Promise((resolve, reject) => {
     let settled = false;
     let call: unknown;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     const cleanup = () => {
       signal?.removeEventListener('abort', onAbort);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
     };
 
     const settle = (action: () => void) => {
@@ -56,6 +63,18 @@ export function unaryCall<Request, Response, CallbackError extends Error = Error
     };
 
     signal?.addEventListener('abort', onAbort);
+
+    if (hasTimeout) {
+      timeoutId = setTimeout(() => {
+        if (settled) {
+          return;
+        }
+        if (isCancelableCall(call)) {
+          call.cancel();
+        }
+        settle(() => reject(createAbortError(`Timed out after ${timeoutMs}ms`)));
+      }, timeoutMs);
+    }
 
     try {
       call = method(request, (error, response) => {
@@ -93,8 +112,8 @@ function isCancelableCall(value: unknown): value is CancelableCall {
   return 'cancel' in value && typeof (value as { cancel?: unknown }).cancel === 'function';
 }
 
-function createAbortError(): Error {
-  const error = new Error('Aborted');
+function createAbortError(message = 'Aborted'): Error {
+  const error = new Error(message);
   error.name = 'AbortError';
   return error;
 }

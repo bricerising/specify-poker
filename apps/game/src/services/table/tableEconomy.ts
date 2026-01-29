@@ -1,6 +1,6 @@
 import { calculatePotPayouts } from '../../engine/potSettlement';
+import type { BalanceClient } from '../../clients/balanceClient';
 import type { Action, Pot, Seat } from '../../domain/types';
-import type { BalanceClientAdapter } from './balanceClientAdapter';
 
 export type TableEconomyResult =
   | { readonly type: 'ok' }
@@ -43,7 +43,7 @@ function asContributionType(actionType: Action['type']) {
 }
 
 type CreateBalanceTableEconomyOptions = {
-  balanceClient: BalanceClientAdapter;
+  balanceClient: Pick<BalanceClient, 'recordContribution' | 'settlePot'>;
 };
 
 export function createBalanceTableEconomy(options: CreateBalanceTableEconomyOptions): TableEconomy {
@@ -57,13 +57,13 @@ export function createBalanceTableEconomy(options: CreateBalanceTableEconomyOpti
 
       const calls = contributions.map((action) =>
         balanceClient.recordContribution({
-          table_id: tableId,
-          hand_id: handId,
-          seat_id: action.seatId,
-          account_id: action.userId,
+          tableId,
+          handId,
+          seatId: action.seatId,
+          accountId: action.userId,
           amount: action.amount,
-          contribution_type: asContributionType(action.type),
-          idempotency_key: makeContributionIdempotencyKey(tableId, handId, action.actionId),
+          contributionType: asContributionType(action.type),
+          idempotencyKey: makeContributionIdempotencyKey(tableId, handId, action.actionId),
         }),
       );
 
@@ -90,13 +90,13 @@ export function createBalanceTableEconomy(options: CreateBalanceTableEconomyOpti
       }
 
       const call = await balanceClient.recordContribution({
-        table_id: tableId,
-        hand_id: handId,
-        seat_id: action.seatId,
-        account_id: action.userId,
+        tableId,
+        handId,
+        seatId: action.seatId,
+        accountId: action.userId,
         amount,
-        contribution_type: asContributionType(action.type),
-        idempotency_key: makeContributionIdempotencyKey(tableId, handId, action.actionId),
+        contributionType: asContributionType(action.type),
+        idempotencyKey: makeContributionIdempotencyKey(tableId, handId, action.actionId),
       });
 
       if (call.type === 'unavailable') {
@@ -136,17 +136,17 @@ export function createBalanceTableEconomy(options: CreateBalanceTableEconomyOpti
       const winners = Array.from(payoutBySeatId.entries())
         .filter(([, amount]) => amount > 0)
         .map(([seatId, amount]) => ({
-          seat_id: seatId,
-          account_id: seats[seatId]?.userId ?? '',
+          seatId,
+          accountId: seats[seatId]?.userId ?? '',
           amount,
         }))
-        .filter((winner) => winner.account_id.length > 0);
+        .filter((winner) => winner.accountId.length > 0);
 
       const settleCall = await balanceClient.settlePot({
-        table_id: tableId,
-        hand_id: handId,
+        tableId,
+        handId,
         winners,
-        idempotency_key: makeSettlementIdempotencyKey(tableId, handId),
+        idempotencyKey: makeSettlementIdempotencyKey(tableId, handId),
       });
 
       if (settleCall.type === 'unavailable') {

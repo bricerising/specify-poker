@@ -3,8 +3,8 @@ import tablesRouter from '../../../src/http/routes/tables';
 import { dispatchToRouter } from '../helpers/express';
 
 // Mock the gRPC client
-vi.mock('../../../src/grpc/clients', () => ({
-  gameClient: {
+vi.mock('../../../src/grpc/clients', () => {
+  const gameClient = {
     ListTables: vi.fn(),
     CreateTable: vi.fn(),
     GetTable: vi.fn(),
@@ -18,8 +18,22 @@ vi.mock('../../../src/grpc/clients', () => ({
     KickPlayer: vi.fn(),
     MutePlayer: vi.fn(),
     UnmutePlayer: vi.fn(),
-  },
-}));
+  };
+  const eventClient = {};
+  const playerClient = {};
+  const notifyClient = {};
+
+  return {
+    gameClient,
+    eventClient,
+    playerClient,
+    notifyClient,
+    getGameClient: () => gameClient,
+    getEventClient: () => eventClient,
+    getPlayerClient: () => playerClient,
+    getNotifyClient: () => notifyClient,
+  };
+});
 
 // Mock logger
 vi.mock('../../../src/observability/logger', () => ({

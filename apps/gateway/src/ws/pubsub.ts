@@ -1,6 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { RedisClientType } from 'redis';
-import { createClient } from 'redis';
+import { createRedisClientManager, type RedisClientLogger } from '@specify-poker/shared/redis';
 import { getConfig } from '../config';
 import logger from '../observability/logger';
 import { isRecord, safeJsonParseRecord } from '../utils/json';
@@ -17,6 +16,8 @@ export type WsPubSubMessage = {
 const PUBSUB_CHANNEL = 'gateway:ws:events';
 
 type Logger = Pick<typeof logger, 'info' | 'warn' | 'error'>;
+
+type CreateRedisClient = Parameters<typeof createRedisClientManager>[0]['createClient'];
 
 type WsPubSubHandlers = {
   onTableEvent: (message: WsPubSubMessage) => void;
@@ -39,7 +40,7 @@ type CreateWsPubSubOptions = {
   redisUrl: string;
   channel?: string;
   instanceId?: string;
-  createClient?: typeof createClient;
+  createClient?: CreateRedisClient;
   logger?: Logger;
 };
 
@@ -72,10 +73,25 @@ export function createWsPubSub(options: CreateWsPubSubOptions): WsPubSub {
   const channel = options.channel ?? PUBSUB_CHANNEL;
   const instanceId = options.instanceId ?? randomUUID();
   const log = options.logger ?? logger;
-  const createRedisClient = options.createClient ?? createClient;
 
-  let pubClient: RedisClientType | null = null;
-  let subClient: RedisClientType | null = null;
+  const redisLogger: RedisClientLogger = {};
+  if (typeof log.info === 'function') {
+    redisLogger.info = (obj, msg) => log.info(obj, msg);
+  }
+  if (typeof log.warn === 'function') {
+    redisLogger.warn = (obj, msg) => log.warn(obj, msg);
+  }
+  if (typeof log.error === 'function') {
+    redisLogger.error = (obj, msg) => log.error(obj, msg);
+  }
+
+  const redis = createRedisClientManager({
+    url: options.redisUrl,
+    createClient: options.createClient,
+    log: redisLogger,
+    name: 'gateway-ws-pubsub',
+  });
+
   let initialized = false;
   let initPromise: Promise<boolean> | null = null;
   let closePromise: Promise<void> | null = null;
@@ -93,18 +109,8 @@ export function createWsPubSub(options: CreateWsPubSubOptions): WsPubSub {
         await closePromise;
       }
 
-      pubClient = createRedisClient({ url: options.redisUrl });
-      subClient = pubClient.duplicate();
-
-      pubClient.on('error', (error) => {
-        log.error({ err: error }, 'Redis pubClient error');
-      });
-      subClient.on('error', (error) => {
-        log.error({ err: error }, 'Redis subClient error');
-      });
-
-      await pubClient.connect();
-      await subClient.connect();
+      await redis.getClient(); // Ensure pub client is connected before returning.
+      const subClient = await redis.getBlockingClient();
 
       const handlerByChannel: Record<WsChannel, (message: WsPubSubMessage) => void> = {
         table: handlers.onTableEvent,
@@ -140,26 +146,9 @@ export function createWsPubSub(options: CreateWsPubSubOptions): WsPubSub {
       return closePromise;
     }
 
-    const closeClient = async (client: RedisClientType | null, label: string) => {
-      if (!client?.isOpen) {
-        return;
-      }
-      try {
-        await client.quit();
-      } catch (err: unknown) {
-        log.warn({ err, label }, 'Redis quit failed; forcing disconnect');
-        client.disconnect();
-      }
-    };
-
-    closePromise = Promise.all([
-      closeClient(subClient, 'subClient'),
-      closeClient(pubClient, 'pubClient'),
-    ])
-      .then(() => undefined)
+    closePromise = redis
+      .close()
       .finally(() => {
-        pubClient = null;
-        subClient = null;
         initialized = false;
         closePromise = null;
       });
@@ -168,9 +157,11 @@ export function createWsPubSub(options: CreateWsPubSubOptions): WsPubSub {
   };
 
   const publish = async (message: Omit<WsPubSubMessage, 'sourceId'>): Promise<boolean> => {
-    if (!pubClient) {
+    if (!initialized) {
       return false;
     }
+
+    const pubClient = await redis.getClient();
     const payload: WsPubSubMessage = { ...message, sourceId: instanceId };
     await pubClient.publish(channel, JSON.stringify(payload));
     return true;

@@ -1,3 +1,5 @@
+import { randomUUID } from 'crypto';
+
 import { GameEventType } from '../domain/events';
 import logger from '../observability/logger';
 import { createLazyUnaryCallResultProxy, toStruct } from '@specify-poker/shared';
@@ -14,7 +16,7 @@ export interface GameEvent {
   userId?: string;
   seatId?: number;
   payload: Record<string, unknown>;
-  idempotencyKey: string;
+  idempotencyKey?: string;
 }
 
 export interface PublishResult {
@@ -23,47 +25,63 @@ export interface PublishResult {
 }
 
 export async function publishEvent(event: GameEvent): Promise<PublishResult> {
-  const call = await unaryEventClient.PublishEvent({
-    type: event.type,
-    table_id: event.tableId,
-    hand_id: event.handId,
-    user_id: event.userId,
-    seat_id: event.seatId,
-    payload: toStruct(event.payload),
-    idempotency_key: event.idempotencyKey,
-  });
+  try {
+    const call = await unaryEventClient.PublishEvent({
+      type: event.type,
+      table_id: event.tableId,
+      hand_id: event.handId,
+      user_id: event.userId,
+      seat_id: event.seatId,
+      payload: toStruct(event.payload),
+      idempotency_key: event.idempotencyKey ?? randomUUID(),
+    });
 
-  if (!call.ok) {
-    logger.error({ err: call.error, event }, 'Event publish failed');
+    if (!call.ok) {
+      logger.error({ err: call.error, event }, 'Event publish failed');
+      return { success: false };
+    }
+
+    const response = call.value;
+    if (!response.success) {
+      logger.error({ event }, 'Event publish failed');
+    }
+    return { success: response.success, eventId: response.event_id };
+  } catch (error: unknown) {
+    logger.error({ err: error, event }, 'Event publish failed');
     return { success: false };
   }
-
-  const response = call.value;
-  return { success: response.success, eventId: response.event_id };
 }
 
 export async function publishEvents(
   events: GameEvent[],
 ): Promise<{ success: boolean; eventIds?: string[] }> {
-  const call = await unaryEventClient.PublishEvents({
-    events: events.map((e) => ({
-      type: e.type,
-      table_id: e.tableId,
-      hand_id: e.handId,
-      user_id: e.userId,
-      seat_id: e.seatId,
-      payload: toStruct(e.payload),
-      idempotency_key: e.idempotencyKey,
-    })),
-  });
+  try {
+    const call = await unaryEventClient.PublishEvents({
+      events: events.map((event) => ({
+        type: event.type,
+        table_id: event.tableId,
+        hand_id: event.handId,
+        user_id: event.userId,
+        seat_id: event.seatId,
+        payload: toStruct(event.payload),
+        idempotency_key: event.idempotencyKey ?? randomUUID(),
+      })),
+    });
 
-  if (!call.ok) {
-    logger.error({ err: call.error }, 'Batch event publish failed');
+    if (!call.ok) {
+      logger.error({ err: call.error }, 'Batch event publish failed');
+      return { success: false };
+    }
+
+    const response = call.value;
+    if (!response.success) {
+      logger.error({ eventCount: events.length }, 'Batch event publish failed');
+    }
+    return { success: response.success, eventIds: response.event_ids };
+  } catch (error: unknown) {
+    logger.error({ err: error }, 'Batch event publish failed');
     return { success: false };
   }
-
-  const response = call.value;
-  return { success: response.success, eventIds: response.event_ids };
 }
 
 // Convenience functions for common events

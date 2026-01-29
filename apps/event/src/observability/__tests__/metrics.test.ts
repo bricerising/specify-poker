@@ -89,6 +89,7 @@ vi.mock('../logger', () => ({
 
 import {
   recordIngestion,
+  recordGrpcRequest,
   recordQueryDuration,
   recordMaterializationLag,
   renderMetrics,
@@ -113,10 +114,16 @@ describe('metrics', () => {
     expect(histogramInstances[0].observe).toHaveBeenCalledWith({ status: 'ok' }, 1.2);
   });
 
+  it('records gRPC request duration in seconds', () => {
+    recordGrpcRequest('PublishEvent', 'ok', 250);
+
+    expect(histogramInstances[1].observe).toHaveBeenCalledWith({ method: 'PublishEvent', status: 'ok' }, 0.25);
+  });
+
   it('records materialization lag in seconds', () => {
     recordMaterializationLag(5000);
 
-    expect(histogramInstances[1].observe).toHaveBeenCalledWith(5);
+    expect(histogramInstances[2].observe).toHaveBeenCalledWith(5);
   });
 
   it('renders metrics from the registry', async () => {

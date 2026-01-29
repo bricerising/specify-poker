@@ -3,8 +3,8 @@ import { EventEmitter } from 'events';
 import WebSocket from 'ws';
 import { attachTableHub, handleTablePubSubEvent } from '../../../src/ws/handlers/table';
 
-vi.mock('../../../src/grpc/clients', () => ({
-  gameClient: {
+vi.mock('../../../src/grpc/clients', () => {
+  const gameClient = {
     JoinSpectator: vi.fn(),
     LeaveSpectator: vi.fn(),
     GetTable: vi.fn(),
@@ -12,8 +12,22 @@ vi.mock('../../../src/grpc/clients', () => ({
     SubmitAction: vi.fn(),
     JoinSeat: vi.fn(),
     LeaveSeat: vi.fn(),
-  },
-}));
+  };
+  const eventClient = {};
+  const playerClient = {};
+  const notifyClient = {};
+
+  return {
+    gameClient,
+    eventClient,
+    playerClient,
+    notifyClient,
+    getGameClient: () => gameClient,
+    getEventClient: () => eventClient,
+    getPlayerClient: () => playerClient,
+    getNotifyClient: () => notifyClient,
+  };
+});
 
 vi.mock('../../../src/ws/subscriptions', () => ({
   subscribeToChannel: vi.fn(),

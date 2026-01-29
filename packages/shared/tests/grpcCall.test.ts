@@ -46,6 +46,34 @@ describe('unaryCall', () => {
     capturedCallback?.(null, 'ok');
   });
 
+  it('cancels and rejects on timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      const cancel = vi.fn();
+      let capturedCallback: ((err: Error | null, response: string) => void) | null = null;
+
+      const method = vi.fn(
+        (_request: unknown, callback: (err: Error | null, response: string) => void) => {
+          capturedCallback = callback;
+          return { cancel };
+        },
+      );
+
+      const promise = unaryCall(method, { value: 1 }, { timeoutMs: 10 });
+      const expectation = expect(promise).rejects.toMatchObject({
+        name: 'AbortError',
+        message: expect.stringMatching(/Timed out/),
+      });
+      await vi.advanceTimersByTimeAsync(10);
+      await expectation;
+      expect(cancel).toHaveBeenCalledTimes(1);
+
+      capturedCallback?.(null, 'ok');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('rejects immediately when already aborted', async () => {
     const controller = new AbortController();
     controller.abort();

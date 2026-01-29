@@ -1,4 +1,4 @@
-import { apiFetch } from './apiClient';
+import { apiFetchDecoded } from './apiClient';
 import { registerPushSubscription } from './pushClient';
 import { asRecord, readTrimmedString } from '../utils/unknown';
 
@@ -11,6 +11,11 @@ function urlBase64ToUint8Array(base64String: string) {
     outputArray[i] = rawData.charCodeAt(i);
   }
   return outputArray;
+}
+
+function decodeVapidPublicKey(payload: unknown): string | null {
+  const record = asRecord(payload);
+  return readTrimmedString(record?.publicKey) ?? null;
 }
 
 export async function ensurePushSubscription() {
@@ -30,9 +35,7 @@ export async function ensurePushSubscription() {
   const registration = await navigator.serviceWorker.register('/sw.js');
   let subscription = await registration.pushManager.getSubscription();
   if (!subscription) {
-    const response = await apiFetch('/api/push/vapid');
-    const payload = asRecord(await response.json());
-    const publicKey = readTrimmedString(payload?.publicKey);
+    const publicKey = await apiFetchDecoded('/api/push/vapid', decodeVapidPublicKey);
     if (!publicKey) {
       return;
     }

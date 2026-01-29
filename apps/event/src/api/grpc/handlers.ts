@@ -11,6 +11,16 @@ import type {
   SubscribeRequest,
   GetCursorRequest,
   UpdateCursorRequest,
+  ProtoCursor,
+  ProtoGameEvent,
+  ProtoGetHandHistoryResponse,
+  ProtoGetHandReplayResponse,
+  ProtoGetHandsForUserResponse,
+  ProtoHandRecord,
+  ProtoPublishEventResponse,
+  ProtoPublishEventsResponse,
+  ProtoQueryEventsResponse,
+  ProtoTimestamp,
 } from './types';
 import { unary } from './unary';
 import { eventIngestionService } from '../../services/eventIngestionService';
@@ -25,7 +35,7 @@ import { InvalidArgumentError, isRecord, NotFoundError } from '../../errors';
 
 export function createHandlers() {
   return {
-    publishEvent: unary<PublishEventRequest, unknown>(async (request) => {
+    publishEvent: unary<PublishEventRequest, ProtoPublishEventResponse>('PublishEvent', async (request) => {
       const type = parseEventType(request.type);
       const tableId = requireNonEmptyString(request.tableId, 'tableId');
 
@@ -42,7 +52,7 @@ export function createHandlers() {
       return { success: true, eventId: event.eventId };
     }),
 
-    publishEvents: unary<PublishEventsRequest, unknown>(async (request) => {
+    publishEvents: unary<PublishEventsRequest, ProtoPublishEventsResponse>('PublishEvents', async (request) => {
       const events = request.events.map((req) => ({
         type: parseEventType(req.type),
         tableId: requireNonEmptyString(req.tableId, 'tableId'),
@@ -57,7 +67,7 @@ export function createHandlers() {
       return { success: true, eventIds: results.map((r) => r.eventId) };
     }),
 
-    queryEvents: unary<QueryEventsRequest, unknown>(async (request) => {
+    queryEvents: unary<QueryEventsRequest, ProtoQueryEventsResponse>('QueryEvents', async (request) => {
       const limit = coercePositiveInt(request.limit, 100);
 
       const result = await eventQueryService.queryEvents({
@@ -80,7 +90,7 @@ export function createHandlers() {
       };
     }),
 
-    getEvent: unary<GetEventRequest, unknown>(async (request) => {
+    getEvent: unary<GetEventRequest, ProtoGameEvent>('GetEvent', async (request) => {
       const eventId = requireNonEmptyString(request.eventId, 'eventId');
       const event = await eventQueryService.getEvent(eventId);
       if (!event) {
@@ -89,7 +99,7 @@ export function createHandlers() {
       return mapEventToProto(event);
     }),
 
-    getHandRecord: unary<GetHandRecordRequest, unknown>(async (request) => {
+    getHandRecord: unary<GetHandRecordRequest, ProtoHandRecord>('GetHandRecord', async (request) => {
       const handId = requireNonEmptyString(request.handId, 'handId');
       const record = await handRecordService.getHandRecord(
         handId,
@@ -101,7 +111,7 @@ export function createHandlers() {
       return mapHandRecordToProto(record);
     }),
 
-    getHandHistory: unary<GetHandHistoryRequest, unknown>(async (request) => {
+    getHandHistory: unary<GetHandHistoryRequest, ProtoGetHandHistoryResponse>('GetHandHistory', async (request) => {
       const tableId = requireNonEmptyString(request.tableId, 'tableId');
       const limit = coercePositiveInt(request.limit, 20);
       const offset = coerceNonNegativeInt(request.offset, 0);
@@ -117,7 +127,7 @@ export function createHandlers() {
       };
     }),
 
-    getHandsForUser: unary<GetHandsForUserRequest, unknown>(async (request) => {
+    getHandsForUser: unary<GetHandsForUserRequest, ProtoGetHandsForUserResponse>('GetHandsForUser', async (request) => {
       const userId = requireNonEmptyString(request.userId, 'userId');
       const limit = coercePositiveInt(request.limit, 20);
       const offset = coerceNonNegativeInt(request.offset, 0);
@@ -128,7 +138,7 @@ export function createHandlers() {
       };
     }),
 
-    getHandReplay: unary<GetHandReplayRequest, unknown>(async (request) => {
+    getHandReplay: unary<GetHandReplayRequest, ProtoGetHandReplayResponse>('GetHandReplay', async (request) => {
       const handId = requireNonEmptyString(request.handId, 'handId');
       const events = await replayService.getHandEvents(
         handId,
@@ -137,7 +147,7 @@ export function createHandlers() {
       return { handId, events: events.map(mapEventToProto) };
     }),
 
-    subscribeToStream: async (call: grpc.ServerWritableStream<SubscribeRequest, unknown>) => {
+    subscribeToStream: async (call: grpc.ServerWritableStream<SubscribeRequest, ProtoGameEvent>) => {
       const { streamId, startSequence } = call.request;
       if (!streamId || streamId.trim().length === 0) {
         call.emit('error', { code: grpc.status.INVALID_ARGUMENT, message: 'streamId is required' });
@@ -213,7 +223,7 @@ export function createHandlers() {
       void poll();
     },
 
-    getCursor: unary<GetCursorRequest, unknown>(async (request) => {
+    getCursor: unary<GetCursorRequest, ProtoCursor>('GetCursor', async (request) => {
       const streamId = requireNonEmptyString(request.streamId, 'streamId');
       const subscriberId = requireNonEmptyString(request.subscriberId, 'subscriberId');
 
@@ -230,7 +240,7 @@ export function createHandlers() {
           });
     }),
 
-    updateCursor: unary<UpdateCursorRequest, unknown>(async (request) => {
+    updateCursor: unary<UpdateCursorRequest, ProtoCursor>('UpdateCursor', async (request) => {
       const streamId = requireNonEmptyString(request.streamId, 'streamId');
       const subscriberId = requireNonEmptyString(request.subscriberId, 'subscriberId');
       const position = coerceNonNegativeInt(request.position, 0);
@@ -298,9 +308,7 @@ function parseEventTypes(values: unknown): EventType[] | undefined {
   return values.map(parseEventType);
 }
 
-type GrpcTimestamp = { seconds: number; nanos?: number };
-
-function timestampToDate(timestamp?: GrpcTimestamp): Date | undefined {
+function timestampToDate(timestamp?: ProtoTimestamp): Date | undefined {
   if (!timestamp) {
     return undefined;
   }
@@ -312,7 +320,7 @@ function timestampToDate(timestamp?: GrpcTimestamp): Date | undefined {
   return new Date(timestamp.seconds * 1000 + Math.floor(nanos / 1_000_000));
 }
 
-function toTimestamp(date: Date): { seconds: number; nanos: 0 } {
+function toTimestamp(date: Date): ProtoTimestamp {
   return { seconds: Math.floor(date.getTime() / 1000), nanos: 0 };
 }
 
@@ -373,7 +381,7 @@ function mapEventToProto(event: {
   payload: unknown;
   timestamp: Date;
   sequence?: number | null;
-}) {
+}): ProtoGameEvent {
   return {
     eventId: event.eventId,
     type: event.type,
@@ -394,7 +402,7 @@ function mapCursorToProto(cursor: {
   position: number;
   createdAt: Date;
   updatedAt: Date;
-}) {
+}): ProtoCursor {
   return {
     cursorId: cursor.cursorId,
     streamId: cursor.streamId,
@@ -403,6 +411,27 @@ function mapCursorToProto(cursor: {
     createdAt: toTimestamp(cursor.createdAt),
     updatedAt: toTimestamp(cursor.updatedAt),
   };
+}
+
+type CardLike = { rank: string; suit: string };
+
+function cardToString(card: CardLike): string {
+  const rank = card.rank.trim();
+  const normalizedSuit = card.suit.trim().toLowerCase();
+  const suitChar = normalizedSuit.startsWith('h')
+    ? 'h'
+    : normalizedSuit.startsWith('d')
+      ? 'd'
+      : normalizedSuit.startsWith('c')
+        ? 'c'
+        : normalizedSuit.startsWith('s')
+          ? 's'
+          : normalizedSuit.charAt(0);
+  return `${rank}${suitChar}`;
+}
+
+function cardsToStrings(cards: CardLike[] | null | undefined): string[] {
+  return (cards ?? []).map(cardToString);
 }
 
 function mapHandRecordToProto(r: {
@@ -426,7 +455,7 @@ function mapHandRecordToProto(r: {
   startedAt: Date;
   completedAt: Date;
   duration: number;
-}) {
+}): ProtoHandRecord {
   return {
     handId: r.handId,
     tableId: r.tableId,
@@ -438,7 +467,7 @@ function mapHandRecordToProto(r: {
       nickname: p.nickname,
       startingStack: p.startingStack,
       endingStack: p.endingStack,
-      holeCards: p.holeCards ?? [],
+      holeCards: cardsToStrings(p.holeCards),
       actions: p.actions.map((a) => ({
         street: a.street,
         action: a.action,
@@ -447,7 +476,7 @@ function mapHandRecordToProto(r: {
       })),
       result: p.result,
     })),
-    communityCards: r.communityCards,
+    communityCards: cardsToStrings(r.communityCards),
     pots: r.pots.map((p) => ({
       amount: p.amount,
       winners: p.winners,

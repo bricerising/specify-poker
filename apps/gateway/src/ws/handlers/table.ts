@@ -2,7 +2,7 @@ import type WebSocket from 'ws';
 import type { z } from 'zod';
 import { wsClientMessageSchema } from '@specify-poker/shared';
 
-import { grpc } from '../../grpc/unaryClients';
+import { grpcResult } from '../../grpc/unaryClients';
 import type { WsPubSubMessage } from '../pubsub';
 import { parseActionType, parseSeatId, parseTableId, checkWsRateLimit } from '../validators';
 import { subscribeToChannel, unsubscribeFromChannel, unsubscribeAll } from '../subscriptions';
@@ -42,29 +42,23 @@ async function handleSubscribe(connectionId: string, userId: string, tableId: st
   const channel = `table:${tableId}`;
   await subscribeToChannel(connectionId, channel);
 
-  void grpc.game.JoinSpectator({ table_id: tableId, user_id: userId }).catch(() => undefined);
+  void grpcResult.game.JoinSpectator({ table_id: tableId, user_id: userId });
 
-  const [tableResult, stateResult] = await Promise.allSettled([
-    grpc.game.GetTable({ table_id: tableId }),
-    grpc.game.GetTableState({ table_id: tableId, user_id: userId }),
+  const [tableResult, stateResult] = await Promise.all([
+    grpcResult.game.GetTable({ table_id: tableId }),
+    grpcResult.game.GetTableState({ table_id: tableId, user_id: userId }),
   ]);
 
-  if (stateResult.status !== 'fulfilled') {
-    logger.error(
-      { err: stateResult.reason, tableId },
-      'Failed to get table state from game service',
-    );
+  if (!stateResult.ok) {
+    logger.error({ err: stateResult.error, tableId }, 'Failed to get table state from game service');
     return;
   }
 
-  const table = tableResult.status === 'fulfilled' ? tableResult.value : null;
-  const tableStateWire = toWireTableStateView(
-    table,
-    (stateResult.value as { state?: unknown }).state,
-  );
+  const table = tableResult.ok ? tableResult.value : null;
+  const tableStateWire = toWireTableStateView(table, stateResult.value.state);
   sendToLocal(connectionId, { type: 'TableSnapshot', tableState: tableStateWire });
 
-  const holeCards = (stateResult.value as { hole_cards?: unknown[] }).hole_cards;
+  const holeCards = stateResult.value.hole_cards;
   if (Array.isArray(holeCards) && holeCards.length > 0) {
     sendToLocal(connectionId, {
       type: 'HoleCards',
@@ -106,22 +100,24 @@ async function handleAction(
     request.amount = payload.amount;
   }
 
-  try {
-    const response = await grpc.game.SubmitAction(request);
-    sendToLocal(connectionId, {
-      type: 'ActionResult',
-      tableId: payload.tableId,
-      accepted: response.ok,
-      reason: response.error,
-    });
-  } catch {
+  const result = await grpcResult.game.SubmitAction(request);
+  if (!result.ok) {
     sendToLocal(connectionId, {
       type: 'ActionResult',
       tableId: payload.tableId,
       accepted: false,
       reason: 'internal_error',
     });
+    return;
   }
+
+  const response = result.value;
+  sendToLocal(connectionId, {
+    type: 'ActionResult',
+    tableId: payload.tableId,
+    accepted: response.ok,
+    reason: response.error,
+  });
 }
 
 async function handleJoinSeat(
@@ -130,30 +126,31 @@ async function handleJoinSeat(
   payload: { tableId: string; seatId: number; buyInAmount?: number },
 ) {
   const buyInAmount = payload.buyInAmount && payload.buyInAmount > 0 ? payload.buyInAmount : 200;
-  try {
-    const response = await grpc.game.JoinSeat({
-      table_id: payload.tableId,
-      user_id: userId,
-      seat_id: payload.seatId,
-      buy_in_amount: buyInAmount,
-    });
-    if (!response.ok) {
-      sendToLocal(connectionId, { type: 'Error', message: response.error });
-    }
-  } catch {
+  const result = await grpcResult.game.JoinSeat({
+    table_id: payload.tableId,
+    user_id: userId,
+    seat_id: payload.seatId,
+    buy_in_amount: buyInAmount,
+  });
+
+  if (!result.ok) {
     sendToLocal(connectionId, { type: 'Error', message: 'Internal error' });
+    return;
+  }
+
+  if (!result.value.ok) {
+    sendToLocal(connectionId, {
+      type: 'Error',
+      message: result.value.error ?? 'Failed to join seat',
+    });
   }
 }
 
 async function handleLeaveTable(userId: string, tableId: string) {
-  try {
-    await grpc.game.LeaveSeat({
-      table_id: tableId,
-      user_id: userId,
-    });
-  } catch {
-    // Best-effort.
-  }
+  await grpcResult.game.LeaveSeat({
+    table_id: tableId,
+    user_id: userId,
+  });
 }
 
 export function attachTableHub(socket: WebSocket, userId: string, connectionId: string) {
@@ -171,9 +168,7 @@ export function attachTableHub(socket: WebSocket, userId: string, connectionId: 
         await handleSubscribe(connectionId, userId, message.tableId);
       },
       UnsubscribeTable: async (message) => {
-        void grpc.game
-          .LeaveSpectator({ table_id: message.tableId, user_id: userId })
-          .catch(() => undefined);
+        void grpcResult.game.LeaveSpectator({ table_id: message.tableId, user_id: userId });
         await handleUnsubscribe(connectionId, message.tableId);
       },
       JoinSeat: async (message) => {
