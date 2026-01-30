@@ -65,6 +65,47 @@ function toIncomingVersion(
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function readTableStateResponseHoleCards(payload: UnknownRecord): unknown[] {
+  if (Array.isArray(payload.hole_cards)) {
+    return payload.hole_cards;
+  }
+  if (Array.isArray(payload.holeCards)) {
+    return payload.holeCards;
+  }
+  return [];
+}
+
+function normalizeHoleCards(cards: unknown[]): string[] {
+  return cards.map((card) => cardToString(card)).filter((card): card is string => Boolean(card));
+}
+
+function shouldClearPrivateState(incomingHandId: string | null, privateHandId: string | null) {
+  if (!incomingHandId) {
+    return true;
+  }
+  return privateHandId !== null && privateHandId !== incomingHandId;
+}
+
+function shouldRequestPrivateHoleCards(params: {
+  incomingHandId: string | null;
+  seatId: number | null;
+  isSpectating: boolean;
+  adoptedSeat: boolean;
+  privateHoleCards: string[] | null;
+  privateHandId: string | null;
+}) {
+  if (!params.incomingHandId) {
+    return false;
+  }
+  if (params.seatId === null || params.isSpectating) {
+    return false;
+  }
+  if (params.adoptedSeat || params.privateHoleCards === null) {
+    return true;
+  }
+  return params.privateHandId !== params.incomingHandId;
+}
+
 export function createTableStore(): TableStore {
   let state: TableStoreState = {
     tables: [],
@@ -135,6 +176,25 @@ export function createTableStore(): TableStore {
 
   const clearRequestedHoleCards = () => {
     requestedHoleCards.clear();
+  };
+
+  const loadTableStateResponse = async (
+    tableId: string,
+  ): Promise<{ statePayload: UnknownRecord; holeCardsPayload: unknown[] } | null> => {
+    try {
+      const response = await apiFetch(`/api/tables/${tableId}/state`);
+      const payload = asRecord(await response.json());
+      const statePayload = asRecord(payload?.state);
+      if (!payload || !statePayload) {
+        return null;
+      }
+      return {
+        statePayload,
+        holeCardsPayload: readTableStateResponseHoleCards(payload),
+      };
+    } catch {
+      return null;
+    }
   };
 
   const applyCachedProfiles = (tableState: TableState): TableState => {
@@ -261,28 +321,19 @@ export function createTableStore(): TableStore {
     expectedHandId: string,
   ): Promise<string[] | null> {
     try {
-      const response = await apiFetch(`/api/tables/${tableId}/state`);
-      const payload = asRecord(await response.json());
-      const statePayload = asRecord(payload?.state);
-      if (!payload || !statePayload) {
+      const response = await loadTableStateResponse(tableId);
+      if (!response) {
         return null;
       }
 
-      const handPayload = asRecord(statePayload.hand);
+      const handPayload = asRecord(response.statePayload.hand);
       const handId = readTrimmedString(handPayload?.handId ?? handPayload?.hand_id);
 
       if (!handId || handId !== expectedHandId) {
         return null;
       }
 
-      const holeCardsPayload = Array.isArray(payload.hole_cards)
-        ? payload.hole_cards
-        : Array.isArray(payload.holeCards)
-          ? payload.holeCards
-          : [];
-      const cards = holeCardsPayload
-        .map((card) => cardToString(card))
-        .filter((card): card is string => Boolean(card));
+      const cards = normalizeHoleCards(response.holeCardsPayload);
 
       return cards.length === 2 ? cards : null;
     } catch {
@@ -401,22 +452,23 @@ export function createTableStore(): TableStore {
     const tokenUserId = currentUserIdFromToken();
     const inferredSeatId = inferSeatIdForUserId(normalized, tokenUserId);
 
+    const incomingHandId = normalized.hand?.handId ?? null;
     const shouldAdoptSeat =
       inferredSeatId !== null &&
       (state.seatId === null || state.isSpectating || state.seatId !== inferredSeatId);
+
     const effectiveSeatId = shouldAdoptSeat ? inferredSeatId : state.seatId;
     const effectiveIsSpectating = shouldAdoptSeat ? false : state.isSpectating;
 
-    const incomingHandId = normalized.hand?.handId ?? null;
-    const shouldRequestHoleCards =
-      Boolean(incomingHandId) &&
-      effectiveSeatId !== null &&
-      !effectiveIsSpectating &&
-      (shouldAdoptSeat ||
-        state.privateHoleCards === null ||
-        state.privateHandId !== incomingHandId);
-    const clearPrivate =
-      !incomingHandId || (state.privateHandId !== null && state.privateHandId !== incomingHandId);
+    const clearPrivate = shouldClearPrivateState(incomingHandId, state.privateHandId);
+    const shouldRequestHoleCards = shouldRequestPrivateHoleCards({
+      incomingHandId,
+      seatId: effectiveSeatId,
+      isSpectating: effectiveIsSpectating,
+      adoptedSeat: shouldAdoptSeat,
+      privateHoleCards: state.privateHoleCards,
+      privateHandId: state.privateHandId,
+    });
 
     setState({
       tableState: normalized,
@@ -619,22 +671,14 @@ export function createTableStore(): TableStore {
 
   const loadTableSnapshot = async (tableId: string) => {
     try {
-      const response = await apiFetch(`/api/tables/${tableId}/state`);
-      const payload = asRecord(await response.json());
-      const statePayload = asRecord(payload?.state);
-      if (!payload || !statePayload) {
+      const response = await loadTableStateResponse(tableId);
+      if (!response) {
         return null;
       }
+
       const fallback = state.tables.find((table) => table.tableId === tableId);
-      const tableState = applyCachedProfiles(normalizeTableState(statePayload, fallback));
-      const holeCardsPayload = Array.isArray(payload.hole_cards)
-        ? payload.hole_cards
-        : Array.isArray(payload.holeCards)
-          ? payload.holeCards
-          : [];
-      const privateHoleCards = holeCardsPayload
-        .map((card) => cardToString(card))
-        .filter((card): card is string => Boolean(card));
+      const tableState = applyCachedProfiles(normalizeTableState(response.statePayload, fallback));
+      const privateHoleCards = normalizeHoleCards(response.holeCardsPayload);
       return {
         tableState,
         privateHoleCards: privateHoleCards.length > 0 ? privateHoleCards : null,

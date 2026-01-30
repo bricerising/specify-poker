@@ -59,7 +59,17 @@ export async function broadcastToChannel(channel: string, payload: Record<string
       return;
     }
 
-    await publishToRedisByKind[parsedChannel.kind](parsedChannel, payload);
+    switch (parsedChannel.kind) {
+      case 'table':
+        await publishToRedisByKind.table(parsedChannel, payload);
+        break;
+      case 'chat':
+        await publishToRedisByKind.chat(parsedChannel, payload);
+        break;
+      case 'lobby':
+        await publishToRedisByKind.lobby(parsedChannel, payload);
+        break;
+    }
   } catch (err) {
     logger.error({ err, channel }, 'Failed to broadcast to channel');
   }

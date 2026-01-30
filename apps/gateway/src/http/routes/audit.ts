@@ -141,7 +141,8 @@ router.get(
       // Only allow users to see their own hand history (unless admin)
       const requesterId = req.auth?.userId;
       if (requesterId !== userId && !req.auth?.claims?.admin) {
-        return res.status(403).json({ error: 'Forbidden' });
+        res.status(403).json({ error: 'Forbidden' });
+        return;
       }
 
       const response = await grpc.event.GetHandsForUser({
@@ -150,7 +151,7 @@ router.get(
         offset: offset ? parseInt(offset as string, 10) : 0,
       });
 
-      return res.json({
+      res.json({
         hands: response.hands || [],
         total: response.total,
       });
@@ -178,7 +179,7 @@ router.get(
         offset: offset ? parseInt(offset as string, 10) : 0,
       });
 
-      return res.json({
+      res.json({
         hands: response.hands || [],
         total: response.total,
       });

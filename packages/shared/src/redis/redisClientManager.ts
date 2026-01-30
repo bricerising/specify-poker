@@ -43,11 +43,15 @@ export function createRedisClientManager(
   let closePromise: Promise<void> | null = null;
 
   const logWarn = (obj: Record<string, unknown>, msg: string) => {
-    (log?.warn ?? log?.error)?.(obj, msg);
+    const fn = log?.warn ?? log?.error;
+    if (!fn) return;
+    fn.call(log, obj, msg);
   };
 
   const logError = (obj: Record<string, unknown>, msg: string) => {
-    (log?.error ?? log?.warn)?.(obj, msg);
+    const fn = log?.error ?? log?.warn;
+    if (!fn) return;
+    fn.call(log, obj, msg);
   };
 
   const requireUrl = (): string => {

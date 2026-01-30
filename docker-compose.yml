@@ -173,6 +173,23 @@ services:
 
   redis:
     image: redis:7-alpine
+    # Keep Redis ephemeral in local dev / E2E: avoid loading/saving large RDB snapshots across restarts.
+    command:
+      [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+        "--dir",
+        "/tmp",
+        "--dbfilename",
+        "specify-poker.rdb",
+        "--maxmemory",
+        "256mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
     ports:
       - "6379:6379"
     healthcheck:
@@ -180,6 +197,7 @@ services:
       interval: 10s
       timeout: 2s
       retries: 3
+    restart: unless-stopped
 
   event-db:
     image: postgres:15-alpine

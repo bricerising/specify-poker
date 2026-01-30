@@ -56,7 +56,8 @@ router.post(
 
       const parsed = parseSubscription(req.body);
       if (!parsed.ok) {
-        return res.status(400).json({ error: parsed.error });
+        res.status(400).json({ error: parsed.error });
+        return;
       }
 
       const response = await grpc.notify.RegisterSubscription({
@@ -65,10 +66,11 @@ router.post(
       });
 
       if (!response.ok) {
-        return res.status(400).json({ error: response.error || 'Failed to register subscription' });
+        res.status(400).json({ error: response.error || 'Failed to register subscription' });
+        return;
       }
 
-      return res.status(204).send();
+      res.status(204).send();
     },
     { logMessage: 'Failed to register push subscription' },
   ),
@@ -83,7 +85,8 @@ router.delete(
 
       const endpoint = typeof req.body?.endpoint === 'string' ? req.body.endpoint.trim() : '';
       if (!endpoint) {
-        return res.status(400).json({ error: 'endpoint is required' });
+        res.status(400).json({ error: 'endpoint is required' });
+        return;
       }
 
       const response = await grpc.notify.UnregisterSubscription({
@@ -92,12 +95,11 @@ router.delete(
       });
 
       if (!response.ok) {
-        return res
-          .status(400)
-          .json({ error: response.error || 'Failed to unregister subscription' });
+        res.status(400).json({ error: response.error || 'Failed to unregister subscription' });
+        return;
       }
 
-      return res.status(204).send();
+      res.status(204).send();
     },
     { logMessage: 'Failed to unregister push subscription' },
   ),

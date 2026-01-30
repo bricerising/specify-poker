@@ -320,25 +320,7 @@ export class TableService {
     const normalizedBuyIn = buyInAmount > 0 ? buyInAmount : startingStack;
     const finalBuyIn = normalizedBuyIn > 0 ? normalizedBuyIn : DEFAULT_STARTING_STACK;
 
-    const existingSeat = state.seats.find(
-      (entry) => entry.userId === userId && entry.status !== 'EMPTY',
-    );
-    if (existingSeat) {
-      if (existingSeat.seatId !== seatId) {
-        recordSeatJoin('error', 'ALREADY_SEATED');
-        return { ok: false, error: 'ALREADY_SEATED' };
-      }
-
-      if (existingSeat.status === 'SEATED') {
-        recordSeatJoin('ok', 'IDEMPOTENT');
-        return { ok: true };
-      }
-
-      if (existingSeat.status !== 'RESERVED') {
-        recordSeatJoin('error', 'ALREADY_SEATED');
-        return { ok: false, error: 'ALREADY_SEATED' };
-      }
-
+    const finalizeJoin = async (okMetric: string) => {
       const result = await this.finalizeReservedSeatJoin({
         table,
         tableId,
@@ -364,8 +346,30 @@ export class TableService {
         return { ok: false, error: result.error };
       }
 
-      recordSeatJoin('ok', 'RESUMED');
+      recordSeatJoin('ok', okMetric);
       return { ok: true };
+    };
+
+    const existingSeat = state.seats.find(
+      (entry) => entry.userId === userId && entry.status !== 'EMPTY',
+    );
+    if (existingSeat) {
+      if (existingSeat.seatId !== seatId) {
+        recordSeatJoin('error', 'ALREADY_SEATED');
+        return { ok: false, error: 'ALREADY_SEATED' };
+      }
+
+      if (existingSeat.status === 'SEATED') {
+        recordSeatJoin('ok', 'IDEMPOTENT');
+        return { ok: true };
+      }
+
+      if (existingSeat.status !== 'RESERVED') {
+        recordSeatJoin('error', 'ALREADY_SEATED');
+        return { ok: false, error: 'ALREADY_SEATED' };
+      }
+
+      return finalizeJoin('RESUMED');
     }
 
     const seat = seatAt(state.seats, seatId);
@@ -382,33 +386,7 @@ export class TableService {
     await tableStateStore.save(state);
     await this.publishTableAndLobby(table, state);
 
-    const result = await this.finalizeReservedSeatJoin({
-      table,
-      tableId,
-      seatId,
-      userId,
-      fallbackBuyInAmount: finalBuyIn,
-    });
-
-    if (result.type === 'balance_unavailable') {
-      await this.handleBalanceUnavailable({
-        tableId,
-        seatId,
-        userId,
-        buyInAmount: finalBuyIn,
-        error: result.error,
-      });
-      recordSeatJoin('ok', GameEventType.BALANCE_UNAVAILABLE);
-      return { ok: true };
-    }
-
-    if (result.type === 'error') {
-      recordSeatJoin('error', result.error);
-      return { ok: false, error: result.error };
-    }
-
-    recordSeatJoin('ok', 'OK');
-    return { ok: true };
+    return finalizeJoin('OK');
   }
 
   private async finalizeReservedSeatJoin({

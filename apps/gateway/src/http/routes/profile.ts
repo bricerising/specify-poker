@@ -20,7 +20,7 @@ router.get(
       const username = normalizeUsernameFromClaims(req.auth?.claims ?? undefined);
 
       const profile = await profileFacade.getMe({ userId, username });
-      return res.json(profile);
+      res.json(profile);
     },
     { logMessage: 'Failed to get profile' },
   ),
@@ -36,7 +36,7 @@ router.put(
 
       const username = normalizeUsernameFromClaims(req.auth?.claims ?? undefined);
       const profile = await profileFacade.updateMe({ userId, username, body: req.body });
-      return res.json(profile);
+      res.json(profile);
     },
     { logMessage: 'Failed to update profile' },
   ),
@@ -52,7 +52,7 @@ router.post(
 
       const username = normalizeUsernameFromClaims(req.auth?.claims ?? undefined);
       const profile = await profileFacade.updateMe({ userId, username, body: req.body });
-      return res.json(profile);
+      res.json(profile);
     },
     { logMessage: 'Failed to update profile' },
   ),
@@ -68,9 +68,10 @@ router.delete(
 
       const response = await profileFacade.deleteMe({ userId });
       if (!response.success) {
-        return res.status(500).json({ error: 'Failed to delete profile' });
+        res.status(500).json({ error: 'Failed to delete profile' });
+        return;
       }
-      return res.status(204).send();
+      res.status(204).send();
     },
     { logMessage: 'Failed to delete profile' },
   ),
@@ -85,7 +86,7 @@ router.get(
       if (!userId) return;
 
       const statistics = await profileFacade.getStatistics({ userId });
-      return res.json(statistics);
+      res.json(statistics);
     },
     { logMessage: 'Failed to get statistics' },
   ),
@@ -98,7 +99,7 @@ router.get(
     async (req: Request, res: Response) => {
       const { userId } = req.params;
       const profile = await profileFacade.getProfile({ userId });
-      return res.json(profile);
+      res.json(profile);
     },
     {
       logMessage: 'Failed to get profile',
@@ -118,7 +119,7 @@ router.get(
       if (!userId) return;
 
       const friends = await profileFacade.getFriendIds({ userId });
-      return res.json({ friends });
+      res.json({ friends });
     },
     { logMessage: 'Failed to get friends' },
   ),
@@ -134,11 +135,12 @@ router.put(
 
       const desired = (req.body as { friends?: unknown } | undefined)?.friends;
       if (!Array.isArray(desired)) {
-        return res.status(400).json({ error: 'friends array is required' });
+        res.status(400).json({ error: 'friends array is required' });
+        return;
       }
 
       const friends = await profileFacade.syncFriends({ userId, desiredFriendIds: desired });
-      return res.json({ friends });
+      res.json({ friends });
     },
     { logMessage: 'Failed to update friends' },
   ),
@@ -155,11 +157,12 @@ router.post(
       const rawFriendId = (req.body as { friendId?: unknown } | undefined)?.friendId;
       const friendId = typeof rawFriendId === 'string' ? rawFriendId.trim() : '';
       if (friendId.length === 0) {
-        return res.status(400).json({ error: 'friendId is required' });
+        res.status(400).json({ error: 'friendId is required' });
+        return;
       }
 
       await profileFacade.addFriend({ userId, friendId });
-      return res.status(201).json({ ok: true });
+      res.status(201).json({ ok: true });
     },
     { logMessage: 'Failed to add friend' },
   ),
@@ -175,7 +178,7 @@ router.delete(
 
       const { friendId } = req.params;
       await profileFacade.removeFriend({ userId, friendId });
-      return res.status(204).send();
+      res.status(204).send();
     },
     { logMessage: 'Failed to remove friend' },
   ),
@@ -188,11 +191,12 @@ router.post(
     async (req: Request, res: Response) => {
       const userIds = (req.body as { userIds?: unknown } | undefined)?.userIds;
       if (!userIds || !Array.isArray(userIds)) {
-        return res.status(400).json({ error: 'userIds array is required' });
+        res.status(400).json({ error: 'userIds array is required' });
+        return;
       }
 
       const nicknames = await profileFacade.getNicknames({ userIds });
-      return res.json({ nicknames });
+      res.json({ nicknames });
     },
     { logMessage: 'Failed to get nicknames' },
   ),

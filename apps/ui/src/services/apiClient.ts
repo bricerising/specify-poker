@@ -125,7 +125,7 @@ export function createApiClient(deps: ApiClientDeps): ApiClient {
 }
 
 export const api = createApiClient({
-  fetch,
+  fetch: (input, init) => globalThis.fetch(input, init),
   getBaseUrl: getApiBaseUrl,
   getToken,
   now: () => Date.now(),

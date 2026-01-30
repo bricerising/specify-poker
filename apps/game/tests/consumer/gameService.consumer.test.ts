@@ -249,6 +249,24 @@ describe('TableService consumer flows', () => {
     expect(state?.seats[0].reservationId).toBe('reservation-1');
   });
 
+  it('treats repeated joinSeat as idempotent when already seated', async () => {
+    const table = await tableService.createTable('Idempotent Join', 'owner-1', defaultConfig);
+
+    const first = await tableService.joinSeat(table.tableId, 'user-1', 0, 150);
+    expect(first.ok).toBe(true);
+    expect(grpcState.reserveCalls).toHaveLength(1);
+    expect(grpcState.commitCalls).toHaveLength(1);
+
+    const second = await tableService.joinSeat(table.tableId, 'user-1', 0, 150);
+    expect(second.ok).toBe(true);
+    expect(grpcState.reserveCalls).toHaveLength(1);
+    expect(grpcState.commitCalls).toHaveLength(1);
+
+    const state = await tableStateStore.get(table.tableId);
+    expect(state?.seats[0].status).toBe('SEATED');
+    expect(state?.seats[0].stack).toBe(150);
+  });
+
   it('resumes a reserved seat by reusing the buy-in idempotency key', async () => {
     const table = await tableService.createTable('Reserved Seat', 'owner-1', defaultConfig);
 

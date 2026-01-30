@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 
 import { seatAt } from '../domain/seats';
-import type { Action, ActionInput, HandState, Seat, TableConfig, TableState } from '../domain/types';
+import type { Action, ActionInput, Card, HandState, Seat, TableConfig, TableState } from '../domain/types';
 import { validateAction, type ValidationReason } from './actionRules';
 import { calculatePots } from './potCalculator';
 import {

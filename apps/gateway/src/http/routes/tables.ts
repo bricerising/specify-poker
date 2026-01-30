@@ -27,7 +27,7 @@ async function handleJoinSeatRequest(
   req: Request,
   res: Response,
   params: { tableId: string; seatId: number; buyInAmount?: number },
-) {
+): Promise<void> {
   const userId = requireUserId(req, res);
   if (!userId) return;
 
@@ -39,10 +39,11 @@ async function handleJoinSeatRequest(
   });
 
   if (!response.ok) {
-    return res.status(400).json({ error: response.error || 'Failed to join seat' });
+    res.status(400).json({ error: response.error || 'Failed to join seat' });
+    return;
   }
 
-  return res.json({ tableId: params.tableId, seatId: params.seatId, wsUrl: buildWsUrl(req) });
+  res.json({ tableId: params.tableId, seatId: params.seatId, wsUrl: buildWsUrl(req) });
 }
 
 type GrpcOkResponse = { ok: boolean; error?: string };
@@ -51,11 +52,12 @@ async function handleOkGrpcResponse(
   res: Response,
   response: GrpcOkResponse,
   fallbackError: string,
-) {
+): Promise<void> {
   if (!response.ok) {
-    return res.status(400).json({ error: response.error || fallbackError });
+    res.status(400).json({ error: response.error || fallbackError });
+    return;
   }
-  return res.json({ ok: true });
+  res.json({ ok: true });
 }
 
 type ModerationAction = 'kick' | 'mute' | 'unmute';
@@ -269,7 +271,8 @@ router.post(
     async (req: Request, res: Response) => {
       const parsed = tableCreateRequestInputSchema.safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).json({ error: 'Invalid request' });
+        res.status(400).json({ error: 'Invalid request' });
+        return;
       }
 
       const { name, config } = parsed.data;
@@ -288,7 +291,7 @@ router.post(
           turn_timer_seconds: config.turnTimerSeconds ?? 20,
         },
       });
-      return res.status(201).json(response);
+      res.status(201).json(response);
     },
     { logMessage: 'Failed to create table' },
   ),
@@ -356,7 +359,8 @@ router.post(
       const { tableId } = req.params;
       const parsed = tableJoinSeatRequestSchema.safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).json({ error: 'seatId is required' });
+        res.status(400).json({ error: 'seatId is required' });
+        return;
       }
 
       const { seatId, buyInAmount } = parsed.data;
@@ -377,7 +381,8 @@ router.post(
         buyInAmount: req.body?.buyInAmount,
       });
       if (!parsed.success) {
-        return res.status(400).json({ error: 'seatId is required' });
+        res.status(400).json({ error: 'seatId is required' });
+        return;
       }
 
       const { seatId: parsedSeatId, buyInAmount } = parsed.data;
