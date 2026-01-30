@@ -2,22 +2,18 @@ import { createShutdownManager, runServiceMain, type ShutdownManager } from '@sp
 import { getConfig } from './config';
 import logger from './observability/logger';
 import { startObservability, stopObservability } from './observability';
+import { toError } from './shared/errors';
 import type { NotifyApp } from './app';
 
 let runningApp: NotifyApp | null = null;
 let runningShutdown: ShutdownManager | null = null;
 
-export async function main() {
+export async function main(): Promise<NotifyApp['services']> {
   const isTestEnv = process.env.NODE_ENV === 'test';
 
   if (runningApp) {
     logger.warn('Notify Service is already running; restarting');
     await shutdown();
-  }
-
-  if (!isTestEnv) {
-    // Start OTel before importing instrumented subsystems (grpc, redis, etc.).
-    await startObservability();
   }
 
   const shutdownManager = createShutdownManager({ logger });
@@ -33,26 +29,31 @@ export async function main() {
     await app?.stop();
   });
 
-  const config = getConfig();
-
-  const { createNotifyApp } = await import('./app');
-  const app = createNotifyApp({ config });
-  runningApp = app;
-
   try {
+    if (!isTestEnv) {
+      // Start OTel before importing instrumented subsystems (grpc, redis, etc.).
+      await startObservability();
+    }
+
+    const config = getConfig();
+
+    const { createNotifyApp } = await import('./app');
+    const app = createNotifyApp({ config });
+    runningApp = app;
+
     await app.start();
 
     logger.info({ port: config.grpcPort }, 'Notify Service is running');
     return app.services;
-  } catch (error) {
-    logger.error({ err: error }, 'Failed to start Notify Service');
+  } catch (error: unknown) {
+    logger.error({ err: toError(error) }, 'Failed to start Notify Service');
     await shutdownManager.run();
     runningShutdown = null;
     throw error;
   }
 }
 
-export async function shutdown() {
+export async function shutdown(): Promise<void> {
   logger.info('Shutting down Notify Service');
   await runningShutdown?.run();
   runningShutdown = null;

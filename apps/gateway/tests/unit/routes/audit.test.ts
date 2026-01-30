@@ -105,6 +105,30 @@ describe('Audit Routes', () => {
         expect.any(Function),
       );
     });
+
+    it('returns 400 when limit is invalid', async () => {
+      const response = await dispatchToRouter(auditRouter, {
+        method: 'GET',
+        url: '/events',
+        auth,
+        query: { limit: 'nope' },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(eventClient.QueryEvents).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 when startTime is invalid', async () => {
+      const response = await dispatchToRouter(auditRouter, {
+        method: 'GET',
+        url: '/events',
+        auth,
+        query: { startTime: 'not-a-date' },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(eventClient.QueryEvents).not.toHaveBeenCalled();
+    });
   });
 
   describe('GET /api/audit/events/:eventId', () => {

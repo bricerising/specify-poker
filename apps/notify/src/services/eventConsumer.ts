@@ -1,34 +1,26 @@
-import { getBlockingRedisClient } from '../storage/redisClient';
 import logger from '../observability/logger';
-import { getConfig } from '../config';
-import { getErrorMessage } from '../shared/errors';
+import { getErrorMessage, toError } from '../shared/errors';
+import { createAsyncLifecycle, type AsyncLifecycle } from '../shared/asyncLifecycle';
 import { dispatchByTypeNoCtx } from '@specify-poker/shared/pipeline';
 import {
   runRedisStreamConsumer,
   type RedisStreamConsumerClient,
 } from '@specify-poker/shared/redis';
-import {
-  createGameEventHandlers,
-  decodeGameEvent,
-  type GameEvent,
-  type GameEventDecodeResult,
-  type GameEventHandlers,
-  type PushSender,
-} from './gameEventHandlers';
+import type { GameEventHandlers } from './gameEventHandlers';
+import { decodeGameEvent, type GameEvent, type GameEventDecodeResult } from './gameEvents';
 
 type EventConsumerOptions = {
-  streamKey?: string;
+  streamKey: string;
   groupName?: string;
   consumerName?: string;
-  getRedisClient?: () => Promise<RedisStreamConsumerClient>;
+  getRedisClient: () => Promise<RedisStreamConsumerClient>;
   blockMs?: number;
   readCount?: number;
   sleep?: (ms: number) => Promise<void>;
+  runConsumer?: typeof runRedisStreamConsumer;
 };
 
 export class EventConsumer {
-  private readonly pushSender: PushSender;
-  private isRunning: boolean = false;
   private readonly streamKey: string;
   private readonly groupName: string;
   private readonly consumerName: string;
@@ -36,83 +28,141 @@ export class EventConsumer {
   private readonly blockMs: number;
   private readonly readCount: number;
   private readonly sleep: (ms: number) => Promise<void>;
+  private readonly runConsumer: typeof runRedisStreamConsumer;
   private pollPromise: Promise<void> | null = null;
-  private readonly handlers: GameEventHandlers;
+  private readonly eventHandlers: GameEventHandlers;
   private abortController: AbortController | null = null;
+  private readonly lifecycle: AsyncLifecycle;
 
-  constructor(pushSender: PushSender, options: EventConsumerOptions = {}) {
-    this.pushSender = pushSender;
-    this.streamKey = options.streamKey ?? getConfig().eventStreamKey;
+  constructor(handlers: GameEventHandlers, options: EventConsumerOptions) {
+    this.streamKey = options.streamKey;
     this.groupName = options.groupName ?? 'notify-service';
     this.consumerName = options.consumerName ?? `consumer-${process.pid}`;
-    this.getClient = options.getRedisClient ?? getBlockingRedisClient;
+    this.getClient = options.getRedisClient;
     this.blockMs = options.blockMs ?? 5000;
     this.readCount = options.readCount ?? 1;
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
-    this.handlers = createGameEventHandlers(this.pushSender);
+    this.runConsumer = options.runConsumer ?? runRedisStreamConsumer;
+    this.eventHandlers = handlers;
+    this.lifecycle = createAsyncLifecycle({
+      start: () => this.startInternal(),
+      stop: () => this.stopInternal(),
+    });
   }
 
   async start(): Promise<void> {
-    if (this.isRunning) {
-      return;
-    }
-    this.isRunning = true;
+    await this.lifecycle.start();
+  }
+
+  private async startInternal(): Promise<void> {
     logger.info({ streamKey: this.streamKey }, 'EventConsumer starting');
 
     const controller = new AbortController();
     this.abortController = controller;
 
-    this.pollPromise = runRedisStreamConsumer(controller.signal, {
-      streamKey: this.streamKey,
-      groupName: this.groupName,
-      consumerName: this.consumerName,
-      getClient: this.getClient,
-      onMessage: async ({ fields }) => {
-        await this.handleEvent(fields);
-      },
-      blockMs: this.blockMs,
-      readCount: this.readCount,
-      sleep: this.sleep,
-      logger,
-      isBusyGroupError: (error: unknown) => getErrorMessage(error).includes('BUSYGROUP'),
-    }).catch((error: unknown) => {
-      logger.error({ err: error }, 'EventConsumer poll loop crashed');
-    });
+    this.pollPromise = this.runPollLoop(controller.signal);
   }
 
-  private async handleEvent(message: unknown): Promise<void> {
-    try {
-      const decoded = decodeGameEvent(message);
-      if (!decoded.ok) {
-        this.logDecodeFailure(decoded);
-        return;
-      }
+  private async runPollLoop(signal: AbortSignal): Promise<void> {
+    let attempt = 0;
 
-      await this.dispatch(decoded.event);
-    } catch (err) {
-      logger.error({ err }, 'Error handling event');
+    while (!signal.aborted) {
+      try {
+        await this.runConsumer(signal, {
+          streamKey: this.streamKey,
+          groupName: this.groupName,
+          consumerName: this.consumerName,
+          getClient: this.getClient,
+          onMessage: async ({ id, fields }) => {
+            await this.handleMessage(fields, id);
+          },
+          blockMs: this.blockMs,
+          readCount: this.readCount,
+          sleep: this.sleep,
+          logger,
+          isBusyGroupError: (error: unknown) => getErrorMessage(error).includes('BUSYGROUP'),
+        });
+
+        if (signal.aborted) {
+          return;
+        }
+
+        attempt = 0;
+        logger.warn(
+          { streamKey: this.streamKey },
+          'EventConsumer stream consumer exited unexpectedly; restarting',
+        );
+        await this.sleep(1000);
+        continue;
+      } catch (error: unknown) {
+        if (signal.aborted) {
+          return;
+        }
+
+        attempt += 1;
+        const delayMs = Math.min(1000 * 2 ** (attempt - 1), 30_000);
+
+        logger.error(
+          { err: toError(error), attempt, delayMs, streamKey: this.streamKey },
+          'EventConsumer poll loop crashed; restarting',
+        );
+        await this.sleep(delayMs);
+      }
     }
   }
 
-  private logDecodeFailure(result: Extract<GameEventDecodeResult, { ok: false }>): void {
-    if (result.reason !== 'UnknownType') {
+  async handleMessage(message: unknown, messageId?: string): Promise<void> {
+    const decoded = decodeGameEvent(message);
+    if (!decoded.ok) {
+      this.logDecodeFailure(decoded, messageId);
       return;
     }
 
-    logger.debug({ type: result.type }, 'Ignoring unknown game event');
+    try {
+      await this.dispatch(decoded.value);
+    } catch (error: unknown) {
+      logger.error(
+        {
+          err: toError(error),
+          type: decoded.value.type,
+          userId: decoded.value.userId,
+          messageId,
+        },
+        'Error handling game event',
+      );
+    }
+  }
+
+  private logDecodeFailure(
+    result: Extract<GameEventDecodeResult, { ok: false }>,
+    messageId?: string,
+  ): void {
+    if (result.error.type === 'UnknownType') {
+      logger.debug({ type: result.error.eventType, messageId }, 'Ignoring unknown game event');
+      return;
+    }
+
+    logger.debug({ messageId }, 'Ignoring invalid game event message');
   }
 
   private async dispatch(event: GameEvent): Promise<void> {
-    await dispatchByTypeNoCtx(this.handlers, event);
+    await dispatchByTypeNoCtx(this.eventHandlers, event);
   }
 
   async stop(): Promise<void> {
-    this.isRunning = false;
+    await this.lifecycle.stop();
+  }
+
+  private async stopInternal(): Promise<void> {
     this.abortController?.abort();
+    this.abortController = null;
     if (this.pollPromise) {
       await this.pollPromise;
       this.pollPromise = null;
     }
-    this.abortController = null;
+  }
+
+  isRunning(): boolean {
+    return this.lifecycle.isRunning();
   }
 }

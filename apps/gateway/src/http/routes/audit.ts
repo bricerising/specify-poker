@@ -1,10 +1,46 @@
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { grpc } from '../../grpc/unaryClients';
-import { requireUserId } from '../utils/requireUserId';
+import { safeAuthedRoute } from '../utils/safeAuthedRoute';
 import { safeRoute } from '../utils/safeRoute';
 
 const router = Router();
+
+function parseOptionalNonNegativeInt(
+  value: unknown,
+  fallback: number,
+): { ok: true; value: number } | { ok: false; error: string } {
+  if (value === undefined) {
+    return { ok: true, value: fallback };
+  }
+  if (typeof value !== 'string') {
+    return { ok: false, error: 'Invalid number' };
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return { ok: false, error: 'Invalid number' };
+  }
+  return { ok: true, value: parsed };
+}
+
+function parseOptionalTimestampSeconds(
+  value: unknown,
+): { ok: true; value: { seconds: number } | undefined } | { ok: false; error: string } {
+  if (value === undefined) {
+    return { ok: true, value: undefined };
+  }
+  if (typeof value !== 'string') {
+    return { ok: false, error: 'Invalid timestamp' };
+  }
+
+  const ms = new Date(value).getTime();
+  if (!Number.isFinite(ms)) {
+    return { ok: false, error: 'Invalid timestamp' };
+  }
+
+  return { ok: true, value: { seconds: Math.floor(ms / 1000) } };
+}
 
 // GET /api/audit/events - Query events
 router.get(
@@ -14,19 +50,39 @@ router.get(
       const { tableId, handId, userId, types, startTime, endTime, limit, offset, cursor } =
         req.query;
 
+      const limitParsed = parseOptionalNonNegativeInt(limit, 50);
+      if (!limitParsed.ok) {
+        res.status(400).json({ error: 'Invalid limit' });
+        return;
+      }
+
+      const offsetParsed = parseOptionalNonNegativeInt(offset, 0);
+      if (!offsetParsed.ok) {
+        res.status(400).json({ error: 'Invalid offset' });
+        return;
+      }
+
+      const startTimeParsed = parseOptionalTimestampSeconds(startTime);
+      if (!startTimeParsed.ok) {
+        res.status(400).json({ error: 'Invalid startTime' });
+        return;
+      }
+
+      const endTimeParsed = parseOptionalTimestampSeconds(endTime);
+      if (!endTimeParsed.ok) {
+        res.status(400).json({ error: 'Invalid endTime' });
+        return;
+      }
+
       const response = await grpc.event.QueryEvents({
         table_id: tableId as string | undefined,
         hand_id: handId as string | undefined,
         user_id: userId as string | undefined,
         types: types ? (types as string).split(',') : undefined,
-        start_time: startTime
-          ? { seconds: Math.floor(new Date(startTime as string).getTime() / 1000) }
-          : undefined,
-        end_time: endTime
-          ? { seconds: Math.floor(new Date(endTime as string).getTime() / 1000) }
-          : undefined,
-        limit: limit ? parseInt(limit as string, 10) : 50,
-        offset: offset ? parseInt(offset as string, 10) : 0,
+        start_time: startTimeParsed.value,
+        end_time: endTimeParsed.value,
+        limit: limitParsed.value,
+        offset: offsetParsed.value,
         cursor: cursor as string | undefined,
       });
 
@@ -111,10 +167,22 @@ router.get(
       const { limit, offset } = req.query;
       const requesterId = req.auth?.userId;
 
+      const limitParsed = parseOptionalNonNegativeInt(limit, 20);
+      if (!limitParsed.ok) {
+        res.status(400).json({ error: 'Invalid limit' });
+        return;
+      }
+
+      const offsetParsed = parseOptionalNonNegativeInt(offset, 0);
+      if (!offsetParsed.ok) {
+        res.status(400).json({ error: 'Invalid offset' });
+        return;
+      }
+
       const response = await grpc.event.GetHandHistory({
         table_id: tableId,
-        limit: limit ? parseInt(limit as string, 10) : 20,
-        offset: offset ? parseInt(offset as string, 10) : 0,
+        limit: limitParsed.value,
+        offset: offsetParsed.value,
         requester_id: requesterId,
       });
 
@@ -140,15 +208,28 @@ router.get(
 
       // Only allow users to see their own hand history (unless admin)
       const requesterId = req.auth?.userId;
-      if (requesterId !== userId && !req.auth?.claims?.admin) {
+      const isAdmin = Boolean((req.auth?.claims as Record<string, unknown> | undefined)?.admin);
+      if (requesterId !== userId && !isAdmin) {
         res.status(403).json({ error: 'Forbidden' });
+        return;
+      }
+
+      const limitParsed = parseOptionalNonNegativeInt(limit, 20);
+      if (!limitParsed.ok) {
+        res.status(400).json({ error: 'Invalid limit' });
+        return;
+      }
+
+      const offsetParsed = parseOptionalNonNegativeInt(offset, 0);
+      if (!offsetParsed.ok) {
+        res.status(400).json({ error: 'Invalid offset' });
         return;
       }
 
       const response = await grpc.event.GetHandsForUser({
         user_id: userId,
-        limit: limit ? parseInt(limit as string, 10) : 20,
-        offset: offset ? parseInt(offset as string, 10) : 0,
+        limit: limitParsed.value,
+        offset: offsetParsed.value,
       });
 
       res.json({
@@ -166,17 +247,26 @@ router.get(
 // GET /api/audit/my-hands - Get current user's hand history
 router.get(
   '/my-hands',
-  safeRoute(
-    async (req: Request, res: Response) => {
-      const userId = requireUserId(req, res);
-      if (!userId) return;
-
+  safeAuthedRoute(
+    async (req: Request, res: Response, userId: string) => {
       const { limit, offset } = req.query;
+
+      const limitParsed = parseOptionalNonNegativeInt(limit, 20);
+      if (!limitParsed.ok) {
+        res.status(400).json({ error: 'Invalid limit' });
+        return;
+      }
+
+      const offsetParsed = parseOptionalNonNegativeInt(offset, 0);
+      if (!offsetParsed.ok) {
+        res.status(400).json({ error: 'Invalid offset' });
+        return;
+      }
 
       const response = await grpc.event.GetHandsForUser({
         user_id: userId,
-        limit: limit ? parseInt(limit as string, 10) : 20,
-        offset: offset ? parseInt(offset as string, 10) : 0,
+        limit: limitParsed.value,
+        offset: offsetParsed.value,
       });
 
       res.json({

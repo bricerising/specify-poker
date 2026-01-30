@@ -37,6 +37,7 @@ type MockWebSocketListener = (event: { data?: string }) => void;
 
 const wsState = vi.hoisted(() => ({
   instances: [] as MockWebSocket[],
+  autoOpen: true,
 }));
 
 class MockWebSocket {
@@ -58,14 +59,21 @@ class MockWebSocket {
   constructor(url: string) {
     this.url = url;
     wsState.instances.push(this);
-    queueMicrotask(() => {
-      this.readyState = MockWebSocket.OPEN;
-      this.emit('open');
-    });
+    if (wsState.autoOpen) {
+      queueMicrotask(() => {
+        this.readyState = MockWebSocket.OPEN;
+        this.emit('open');
+      });
+    }
   }
 
   addEventListener(type: string, callback: MockWebSocketListener) {
     this.listeners[type]?.push(callback);
+  }
+
+  open() {
+    this.readyState = MockWebSocket.OPEN;
+    this.emit('open');
   }
 
   send(data: string) {
@@ -150,6 +158,7 @@ describe('createTableStore', () => {
 
   beforeEach(() => {
     wsState.instances.length = 0;
+    wsState.autoOpen = true;
     // @ts-expect-error - test override
     window.WebSocket = MockWebSocket;
     store = createTableStore();
@@ -202,6 +211,50 @@ describe('createTableStore', () => {
       expect(state.seatId).toBeNull();
       expect(state.isSpectating).toBe(false);
       expect(state.chatMessages).toEqual([]);
+    });
+
+    it('cancels queued subscribe messages when leaving before socket opens', async () => {
+      apiFetchMock.mockImplementation(async (path: string) => {
+        if (path === '/api/tables/table-1/state') {
+          return jsonResponse({ state: wsTableState({ version: 1, seatedUserId: null, handId: null }) });
+        }
+        throw new Error(`Unexpected apiFetch path: ${path}`);
+      });
+
+      store.spectateTable('table-1');
+      store.leaveTable();
+
+      await Promise.resolve();
+
+      const socket = wsState.instances.at(-1);
+      expect(socket).toBeTruthy();
+      expect(socket!.sent).toEqual([]);
+    });
+
+    it('queues LeaveTable when leaving a seat before socket opens', async () => {
+      wsState.autoOpen = false;
+
+      apiFetchMock.mockImplementation(async (path: string) => {
+        if (path === '/api/tables/table-1/join') {
+          return jsonResponse({ wsUrl: '/ws' });
+        }
+        if (path === '/api/tables/table-1/state') {
+          return jsonResponse({ state: wsTableState({ version: 1, seatedUserId: null, handId: null }) });
+        }
+        throw new Error(`Unexpected apiFetch path: ${path}`);
+      });
+
+      await store.joinSeat('table-1', 2);
+      const socket = wsState.instances.at(-1);
+      expect(socket).toBeTruthy();
+
+      store.leaveTable();
+
+      socket!.open();
+
+      expect(socket!.sent.some((entry) => entry.includes('"LeaveTable"'))).toBe(true);
+      expect(socket!.sent.some((entry) => entry.includes('"SubscribeTable"'))).toBe(false);
+      expect(socket!.sent.some((entry) => entry.includes('"SubscribeChat"'))).toBe(false);
     });
   });
 

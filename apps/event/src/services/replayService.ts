@@ -27,13 +27,20 @@ function extractParticipants(events: GameEvent[]): Set<string> {
   return participants;
 }
 
+export type ReplayServiceDependencies = {
+  eventStore: Pick<typeof eventStore, 'queryEvents'>;
+  privacyService: Pick<typeof privacyService, 'createEventFilter'>;
+};
+
 export class ReplayService {
+  constructor(private readonly deps: ReplayServiceDependencies = { eventStore, privacyService }) {}
+
   async getHandEvents(
     handId: string,
     requesterUserId?: string,
     isOperator = false,
   ): Promise<GameEvent[]> {
-    const result = await eventStore.queryEvents({ handId, limit: 1000 });
+    const result = await this.deps.eventStore.queryEvents({ handId, limit: 1000 });
     const events = result.events;
 
     if (isOperator) {
@@ -42,9 +49,13 @@ export class ReplayService {
 
     const participantUserIds = extractParticipants(events);
 
-    return events.map((event) =>
-      privacyService.filterEvent(event, requesterUserId, isOperator, participantUserIds),
-    );
+    const filter = this.deps.privacyService.createEventFilter({
+      requesterUserId,
+      isOperator,
+      participantUserIds,
+    });
+
+    return events.map(filter);
   }
 }
 

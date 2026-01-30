@@ -1,9 +1,11 @@
 import pino from 'pino';
 import { context, trace } from '@opentelemetry/api';
-import { getConfig } from '../config';
+import { getObservabilityRuntimeConfig } from './runtimeConfig';
+
+const { logLevel } = getObservabilityRuntimeConfig();
 
 const logger = pino({
-  level: getConfig().logLevel,
+  level: logLevel,
   mixin() {
     const span = trace.getSpan(context.active());
     if (!span) {

@@ -40,8 +40,10 @@ const MATERIALIZABLE_EVENT_TYPES = [
 
 type MaterializableEventType = (typeof MATERIALIZABLE_EVENT_TYPES)[number];
 
+const MATERIALIZABLE_EVENT_TYPE_SET: ReadonlySet<string> = new Set(MATERIALIZABLE_EVENT_TYPES);
+
 function isMaterializableEventType(type: string): type is MaterializableEventType {
-  return (MATERIALIZABLE_EVENT_TYPES as readonly string[]).includes(type);
+  return MATERIALIZABLE_EVENT_TYPE_SET.has(type);
 }
 
 type MaterializerEvent =
@@ -371,10 +373,10 @@ function decodeHandStartedSeats(payload: unknown): HandStartedPayload['seats'] {
       continue;
     }
 
-    const seatId = decodeFiniteNumber(seat.seatId ?? seat.seat_id);
+    const seatId = decodeSeatId(seat.seatId ?? seat.seat_id);
     const userId = decodeNonEmptyString(seat.userId ?? seat.user_id);
     const stack = decodeFiniteNumber(seat.stack);
-    if (seatId === null || !Number.isInteger(seatId) || seatId < 0) {
+    if (seatId === null) {
       continue;
     }
     if (!userId) {
@@ -390,24 +392,28 @@ function decodeHandStartedSeats(payload: unknown): HandStartedPayload['seats'] {
   return seats;
 }
 
-function decodeCardsDealtCards(payload: unknown): Card[] | null {
-  if (!isRecord(payload)) {
-    return null;
-  }
-  const cardsValue = payload.cards;
-  if (!Array.isArray(cardsValue)) {
+function decodeCardList(value: unknown): Card[] | null {
+  if (!Array.isArray(value)) {
     return null;
   }
 
   const cards: Card[] = [];
-  for (const entry of cardsValue) {
+  for (const entry of value) {
     const card = decodeCard(entry);
     if (!card) {
       return null;
     }
     cards.push(card);
   }
+
   return cards;
+}
+
+function decodeCardsDealtCards(payload: unknown): Card[] | null {
+  if (!isRecord(payload)) {
+    return null;
+  }
+  return decodeCardList(payload.cards);
 }
 
 function decodeActionTakenPayload(
@@ -430,19 +436,7 @@ function decodeCommunityCards(payload: unknown): Card[] | null {
   if (!isRecord(payload)) {
     return null;
   }
-  const cardsValue = payload.communityCards;
-  if (!Array.isArray(cardsValue)) {
-    return null;
-  }
-  const cards: Card[] = [];
-  for (const entry of cardsValue) {
-    const card = decodeCard(entry);
-    if (!card) {
-      return null;
-    }
-    cards.push(card);
-  }
-  return cards;
+  return decodeCardList(payload.communityCards);
 }
 
 function decodeShowdownReveals(
@@ -460,21 +454,17 @@ function decodeShowdownReveals(
     if (!isRecord(reveal)) {
       continue;
     }
-    const seatId = decodeFiniteNumber(reveal.seatId ?? reveal.seat_id);
-    if (seatId === null || !Number.isInteger(seatId) || seatId < 0) {
+    const seatId = decodeSeatId(reveal.seatId ?? reveal.seat_id);
+    if (seatId === null) {
       continue;
     }
-    const cardsValue = reveal.cards;
-    if (!Array.isArray(cardsValue)) {
+    if (!Array.isArray(reveal.cards)) {
       continue;
     }
-    const cards: Card[] = [];
-    for (const entry of cardsValue) {
-      const card = decodeCard(entry);
-      if (!card) {
-        return null;
-      }
-      cards.push(card);
+
+    const cards = decodeCardList(reveal.cards);
+    if (!cards) {
+      return null;
     }
     reveals.push({ seatId, cards });
   }
@@ -501,9 +491,9 @@ function decodePotAwardedPayload(
     if (!isRecord(winner)) {
       continue;
     }
-    const seatId = decodeFiniteNumber(winner.seatId ?? winner.seat_id);
+    const seatId = decodeSeatId(winner.seatId ?? winner.seat_id);
     const share = decodeFiniteNumber(winner.share);
-    if (seatId === null || !Number.isInteger(seatId) || seatId < 0) {
+    if (seatId === null) {
       continue;
     }
     if (share === null) {
@@ -538,6 +528,14 @@ function decodePlayerEndStacks(payload: unknown): Record<string, number> | null 
   return Object.keys(endStacks).length > 0 ? endStacks : null;
 }
 
+function decodeSeatId(value: unknown): number | null {
+  const seatId = decodeFiniteNumber(value);
+  if (seatId === null || !Number.isInteger(seatId) || seatId < 0) {
+    return null;
+  }
+  return seatId;
+}
+
 function decodeCard(value: unknown): Card | null {
   if (!isRecord(value)) {
     return null;
@@ -569,7 +567,11 @@ function decodeFiniteNumber(value: unknown): number | null {
   return null;
 }
 
-export function aggregateHandRecord(handId: string, tableId: string, events: GameEvent[]): HandRecord {
+export function aggregateHandRecord(
+  handId: string,
+  tableId: string,
+  events: GameEvent[],
+): HandRecord {
   const startedEvent = events.find((event) => event.type === 'HAND_STARTED');
   const completedEvent = events.find((event) => event.type === 'HAND_COMPLETED');
 

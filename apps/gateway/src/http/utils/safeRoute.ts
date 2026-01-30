@@ -4,7 +4,7 @@ import { safeAsyncHandler } from '../../utils/safeAsyncHandler';
 
 export type RouteHandler = (req: Request, res: Response) => Promise<void> | void;
 
-type SafeRouteOptions = {
+export type SafeRouteOptions = {
   readonly logMessage: string;
   readonly errorMessage?: string;
   readonly status?: number;

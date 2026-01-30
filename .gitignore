@@ -22,3 +22,5 @@ build/
 .codex/log/
 .codex/sessions/
 .codex/version.json
+
+**/zellij/**

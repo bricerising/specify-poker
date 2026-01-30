@@ -8,6 +8,10 @@ import * as statisticsCache from '../../src/storage/statisticsCache';
 import * as deletedCache from '../../src/storage/deletedCache';
 import * as statisticsRepository from '../../src/storage/statisticsRepository';
 
+vi.mock('../../src/storage/db', () => ({
+  transaction: vi.fn(async (fn) => fn({})),
+}));
+
 vi.mock('../../src/storage/profileRepository');
 vi.mock('../../src/storage/friendsRepository');
 vi.mock('../../src/storage/profileCache');
@@ -35,6 +39,7 @@ describe('deletionService consumer behavior', () => {
       deletedAt: null,
     });
     vi.mocked(friendsRepository.getFriends).mockResolvedValue(['friend-1', 'friend-2']);
+    vi.mocked(friendsRepository.getUsersWithFriend).mockResolvedValue(['friend-3']);
     vi.mocked(statisticsRepository.findById).mockResolvedValue({
       userId: 'user-1',
       handsPlayed: 10,
@@ -50,7 +55,7 @@ describe('deletionService consumer behavior', () => {
     await deletionService.requestDeletion('user-1');
 
     expect(profileRepository.softDelete).toHaveBeenCalled();
-    expect(friendsRepository.removeAllReferences).toHaveBeenCalledWith('user-1');
+    expect(friendsRepository.removeAllReferences).toHaveBeenCalledWith('user-1', expect.anything());
     expect(statisticsRepository.update).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 'user-1',
@@ -59,6 +64,7 @@ describe('deletionService consumer behavior', () => {
         biggestPot: 0,
         referralCount: 0,
       }),
+      expect.anything(),
     );
     expect(profileCache.deleteNickname).toHaveBeenCalledWith('OldNick');
     expect(profileCache.invalidate).toHaveBeenCalledWith('user-1');
@@ -67,13 +73,14 @@ describe('deletionService consumer behavior', () => {
     expect(deletedCache.markDeleted).toHaveBeenCalledWith('user-1');
     expect(friendsCache.invalidate).toHaveBeenCalledWith('friend-1');
     expect(friendsCache.invalidate).toHaveBeenCalledWith('friend-2');
+    expect(friendsCache.invalidate).toHaveBeenCalledWith('friend-3');
   });
 
   it('purges data on hard delete', async () => {
     await deletionService.hardDelete('user-2');
 
-    expect(friendsRepository.removeAllReferences).toHaveBeenCalledWith('user-2');
-    expect(profileRepository.hardDelete).toHaveBeenCalledWith('user-2');
+    expect(friendsRepository.removeAllReferences).toHaveBeenCalledWith('user-2', expect.anything());
+    expect(profileRepository.hardDelete).toHaveBeenCalledWith('user-2', expect.anything());
     expect(profileCache.invalidate).toHaveBeenCalledWith('user-2');
     expect(friendsCache.invalidate).toHaveBeenCalledWith('user-2');
     expect(statisticsCache.invalidate).toHaveBeenCalledWith('user-2');

@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg';
 import { query } from './db';
 import type { Profile } from '../domain/types';
 import { normalizeUserPreferences } from '../domain/decoders';
+import { DELETED_USER_DISPLAY_NAME } from '../domain/deletedUser';
 
 const profileColumns = `user_id, username, nickname, avatar_url, preferences, last_login_at, referred_by, created_at, updated_at, deleted_at`;
 
@@ -33,12 +34,16 @@ function mapProfile(row: ProfileRow): Profile {
   };
 }
 
-export async function findById(userId: string, includeDeleted = false): Promise<Profile | null> {
+export async function findById(
+  userId: string,
+  includeDeleted = false,
+  client?: PoolClient,
+): Promise<Profile | null> {
   const condition = includeDeleted ? '' : 'AND deleted_at IS NULL';
-  const result = await query<ProfileRow>(
-    `SELECT ${profileColumns} FROM profiles WHERE user_id = $1 ${condition}`,
-    [userId],
-  );
+  const sql = `SELECT ${profileColumns} FROM profiles WHERE user_id = $1 ${condition}`;
+  const result = client
+    ? await client.query<ProfileRow>(sql, [userId])
+    : await query<ProfileRow>(sql, [userId]);
 
   if (result.rows.length === 0) {
     return null;
@@ -46,24 +51,31 @@ export async function findById(userId: string, includeDeleted = false): Promise<
   return mapProfile(result.rows[0]);
 }
 
-export async function findByIds(userIds: string[], includeDeleted = false): Promise<Profile[]> {
+export async function findByIds(
+  userIds: string[],
+  includeDeleted = false,
+  client?: PoolClient,
+): Promise<Profile[]> {
   if (userIds.length === 0) {
     return [];
   }
   const condition = includeDeleted ? '' : 'AND deleted_at IS NULL';
-  const result = await query<ProfileRow>(
-    `SELECT ${profileColumns} FROM profiles WHERE user_id = ANY($1::varchar[]) ${condition}`,
-    [userIds],
-  );
+  const sql = `SELECT ${profileColumns} FROM profiles WHERE user_id = ANY($1::varchar[]) ${condition}`;
+  const result = client
+    ? await client.query<ProfileRow>(sql, [userIds])
+    : await query<ProfileRow>(sql, [userIds]);
 
   return result.rows.map(mapProfile);
 }
 
-export async function findByNickname(nickname: string): Promise<Profile | null> {
-  const result = await query<ProfileRow>(
-    `SELECT ${profileColumns} FROM profiles WHERE nickname = $1 AND deleted_at IS NULL LIMIT 1`,
-    [nickname],
-  );
+export async function findByNickname(
+  nickname: string,
+  client?: PoolClient,
+): Promise<Profile | null> {
+  const sql = `SELECT ${profileColumns} FROM profiles WHERE LOWER(nickname) = LOWER($1) AND deleted_at IS NULL LIMIT 1`;
+  const result = client
+    ? await client.query<ProfileRow>(sql, [nickname])
+    : await query<ProfileRow>(sql, [nickname]);
 
   if (result.rows.length === 0) {
     return null;
@@ -141,9 +153,8 @@ export async function update(profile: Profile, client?: PoolClient): Promise<Pro
   return mapProfile(result.rows[0]);
 }
 
-export async function upsert(profile: Profile): Promise<Profile> {
-  const result = await query<ProfileRow>(
-    `INSERT INTO profiles (user_id, username, nickname, avatar_url, preferences, last_login_at, referred_by, created_at, updated_at, deleted_at)
+export async function upsert(profile: Profile, client?: PoolClient): Promise<Profile> {
+  const sql = `INSERT INTO profiles (user_id, username, nickname, avatar_url, preferences, last_login_at, referred_by, created_at, updated_at, deleted_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      ON CONFLICT (user_id)
      DO UPDATE SET username = EXCLUDED.username,
@@ -154,44 +165,57 @@ export async function upsert(profile: Profile): Promise<Profile> {
                   referred_by = EXCLUDED.referred_by,
                   updated_at = EXCLUDED.updated_at,
                   deleted_at = EXCLUDED.deleted_at
-     RETURNING ${profileColumns}`,
-    [
-      profile.userId,
-      profile.username,
-      profile.nickname,
-      profile.avatarUrl,
-      profile.preferences,
-      profile.lastLoginAt ? new Date(profile.lastLoginAt) : null,
-      profile.referredBy,
-      new Date(profile.createdAt),
-      new Date(profile.updatedAt),
-      profile.deletedAt ? new Date(profile.deletedAt) : null,
-    ],
-  );
+     RETURNING ${profileColumns}`;
+  const params = [
+    profile.userId,
+    profile.username,
+    profile.nickname,
+    profile.avatarUrl,
+    profile.preferences,
+    profile.lastLoginAt ? new Date(profile.lastLoginAt) : null,
+    profile.referredBy,
+    new Date(profile.createdAt),
+    new Date(profile.updatedAt),
+    profile.deletedAt ? new Date(profile.deletedAt) : null,
+  ];
+  const result = client
+    ? await client.query<ProfileRow>(sql, params)
+    : await query<ProfileRow>(sql, params);
 
   return mapProfile(result.rows[0]);
 }
 
-export async function softDelete(userId: string, deletedAt: Date): Promise<void> {
-  await query(
+export async function softDelete(
+  userId: string,
+  deletedAt: Date,
+  client?: PoolClient,
+): Promise<void> {
+  const run = client ? client.query.bind(client) : query;
+  await run(
     `UPDATE profiles
      SET deleted_at = $2,
-         nickname = 'Deleted User',
-         username = 'Deleted User',
+         nickname = $3,
+         username = $3,
          avatar_url = NULL,
-         preferences = $3,
+         preferences = $4,
          updated_at = $2
      WHERE user_id = $1`,
-    [userId, deletedAt, {}],
+    [userId, deletedAt, DELETED_USER_DISPLAY_NAME, {}],
   );
 }
 
-export async function hardDelete(userId: string): Promise<void> {
-  await query(`DELETE FROM profiles WHERE user_id = $1`, [userId]);
+export async function hardDelete(userId: string, client?: PoolClient): Promise<void> {
+  const run = client ? client.query.bind(client) : query;
+  await run(`DELETE FROM profiles WHERE user_id = $1`, [userId]);
 }
 
-export async function touchLogin(userId: string, lastLoginAt: Date): Promise<void> {
-  await query(
+export async function touchLogin(
+  userId: string,
+  lastLoginAt: Date,
+  client?: PoolClient,
+): Promise<void> {
+  const run = client ? client.query.bind(client) : query;
+  await run(
     `UPDATE profiles
      SET last_login_at = $2,
          updated_at = $2

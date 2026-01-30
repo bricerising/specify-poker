@@ -361,7 +361,10 @@ describe('End-to-End Balance Flows', () => {
       );
 
       expect(withdrawResult.ok).toBe(true);
-      expect(withdrawResult.transaction!.balanceAfter).toBe(0);
+      if (!withdrawResult.ok) {
+        throw new Error('expected ok');
+      }
+      expect(withdrawResult.value.balanceAfter).toBe(0);
 
       balance = await getBalance('cashout-player');
       expect(balance!.balance).toBe(0);

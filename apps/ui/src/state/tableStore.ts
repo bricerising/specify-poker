@@ -1,5 +1,6 @@
 import { apiFetch, apiFetchDecoded, getApiBaseUrl } from '../services/apiClient';
 import { getToken } from '../services/auth';
+import { createWebSocketTransport } from '../services/webSocketTransport';
 import { isStaleVersion, requestResync, shouldResync } from '../services/wsClient';
 import { recordWebSocketMessage } from '../observability/otel';
 import { decodeJwtUserId } from '../utils/jwt';
@@ -119,7 +120,8 @@ export function createTableStore(): TableStore {
   };
 
   const listeners = new Set<(state: TableStoreState) => void>();
-  let socket: WebSocket | null = null;
+  type WsClientMessage = { type: string; tableId?: string } & Record<string, unknown>;
+
   const requestedHoleCards = new Set<string>();
   const profileCache = new Map<string, { username: string; avatarUrl: string | null }>();
   const requestedProfiles = new Set<string>();
@@ -137,42 +139,51 @@ export function createTableStore(): TableStore {
 
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  const sendWhenSocketOpen = (send: (socket: WebSocket) => void) => {
-    if (!socket) {
-      return;
+  const buildWebSocketUrl = (wsUrl?: string) => {
+    const apiBaseUrl = getApiBaseUrl();
+    const defaultWsBaseUrl = apiBaseUrl.replace(/^http/, 'ws');
+    const token = getToken();
+
+    const url = new URL(wsUrl ?? '/ws', defaultWsBaseUrl);
+    if (token && !url.searchParams.has('token')) {
+      url.searchParams.set('token', token);
     }
-    const activeSocket = socket;
-    if (activeSocket.readyState === WebSocket.OPEN) {
-      send(activeSocket);
-      return;
-    }
-    activeSocket.addEventListener('open', () => send(activeSocket), { once: true });
+
+    return url.toString();
   };
 
-  type WsClientMessage = { type: string; tableId?: string } & Record<string, unknown>;
-
-  const sendWsMessage = (activeSocket: WebSocket, message: WsClientMessage) => {
-    recordWebSocketMessage(
-      message.type,
-      'sent',
-      typeof message.tableId === 'string' ? message.tableId : undefined,
-    );
-    activeSocket.send(JSON.stringify(message));
-  };
-
-  const sendWsMessageNow = (message: WsClientMessage) => {
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      return false;
-    }
-    sendWsMessage(socket, message);
-    return true;
-  };
-
-  const sendWsMessageOnOpen = (message: WsClientMessage) => {
-    sendWhenSocketOpen((activeSocket) => {
-      sendWsMessage(activeSocket, message);
-    });
-  };
+  const ws = createWebSocketTransport<WsServerMessage, WsClientMessage>({
+    buildUrl: buildWebSocketUrl,
+    decodeServerMessage: (raw) => {
+      const parsed = wsServerMessageSchema.safeParse(raw);
+      return parsed.success ? parsed.data : null;
+    },
+    beforeServerMessage: (message) => {
+      recordWebSocketMessage(message.type, 'received', tableIdForMessage(message));
+    },
+    onServerMessage: (message) => {
+      handleWsServerMessage(message);
+    },
+    onConnecting: () => {
+      setState({ status: 'connecting', error: undefined });
+    },
+    onConnected: () => {
+      setState({ status: 'connected', error: undefined });
+    },
+    onClosed: () => {
+      setState({ status: 'idle' });
+    },
+    onError: () => {
+      setState({ status: 'error', error: 'WebSocket error' });
+    },
+    onClientMessageSent: (message) => {
+      recordWebSocketMessage(
+        message.type,
+        'sent',
+        typeof message.tableId === 'string' ? message.tableId : undefined,
+      );
+    },
+  });
 
   const clearRequestedHoleCards = () => {
     requestedHoleCards.clear();
@@ -377,7 +388,7 @@ export function createTableStore(): TableStore {
     }
     requestedHoleCards.add(key);
 
-    requestResync(socket, tableId);
+    requestResync(ws.getSocket(), tableId);
 
     void loadHoleCardsWithRetry(tableId, handId).then((cards) => {
       requestedHoleCards.delete(key);
@@ -439,7 +450,7 @@ export function createTableStore(): TableStore {
         return;
       }
       if (shouldResync(currentVersion, incomingVersion)) {
-        requestResync(socket, tableId);
+        requestResync(ws.getSocket(), tableId);
       }
     }
 
@@ -607,68 +618,6 @@ export function createTableStore(): TableStore {
     return undefined;
   };
 
-  const connect = (wsUrl?: string) => {
-    if (
-      socket &&
-      (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)
-    ) {
-      return;
-    }
-    const apiBase = getApiBaseUrl();
-    const baseUrl = wsUrl ?? apiBase.replace(/^http/, 'ws') + '/ws';
-    const token = getToken();
-    const url = new URL(baseUrl, window.location.origin);
-    if (token && !url.searchParams.has('token')) {
-      url.searchParams.set('token', token);
-    }
-    setState({ status: 'connecting', error: undefined });
-    const nextSocket = new WebSocket(url.toString());
-    socket = nextSocket;
-
-    nextSocket.addEventListener('open', () => {
-      if (socket !== nextSocket) {
-        return;
-      }
-      setState({ status: 'connected', error: undefined });
-    });
-
-    nextSocket.addEventListener('close', () => {
-      if (socket !== nextSocket) {
-        return;
-      }
-      socket = null;
-      setState({ status: 'idle' });
-    });
-
-    nextSocket.addEventListener('error', () => {
-      if (socket !== nextSocket) {
-        return;
-      }
-      setState({ status: 'error', error: 'WebSocket error' });
-    });
-
-    nextSocket.addEventListener('message', (event) => {
-      if (socket !== nextSocket) {
-        return;
-      }
-      let raw: unknown;
-      try {
-        raw = JSON.parse(event.data as string);
-      } catch {
-        return;
-      }
-
-      const parsed = wsServerMessageSchema.safeParse(raw);
-      if (!parsed.success) {
-        return;
-      }
-
-      const message: WsServerMessage = parsed.data;
-      recordWebSocketMessage(message.type, 'received', tableIdForMessage(message));
-      handleWsServerMessage(message);
-    });
-  };
-
   const loadTableSnapshot = async (tableId: string) => {
     try {
       const response = await loadTableStateResponse(tableId);
@@ -719,11 +668,9 @@ export function createTableStore(): TableStore {
       privateHandId: null,
     });
 
-    connect(mode.wsUrl);
-    sendWhenSocketOpen((activeSocket) => {
-      sendWsMessage(activeSocket, { type: 'SubscribeTable', tableId });
-      sendWsMessage(activeSocket, { type: 'SubscribeChat', tableId });
-    });
+    ws.connect(mode.wsUrl);
+    ws.sendOnOpen({ type: 'SubscribeTable', tableId });
+    ws.sendOnOpen({ type: 'SubscribeChat', tableId });
 
     snapshotPromise.then((snapshot) => {
       if (!snapshot?.tableState) {
@@ -763,7 +710,7 @@ export function createTableStore(): TableStore {
       setState({ tables });
     },
     subscribeLobby: () => {
-      connect();
+      ws.connect();
     },
     joinSeat: async (tableId, seatId) => {
       const response = await apiFetch(`/api/tables/${tableId}/join`, {
@@ -782,10 +729,18 @@ export function createTableStore(): TableStore {
       clearRequestedHoleCards();
       const tableId = state.tableState?.tableId;
       if (tableId) {
-        sendWsMessageNow({ type: 'UnsubscribeTable', tableId });
-        sendWsMessageNow({ type: 'UnsubscribeChat', tableId });
+        ws.cancelOutbox(
+          (message) =>
+            message.tableId === tableId &&
+            (message.type === 'SubscribeTable' || message.type === 'SubscribeChat'),
+        );
+        ws.sendNow({ type: 'UnsubscribeTable', tableId });
+        ws.sendNow({ type: 'UnsubscribeChat', tableId });
         if (state.seatId !== null) {
-          sendWsMessageNow({ type: 'LeaveTable', tableId });
+          const sent = ws.sendNow({ type: 'LeaveTable', tableId });
+          if (!sent) {
+            ws.sendOnOpen({ type: 'LeaveTable', tableId });
+          }
         }
       }
       setState({
@@ -799,14 +754,14 @@ export function createTableStore(): TableStore {
       });
     },
     subscribeTable: (tableId) => {
-      connect();
-      sendWsMessageOnOpen({ type: 'SubscribeTable', tableId });
+      ws.connect();
+      ws.sendOnOpen({ type: 'SubscribeTable', tableId });
     },
     sendAction: (action) => {
       if (!state.tableState?.hand) {
         return;
       }
-      sendWsMessageNow({
+      ws.sendNow({
         type: 'Action',
         tableId: state.tableState.tableId,
         handId: state.tableState.hand.handId,
@@ -815,14 +770,14 @@ export function createTableStore(): TableStore {
       });
     },
     subscribeChat: (tableId) => {
-      connect();
-      sendWsMessageOnOpen({ type: 'SubscribeChat', tableId });
+      ws.connect();
+      ws.sendOnOpen({ type: 'SubscribeChat', tableId });
     },
     sendChat: (message) => {
       if (!state.tableState) {
         return;
       }
-      sendWsMessageNow({ type: 'ChatSend', tableId: state.tableState.tableId, message });
+      ws.sendNow({ type: 'ChatSend', tableId: state.tableState.tableId, message });
     },
   };
 }

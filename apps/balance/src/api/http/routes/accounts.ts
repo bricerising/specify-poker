@@ -1,234 +1,212 @@
 import type { Request, Response } from 'express';
 import { Router } from 'express';
-import {
-  getBalance,
-  ensureAccount,
-  processDeposit,
-  processWithdrawal,
-} from '../../../services/accountService';
-import { getTransactionsByAccount } from '../../../storage/transactionStore';
-import { queryLedger } from '../../../services/ledgerService';
+import type { Transaction } from '../../../domain/types';
+import type { BalanceService } from '../../../services/balanceService';
 import { toNonEmptyString, toNumber } from '../../validation';
 
-const router = Router();
+function badRequest(res: Response, error: string, message: string) {
+  return res.status(400).json({ error, message });
+}
 
-// Get account balance
-router.get('/:accountId/balance', async (req: Request, res: Response) => {
+function requireAccountId(req: Request, res: Response): string | null {
   const accountId = toNonEmptyString(req.params.accountId);
   if (!accountId) {
-    return res.status(400).json({
-      error: 'INVALID_ACCOUNT_ID',
-      message: 'AccountId is required',
-    });
+    badRequest(res, 'INVALID_ACCOUNT_ID', 'AccountId is required');
+    return null;
   }
+  return accountId;
+}
 
-  const balance = await getBalance(accountId);
-  if (!balance) {
-    return res.status(404).json({
-      error: 'ACCOUNT_NOT_FOUND',
-      message: `Account ${accountId} not found`,
-    });
-  }
-
-  res.json(balance);
-});
-
-// Ensure account exists (create if not)
-router.post('/:accountId', async (req: Request, res: Response) => {
-  const accountId = toNonEmptyString(req.params.accountId);
-  if (!accountId) {
-    return res.status(400).json({
-      error: 'INVALID_ACCOUNT_ID',
-      message: 'AccountId is required',
-    });
-  }
-
-  const initialBalance = toNumber((req.body as { initialBalance?: unknown })?.initialBalance, 0);
-  if (!Number.isFinite(initialBalance) || initialBalance < 0) {
-    return res.status(400).json({
-      error: 'INVALID_AMOUNT',
-      message: 'initialBalance must be a non-negative number',
-    });
-  }
-
-  const result = await ensureAccount(accountId, initialBalance);
-
-  res.status(result.created ? 201 : 200).json({
-    accountId: result.account.accountId,
-    balance: result.account.balance,
-    currency: result.account.currency,
-    created: result.created,
-  });
-});
-
-// Deposit chips
-router.post('/:accountId/deposit', async (req: Request, res: Response) => {
-  const accountId = toNonEmptyString(req.params.accountId);
-  if (!accountId) {
-    return res.status(400).json({
-      error: 'INVALID_ACCOUNT_ID',
-      message: 'AccountId is required',
-    });
-  }
-
+function requireIdempotencyKey(req: Request, res: Response): string | null {
   const idempotencyKey = toNonEmptyString(req.headers['idempotency-key']);
-
   if (!idempotencyKey) {
-    return res.status(400).json({
-      error: 'MISSING_IDEMPOTENCY_KEY',
-      message: 'Idempotency-Key header is required',
-    });
+    badRequest(res, 'MISSING_IDEMPOTENCY_KEY', 'Idempotency-Key header is required');
+    return null;
   }
+  return idempotencyKey;
+}
 
-  const body = req.body as { amount?: unknown; source?: unknown };
-  const amount = toNumber(body?.amount, Number.NaN);
-  const source = toNonEmptyString(body?.source);
+function toTransactionResponse(tx: Transaction) {
+  return {
+    transactionId: tx.transactionId,
+    type: tx.type,
+    amount: tx.amount,
+    balanceBefore: tx.balanceBefore,
+    balanceAfter: tx.balanceAfter,
+    status: tx.status,
+    createdAt: tx.createdAt,
+    completedAt: tx.completedAt,
+  };
+}
 
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return res.status(400).json({
-      error: 'INVALID_AMOUNT',
-      message: 'Amount must be a positive number',
-    });
-  }
+function toTransactionHistoryItem(tx: Transaction) {
+  return {
+    ...toTransactionResponse(tx),
+    metadata: tx.metadata,
+  };
+}
 
-  if (!source) {
-    return res.status(400).json({
-      error: 'MISSING_SOURCE',
-      message: 'Source is required (FREEROLL, PURCHASE, ADMIN, BONUS)',
-    });
-  }
+export function createAccountRoutes(service: BalanceService): Router {
+  const router = Router();
 
-  const result = await processDeposit(accountId, amount, source, idempotencyKey);
+  // Get account balance
+  router.get('/:accountId/balance', async (req: Request, res: Response) => {
+    const accountId = requireAccountId(req, res);
+    if (!accountId) {
+      return;
+    }
 
-  if (!result.ok) {
-    return res.status(400).json({
-      error: result.error,
-      message: `Deposit failed: ${result.error}`,
-    });
-  }
+    const balance = await service.getBalance(accountId);
+    if (!balance) {
+      return res.status(404).json({
+        error: 'ACCOUNT_NOT_FOUND',
+        message: `Account ${accountId} not found`,
+      });
+    }
 
-  res.json({
-    transactionId: result.transaction.transactionId,
-    type: result.transaction.type,
-    amount: result.transaction.amount,
-    balanceBefore: result.transaction.balanceBefore,
-    balanceAfter: result.transaction.balanceAfter,
-    status: result.transaction.status,
-    createdAt: result.transaction.createdAt,
-    completedAt: result.transaction.completedAt,
+    res.json(balance);
   });
-});
 
-// Withdraw chips
-router.post('/:accountId/withdraw', async (req: Request, res: Response) => {
-  const accountId = toNonEmptyString(req.params.accountId);
-  if (!accountId) {
-    return res.status(400).json({
-      error: 'INVALID_ACCOUNT_ID',
-      message: 'AccountId is required',
+  // Ensure account exists (create if not)
+  router.post('/:accountId', async (req: Request, res: Response) => {
+    const accountId = requireAccountId(req, res);
+    if (!accountId) {
+      return;
+    }
+
+    const body = req.body as { initialBalance?: unknown };
+    const initialBalanceRaw = body?.initialBalance;
+    const initialBalance =
+      initialBalanceRaw === undefined ? 0 : toNumber(initialBalanceRaw, Number.NaN);
+    if (!Number.isFinite(initialBalance) || initialBalance < 0) {
+      return badRequest(res, 'INVALID_AMOUNT', 'initialBalance must be a non-negative number');
+    }
+
+    const result = await service.ensureAccount(accountId, initialBalance);
+
+    res.status(result.created ? 201 : 200).json({
+      accountId: result.account.accountId,
+      balance: result.account.balance,
+      currency: result.account.currency,
+      created: result.created,
     });
-  }
-
-  const idempotencyKey = toNonEmptyString(req.headers['idempotency-key']);
-
-  if (!idempotencyKey) {
-    return res.status(400).json({
-      error: 'MISSING_IDEMPOTENCY_KEY',
-      message: 'Idempotency-Key header is required',
-    });
-  }
-
-  const body = req.body as { amount?: unknown; reason?: unknown };
-  const amount = toNumber(body?.amount, Number.NaN);
-  const reason = toNonEmptyString(body?.reason) ?? undefined;
-
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return res.status(400).json({
-      error: 'INVALID_AMOUNT',
-      message: 'Amount must be a positive number',
-    });
-  }
-
-  const result = await processWithdrawal(accountId, amount, idempotencyKey, reason);
-
-  if (!result.ok) {
-    const status = result.error === 'INSUFFICIENT_BALANCE' ? 400 : 400;
-    return res.status(status).json({
-      error: result.error,
-      message: `Withdrawal failed: ${result.error}`,
-    });
-  }
-
-  res.json({
-    transactionId: result.transaction.transactionId,
-    type: result.transaction.type,
-    amount: result.transaction.amount,
-    balanceBefore: result.transaction.balanceBefore,
-    balanceAfter: result.transaction.balanceAfter,
-    status: result.transaction.status,
-    createdAt: result.transaction.createdAt,
-    completedAt: result.transaction.completedAt,
   });
-});
 
-// Get transaction history
-router.get('/:accountId/transactions', async (req: Request, res: Response) => {
-  const accountId = toNonEmptyString(req.params.accountId);
-  if (!accountId) {
-    return res.status(400).json({
-      error: 'INVALID_ACCOUNT_ID',
-      message: 'AccountId is required',
-    });
-  }
+  // Deposit chips
+  router.post('/:accountId/deposit', async (req: Request, res: Response) => {
+    const accountId = requireAccountId(req, res);
+    if (!accountId) {
+      return;
+    }
 
-  const limitRaw = toNumber(req.query.limit, 50);
-  const offsetRaw = toNumber(req.query.offset, 0);
-  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.floor(limitRaw)) : 50;
-  const offset = Number.isFinite(offsetRaw) ? Math.max(0, Math.floor(offsetRaw)) : 0;
-  const type = toNonEmptyString(req.query.type) ?? undefined;
+    const idempotencyKey = requireIdempotencyKey(req, res);
+    if (!idempotencyKey) {
+      return;
+    }
 
-  const result = await getTransactionsByAccount(accountId, { limit, offset, type });
+    const body = req.body as { amount?: unknown; source?: unknown };
+    const amount = toNumber(body?.amount, Number.NaN);
+    const source = toNonEmptyString(body?.source);
 
-  res.json({
-    transactions: result.transactions.map((tx) => ({
-      transactionId: tx.transactionId,
-      type: tx.type,
-      amount: tx.amount,
-      balanceBefore: tx.balanceBefore,
-      balanceAfter: tx.balanceAfter,
-      status: tx.status,
-      metadata: tx.metadata,
-      createdAt: tx.createdAt,
-      completedAt: tx.completedAt,
-    })),
-    total: result.total,
-    limit,
-    offset,
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return badRequest(res, 'INVALID_AMOUNT', 'Amount must be a positive number');
+    }
+
+    if (!source) {
+      return badRequest(
+        res,
+        'MISSING_SOURCE',
+        'Source is required (FREEROLL, PURCHASE, ADMIN, BONUS)',
+      );
+    }
+
+    const result = await service.processDeposit(accountId, amount, source, idempotencyKey);
+
+    if (!result.ok) {
+      return res.status(400).json({
+        error: result.error,
+        message: `Deposit failed: ${result.error}`,
+      });
+    }
+
+    res.json(toTransactionResponse(result.value));
   });
-});
 
-// Get ledger entries
-router.get('/:accountId/ledger', async (req: Request, res: Response) => {
-  const accountId = toNonEmptyString(req.params.accountId);
-  if (!accountId) {
-    return res.status(400).json({
-      error: 'INVALID_ACCOUNT_ID',
-      message: 'AccountId is required',
-    });
-  }
+  // Withdraw chips
+  router.post('/:accountId/withdraw', async (req: Request, res: Response) => {
+    const accountId = requireAccountId(req, res);
+    if (!accountId) {
+      return;
+    }
 
-  const limitRaw = toNumber(req.query.limit, 50);
-  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.floor(limitRaw)) : 50;
-  const from = toNonEmptyString(req.query.from) ?? undefined;
-  const to = toNonEmptyString(req.query.to) ?? undefined;
+    const idempotencyKey = requireIdempotencyKey(req, res);
+    if (!idempotencyKey) {
+      return;
+    }
 
-  const result = await queryLedger(accountId, { limit, from, to });
+    const body = req.body as { amount?: unknown; reason?: unknown };
+    const amount = toNumber(body?.amount, Number.NaN);
+    const reason = toNonEmptyString(body?.reason) ?? undefined;
 
-  res.json({
-    entries: result.entries,
-    total: result.total,
-    latestChecksum: result.latestChecksum,
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return badRequest(res, 'INVALID_AMOUNT', 'Amount must be a positive number');
+    }
+
+    const result = await service.processWithdrawal(accountId, amount, idempotencyKey, reason);
+
+    if (!result.ok) {
+      return res.status(400).json({
+        error: result.error,
+        message: `Withdrawal failed: ${result.error}`,
+      });
+    }
+
+    res.json(toTransactionResponse(result.value));
   });
-});
 
-export default router;
+  // Get transaction history
+  router.get('/:accountId/transactions', async (req: Request, res: Response) => {
+    const accountId = requireAccountId(req, res);
+    if (!accountId) {
+      return;
+    }
+
+    const limitRaw = toNumber(req.query.limit, 50);
+    const offsetRaw = toNumber(req.query.offset, 0);
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.floor(limitRaw)) : 50;
+    const offset = Number.isFinite(offsetRaw) ? Math.max(0, Math.floor(offsetRaw)) : 0;
+    const type = toNonEmptyString(req.query.type) ?? undefined;
+
+    const result = await service.getTransactionsByAccount(accountId, { limit, offset, type });
+
+    res.json({
+      transactions: result.transactions.map((tx) => toTransactionHistoryItem(tx)),
+      total: result.total,
+      limit,
+      offset,
+    });
+  });
+
+  // Get ledger entries
+  router.get('/:accountId/ledger', async (req: Request, res: Response) => {
+    const accountId = requireAccountId(req, res);
+    if (!accountId) {
+      return;
+    }
+
+    const limitRaw = toNumber(req.query.limit, 50);
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.floor(limitRaw)) : 50;
+    const from = toNonEmptyString(req.query.from) ?? undefined;
+    const to = toNonEmptyString(req.query.to) ?? undefined;
+
+    const result = await service.queryLedger(accountId, { limit, from, to });
+
+    res.json({
+      entries: result.entries,
+      total: result.total,
+      latestChecksum: result.latestChecksum,
+    });
+  });
+
+  return router;
+}

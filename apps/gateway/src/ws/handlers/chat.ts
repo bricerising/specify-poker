@@ -1,7 +1,5 @@
 import { randomUUID } from 'crypto';
 import type WebSocket from 'ws';
-import type { z } from 'zod';
-import { wsClientMessageSchema } from '@specify-poker/shared';
 
 import { grpcResult } from '../../grpc/unaryClients';
 import type { WsPubSubMessage } from '../pubsub';
@@ -11,14 +9,8 @@ import { getLocalConnectionMeta, sendToLocal } from '../localRegistry';
 import { deliverToSubscribers } from '../delivery';
 import { broadcastToChannel } from '../../services/broadcastService';
 import { saveChatMessage, getChatHistory } from '../../storage/chatStore';
-import { parseJsonWithSchema } from '../messageParsing';
-import { attachWsRouter } from '../router';
-
-type WsClientMessage = z.infer<typeof wsClientMessageSchema>;
-
-function parseClientMessage(data: WebSocket.RawData): WsClientMessage | null {
-  return parseJsonWithSchema(data, wsClientMessageSchema);
-}
+import { parseWsClientMessage, type WsClientMessage } from '../clientMessage';
+import { attachWsRouter, type WsHub } from '../router';
 
 export async function handleChatPubSubEvent(message: WsPubSubMessage) {
   if (message.channel !== 'chat') {
@@ -133,10 +125,14 @@ async function handleChatSend(
   });
 }
 
-export function attachChatHub(socket: WebSocket, userId: string, connectionId: string) {
-  attachWsRouter(socket, {
+export function createChatHub(params: {
+  connectionId: string;
+  userId: string;
+}): WsHub<WsClientMessage> {
+  const { connectionId, userId } = params;
+
+  return {
     hubName: 'chat',
-    parseMessage: parseClientMessage,
     getAttributes: (message): Record<string, string> => {
       if ('tableId' in message && typeof message.tableId === 'string') {
         return { 'poker.table_id': message.tableId };
@@ -166,6 +162,13 @@ export function attachChatHub(socket: WebSocket, userId: string, connectionId: s
         await handleChatSend(connectionId, userId, { tableId, message: message.message });
       },
     },
+  };
+}
+
+export function attachChatHub(socket: WebSocket, userId: string, connectionId: string) {
+  attachWsRouter(socket, {
+    ...createChatHub({ connectionId, userId }),
+    parseMessage: parseWsClientMessage,
     onClose: async () => {
       await unsubscribeAll(connectionId);
     },

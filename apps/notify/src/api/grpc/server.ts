@@ -4,8 +4,7 @@ import * as path from 'path';
 import { addGrpcService, createGrpcServerLifecycle } from '@specify-poker/shared';
 import { createHandlers } from './handlers';
 import { createHealthHandlers } from './health';
-import type { SubscriptionService } from '../../services/subscriptionService';
-import type { PushSenderService } from '../../services/pushSenderService';
+import type { NotifyService } from '../../services/notifyService';
 import logger from '../../observability/logger';
 
 const PROTO_PATH = path.resolve(__dirname, '../../../proto/notify.proto');
@@ -18,8 +17,7 @@ export type GrpcServer = {
 
 type CreateGrpcServerParams = {
   port: number;
-  subscriptionService: SubscriptionService;
-  pushService: PushSenderService;
+  notifyService: NotifyService;
 };
 
 type NotifyProto = {
@@ -42,7 +40,7 @@ export function createGrpcServer(params: CreateGrpcServerParams): GrpcServer {
     port: params.port,
     loadProto: (loaded) => loaded as NotifyProto,
     register: (server, proto) => {
-      const handlers = createHandlers(params.subscriptionService, params.pushService);
+      const handlers = createHandlers(params.notifyService);
       const healthHandlers = createHealthHandlers();
 
       addGrpcService({
@@ -70,15 +68,14 @@ let defaultServer: GrpcServer | null = null;
 
 export async function startGrpcServer(
   port: number,
-  subscriptionService: SubscriptionService,
-  pushService: PushSenderService,
+  notifyService: NotifyService,
 ): Promise<void> {
   if (defaultServer) {
     defaultServer.stop();
     defaultServer = null;
   }
 
-  defaultServer = createGrpcServer({ port, subscriptionService, pushService });
+  defaultServer = createGrpcServer({ port, notifyService });
   await defaultServer.start();
 }
 

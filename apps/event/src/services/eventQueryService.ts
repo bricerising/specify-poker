@@ -12,14 +12,24 @@ function decodeCursor(cursor: string): number {
   return Number.isNaN(value) ? 0 : value;
 }
 
+export type EventQueryServiceDependencies = {
+  eventStore: Pick<typeof eventStore, 'queryEvents' | 'getEventById'>;
+  recordQueryDuration: typeof recordQueryDuration;
+};
+
 export class EventQueryService {
+  constructor(
+    private readonly deps: EventQueryServiceDependencies = { eventStore, recordQueryDuration },
+  ) {}
+
   async queryEvents(query: EventQuery): Promise<EventQueryResult> {
     const start = Date.now();
-    const offset = query.cursor ? decodeCursor(query.cursor) : query.offset || 0;
-    const limit = query.limit || 100;
+    const offset = query.cursor ? decodeCursor(query.cursor) : (query.offset ?? 0);
+    const limit = query.limit ?? 100;
+    let status: 'ok' | 'error' = 'ok';
 
     try {
-      const result = await eventStore.queryEvents({
+      const result = await this.deps.eventStore.queryEvents({
         tableId: query.tableId,
         handId: query.handId,
         userId: query.userId,
@@ -31,7 +41,6 @@ export class EventQueryService {
       });
 
       const hasMore = result.total > offset + result.events.length;
-      recordQueryDuration('ok', Date.now() - start);
       return {
         events: result.events,
         total: result.total,
@@ -39,13 +48,15 @@ export class EventQueryService {
         nextCursor: hasMore ? encodeCursor(offset + result.events.length) : undefined,
       };
     } catch (err) {
-      recordQueryDuration('error', Date.now() - start);
+      status = 'error';
       throw err;
+    } finally {
+      this.deps.recordQueryDuration(status, Date.now() - start);
     }
   }
 
   async getEvent(eventId: string): Promise<GameEvent | null> {
-    return eventStore.getEventById(eventId);
+    return this.deps.eventStore.getEventById(eventId);
   }
 }
 

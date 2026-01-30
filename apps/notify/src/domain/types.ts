@@ -11,7 +11,13 @@ export interface UserPushSubscription extends PushSubscription {
   createdAt: string;
 }
 
-export type NotificationType = 'turn_alert' | 'game_invite' | 'system';
+export const NOTIFICATION_TYPES = ['turn_alert', 'game_invite', 'system'] as const;
+
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+export function isNotificationType(value: string): value is NotificationType {
+  return (NOTIFICATION_TYPES as readonly string[]).includes(value);
+}
 
 export interface NotificationPayload {
   title: string;

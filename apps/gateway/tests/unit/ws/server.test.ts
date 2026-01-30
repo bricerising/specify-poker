@@ -50,7 +50,7 @@ vi.mock('../../../src/ws/pubsub', () => ({
 }));
 
 vi.mock('../../../src/ws/handlers/table', () => ({
-  attachTableHub: vi.fn(),
+  createTableHub: vi.fn(() => ({ hubName: 'table', handlers: {} })),
   handleTablePubSubEvent: vi.fn(),
 }));
 
@@ -60,8 +60,15 @@ vi.mock('../../../src/ws/handlers/lobby', () => ({
 }));
 
 vi.mock('../../../src/ws/handlers/chat', () => ({
-  attachChatHub: vi.fn(),
+  createChatHub: vi.fn(() => ({ hubName: 'chat', handlers: {} })),
   handleChatPubSubEvent: vi.fn(),
+}));
+
+const getSubscribedChannels = vi.fn(async () => []);
+const unsubscribeAll = vi.fn(async () => {});
+vi.mock('../../../src/ws/subscriptions', () => ({
+  getSubscribedChannels: (...args: unknown[]) => getSubscribedChannels(...args),
+  unsubscribeAll: (...args: unknown[]) => unsubscribeAll(...args),
 }));
 
 const registerConnection = vi.fn();
@@ -211,5 +218,103 @@ describe('WS server', () => {
 
     expect(unregisterConnection).toHaveBeenCalledWith('conn-1', 'user-1');
     expect(updatePresence).toHaveBeenCalledWith('user-1', 'offline');
+  });
+
+  it('authenticates via the first WS message when token is missing', async () => {
+    authenticateWs.mockResolvedValue({ status: 'missing' });
+    authenticateWsToken.mockResolvedValue({ status: 'ok', userId: 'user-1' });
+    getConnectionsByUser.mockResolvedValue([]);
+
+    const { initWsServer } = await import('../../../src/ws/server');
+    let upgradeHandler: (req: IncomingMessage, socket: object, head: Buffer) => void;
+    const server = {
+      on: vi.fn((event: string, handler: typeof upgradeHandler) => {
+        if (event === 'upgrade') {
+          upgradeHandler = handler;
+        }
+      }),
+    };
+
+    await initWsServer(server as unknown as EventEmitter);
+    const request = {
+      url: '/ws',
+      headers: { host: 'localhost' },
+      socket: { remoteAddress: '1.2.3.4' },
+    } as IncomingMessage;
+
+    await upgradeHandler(request, {}, Buffer.alloc(0));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    lastWss?.lastSocket?.emit('message', JSON.stringify({ type: 'Authenticate', token: 'good' }));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(authenticateWsToken).toHaveBeenCalledWith('good');
+    expect(registerConnection).toHaveBeenCalledWith(
+      expect.objectContaining({ connectionId: 'conn-1', userId: 'user-1', ip: '1.2.3.4' }),
+      expect.any(MockWebSocket),
+    );
+    expect(updatePresence).toHaveBeenCalledWith('user-1', 'online');
+    expect(lastWss?.lastSocket?.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: 'Welcome', userId: 'user-1', connectionId: 'conn-1' }),
+    );
+  });
+
+  it('closes the connection when auth is not provided in time', async () => {
+    vi.useFakeTimers();
+    try {
+      authenticateWs.mockResolvedValue({ status: 'missing' });
+
+      const { initWsServer } = await import('../../../src/ws/server');
+      let upgradeHandler: (req: IncomingMessage, socket: object, head: Buffer) => void;
+      const server = {
+        on: vi.fn((event: string, handler: typeof upgradeHandler) => {
+          if (event === 'upgrade') {
+            upgradeHandler = handler;
+          }
+        }),
+      };
+
+      await initWsServer(server as unknown as EventEmitter);
+      const request = {
+        url: '/ws',
+        headers: { host: 'localhost' },
+        socket: { remoteAddress: '1.2.3.4' },
+      } as IncomingMessage;
+
+      await upgradeHandler(request, {}, Buffer.alloc(0));
+
+      vi.advanceTimersByTime(5000);
+
+      expect(lastWss?.lastSocket?.close).toHaveBeenCalledWith(1008, 'Authentication required');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('runs shutdown cleanup when setup fails', async () => {
+    authenticateWs.mockResolvedValue({ status: 'ok', userId: 'user-1' });
+    registerConnection.mockRejectedValue(new Error('redis_down'));
+
+    const { initWsServer } = await import('../../../src/ws/server');
+    let upgradeHandler: (req: IncomingMessage, socket: object, head: Buffer) => void;
+    const server = {
+      on: vi.fn((event: string, handler: typeof upgradeHandler) => {
+        if (event === 'upgrade') {
+          upgradeHandler = handler;
+        }
+      }),
+    };
+
+    await initWsServer(server as unknown as EventEmitter);
+    const request = {
+      url: '/ws?token=good',
+      headers: { host: 'localhost' },
+      socket: { remoteAddress: '1.2.3.4' },
+    } as IncomingMessage;
+
+    await upgradeHandler(request, {}, Buffer.alloc(0));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(unsubscribeAll).toHaveBeenCalledWith('conn-1');
   });
 });

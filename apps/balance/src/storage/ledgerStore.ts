@@ -87,47 +87,96 @@ export async function getLedgerEntries(
 ): Promise<{ entries: LedgerEntry[]; total: number; latestChecksum: string }> {
   const { limit = 50, from, to } = options;
 
+  const fromTime = from === undefined ? null : new Date(from).getTime();
+  const toTime = to === undefined ? null : new Date(to).getTime();
+
+  if (
+    (fromTime !== null && !Number.isFinite(fromTime)) ||
+    (toTime !== null && !Number.isFinite(toTime))
+  ) {
+    const latestChecksum = await getLatestChecksum(accountId);
+    return { entries: [], total: 0, latestChecksum };
+  }
+
   const redis = await getRedisClient();
   if (redis) {
-    const total = await redis.lLen(`${LEDGER_PREFIX}${accountId}`);
-    const rawEntries = await redis.lRange(`${LEDGER_PREFIX}${accountId}`, -limit, -1);
-
-    const parsedEntries: LedgerEntry[] = [];
-    for (const raw of rawEntries) {
-      const parsed = tryJsonParse<LedgerEntry>(raw);
-      if (!parsed.ok) {
-        logger.warn({ err: parsed.error, accountId }, 'ledgerStore.parse.failed');
-        continue;
-      }
-      parsedEntries.push(parsed.value);
-    }
-
-    let entries = parsedEntries.reverse();
-
-    // Filter by time range if specified
-    if (from) {
-      const fromTime = new Date(from).getTime();
-      entries = entries.filter((e) => new Date(e.timestamp).getTime() >= fromTime);
-    }
-    if (to) {
-      const toTime = new Date(to).getTime();
-      entries = entries.filter((e) => new Date(e.timestamp).getTime() <= toTime);
+    const key = `${LEDGER_PREFIX}${accountId}`;
+    const totalInAccount = await redis.lLen(key);
+    if (totalInAccount === 0) {
+      const latestChecksum = await getLatestChecksum(accountId);
+      return { entries: [], total: 0, latestChecksum };
     }
 
     const latestChecksum = await getLatestChecksum(accountId);
 
-    return { entries, total, latestChecksum };
+    // Fast path: no time filters (just return most-recent entries).
+    if (fromTime === null && toTime === null) {
+      const start = Math.max(0, totalInAccount - limit);
+      const rawEntries = await redis.lRange(key, start, totalInAccount - 1);
+
+      const parsedEntries: LedgerEntry[] = [];
+      for (const raw of rawEntries) {
+        const parsed = tryJsonParse<LedgerEntry>(raw);
+        if (!parsed.ok) {
+          logger.warn({ err: parsed.error, accountId }, 'ledgerStore.parse.failed');
+          continue;
+        }
+        parsedEntries.push(parsed.value);
+      }
+
+      return { entries: parsedEntries.reverse(), total: totalInAccount, latestChecksum };
+    }
+
+    // Slow path: scan from newest → oldest to honor `from`/`to` windows.
+    const entries: LedgerEntry[] = [];
+    let totalMatching = 0;
+    const batchSize = 200;
+
+    let stop = false;
+    for (let end = totalInAccount - 1; end >= 0 && !stop; end -= batchSize) {
+      const start = Math.max(0, end - batchSize + 1);
+      const rawEntries = await redis.lRange(key, start, end);
+
+      for (let i = rawEntries.length - 1; i >= 0; i -= 1) {
+        const raw = rawEntries[i];
+        const parsed = tryJsonParse<LedgerEntry>(raw);
+        if (!parsed.ok) {
+          logger.warn({ err: parsed.error, accountId }, 'ledgerStore.parse.failed');
+          continue;
+        }
+
+        const entry = parsed.value;
+        const entryTime = new Date(entry.timestamp).getTime();
+        if (!Number.isFinite(entryTime)) {
+          continue;
+        }
+
+        if (toTime !== null && entryTime > toTime) {
+          continue;
+        }
+
+        if (fromTime !== null && entryTime < fromTime) {
+          stop = true;
+          break;
+        }
+
+        totalMatching += 1;
+        if (entries.length < limit) {
+          entries.push(entry);
+        }
+      }
+    }
+
+    return { entries, total: totalMatching, latestChecksum };
   }
 
   // Fallback to in-memory
   let entries = ledgerByAccount.get(accountId) ?? [];
 
-  if (from) {
-    const fromTime = new Date(from).getTime();
+  if (fromTime !== null) {
     entries = entries.filter((e) => new Date(e.timestamp).getTime() >= fromTime);
   }
-  if (to) {
-    const toTime = new Date(to).getTime();
+  if (toTime !== null) {
     entries = entries.filter((e) => new Date(e.timestamp).getTime() <= toTime);
   }
 

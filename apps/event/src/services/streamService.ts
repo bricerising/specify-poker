@@ -3,17 +3,26 @@ import type { StreamResponse } from '../storage/streamStore';
 import { streamStore } from '../storage/streamStore';
 import type { Cursor } from '../domain/types';
 
+export type StreamServiceDependencies = {
+  cursorStore: Pick<typeof cursorStore, 'getCursor' | 'upsertCursor'>;
+  streamStore: Pick<typeof streamStore, 'read'>;
+};
+
 export class StreamService {
+  constructor(
+    private readonly deps: StreamServiceDependencies = { cursorStore, streamStore },
+  ) {}
+
   async getCursor(streamId: string, subscriberId: string): Promise<Cursor | null> {
-    return cursorStore.getCursor(streamId, subscriberId);
+    return this.deps.cursorStore.getCursor(streamId, subscriberId);
   }
 
   async updateCursor(streamId: string, subscriberId: string, position: number): Promise<Cursor> {
-    return cursorStore.upsertCursor(streamId, subscriberId, position);
+    return this.deps.cursorStore.upsertCursor(streamId, subscriberId, position);
   }
 
   async readStream(streamId: string, lastId: string): Promise<StreamResponse[] | null> {
-    return streamStore.read(streamId, lastId);
+    return this.deps.streamStore.read(streamId, lastId);
   }
 }
 

@@ -35,14 +35,17 @@ describe('gRPC Handlers', () => {
         updatedAt: '2024-01-01T00:00:00Z',
         deletedAt: null,
       };
-      vi.mocked(profileService.getProfile).mockResolvedValue(mockProfile);
+      vi.mocked(profileService.getProfileWithLookupStatus).mockResolvedValue({
+        profile: mockProfile,
+        lookupStatus: 'ok',
+      });
 
       const call = {
         request: { userId: 'user1', referrerId: 'ref1' },
       } as unknown as ServerUnaryCall<{ userId: string; referrerId?: string }, unknown>;
       await handlers.GetProfile(call, callback);
 
-      expect(profileService.getProfile).toHaveBeenCalledWith('user1', 'ref1', undefined);
+      expect(profileService.getProfileWithLookupStatus).toHaveBeenCalledWith('user1', 'ref1', undefined);
       expect(callback).toHaveBeenCalledWith(null, {
         profile: expect.objectContaining({ userId: 'user1', username: 'user1', nickname: 'Nick' }),
       });

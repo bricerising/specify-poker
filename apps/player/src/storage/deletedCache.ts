@@ -1,4 +1,4 @@
-import { getRedisClient } from './redisClient';
+import { createRedisKeyedStringCache } from './redisCache';
 
 const DELETED_TTL_SECONDS = 30 * 24 * 60 * 60;
 
@@ -6,27 +6,31 @@ function deletedKey(userId: string): string {
   return `player:deleted:${userId}`;
 }
 
+const deletedFlagCache = createRedisKeyedStringCache<string>({
+  key: deletedKey,
+  ttlSeconds: DELETED_TTL_SECONDS,
+});
+
+export async function isDeletedMulti(userIds: string[]): Promise<Set<string>> {
+  const deleted = new Set<string>();
+  const results = await deletedFlagCache.getMulti(userIds);
+  results.forEach((value, userId) => {
+    if (value === '1') {
+      deleted.add(userId);
+    }
+  });
+  return deleted;
+}
+
 export async function markDeleted(userId: string): Promise<void> {
-  const redis = await getRedisClient();
-  if (!redis) {
-    return;
-  }
-  await redis.set(deletedKey(userId), '1', { EX: DELETED_TTL_SECONDS });
+  await deletedFlagCache.set(userId, '1');
 }
 
 export async function isDeleted(userId: string): Promise<boolean> {
-  const redis = await getRedisClient();
-  if (!redis) {
-    return false;
-  }
-  const value = await redis.get(deletedKey(userId));
+  const value = await deletedFlagCache.get(userId);
   return value === '1';
 }
 
 export async function clearDeleted(userId: string): Promise<void> {
-  const redis = await getRedisClient();
-  if (!redis) {
-    return;
-  }
-  await redis.del(deletedKey(userId));
+  await deletedFlagCache.del(userId);
 }

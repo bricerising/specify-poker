@@ -1,8 +1,7 @@
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { grpc } from '../../grpc/unaryClients';
-import { requireUserId } from '../utils/requireUserId';
-import { safeRoute } from '../utils/safeRoute';
+import { safeAuthedRoute } from '../utils/safeAuthedRoute';
 
 const router = Router();
 
@@ -36,24 +35,26 @@ function parseSubscription(body: unknown): ParsedSubscription {
   return { ok: true, subscription: { endpoint, keys: { p256dh, auth } } };
 }
 
-router.get('/vapid', (req: Request, res: Response) => {
-  const userId = requireUserId(req, res);
-  if (!userId) return;
+router.get(
+  '/vapid',
+  safeAuthedRoute(
+    async (_req: Request, res: Response) => {
+      const publicKey = process.env.VAPID_PUBLIC_KEY;
+      if (!publicKey) {
+        res.status(503).json({ error: 'VAPID public key is not configured' });
+        return;
+      }
 
-  const publicKey = process.env.VAPID_PUBLIC_KEY;
-  if (!publicKey) {
-    return res.status(503).json({ error: 'VAPID public key is not configured' });
-  }
-  return res.json({ publicKey });
-});
+      res.json({ publicKey });
+    },
+    { logMessage: 'Failed to get VAPID public key' },
+  ),
+);
 
 router.post(
   '/subscribe',
-  safeRoute(
-    async (req: Request, res: Response) => {
-      const userId = requireUserId(req, res);
-      if (!userId) return;
-
+  safeAuthedRoute(
+    async (req: Request, res: Response, userId: string) => {
       const parsed = parseSubscription(req.body);
       if (!parsed.ok) {
         res.status(400).json({ error: parsed.error });
@@ -78,11 +79,8 @@ router.post(
 
 router.delete(
   '/subscribe',
-  safeRoute(
-    async (req: Request, res: Response) => {
-      const userId = requireUserId(req, res);
-      if (!userId) return;
-
+  safeAuthedRoute(
+    async (req: Request, res: Response, userId: string) => {
       const endpoint = typeof req.body?.endpoint === 'string' ? req.body.endpoint.trim() : '';
       if (!endpoint) {
         res.status(400).json({ error: 'endpoint is required' });

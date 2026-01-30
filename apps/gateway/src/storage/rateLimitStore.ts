@@ -1,31 +1,32 @@
-import { getRedisClient } from './redisClient';
-import logger from '../observability/logger';
+import { withRedisClient } from './redisClient';
 
 export async function incrementRateLimit(key: string, windowMs: number): Promise<number> {
-  const redis = await getRedisClient();
-  if (!redis) return 0;
-
-  try {
-    const current = await redis.incr(key);
-    if (current === 1) {
-      await redis.pExpire(key, windowMs);
-    }
-    return current;
-  } catch (err) {
-    logger.error({ err, key }, 'Failed to increment rate limit in Redis');
-    return 0;
-  }
+  return await withRedisClient(
+    async (redis) => {
+      const current = await redis.incr(key);
+      if (current === 1) {
+        await redis.pExpire(key, windowMs);
+      }
+      return current;
+    },
+    {
+      fallback: 0,
+      logMessage: 'ratelimit.increment.failed',
+      context: { key },
+    },
+  );
 }
 
 export async function getRateLimit(key: string): Promise<number> {
-  const redis = await getRedisClient();
-  if (!redis) return 0;
-
-  try {
-    const val = await redis.get(key);
-    return val ? parseInt(val, 10) : 0;
-  } catch (err) {
-    logger.error({ err, key }, 'Failed to get rate limit from Redis');
-    return 0;
-  }
+  return await withRedisClient(
+    async (redis) => {
+      const val = await redis.get(key);
+      return val ? Number.parseInt(val, 10) : 0;
+    },
+    {
+      fallback: 0,
+      logMessage: 'ratelimit.get.failed',
+      context: { key },
+    },
+  );
 }

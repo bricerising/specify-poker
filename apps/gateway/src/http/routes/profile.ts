@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { normalizeUsernameFromClaims } from '../../auth/claims';
-import { requireUserId } from '../utils/requireUserId';
+import { safeAuthedRoute } from '../utils/safeAuthedRoute';
 import { safeRoute } from '../utils/safeRoute';
 import { createProfileFacade } from './profile/facade';
 
@@ -12,11 +12,8 @@ const profileFacade = createProfileFacade();
 // GET /api/me - Get current user's profile
 router.get(
   '/me',
-  safeRoute(
-    async (req: Request, res: Response) => {
-      const userId = requireUserId(req, res);
-      if (!userId) return;
-
+  safeAuthedRoute(
+    async (req: Request, res: Response, userId: string) => {
       const username = normalizeUsernameFromClaims(req.auth?.claims ?? undefined);
 
       const profile = await profileFacade.getMe({ userId, username });
@@ -29,11 +26,8 @@ router.get(
 // PUT /api/me - Update current user's profile
 router.put(
   '/me',
-  safeRoute(
-    async (req: Request, res: Response) => {
-      const userId = requireUserId(req, res);
-      if (!userId) return;
-
+  safeAuthedRoute(
+    async (req: Request, res: Response, userId: string) => {
       const username = normalizeUsernameFromClaims(req.auth?.claims ?? undefined);
       const profile = await profileFacade.updateMe({ userId, username, body: req.body });
       res.json(profile);
@@ -45,11 +39,8 @@ router.put(
 // POST /api/profile - Update nickname and avatar (OpenAPI alias)
 router.post(
   '/profile',
-  safeRoute(
-    async (req: Request, res: Response) => {
-      const userId = requireUserId(req, res);
-      if (!userId) return;
-
+  safeAuthedRoute(
+    async (req: Request, res: Response, userId: string) => {
       const username = normalizeUsernameFromClaims(req.auth?.claims ?? undefined);
       const profile = await profileFacade.updateMe({ userId, username, body: req.body });
       res.json(profile);
@@ -61,11 +52,8 @@ router.post(
 // DELETE /api/me - Delete current user's profile (GDPR)
 router.delete(
   '/me',
-  safeRoute(
-    async (req: Request, res: Response) => {
-      const userId = requireUserId(req, res);
-      if (!userId) return;
-
+  safeAuthedRoute(
+    async (_req: Request, res: Response, userId: string) => {
       const response = await profileFacade.deleteMe({ userId });
       if (!response.success) {
         res.status(500).json({ error: 'Failed to delete profile' });
@@ -80,11 +68,8 @@ router.delete(
 // GET /api/me/statistics - Get current user's statistics
 router.get(
   '/me/statistics',
-  safeRoute(
-    async (req: Request, res: Response) => {
-      const userId = requireUserId(req, res);
-      if (!userId) return;
-
+  safeAuthedRoute(
+    async (_req: Request, res: Response, userId: string) => {
       const statistics = await profileFacade.getStatistics({ userId });
       res.json(statistics);
     },
@@ -113,11 +98,8 @@ router.get(
 // GET /api/friends - Get current user's friends list
 router.get(
   '/friends',
-  safeRoute(
-    async (req: Request, res: Response) => {
-      const userId = requireUserId(req, res);
-      if (!userId) return;
-
+  safeAuthedRoute(
+    async (_req: Request, res: Response, userId: string) => {
       const friends = await profileFacade.getFriendIds({ userId });
       res.json({ friends });
     },
@@ -128,11 +110,8 @@ router.get(
 // PUT /api/friends - Replace current user's friends list
 router.put(
   '/friends',
-  safeRoute(
-    async (req: Request, res: Response) => {
-      const userId = requireUserId(req, res);
-      if (!userId) return;
-
+  safeAuthedRoute(
+    async (req: Request, res: Response, userId: string) => {
       const desired = (req.body as { friends?: unknown } | undefined)?.friends;
       if (!Array.isArray(desired)) {
         res.status(400).json({ error: 'friends array is required' });
@@ -149,11 +128,8 @@ router.put(
 // POST /api/friends - Add a friend
 router.post(
   '/friends',
-  safeRoute(
-    async (req: Request, res: Response) => {
-      const userId = requireUserId(req, res);
-      if (!userId) return;
-
+  safeAuthedRoute(
+    async (req: Request, res: Response, userId: string) => {
       const rawFriendId = (req.body as { friendId?: unknown } | undefined)?.friendId;
       const friendId = typeof rawFriendId === 'string' ? rawFriendId.trim() : '';
       if (friendId.length === 0) {
@@ -171,11 +147,8 @@ router.post(
 // DELETE /api/friends/:friendId - Remove a friend
 router.delete(
   '/friends/:friendId',
-  safeRoute(
-    async (req: Request, res: Response) => {
-      const userId = requireUserId(req, res);
-      if (!userId) return;
-
+  safeAuthedRoute(
+    async (req: Request, res: Response, userId: string) => {
       const { friendId } = req.params;
       await profileFacade.removeFriend({ userId, friendId });
       res.status(204).send();

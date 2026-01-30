@@ -194,17 +194,6 @@ const resetRedisState = () => {
   moduleWithReset.__resetRedis?.();
 };
 
-const clearTurnTimers = () => {
-  const service = tableService as typeof tableService & {
-    turnTimers?: Map<string, NodeJS.Timeout>;
-  };
-  if (!service.turnTimers) return;
-  for (const timer of service.turnTimers.values()) {
-    clearTimeout(timer);
-  }
-  service.turnTimers.clear();
-};
-
 const defaultConfig: TableConfig = {
   smallBlind: 1,
   bigBlind: 2,
@@ -229,7 +218,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  clearTurnTimers();
+  tableService.shutdown();
 });
 
 describe('TableService consumer flows', () => {

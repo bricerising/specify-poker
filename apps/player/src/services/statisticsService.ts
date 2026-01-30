@@ -1,21 +1,18 @@
 import { defaultProfile, defaultStatistics } from '../domain/defaults';
 import type { Statistics } from '../domain/types';
-import * as statisticsRepository from '../storage/statisticsRepository';
-import * as statisticsCache from '../storage/statisticsCache';
-import * as profileRepository from '../storage/profileRepository';
-import * as profileCache from '../storage/profileCache';
 import { generateNickname } from './nicknameService';
+import { statisticsStore } from '../storage/statisticsStore';
+import { profileStore } from '../storage/profileStore';
 
 async function ensureProfile(userId: string) {
-  const existing = await profileRepository.findById(userId, true);
+  const existing = await profileStore.get(userId, true);
   if (existing) {
     return;
   }
 
   const nickname = await generateNickname(userId);
   const profile = defaultProfile(userId, nickname, new Date());
-  const createResult = await profileRepository.create(profile);
-  await profileCache.set(createResult.profile);
+  await profileStore.create(profile);
 }
 
 export enum StatisticType {
@@ -55,20 +52,13 @@ const statisticUpdaters: Record<StatisticType, StatisticUpdater> = {
 };
 
 export async function getStatistics(userId: string): Promise<Statistics> {
-  const cached = await statisticsCache.get(userId);
-  if (cached) {
-    return cached;
-  }
-  const existing = await statisticsRepository.findById(userId);
+  const existing = await statisticsStore.get(userId);
   if (existing) {
-    await statisticsCache.set(existing);
     return existing;
   }
   await ensureProfile(userId);
   const created = defaultStatistics(userId, new Date());
-  const saved = await statisticsRepository.upsert(created);
-  await statisticsCache.set(saved);
-  return saved;
+  return statisticsStore.upsert(created);
 }
 
 export async function incrementStatistic(
@@ -80,9 +70,7 @@ export async function incrementStatistic(
   statisticUpdaters[type](stats, amount);
 
   stats.lastUpdated = new Date().toISOString();
-  const saved = await statisticsRepository.update(stats);
-  await statisticsCache.set(saved);
-  return saved;
+  return statisticsStore.update(stats);
 }
 
 export async function incrementHandsPlayed(userId: string): Promise<Statistics> {

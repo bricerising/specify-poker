@@ -51,6 +51,10 @@ The balance service will be available alongside the poker service.
 | `REDIS_URL` | (none) | Redis connection URL |
 | `RESERVATION_TIMEOUT_MS` | 30000 | Reservation expiry timeout |
 | `IDEMPOTENCY_TTL_MS` | 86400000 | Idempotency key TTL (24h) |
+| `IDEMPOTENCY_CACHE_MAX_ENTRIES` | 100000 | Max in-memory idempotency cache entries (LRU). |
+| `RAKE_BASIS_POINTS` | 500 | Rake rate in basis points (e.g., 500 = 5%). Set to 0 to disable rake. |
+| `RAKE_CAP_CHIPS` | 5 | Max rake per hand (in chips). |
+| `RAKE_MIN_POT_CHIPS` | 20 | Minimum pot size (in chips) before rake applies. |
 | `LOG_LEVEL` | info | Structured log level |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | http://localhost:4317 | OTLP gRPC exporter endpoint |
 | `JWT_SECRET` | default-secret | JWT secret for HS256 validation |

@@ -135,6 +135,32 @@ describe('EventStore', () => {
     );
   });
 
+  it('builds query filters with stable parameter ordering', async () => {
+    const startTime = new Date('2024-01-01T00:00:00.000Z');
+    const endTime = new Date('2024-01-02T00:00:00.000Z');
+
+    (pool.query as unknown).mockResolvedValueOnce({ rows: [{ count: '0' }] });
+    (pool.query as unknown).mockResolvedValueOnce({ rows: [] });
+
+    await eventStore.queryEvents({
+      tableId: 't1',
+      types: ['T1', 'T2'],
+      startTime,
+      endTime,
+      limit: 10,
+      offset: 5,
+    });
+
+    const calls = vi.mocked(pool.query).mock.calls;
+    expect(calls[0]?.[0]).toContain(
+      'FROM events WHERE table_id = $1 AND type = ANY($2) AND timestamp >= $3 AND timestamp <= $4',
+    );
+    expect(calls[0]?.[1]).toEqual(['t1', ['T1', 'T2'], startTime, endTime]);
+
+    expect(calls[1]?.[0]).toContain('LIMIT $5 OFFSET $6');
+    expect(calls[1]?.[1]).toEqual(['t1', ['T1', 'T2'], startTime, endTime, 10, 5]);
+  });
+
   it('should get event by id', async () => {
     const mockEvent = {
       event_id: 'e1',

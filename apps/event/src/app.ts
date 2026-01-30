@@ -19,127 +19,145 @@ export type CreateEventAppOptions = {
 };
 
 export function createEventApp(options: CreateEventAppOptions): EventApp {
-  let shutdownManager: ShutdownManager | null = null;
-  let metricsServer: HttpServer | null = null;
-  let isStarted = false;
-  let startPromise: Promise<void> | null = null;
-  let stopPromise: Promise<void> | null = null;
+  type RunningResources = {
+    shutdown: ShutdownManager;
+    metricsServer: HttpServer | null;
+  };
 
-  const stop = async (): Promise<void> => {
-    if (stopPromise) {
-      await stopPromise;
-      return;
+  type AppState =
+    | { kind: 'stopped' }
+    | { kind: 'starting'; promise: Promise<void> }
+    | { kind: 'started'; resources: RunningResources }
+    | { kind: 'stopping'; promise: Promise<void> };
+
+  let state: AppState = { kind: 'stopped' };
+
+  const startInternal = async (resources: RunningResources): Promise<void> => {
+    const shutdown = resources.shutdown;
+
+    if (!options.isTest) {
+      // Start OTel before importing instrumented subsystems (pg, redis, grpc, etc.)
+      await startObservability();
+      shutdown.add('otel.shutdown', async () => {
+        await stopObservability();
+      });
     }
 
-    const shutdown = shutdownManager;
-    if (!shutdown) {
-      isStarted = false;
-      startPromise = null;
-      metricsServer = null;
-      return;
+    const { closePgPool } = await import('./storage/pgClient');
+    shutdown.add('pg.close', async () => {
+      await closePgPool();
+    });
+
+    const { runMigrations } = await import('./storage/migrations');
+    const { connectRedis, closeRedis } = await import('./storage/redisClient');
+    const { handMaterializer } = await import('./jobs/handMaterializer');
+    const { archiver } = await import('./jobs/archiver');
+    const { startMetricsServer } = await import('./observability/metrics');
+    const { startGrpcServer, stopGrpcServer } = await import('./api/grpc/server');
+
+    if (!options.isTest) {
+      await runMigrations();
     }
 
-    stopPromise = (async () => {
-      try {
-        await shutdown.run();
-      } finally {
-        shutdownManager = null;
-        metricsServer = null;
-        isStarted = false;
-        startPromise = null;
-        stopPromise = null;
-      }
-    })();
+    await connectRedis();
+    shutdown.add('redis.close', async () => {
+      await closeRedis();
+    });
 
-    await stopPromise;
+    if (!options.isTest) {
+      await handMaterializer.start();
+      await archiver.start();
+      shutdown.add('jobs.stop', async () => {
+        await handMaterializer.stop();
+        archiver.stop();
+      });
+
+      resources.metricsServer = startMetricsServer(options.config.metricsPort);
+      shutdown.add('metrics.close', async () => {
+        if (!resources.metricsServer) {
+          return;
+        }
+        await closeHttpServer(resources.metricsServer);
+        resources.metricsServer = null;
+      });
+    }
+
+    await startGrpcServer(options.config.grpcPort);
+    shutdown.add('grpc.stop', () => {
+      stopGrpcServer();
+    });
   };
 
   const start = async (): Promise<void> => {
-    if (stopPromise) {
-      await stopPromise;
-    }
-    if (isStarted) {
-      return;
-    }
-    if (startPromise) {
-      return startPromise;
-    }
+    while (true) {
+      const current = state;
+      switch (current.kind) {
+        case 'started':
+          return;
+        case 'starting':
+          await current.promise;
+          return;
+        case 'stopping':
+          await current.promise;
+          continue;
+        case 'stopped': {
+          const shutdown = createShutdownManager({ logger });
+          const resources: RunningResources = { shutdown, metricsServer: null };
 
-    startPromise = (async () => {
-      const shutdown = createShutdownManager({ logger });
-      shutdownManager = shutdown;
-
-      try {
-        if (!options.isTest) {
-          // Start OTel before importing instrumented subsystems (pg, redis, grpc, etc.)
-          await startObservability();
-          shutdown.add('otel.shutdown', async () => {
-            await stopObservability();
-          });
-        }
-
-        const { closePgPool } = await import('./storage/pgClient');
-        shutdown.add('pg.close', async () => {
-          await closePgPool();
-        });
-
-        const { runMigrations } = await import('./storage/migrations');
-        const { connectRedis, closeRedis } = await import('./storage/redisClient');
-        const { handMaterializer } = await import('./jobs/handMaterializer');
-        const { archiver } = await import('./jobs/archiver');
-        const { startMetricsServer } = await import('./observability/metrics');
-        const { startGrpcServer, stopGrpcServer } = await import('./api/grpc/server');
-
-        if (!options.isTest) {
-          await runMigrations();
-        }
-
-        await connectRedis();
-        shutdown.add('redis.close', async () => {
-          await closeRedis();
-        });
-
-        if (!options.isTest) {
-          await handMaterializer.start();
-          await archiver.start();
-          shutdown.add('jobs.stop', async () => {
-            await handMaterializer.stop();
-            archiver.stop();
-          });
-
-          metricsServer = startMetricsServer(options.config.metricsPort);
-          shutdown.add('metrics.close', async () => {
-            if (!metricsServer) {
-              return;
+          const startPromise = (async () => {
+            try {
+              await startInternal(resources);
+              state = { kind: 'started', resources };
+            } catch (error: unknown) {
+              try {
+                await shutdown.run();
+              } catch (shutdownError: unknown) {
+                logger.error(
+                  { err: shutdownError },
+                  'EventApp shutdown failed after start error',
+                );
+              } finally {
+                state = { kind: 'stopped' };
+              }
+              throw error;
             }
-            await closeHttpServer(metricsServer);
-            metricsServer = null;
-          });
-        }
+          })();
 
-        await startGrpcServer(options.config.grpcPort);
-        shutdown.add('grpc.stop', () => {
-          stopGrpcServer();
-        });
-
-        isStarted = true;
-      } catch (error: unknown) {
-        try {
-          await shutdown.run();
-        } catch (shutdownError: unknown) {
-          logger.error({ err: shutdownError }, 'EventApp shutdown failed after start error');
-        } finally {
-          shutdownManager = null;
-          metricsServer = null;
-          isStarted = false;
+          state = { kind: 'starting', promise: startPromise };
+          await startPromise;
+          return;
         }
-        throw error;
-      } finally {
-        startPromise = null;
       }
-    })();
+    }
+  };
 
-    return startPromise;
+  const stop = async (): Promise<void> => {
+    while (true) {
+      const current = state;
+      switch (current.kind) {
+        case 'stopped':
+          return;
+        case 'starting':
+          await current.promise.catch(() => undefined);
+          continue;
+        case 'stopping':
+          await current.promise;
+          return;
+        case 'started': {
+          const promise = (async () => {
+            try {
+              await current.resources.shutdown.run();
+            } finally {
+              state = { kind: 'stopped' };
+            }
+          })();
+
+          state = { kind: 'stopping', promise };
+          await promise;
+          return;
+        }
+      }
+    }
   };
 
   return { start, stop };

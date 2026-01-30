@@ -1,9 +1,15 @@
 import { randomUUID } from 'crypto';
 import { getRedisClient } from '../storage/redisClient';
 import logger from '../observability/logger';
+import { asError } from '../domain/errors';
 
 export async function publishEvent(type: string, payload: unknown, userId?: string): Promise<void> {
-  const client = await getRedisClient();
+  let client: Awaited<ReturnType<typeof getRedisClient>>;
+  try {
+    client = await getRedisClient();
+  } catch {
+    client = null;
+  }
   if (!client) {
     logger.warn({ type }, 'Redis not available, cannot publish event');
     return;
@@ -21,8 +27,7 @@ export async function publishEvent(type: string, payload: unknown, userId?: stri
     await client.xAdd('events:all', '*', {
       data: JSON.stringify(event),
     });
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'unknown';
-    logger.error({ type, error: errorMessage }, 'Failed to publish event to Redis');
+  } catch (error: unknown) {
+    logger.error({ err: asError(error), type }, 'eventProducer.publishEvent.failed');
   }
 }

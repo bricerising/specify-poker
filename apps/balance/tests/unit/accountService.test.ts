@@ -74,12 +74,14 @@ describe('accountService', () => {
       const result = await creditBalance('user-5', 500, 'DEPOSIT', 'credit-1');
 
       expect(result.ok).toBe(true);
-      expect(result.transaction).toBeDefined();
-      expect(result.transaction!.amount).toBe(500);
-      expect(result.transaction!.balanceBefore).toBe(100);
-      expect(result.transaction!.balanceAfter).toBe(600);
-      expect(result.transaction!.type).toBe('DEPOSIT');
-      expect(result.transaction!.status).toBe('COMPLETED');
+      if (!result.ok) {
+        throw new Error('expected ok');
+      }
+      expect(result.value.amount).toBe(500);
+      expect(result.value.balanceBefore).toBe(100);
+      expect(result.value.balanceAfter).toBe(600);
+      expect(result.value.type).toBe('DEPOSIT');
+      expect(result.value.status).toBe('COMPLETED');
 
       const balance = await getBalance('user-5');
       expect(balance!.balance).toBe(600);
@@ -117,7 +119,10 @@ describe('accountService', () => {
 
       expect(result1.ok).toBe(true);
       expect(result2.ok).toBe(true);
-      expect(result1.transaction!.transactionId).toBe(result2.transaction!.transactionId);
+      if (!result1.ok || !result2.ok) {
+        throw new Error('expected ok');
+      }
+      expect(result1.value.transactionId).toBe(result2.value.transactionId);
 
       const balance = await getBalance('user-8');
       expect(balance!.balance).toBe(600); // Only credited once
@@ -130,9 +135,12 @@ describe('accountService', () => {
       const result = await debitBalance('user-9', 300, 'WITHDRAW', 'debit-1');
 
       expect(result.ok).toBe(true);
-      expect(result.transaction!.amount).toBe(300);
-      expect(result.transaction!.balanceBefore).toBe(1000);
-      expect(result.transaction!.balanceAfter).toBe(700);
+      if (!result.ok) {
+        throw new Error('expected ok');
+      }
+      expect(result.value.amount).toBe(300);
+      expect(result.value.balanceBefore).toBe(1000);
+      expect(result.value.balanceAfter).toBe(700);
 
       const balance = await getBalance('user-9');
       expect(balance!.balance).toBe(700);
@@ -154,7 +162,10 @@ describe('accountService', () => {
       const result = await debitBalance('user-11', 500, 'WITHDRAW', 'debit-3');
 
       expect(result.ok).toBe(true);
-      expect(result.transaction!.balanceAfter).toBe(0);
+      if (!result.ok) {
+        throw new Error('expected ok');
+      }
+      expect(result.value.balanceAfter).toBe(0);
     });
 
     it('rejects zero amount', async () => {
@@ -174,7 +185,10 @@ describe('accountService', () => {
 
       expect(result1.ok).toBe(true);
       expect(result2.ok).toBe(true);
-      expect(result1.transaction!.transactionId).toBe(result2.transaction!.transactionId);
+      if (!result1.ok || !result2.ok) {
+        throw new Error('expected ok');
+      }
+      expect(result1.value.transactionId).toBe(result2.value.transactionId);
 
       const balance = await getBalance('user-13');
       expect(balance!.balance).toBe(700); // Only debited once
@@ -186,8 +200,11 @@ describe('accountService', () => {
       const result = await processDeposit('new-user', 1000, 'FREEROLL', 'deposit-1');
 
       expect(result.ok).toBe(true);
-      expect(result.transaction!.type).toBe('DEPOSIT');
-      expect(result.transaction!.balanceAfter).toBe(1000);
+      if (!result.ok) {
+        throw new Error('expected ok');
+      }
+      expect(result.value.type).toBe('DEPOSIT');
+      expect(result.value.balanceAfter).toBe(1000);
     });
 
     it('deposits to existing account', async () => {
@@ -195,8 +212,11 @@ describe('accountService', () => {
       const result = await processDeposit('existing-user', 500, 'BONUS', 'deposit-2');
 
       expect(result.ok).toBe(true);
-      expect(result.transaction!.type).toBe('BONUS');
-      expect(result.transaction!.balanceAfter).toBe(1000);
+      if (!result.ok) {
+        throw new Error('expected ok');
+      }
+      expect(result.value.type).toBe('BONUS');
+      expect(result.value.balanceAfter).toBe(1000);
     });
   });
 
@@ -206,8 +226,11 @@ describe('accountService', () => {
       const result = await processWithdrawal('user-14', 400, 'withdraw-1', 'Player request');
 
       expect(result.ok).toBe(true);
-      expect(result.transaction!.type).toBe('WITHDRAW');
-      expect(result.transaction!.balanceAfter).toBe(600);
+      if (!result.ok) {
+        throw new Error('expected ok');
+      }
+      expect(result.value.type).toBe('WITHDRAW');
+      expect(result.value.balanceAfter).toBe(600);
     });
 
     it('rejects withdrawal exceeding balance', async () => {
@@ -231,13 +254,16 @@ describe('accountService', () => {
   });
 
   describe('concurrent operations', () => {
-    it('handles sequential deposits to same account', async () => {
+    it('serializes concurrent deposits to same account', async () => {
       await ensureAccount('user-17', 0);
 
-      // Run sequentially - concurrent operations require Redis for atomicity
-      const result1 = await creditBalance('user-17', 100, 'DEPOSIT', 'seq-1');
-      const result2 = await creditBalance('user-17', 200, 'DEPOSIT', 'seq-2');
-      const result3 = await creditBalance('user-17', 300, 'DEPOSIT', 'seq-3');
+      // Note: this only guarantees in-process serialization; cross-instance atomicity still requires
+      // a shared transactional store / distributed locking strategy.
+      const [result1, result2, result3] = await Promise.all([
+        creditBalance('user-17', 100, 'DEPOSIT', 'concurrent-1'),
+        creditBalance('user-17', 200, 'DEPOSIT', 'concurrent-2'),
+        creditBalance('user-17', 300, 'DEPOSIT', 'concurrent-3'),
+      ]);
 
       expect(result1.ok).toBe(true);
       expect(result2.ok).toBe(true);

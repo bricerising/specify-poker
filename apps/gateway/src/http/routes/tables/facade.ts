@@ -1,6 +1,7 @@
 import { grpc as defaultGrpc, type GatewayGrpc } from '../../../grpc/unaryClients';
 import { getConfig } from '../../../config';
 import logger from '../../../observability/logger';
+import { toHttpUrl } from '../../../utils/httpUrl';
 import { isRecord } from '../../../utils/json';
 
 export type JoinSeatResponse = { ok: boolean; error?: string };
@@ -69,9 +70,7 @@ function isoDate(now: () => Date): string {
 
 function balanceBaseUrl(): string {
   const config = getConfig();
-  return config.balanceServiceHttpUrl.startsWith('http')
-    ? config.balanceServiceHttpUrl
-    : `http://${config.balanceServiceHttpUrl}`;
+  return toHttpUrl(config.balanceServiceHttpUrl);
 }
 
 export function createTablesFacade(overrides: Partial<TablesFacadeDeps> = {}): TablesFacade {

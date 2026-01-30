@@ -1,5 +1,12 @@
-import { apiFetchDecoded } from './apiClient';
+import { api } from './apiClient';
+import type { ApiClient } from './apiClient';
+import { createJsonApiClient } from './jsonApiClient';
 import { asRecord, readStringArray } from '../utils/unknown';
+
+export type FriendsApi = {
+  fetchFriends(): Promise<string[]>;
+  updateFriends(friends: string[]): Promise<string[]>;
+};
 
 function decodeFriendsResponse(payload: unknown): string[] {
   const record = asRecord(payload);
@@ -12,14 +19,25 @@ function decodeFriendsResponse(payload: unknown): string[] {
   return readStringArray(record.friends);
 }
 
-export async function fetchFriends() {
-  return apiFetchDecoded('/api/friends', decodeFriendsResponse);
+export function createFriendsApi(client: ApiClient): FriendsApi {
+  const jsonClient = createJsonApiClient(client);
+
+  const fetchFriends: FriendsApi['fetchFriends'] = () => {
+    return jsonClient.requestDecoded('/api/friends', decodeFriendsResponse);
+  };
+
+  const updateFriends: FriendsApi['updateFriends'] = (friends) => {
+    return jsonClient.requestDecoded('/api/friends', decodeFriendsResponse, {
+      method: 'PUT',
+      json: { friends },
+    });
+  };
+
+  return { fetchFriends, updateFriends };
 }
 
-export async function updateFriends(friends: string[]) {
-  return apiFetchDecoded('/api/friends', decodeFriendsResponse, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ friends }),
-  });
-}
+export const friendsApi = createFriendsApi(api);
+
+export const fetchFriends: FriendsApi['fetchFriends'] = (...args) => friendsApi.fetchFriends(...args);
+export const updateFriends: FriendsApi['updateFriends'] = (...args) =>
+  friendsApi.updateFriends(...args);

@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import type { Router } from 'express';
 
-import app from '../../src/api/http/router';
+import { createHttpRouter } from '../../src/api/http/router';
 import { resetAccounts } from '../../src/storage/accountStore';
 import { resetTransactions } from '../../src/storage/transactionStore';
 import { resetIdempotency } from '../../src/storage/idempotencyStore';
@@ -76,6 +76,8 @@ describe('Balance Service HTTP API', () => {
     await resetIdempotency();
     await resetLedger();
   });
+
+  const app: Router = createHttpRouter();
 
   describe('Health Endpoints', () => {
     describe('GET /api/health', () => {

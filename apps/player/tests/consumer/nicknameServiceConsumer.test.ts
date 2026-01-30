@@ -11,6 +11,10 @@ describe('nicknameService consumer behavior', () => {
     vi.clearAllMocks();
   });
 
+  it('trims nicknames during validation', () => {
+    expect(nicknameService.validateNickname('  Nick  ')).toBe('Nick');
+  });
+
   it('rejects invalid nicknames', () => {
     expect(() => nicknameService.validateNickname('')).toThrow(
       'Nickname must be between 1 and 30 characters',
@@ -27,6 +31,22 @@ describe('nicknameService consumer behavior', () => {
 
     expect(available).toBe(false);
     expect(profileRepository.findByNickname).not.toHaveBeenCalled();
+  });
+
+  it('allows the same user to keep a nickname', async () => {
+    vi.mocked(profileCache.getUserIdByNickname).mockResolvedValue('user-1');
+
+    const available = await nicknameService.isAvailableForUser('Nick', 'user-1');
+
+    expect(available).toBe(true);
+  });
+
+  it('rejects nickname collisions across users', async () => {
+    vi.mocked(profileCache.getUserIdByNickname).mockResolvedValue('user-2');
+
+    const available = await nicknameService.isAvailableForUser('Nick', 'user-1');
+
+    expect(available).toBe(false);
   });
 
   it('generates nicknames that pass availability checks', async () => {

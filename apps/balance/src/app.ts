@@ -6,7 +6,8 @@ import {
 import express from 'express';
 import type { Server as HttpServer } from 'http';
 import type { Config } from './config';
-import router from './api/http/router';
+import { createBalanceApi } from './api/balanceApi';
+import type { BalanceService } from './services/balanceService';
 import { startGrpcServer, stopGrpcServer } from './api/grpc/server';
 import { startReservationExpiryJob, stopReservationExpiryJob } from './jobs/reservationExpiry';
 import { startLedgerVerificationJob, stopLedgerVerificationJob } from './jobs/ledgerVerification';
@@ -22,10 +23,11 @@ export type BalanceApp = {
 
 export type CreateBalanceAppOptions = {
   config: Config;
+  service?: BalanceService;
   stopObservability?: () => Promise<void>;
 };
 
-function createBalanceExpressApp(): express.Express {
+function createBalanceExpressApp(httpRouter: express.Router): express.Express {
   const app = express();
 
   app.use(express.json());
@@ -40,7 +42,7 @@ function createBalanceExpressApp(): express.Express {
     next();
   });
 
-  app.use(router);
+  app.use(httpRouter);
 
   app.use(
     (err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -56,7 +58,8 @@ function createBalanceExpressApp(): express.Express {
 }
 
 export function createBalanceApp(options: CreateBalanceAppOptions): BalanceApp {
-  const expressApp = createBalanceExpressApp();
+  const api = createBalanceApi(options.service);
+  const expressApp = createBalanceExpressApp(api.httpRouter);
 
   let httpServer: HttpServer | null = null;
   let metricsServer: HttpServer | null = null;
@@ -132,7 +135,7 @@ export function createBalanceApp(options: CreateBalanceAppOptions): BalanceApp {
           logger.info({ port: options.config.httpPort }, 'Balance HTTP server listening');
         });
 
-        await startGrpcServer(options.config.grpcPort);
+        await startGrpcServer(options.config.grpcPort, api.grpcHandlers);
 
         metricsServer = startMetricsServer(options.config.metricsPort);
 

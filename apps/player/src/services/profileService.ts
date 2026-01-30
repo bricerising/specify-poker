@@ -3,13 +3,13 @@ import type { Profile, ProfileSummary, UserPreferences } from '../domain/types';
 import * as profileRepository from '../storage/profileRepository';
 import * as profileCache from '../storage/profileCache';
 import * as deletedCache from '../storage/deletedCache';
+import { profileStore } from '../storage/profileStore';
 import { publishEvent } from './eventProducer';
-import { generateNickname, isAvailable, validateNickname } from './nicknameService';
+import { generateNickname, isAvailableForUser, normalizeNickname } from './nicknameService';
 import { incrementReferralCount } from './statisticsService';
 import { requestDeletion } from './deletionService';
-import { ConflictError, ValidationError } from '../domain/errors';
-
-const DELETED_NICKNAME = 'Deleted User';
+import { ConflictError, NotFoundError, ValidationError } from '../domain/errors';
+import { createDeletedProfile } from '../domain/deletedUser';
 
 function getProfileRefresh(
   profile: Profile,
@@ -23,11 +23,13 @@ function getProfileRefresh(
     return { updated: null, shouldPublishDailyLogin: false };
   }
 
+  const nextUsername = desiredUsername && shouldUpdateUsername ? desiredUsername : null;
+
   return {
     updated: {
       ...profile,
       ...(shouldUpdateLogin ? { lastLoginAt: nowIso } : {}),
-      ...(shouldUpdateUsername ? { username: desiredUsername! } : {}),
+      ...(nextUsername ? { username: nextUsername } : {}),
       updatedAt: nowIso,
     },
     shouldPublishDailyLogin: shouldUpdateLogin,
@@ -43,24 +45,7 @@ function toSummary(profile: Profile): ProfileSummary {
 }
 
 function deletedProfile(userId: string): Profile {
-  const now = new Date().toISOString();
-  return {
-    userId,
-    username: DELETED_NICKNAME,
-    nickname: DELETED_NICKNAME,
-    avatarUrl: null,
-    preferences: {
-      soundEnabled: false,
-      chatEnabled: false,
-      showHandStrength: false,
-      theme: 'auto',
-    },
-    lastLoginAt: null,
-    referredBy: null,
-    createdAt: now,
-    updatedAt: now,
-    deletedAt: now,
-  };
+  return createDeletedProfile(userId);
 }
 
 function sameDay(isoA: string | null, isoB: string): boolean {
@@ -87,116 +72,256 @@ function normalizeUsername(value: string | undefined): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function isoDate(isoTimestamp: string): string {
+  return isoTimestamp.split('T')[0];
+}
+
+async function applyProfileRefresh(
+  profile: Profile,
+  nowIso: string,
+  desiredUsername: string | null,
+): Promise<{ profile: Profile; didUpdate: boolean; shouldPublishDailyLogin: boolean }> {
+  const refresh = getProfileRefresh(profile, nowIso, desiredUsername);
+  if (!refresh.updated) {
+    return { profile, didUpdate: false, shouldPublishDailyLogin: false };
+  }
+
+  const saved = await profileStore.update(refresh.updated);
+  return {
+    profile: saved,
+    didUpdate: true,
+    shouldPublishDailyLogin: refresh.shouldPublishDailyLogin,
+  };
+}
+
+async function maybePublishDailyLogin(
+  userId: string,
+  nowIso: string,
+  shouldPublishDailyLogin: boolean,
+): Promise<void> {
+  if (!shouldPublishDailyLogin) {
+    return;
+  }
+
+  await publishEvent('DAILY_LOGIN', { userId, date: isoDate(nowIso) }, userId);
+}
+
+type GetProfileContext = {
+  userId: string;
+  referrerId?: string;
+  desiredUsername: string | null;
+  nowIso: string;
+};
+
+export type ProfileLookupStatus = 'ok' | 'deleted' | 'created';
+
+type GetProfileResolution = {
+  profile: Profile;
+  shouldPublishDailyLogin: boolean;
+  lookupStatus: ProfileLookupStatus;
+};
+
+type GetProfileResolver = {
+  name: string;
+  resolve(context: GetProfileContext): Promise<GetProfileResolution | null>;
+};
+
+async function resolveProfile(
+  context: GetProfileContext,
+  resolvers: readonly GetProfileResolver[],
+): Promise<GetProfileResolution> {
+  for (const resolver of resolvers) {
+    const result = await resolver.resolve(context);
+    if (result) {
+      return result;
+    }
+  }
+
+  throw new Error('player.profileService.no_resolver_matched');
+}
+
+const deletedCacheResolver: GetProfileResolver = {
+  name: 'deleted_cache',
+  resolve: async ({ userId }) => {
+    if (!(await deletedCache.isDeleted(userId))) {
+      return null;
+    }
+
+    return {
+      profile: deletedProfile(userId),
+      shouldPublishDailyLogin: false,
+      lookupStatus: 'deleted',
+    };
+  },
+};
+
+const profileCacheResolver: GetProfileResolver = {
+  name: 'profile_cache',
+  resolve: async ({ userId, nowIso, desiredUsername }) => {
+    const cached = await profileCache.get(userId);
+    if (!cached) {
+      return null;
+    }
+
+    if (cached.deletedAt) {
+      await deletedCache.markDeleted(userId);
+      return {
+        profile: deletedProfile(userId),
+        shouldPublishDailyLogin: false,
+        lookupStatus: 'deleted',
+      };
+    }
+
+    const refreshed = await applyProfileRefresh(cached, nowIso, desiredUsername);
+    return {
+      profile: refreshed.profile,
+      shouldPublishDailyLogin: refreshed.shouldPublishDailyLogin,
+      lookupStatus: 'ok',
+    };
+  },
+};
+
+const repositoryResolver: GetProfileResolver = {
+  name: 'repository',
+  resolve: async ({ userId, nowIso, desiredUsername }) => {
+    const existing = await profileRepository.findById(userId, true);
+    if (!existing) {
+      return null;
+    }
+
+    if (existing.deletedAt) {
+      await deletedCache.markDeleted(userId);
+      return {
+        profile: deletedProfile(userId),
+        shouldPublishDailyLogin: false,
+        lookupStatus: 'deleted',
+      };
+    }
+
+    const refreshed = await applyProfileRefresh(existing, nowIso, desiredUsername);
+    if (!refreshed.didUpdate) {
+      await profileStore.set(existing);
+    }
+    return {
+      profile: refreshed.profile,
+      shouldPublishDailyLogin: refreshed.shouldPublishDailyLogin,
+      lookupStatus: 'ok',
+    };
+  },
+};
+
+const createProfileResolver: GetProfileResolver = {
+  name: 'create_profile',
+  resolve: async ({ userId, referrerId, desiredUsername, nowIso }) => {
+    const nickname = await generateNickname(userId);
+    const now = new Date(nowIso);
+    const profile = defaultProfile(userId, nickname, now, desiredUsername ?? '');
+
+    if (referrerId && referrerId !== userId) {
+      profile.referredBy = referrerId;
+    }
+
+    const createResult = await profileStore.create(profile);
+    const created = createResult.profile;
+    const inserted = createResult.created;
+
+    if (inserted && referrerId && referrerId !== userId) {
+      await incrementReferralCount(referrerId, 1);
+      await publishEvent('REFERRAL_REWARD', { referrerId, referredId: userId }, referrerId);
+    }
+
+    return {
+      profile: created,
+      shouldPublishDailyLogin: false,
+      lookupStatus: inserted ? 'created' : 'ok',
+    };
+  },
+};
+
+const defaultGetProfileResolvers: readonly GetProfileResolver[] = [
+  deletedCacheResolver,
+  profileCacheResolver,
+  repositoryResolver,
+  createProfileResolver,
+];
+
 export async function getProfile(
   userId: string,
   referrerId?: string,
   username?: string,
 ): Promise<Profile> {
-  if (await deletedCache.isDeleted(userId)) {
-    return deletedProfile(userId);
-  }
+  const result = await getProfileWithLookupStatus(userId, referrerId, username);
+  return result.profile;
+}
 
+export async function getProfileWithLookupStatus(
+  userId: string,
+  referrerId?: string,
+  username?: string,
+): Promise<{ profile: Profile; lookupStatus: ProfileLookupStatus }> {
   const desiredUsername = normalizeUsername(username);
-  const cached = await profileCache.get(userId);
-  if (cached) {
-    const nowIso = new Date().toISOString();
-    const refresh = getProfileRefresh(cached, nowIso, desiredUsername);
-    if (!refresh.updated) {
-      return cached;
-    }
+  const nowIso = new Date().toISOString();
 
-    const saved = await profileRepository.update(refresh.updated);
-    await profileCache.set(saved);
-    if (refresh.shouldPublishDailyLogin) {
-      await publishEvent('DAILY_LOGIN', { userId, date: nowIso.split('T')[0] }, userId);
-    }
-    return saved;
-  }
+  const { profile, shouldPublishDailyLogin, lookupStatus } = await resolveProfile(
+    { userId, referrerId, desiredUsername, nowIso },
+    defaultGetProfileResolvers,
+  );
 
-  const existing = await profileRepository.findById(userId, true);
-  if (existing) {
-    if (existing.deletedAt) {
-      await deletedCache.markDeleted(userId);
-      return deletedProfile(userId);
-    }
-    const nowIso = new Date().toISOString();
-    const refresh = getProfileRefresh(existing, nowIso, desiredUsername);
-    if (refresh.updated) {
-      const saved = await profileRepository.update(refresh.updated);
-      await profileCache.set(saved);
-      if (refresh.shouldPublishDailyLogin) {
-        await publishEvent('DAILY_LOGIN', { userId, date: nowIso.split('T')[0] }, userId);
-      }
-      return saved;
-    }
-
-    await profileCache.set(existing);
-    return existing;
-  }
-
-  const nickname = await generateNickname(userId);
-  const now = new Date();
-  const profile = defaultProfile(userId, nickname, now, desiredUsername ?? '');
-
-  if (referrerId && referrerId !== userId) {
-    profile.referredBy = referrerId;
-  }
-
-  const createResult = await profileRepository.create(profile);
-  const created = createResult.profile;
-  const inserted = createResult.created;
-
-  await profileCache.set(created);
-
-  if (inserted && referrerId && referrerId !== userId) {
-    await incrementReferralCount(referrerId, 1);
-    await publishEvent('REFERRAL_REWARD', { referrerId, referredId: userId }, referrerId);
-  }
-
-  return created;
+  await maybePublishDailyLogin(userId, nowIso, shouldPublishDailyLogin);
+  return { profile, lookupStatus };
 }
 
 export async function getProfiles(userIds: string[]): Promise<Profile[]> {
-  const cacheResults = await profileCache.getMulti(userIds);
-  const missingIds = userIds.filter((id) => !cacheResults.has(id));
-
-  let dbProfiles: Profile[] = [];
-  if (missingIds.length > 0) {
-    dbProfiles = await profileRepository.findByIds(missingIds, true);
+  if (userIds.length === 0) {
+    return [];
   }
 
-  const foundMap = new Map<string, Profile>();
-  for (const profile of dbProfiles) {
-    foundMap.set(profile.userId, profile);
-    if (!profile.deletedAt) {
-      await profileCache.set(profile);
+  const deletedUserIds = await deletedCache.isDeletedMulti(userIds);
+  const activeUserIds = Array.from(new Set(userIds.filter((id) => !deletedUserIds.has(id))));
+
+  const profilesByUserId = await profileStore.getMulti(activeUserIds, true);
+  const missingUserIds = activeUserIds.filter((userId) => !profilesByUserId.has(userId));
+
+  if (missingUserIds.length > 0) {
+    const nowIso = new Date().toISOString();
+    for (const userId of missingUserIds) {
+      const created = await createProfileResolver.resolve({
+        userId,
+        desiredUsername: null,
+        nowIso,
+      });
+
+      if (!created) {
+        throw new Error('player.profileService.create_profile_failed');
+      }
+
+      profilesByUserId.set(userId, created.profile);
     }
   }
 
+  const deletedToMark = new Set<string>();
   const profiles: Profile[] = [];
   for (const userId of userIds) {
-    if (await deletedCache.isDeleted(userId)) {
+    if (deletedUserIds.has(userId)) {
       profiles.push(deletedProfile(userId));
       continue;
     }
-    const cached = cacheResults.get(userId);
-    if (cached) {
-      profiles.push(cached);
+
+    const existing = profilesByUserId.get(userId);
+    if (!existing) {
+      throw new Error('player.profileService.profile_missing_after_resolution');
+    }
+
+    if (existing.deletedAt) {
+      deletedToMark.add(userId);
+      profiles.push(deletedProfile(userId));
       continue;
     }
-    const existing = foundMap.get(userId);
-    if (existing) {
-      if (existing.deletedAt) {
-        await deletedCache.markDeleted(userId);
-        profiles.push(deletedProfile(userId));
-      } else {
-        profiles.push(existing);
-      }
-      continue;
-    }
-    const created = await getProfile(userId);
-    profiles.push(created);
+
+    profiles.push(existing);
   }
+
+  await Promise.all(Array.from(deletedToMark, (userId) => deletedCache.markDeleted(userId)));
 
   return profiles;
 }
@@ -214,21 +339,24 @@ export async function updateProfile(
     preferences?: Partial<UserPreferences>;
   },
 ): Promise<Profile> {
-  const current = await getProfile(userId);
+  const { profile: current, lookupStatus } = await getProfileWithLookupStatus(userId);
+  if (lookupStatus === 'deleted' || current.deletedAt) {
+    throw new NotFoundError('Profile not found');
+  }
   const previousNickname = current.nickname;
   let nickname = current.nickname;
   let avatarUrl = current.avatarUrl;
   let preferences = current.preferences;
 
   if (updates.nickname !== undefined) {
-    validateNickname(updates.nickname);
-    if (updates.nickname !== current.nickname) {
-      const available = await isAvailable(updates.nickname);
+    const nextNickname = normalizeNickname(updates.nickname);
+    if (nextNickname !== current.nickname) {
+      const available = await isAvailableForUser(nextNickname, userId);
       if (!available) {
         throw new ConflictError('Nickname is not available');
       }
     }
-    nickname = updates.nickname;
+    nickname = nextNickname;
   }
 
   if (updates.avatarUrl !== undefined) {
@@ -247,7 +375,7 @@ export async function updateProfile(
 
   const updatedAt = new Date().toISOString();
 
-  const saved = await profileRepository.update({
+  const saved = await profileStore.update({
     ...current,
     nickname,
     avatarUrl,
@@ -255,9 +383,8 @@ export async function updateProfile(
     updatedAt,
   });
   if (previousNickname !== saved.nickname) {
-    await profileCache.deleteNickname(previousNickname);
+    await profileStore.deleteNickname(previousNickname);
   }
-  await profileCache.set(saved);
   return saved;
 }
 

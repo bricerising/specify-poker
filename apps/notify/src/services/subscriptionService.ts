@@ -1,4 +1,4 @@
-import type { PushSubscription, UserPushSubscription } from '../domain/types';
+import type { PushSubscription } from '../domain/types';
 import type { SubscriptionStore } from '../storage/subscriptionStore';
 
 export class SubscriptionService {
@@ -12,7 +12,11 @@ export class SubscriptionService {
     await this.store.deleteSubscription(userId, endpoint);
   }
 
-  async getSubscriptions(userId: string): Promise<UserPushSubscription[]> {
-    return this.store.getSubscriptions(userId);
+  async getSubscriptions(userId: string): Promise<PushSubscription[]> {
+    const subscriptions = await this.store.getSubscriptions(userId);
+    return subscriptions.map((subscription) => ({
+      endpoint: subscription.endpoint,
+      keys: subscription.keys,
+    }));
   }
 }

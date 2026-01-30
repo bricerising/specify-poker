@@ -4,9 +4,13 @@ import { createGrpcServer } from './api/grpc/server';
 import logger from './observability/logger';
 import { startMetricsServer } from './observability/metrics';
 import { EventConsumer } from './services/eventConsumer';
-import { PushSenderService } from './services/pushSenderService';
-import { configureVapid, createWebPushClient } from './services/webPushClient';
+import { createGameEventHandlers } from './services/gameEventHandlers';
+import { createNotifyService, type NotifyService } from './services/notifyService';
+import { createPushSubsystem } from './services/pushSubsystem';
+import type { PushSenderService } from './services/pushSenderService';
+import { configureVapid } from './services/webPushClient';
 import { SubscriptionService } from './services/subscriptionService';
+import { createAsyncLifecycle } from './shared/asyncLifecycle';
 import { createRedisClientManager, type RedisClientManager } from './storage/redisClient';
 import { SubscriptionStore } from './storage/subscriptionStore';
 
@@ -14,7 +18,8 @@ export type NotifyApp = {
   services: {
     subscriptionStore: SubscriptionStore;
     subscriptionService: SubscriptionService;
-    pushService: PushSenderService;
+    pushSenderService: PushSenderService;
+    notifyService: NotifyService;
     eventConsumer: EventConsumer;
   };
   start(): Promise<void>;
@@ -29,7 +34,7 @@ export type CreateNotifyAppOptions = {
 export function createNotifyApp(options: CreateNotifyAppOptions): NotifyApp {
   const redis =
     options.redis ?? createRedisClientManager({ url: options.config.redisUrl, log: logger });
-  const subscriptionStore = new SubscriptionStore({ getClient: redis.getClient });
+  const subscriptionStore = new SubscriptionStore({ getClient: () => redis.getClient() });
   const subscriptionService = new SubscriptionService(subscriptionStore);
 
   configureVapid({
@@ -38,22 +43,21 @@ export function createNotifyApp(options: CreateNotifyAppOptions): NotifyApp {
     privateKey: options.config.vapidPrivateKey,
   });
 
-  const pushService = new PushSenderService(subscriptionStore, createWebPushClient());
-  const eventConsumer = new EventConsumer(pushService, {
+  const { pushSenderService, pushSender } = createPushSubsystem({ subscriptionStore });
+  const notifyService = createNotifyService({ subscriptionService, pushSender });
+  const eventConsumer = new EventConsumer(createGameEventHandlers(pushSender), {
     streamKey: options.config.eventStreamKey,
-    getRedisClient: redis.getBlockingClient,
+    getRedisClient: () => redis.getBlockingClient(),
   });
 
   const grpcServer = createGrpcServer({
     port: options.config.grpcPort,
-    subscriptionService,
-    pushService,
+    notifyService,
   });
 
   let metricsServer: ReturnType<typeof startMetricsServer> | null = null;
-  let isStarted = false;
 
-  const stop = async (): Promise<void> => {
+  const stopInternal = async (): Promise<void> => {
     grpcServer.stop();
     await eventConsumer.stop();
     if (metricsServer) {
@@ -61,28 +65,30 @@ export function createNotifyApp(options: CreateNotifyAppOptions): NotifyApp {
       metricsServer = null;
     }
     await redis.close();
-    isStarted = false;
   };
 
-  const start = async (): Promise<void> => {
-    if (isStarted) {
-      return;
-    }
-
+  const startInternal = async (): Promise<void> => {
     try {
       await grpcServer.start();
       metricsServer = startMetricsServer(options.config.metricsPort);
       await eventConsumer.start();
-      isStarted = true;
     } catch (error: unknown) {
-      await stop();
+      await stopInternal();
       throw error;
     }
   };
 
+  const lifecycle = createAsyncLifecycle({ start: startInternal, stop: stopInternal });
+
   return {
-    services: { subscriptionStore, subscriptionService, pushService, eventConsumer },
-    start,
-    stop,
+    services: {
+      subscriptionStore,
+      subscriptionService,
+      pushSenderService,
+      notifyService,
+      eventConsumer,
+    },
+    start: lifecycle.start,
+    stop: lifecycle.stop,
   };
 }

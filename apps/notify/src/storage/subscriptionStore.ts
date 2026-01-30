@@ -2,13 +2,10 @@ import { getRedisClient } from './redisClient';
 import type { UserPushSubscription, PushSubscription } from '../domain/types';
 import logger from '../observability/logger';
 import { toError } from '../shared/errors';
+import { isRecord } from '../shared/decoders';
 
 const KEY_PREFIX = 'notify:push:';
 const STATS_KEY = 'notify:stats';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function isPushKeys(value: unknown): value is PushSubscription['keys'] {
   if (!isRecord(value)) {
@@ -30,7 +27,10 @@ function isUserPushSubscription(value: unknown): value is UserPushSubscription {
   );
 }
 
-function parseUserPushSubscription(serialized: string): UserPushSubscription | null {
+function parseUserPushSubscription(
+  serialized: string,
+  context: { userId: string; endpoint: string },
+): UserPushSubscription | null {
   try {
     const parsed: unknown = JSON.parse(serialized);
     if (!isUserPushSubscription(parsed)) {
@@ -38,7 +38,10 @@ function parseUserPushSubscription(serialized: string): UserPushSubscription | n
     }
     return parsed;
   } catch (error: unknown) {
-    logger.warn({ err: toError(error) }, 'Failed to parse stored subscription JSON');
+    logger.warn(
+      { err: toError(error), userId: context.userId, endpoint: context.endpoint },
+      'Failed to parse stored subscription JSON',
+    );
     return null;
   }
 }
@@ -89,11 +92,25 @@ export class SubscriptionStore {
     const all = await client.hGetAll(key);
     const subscriptions: UserPushSubscription[] = [];
 
-    for (const serialized of Object.values(all)) {
-      const parsed = parseUserPushSubscription(serialized);
+    for (const [endpoint, serialized] of Object.entries(all)) {
+      const parsed = parseUserPushSubscription(serialized, { userId, endpoint });
       if (!parsed) {
         continue;
       }
+
+      if (parsed.userId !== userId) {
+        logger.warn(
+          { userId, parsedUserId: parsed.userId, endpoint },
+          'Ignoring subscription stored under unexpected userId',
+        );
+        continue;
+      }
+
+      if (parsed.endpoint !== endpoint) {
+        subscriptions.push({ ...parsed, endpoint });
+        continue;
+      }
+
       subscriptions.push(parsed);
     }
 

@@ -1,8 +1,5 @@
-import type { SubscriptionService } from '../../services/subscriptionService';
-import type { PushSenderService } from '../../services/pushSenderService';
-import type { NotificationPayload, NotificationType, PushSubscription } from '../../domain/types';
 import logger from '../../observability/logger';
-import { recordGrpcRequest, recordNotificationRequested } from '../../observability/metrics';
+import { recordGrpcRequest } from '../../observability/metrics';
 import {
   createUnaryHandler,
   withUnaryErrorHandling,
@@ -11,6 +8,23 @@ import {
 } from '@specify-poker/shared';
 import type { UnaryCall, UnaryCallback } from '@specify-poker/shared';
 import { getErrorMessage, toError } from '../../shared/errors';
+import type { NotifyService } from '../../services/notifyService';
+import type { PushSubscription } from '../../domain/types';
+import {
+  decodeListSubscriptionsRequest,
+  decodeRegisterSubscriptionRequest,
+  decodeSendNotificationRequest,
+  decodeUnregisterSubscriptionRequest,
+} from './requestDecoders';
+
+type GrpcOkResponse = { ok: boolean; error?: string };
+type GrpcListSubscriptionsResponse = { subscriptions: PushSubscription[] };
+type GrpcSendNotificationResponse = {
+  ok: boolean;
+  successCount: number;
+  failureCount: number;
+  error?: string;
+};
 
 function createNotifyUnaryHandler<Req, Res>(params: {
   method: string;
@@ -26,13 +40,14 @@ function createNotifyUnaryHandler<Req, Res>(params: {
   });
 
   const errorLogMessage = params.errorLogMessage ?? `${params.method} failed`;
+  const errorResponse = params.errorResponse;
 
-  const errorInterceptor = params.errorResponse
+  const errorInterceptor = errorResponse
     ? withUnaryErrorResponse<Req, Res, UnaryCall<Req>>({
         onError: (_context, error) => {
-          logger.error({ err: error }, errorLogMessage);
+          logger.error({ err: toError(error) }, errorLogMessage);
         },
-        errorResponse: (_context, error) => params.errorResponse!(error),
+        errorResponse: (_context, error) => errorResponse(error),
       })
     : withUnaryErrorHandling<Req, Res, UnaryCall<Req>>({
         method: params.method,
@@ -47,131 +62,94 @@ function createNotifyUnaryHandler<Req, Res>(params: {
   });
 }
 
-function isNotificationType(value: string): value is NotificationType {
-  return value === 'turn_alert' || value === 'game_invite' || value === 'system';
-}
-
-function resolveNotificationData(
-  data: Record<string, string> | undefined,
-): NotificationPayload['data'] | undefined {
-  if (!data || Object.keys(data).length === 0) {
-    return undefined;
-  }
-
-  const rawType = data.type;
-  const type = rawType && isNotificationType(rawType) ? rawType : 'system';
-  return {
-    ...data,
-    type,
-  };
-}
-
 export function createHandlers(
-  subscriptionService: SubscriptionService,
-  pushService: PushSenderService,
-) {
+  notifyService: NotifyService,
+): {
+  registerSubscription: (
+    call: UnaryCall<unknown>,
+    callback: UnaryCallback<GrpcOkResponse>,
+  ) => Promise<void>;
+  unregisterSubscription: (
+    call: UnaryCall<unknown>,
+    callback: UnaryCallback<GrpcOkResponse>,
+  ) => Promise<void>;
+  listSubscriptions: (
+    call: UnaryCall<unknown>,
+    callback: UnaryCallback<GrpcListSubscriptionsResponse>,
+  ) => Promise<void>;
+  sendNotification: (
+    call: UnaryCall<unknown>,
+    callback: UnaryCallback<GrpcSendNotificationResponse>,
+  ) => Promise<void>;
+} {
   return {
-    registerSubscription: createNotifyUnaryHandler({
+    registerSubscription: createNotifyUnaryHandler<unknown, GrpcOkResponse>({
       method: 'RegisterSubscription',
       statusFromResponse: (response: { ok: boolean }) => (response.ok ? 'ok' : 'error'),
       errorResponse: (error: unknown) => ({ ok: false, error: getErrorMessage(error) }),
       errorLogMessage: 'Failed to register subscription',
-      handler: async (request: {
-        userId?: string;
-        subscription?: { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
-      }) => {
-        const userId = request.userId;
-        const endpoint = request.subscription?.endpoint;
-        const p256dh = request.subscription?.keys?.p256dh;
-        const auth = request.subscription?.keys?.auth;
-
-        if (!userId || !endpoint || !p256dh || !auth) {
-          return { ok: false, error: 'MISSING_FIELDS' };
+      handler: async (request: unknown) => {
+        const decoded = decodeRegisterSubscriptionRequest(request);
+        if (!decoded.ok) {
+          return { ok: false, error: decoded.error };
         }
 
-        const sub: PushSubscription = {
-          endpoint,
-          keys: {
-            p256dh,
-            auth,
-          },
-        };
-
-        await subscriptionService.register(userId, sub);
+        await notifyService.registerSubscription(decoded.value.userId, decoded.value.subscription);
         return { ok: true };
       },
     }),
 
-    unregisterSubscription: createNotifyUnaryHandler({
+    unregisterSubscription: createNotifyUnaryHandler<unknown, GrpcOkResponse>({
       method: 'UnregisterSubscription',
       statusFromResponse: (response: { ok: boolean }) => (response.ok ? 'ok' : 'error'),
       errorResponse: (error: unknown) => ({ ok: false, error: getErrorMessage(error) }),
       errorLogMessage: 'Failed to unregister subscription',
-      handler: async (request: { userId?: string; endpoint?: string }) => {
-        const userId = request.userId;
-        const endpoint = request.endpoint;
-        if (!userId || !endpoint) {
-          return { ok: false, error: 'MISSING_FIELDS' };
+      handler: async (request: unknown) => {
+        const decoded = decodeUnregisterSubscriptionRequest(request);
+        if (!decoded.ok) {
+          return { ok: false, error: decoded.error };
         }
 
-        await subscriptionService.unregister(userId, endpoint);
+        await notifyService.unregisterSubscription(decoded.value.userId, decoded.value.endpoint);
         return { ok: true };
       },
     }),
 
-    listSubscriptions: createNotifyUnaryHandler({
+    listSubscriptions: createNotifyUnaryHandler<unknown, GrpcListSubscriptionsResponse>({
       method: 'ListSubscriptions',
       statusFromResponse: () => 'ok',
       errorLogMessage: 'Failed to list subscriptions',
-      handler: async (request: { userId?: string }) => {
-        const userId = request.userId;
+      handler: async (request: unknown) => {
+        const { userId } = decodeListSubscriptionsRequest(request);
         if (!userId) {
           return { subscriptions: [] };
         }
 
-        const subscriptions = await subscriptionService.getSubscriptions(userId);
-        return {
-          subscriptions: subscriptions.map((s) => ({
-            endpoint: s.endpoint,
-            keys: {
-              p256dh: s.keys.p256dh,
-              auth: s.keys.auth,
-            },
-          })),
-        };
+        const subscriptions = await notifyService.listSubscriptions(userId);
+        return { subscriptions };
       },
     }),
 
-    sendNotification: createNotifyUnaryHandler({
+    sendNotification: createNotifyUnaryHandler<unknown, GrpcSendNotificationResponse>({
       method: 'SendNotification',
       statusFromResponse: (response: { ok: boolean }) => (response.ok ? 'ok' : 'error'),
-      errorResponse: (error: unknown) => ({ ok: false, error: getErrorMessage(error) }),
+      errorResponse: (error: unknown) => ({
+        ok: false,
+        error: getErrorMessage(error),
+        successCount: 0,
+        failureCount: 0,
+      }),
       errorLogMessage: 'Failed to send notification',
-      handler: async (request: {
-        userId?: string;
-        title?: string;
-        body?: string;
-        url?: string;
-        icon?: string;
-        tag?: string;
-        data?: Record<string, string>;
-      }) => {
-        const { userId, title, body, url, icon, tag, data } = request;
-        if (!userId || !title || !body) {
-          return { ok: false, error: 'MISSING_FIELDS' };
+      handler: async (request: unknown) => {
+        const decoded = decodeSendNotificationRequest(request);
+        if (!decoded.ok) {
+          return { ok: false, error: decoded.error, successCount: 0, failureCount: 0 };
         }
 
-        const payload: NotificationPayload = {
-          title,
-          body,
-          url: url || undefined,
-          icon: icon || undefined,
-          tag: tag || undefined,
-          data: resolveNotificationData(data),
-        };
-
-        recordNotificationRequested(payload.data?.type ?? 'system');
-        const result = await pushService.sendToUser(userId, payload);
+        const result = await notifyService.sendNotification(
+          decoded.value.userId,
+          decoded.value.payload,
+        );
         return {
           ok: true,
           successCount: result.success,

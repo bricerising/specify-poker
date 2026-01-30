@@ -113,6 +113,22 @@ describe('ledgerService', () => {
       expect(result.valid).toBe(true);
       expect(result.entriesChecked).toBe(10);
     });
+
+    it('remains valid under concurrent credits to the same account', async () => {
+      await ensureAccount('user-7b', 0);
+
+      const results = await Promise.all(
+        Array.from({ length: 25 }, (_, i) =>
+          creditBalance('user-7b', 1, 'DEPOSIT', `concurrent-ledger-${i}`),
+        ),
+      );
+
+      expect(results.every((r) => r.ok)).toBe(true);
+
+      const integrity = await verifyAccountLedger('user-7b');
+      expect(integrity.valid).toBe(true);
+      expect(integrity.entriesChecked).toBe(25);
+    });
   });
 
   describe('getAccountChecksum', () => {

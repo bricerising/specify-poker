@@ -92,6 +92,27 @@ describe('reservationService', () => {
       const balance = await getBalance('user-5');
       expect(balance!.availableBalance).toBe(500); // Only one reservation
     });
+
+    it('serializes concurrent reservations per account', async () => {
+      await ensureAccount('user-5b', 500);
+
+      const [result1, result2] = await Promise.all([
+        reserveForBuyIn('user-5b', 'table-1', 300, 'reserve-concurrent-1'),
+        reserveForBuyIn('user-5b', 'table-2', 300, 'reserve-concurrent-2'),
+      ]);
+
+      const results = [result1, result2];
+      const successes = results.filter((r) => r.ok);
+      const failures = results.filter((r) => !r.ok);
+
+      expect(successes).toHaveLength(1);
+      expect(failures).toHaveLength(1);
+      expect(failures[0].error).toBe('INSUFFICIENT_BALANCE');
+      expect(failures[0].availableBalance).toBe(200);
+
+      const balance = await getBalance('user-5b');
+      expect(balance!.availableBalance).toBe(200);
+    });
   });
 
   describe('commitReservation', () => {
@@ -126,9 +147,31 @@ describe('reservationService', () => {
 
       expect(commit1.ok).toBe(true);
       expect(commit2.ok).toBe(true);
+      if (commit1.ok && commit2.ok) {
+        expect(commit2.transactionId).toBe(commit1.transactionId);
+      }
 
       const balance = await getBalance('user-7');
       expect(balance!.balance).toBe(500); // Only deducted once
+    });
+
+    it('is idempotent under concurrent commit calls', async () => {
+      await ensureAccount('user-7b', 1000);
+
+      const reserve = await reserveForBuyIn('user-7b', 'table-1', 500, 'reserve-7b');
+      const [commit1, commit2] = await Promise.all([
+        commitReservation(reserve.reservationId!),
+        commitReservation(reserve.reservationId!),
+      ]);
+
+      expect(commit1.ok).toBe(true);
+      expect(commit2.ok).toBe(true);
+      if (commit1.ok && commit2.ok) {
+        expect(commit2.transactionId).toBe(commit1.transactionId);
+      }
+
+      const balance = await getBalance('user-7b');
+      expect(balance!.balance).toBe(500);
     });
   });
 

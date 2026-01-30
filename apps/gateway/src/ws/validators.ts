@@ -24,6 +24,17 @@ export async function checkWsRateLimit(userId: string, ip: string, channel: 'cha
   return { ok: userCount <= wsMax && ipCount <= wsMax };
 }
 
+export function parseFiniteNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 export function parseTableId(value: unknown) {
   if (typeof value !== 'string') {
     return null;

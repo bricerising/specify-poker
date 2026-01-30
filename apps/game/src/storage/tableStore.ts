@@ -1,5 +1,7 @@
 import redisClient from './redisClient';
 import type { Table } from '../domain/types';
+import { isTable } from '../domain/types';
+import { safeJsonParse } from '../utils/json';
 
 const TABLE_PREFIX = 'game:tables:';
 const TABLE_IDS_KEY = 'game:tables:ids';
@@ -17,7 +19,8 @@ export class TableStore {
     const key = `${TABLE_PREFIX}${tableId}`;
     const data = await redisClient.get(key);
     if (!data) return null;
-    return JSON.parse(data);
+    const parsed = safeJsonParse(data);
+    return isTable(parsed) ? parsed : null;
   }
 
   async list(): Promise<string[]> {

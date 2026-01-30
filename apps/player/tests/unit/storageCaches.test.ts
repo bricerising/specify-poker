@@ -29,6 +29,24 @@ describe('storage caches', () => {
     expect(result).toBeNull();
   });
 
+  it('returns null profile cache when redis get fails', async () => {
+    vi.spyOn(redisClient, 'getRedisClient').mockResolvedValue(redis as never);
+    redis.get.mockRejectedValue(new Error('boom'));
+
+    const result = await profileCache.get('user-1');
+
+    expect(result).toBeNull();
+  });
+
+  it('returns empty multi profile cache results when redis mGet fails', async () => {
+    vi.spyOn(redisClient, 'getRedisClient').mockResolvedValue(redis as never);
+    redis.mGet.mockRejectedValue(new Error('boom'));
+
+    const result = await profileCache.getMulti(['user-1', 'user-2']);
+
+    expect(result.size).toBe(0);
+  });
+
   it('stores and retrieves profile cache entries', async () => {
     vi.spyOn(redisClient, 'getRedisClient').mockResolvedValue(redis as never);
     redis.get.mockResolvedValue(
@@ -67,6 +85,33 @@ describe('storage caches', () => {
 
     expect(redis.set).toHaveBeenCalled();
     expect(loaded?.nickname).toBe('Nick');
+  });
+
+  it('decodes cached profiles with empty usernames', async () => {
+    vi.spyOn(redisClient, 'getRedisClient').mockResolvedValue(redis as never);
+    redis.get.mockResolvedValue(
+      JSON.stringify({
+        userId: 'user-1',
+        username: '',
+        nickname: 'Nick',
+        avatarUrl: null,
+        preferences: {
+          soundEnabled: true,
+          chatEnabled: true,
+          showHandStrength: true,
+          theme: 'auto',
+        },
+        lastLoginAt: null,
+        referredBy: null,
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+        deletedAt: null,
+      }),
+    );
+
+    const loaded = await profileCache.get('user-1');
+
+    expect(loaded?.username).toBe('');
   });
 
   it('invalidates profile cache entries', async () => {
@@ -123,31 +168,33 @@ describe('storage caches', () => {
     await friendsCache.set('user-1', ['friend-1']);
     await friendsCache.invalidate('user-1');
 
-    expect(redis.sAdd).toHaveBeenCalledWith('player:friends:user-1', ['friend-1']);
+    expect(redis.set).toHaveBeenCalledWith('player:friends:user-1', '["friend-1"]', { EX: 300 });
     expect(redis.del).toHaveBeenCalledWith('player:friends:user-1');
   });
 
-  it('clears friends cache when empty list is provided', async () => {
+  it('stores an empty friends list to cache empties', async () => {
     vi.spyOn(redisClient, 'getRedisClient').mockResolvedValue(redis as never);
 
     await friendsCache.set('user-1', []);
 
-    expect(redis.del).toHaveBeenCalledWith('player:friends:user-1');
+    expect(redis.set).toHaveBeenCalledWith('player:friends:user-1', '[]', { EX: 300 });
   });
 
   it('adds and removes friend cache entries', async () => {
     vi.spyOn(redisClient, 'getRedisClient').mockResolvedValue(redis as never);
 
+    redis.get.mockResolvedValueOnce('[]').mockResolvedValueOnce('["friend-1"]');
+
     await friendsCache.add('user-1', 'friend-1');
     await friendsCache.remove('user-1', 'friend-1');
 
-    expect(redis.sAdd).toHaveBeenCalledWith('player:friends:user-1', 'friend-1');
-    expect(redis.sRem).toHaveBeenCalledWith('player:friends:user-1', 'friend-1');
+    expect(redis.set).toHaveBeenCalledWith('player:friends:user-1', '["friend-1"]', { EX: 300 });
+    expect(redis.set).toHaveBeenCalledWith('player:friends:user-1', '[]', { EX: 300 });
   });
 
-  it('returns null when friends cache is empty', async () => {
+  it('returns null for friends cache misses', async () => {
     vi.spyOn(redisClient, 'getRedisClient').mockResolvedValue(redis as never);
-    redis.sMembers.mockResolvedValue([]);
+    redis.get.mockResolvedValue(null);
 
     const friends = await friendsCache.get('user-1');
 
@@ -231,6 +278,17 @@ describe('storage caches', () => {
 
     expect(isDeleted).toBe(true);
     expect(redis.del).toHaveBeenCalledWith('player:deleted:user-1');
+  });
+
+  it('loads deleted cache entries in bulk', async () => {
+    vi.spyOn(redisClient, 'getRedisClient').mockResolvedValue(redis as never);
+    redis.mGet.mockResolvedValue(['1', null, '1']);
+
+    const deleted = await deletedCache.isDeletedMulti(['user-1', 'user-2', 'user-3']);
+
+    expect(deleted.has('user-1')).toBe(true);
+    expect(deleted.has('user-2')).toBe(false);
+    expect(deleted.has('user-3')).toBe(true);
   });
 
   it('returns false for deleted cache misses', async () => {

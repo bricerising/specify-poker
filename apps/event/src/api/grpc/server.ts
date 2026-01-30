@@ -1,7 +1,11 @@
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import * as path from 'path';
-import { addGrpcService, createGrpcServerLifecycle, type GrpcServerLifecycle } from '@specify-poker/shared';
+import {
+  addGrpcService,
+  createGrpcServerLifecycle,
+  type GrpcServerLifecycle,
+} from '@specify-poker/shared';
 import { createHandlers } from './handlers';
 import logger from '../../observability/logger';
 

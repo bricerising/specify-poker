@@ -8,6 +8,7 @@ import { incrementHandsPlayed, incrementWins } from './statisticsService';
 import logger from '../observability/logger';
 import { decodeStructLike } from '@specify-poker/shared';
 import { getConfig } from '../config';
+import { asError } from '../domain/errors';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -30,27 +31,144 @@ type StatisticsService = {
 
 type HandEventType = 'HAND_STARTED' | 'HAND_ENDED';
 
-type HandEventHandlers = {
-  [Type in HandEventType]: (data: Record<string, unknown>) => Promise<void>;
+type HandEvent = {
+  type: HandEventType;
+  payload: unknown;
 };
 
-export function createHandEventHandlers(statisticsService: StatisticsService): HandEventHandlers {
-  return {
-    HAND_STARTED: async (data) => {
-      const participants = Array.isArray(data.participants) ? data.participants : [];
-      for (const userId of participants) {
-        if (typeof userId === 'string' && userId) {
+type HandEventPayload = Record<string, unknown>;
+
+type HandEventStrategy = {
+  type: HandEventType;
+  handle(payload: HandEventPayload): Promise<void>;
+};
+
+function asHandEventType(value: unknown): HandEventType | null {
+  if (value === 'HAND_STARTED' || value === 'HAND_ENDED') {
+    return value;
+  }
+  return null;
+}
+
+function decodeHandEvent(event: unknown): HandEvent | null {
+  if (!isRecord(event)) {
+    return null;
+  }
+
+  const type = asHandEventType(event.type);
+  if (!type) {
+    return null;
+  }
+
+  return { type, payload: event.payload };
+}
+
+function listOfNonEmptyStrings(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const result: string[] = [];
+  for (const item of value) {
+    if (typeof item !== 'string') {
+      continue;
+    }
+
+    const trimmed = item.trim();
+    if (trimmed.length > 0) {
+      result.push(trimmed);
+    }
+  }
+  return result;
+}
+
+async function applyStatisticUpdates(
+  userIds: readonly string[],
+  update: (userId: string) => Promise<unknown>,
+): Promise<void> {
+  if (userIds.length === 0) {
+    return;
+  }
+
+  const results = await Promise.allSettled(userIds.map((userId) => update(userId)));
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') {
+      return;
+    }
+
+    logger.error(
+      { err: asError(result.reason), userId: userIds[index] },
+      'eventConsumer.statisticsUpdate.failed',
+    );
+  });
+}
+
+function createHandEventStrategyMap(
+  strategies: readonly HandEventStrategy[],
+): ReadonlyMap<HandEventType, HandEventStrategy> {
+  const byType = new Map<HandEventType, HandEventStrategy>();
+  for (const strategy of strategies) {
+    byType.set(strategy.type, strategy);
+  }
+  return byType;
+}
+
+export function createHandEventStrategies(
+  statisticsService: StatisticsService,
+): readonly HandEventStrategy[] {
+  return [
+    {
+      type: 'HAND_STARTED',
+      handle: async (payload) => {
+        const participants = listOfNonEmptyStrings(payload.participants);
+        await applyStatisticUpdates(participants, async (userId) => {
           await statisticsService.incrementHandsPlayed(userId);
-        }
-      }
+        });
+      },
     },
-    HAND_ENDED: async (data) => {
-      const winnerUserIds = Array.isArray(data.winnerUserIds) ? data.winnerUserIds : [];
-      for (const userId of winnerUserIds) {
-        if (typeof userId === 'string' && userId) {
+    {
+      type: 'HAND_ENDED',
+      handle: async (payload) => {
+        const winnerUserIds = listOfNonEmptyStrings(payload.winnerUserIds);
+        await applyStatisticUpdates(winnerUserIds, async (userId) => {
           await statisticsService.incrementWins(userId);
-        }
+        });
+      },
+    },
+  ];
+}
+
+function createRedisAccessors(options: EventConsumerOptions): {
+  getClient: () => Promise<RedisStreamConsumerClient | null>;
+  closeClient: () => Promise<void>;
+} {
+  if (options.getRedisClient) {
+    return {
+      getClient: options.getRedisClient,
+      closeClient: options.closeRedisClient ?? (async () => undefined),
+    };
+  }
+
+  const url = options.redisUrl ?? getConfig().redisUrl;
+  let manager: ReturnType<typeof createRedisClientManager> | null = null;
+
+  const getManager = () => {
+    if (!manager) {
+      manager = createRedisClientManager({ url, log: logger, name: 'player-event-consumer' });
+    }
+    return manager;
+  };
+
+  return {
+    getClient: async () => {
+      return await getManager().getBlockingClientOrNull();
+    },
+    closeClient: async () => {
+      if (!manager) {
+        return;
       }
+      await manager.close();
+      manager = null;
     },
   };
 }
@@ -81,7 +199,7 @@ export class EventConsumer {
   private readonly readCount: number;
   private readonly sleep: SleepFn;
   private pollPromise: Promise<void> | null = null;
-  private readonly handlers: HandEventHandlers;
+  private readonly strategyByType: ReadonlyMap<HandEventType, HandEventStrategy>;
   private abortController: AbortController | null = null;
 
   constructor(options: EventConsumerOptions = {}) {
@@ -93,35 +211,11 @@ export class EventConsumer {
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
 
     const statistics = options.statistics ?? { incrementHandsPlayed, incrementWins };
-    this.handlers = createHandEventHandlers(statistics);
+    this.strategyByType = createHandEventStrategyMap(createHandEventStrategies(statistics));
 
-    if (options.getRedisClient) {
-      this.getClient = options.getRedisClient;
-      this.closeClient = options.closeRedisClient ?? (async () => undefined);
-      return;
-    }
-
-    const url = options.redisUrl ?? getConfig().redisUrl;
-    let manager: ReturnType<typeof createRedisClientManager> | null = null;
-
-    const getManager = () => {
-      if (!manager) {
-        manager = createRedisClientManager({ url, log: logger, name: 'player-event-consumer' });
-      }
-      return manager;
-    };
-
-    this.getClient = async () => {
-      return await getManager().getBlockingClientOrNull();
-    };
-
-    this.closeClient = async () => {
-      if (!manager) {
-        return;
-      }
-      await manager.close();
-      manager = null;
-    };
+    const redis = createRedisAccessors(options);
+    this.getClient = redis.getClient;
+    this.closeClient = redis.closeClient;
   }
 
   async start(): Promise<void> {
@@ -185,20 +279,20 @@ export class EventConsumer {
 
   async handleEvent(event: unknown): Promise<void> {
     try {
-      if (!isRecord(event)) {
+      const decoded = decodeHandEvent(event);
+      if (!decoded) {
         return;
       }
 
-      const type = event.type;
-      if (type !== 'HAND_STARTED' && type !== 'HAND_ENDED') {
+      const strategy = this.strategyByType.get(decoded.type);
+      if (!strategy) {
         return;
       }
 
-      const data = decodeStructLike(event.payload);
-      await this.handlers[type](data);
+      const payload = decodeStructLike(decoded.payload);
+      await strategy.handle(payload);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'unknown';
-      logger.error({ message }, 'Error handling event');
+      logger.error({ err: asError(error) }, 'eventConsumer.handleEvent.failed');
     }
   }
 

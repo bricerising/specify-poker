@@ -1,21 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createHandlers } from '../../src/api/grpc/handlers';
+import type { NotifyService } from '../../src/services/notifyService';
 
 describe('gRPC Handlers', () => {
   let handlers: unknown;
-  let subscriptionServiceMock: unknown;
-  let pushServiceMock: unknown;
+  let notifyServiceMock: NotifyService;
 
   beforeEach(() => {
-    subscriptionServiceMock = {
-      register: vi.fn(),
-      unregister: vi.fn(),
-      getSubscriptions: vi.fn(),
+    notifyServiceMock = {
+      registerSubscription: vi.fn(),
+      unregisterSubscription: vi.fn(),
+      listSubscriptions: vi.fn(),
+      sendNotification: vi.fn(),
     };
-    pushServiceMock = {
-      sendToUser: vi.fn(),
-    };
-    handlers = createHandlers(subscriptionServiceMock, pushServiceMock);
+    handlers = createHandlers(notifyServiceMock);
   });
 
   it('registerSubscription should save subscription', async () => {
@@ -32,7 +30,7 @@ describe('gRPC Handlers', () => {
 
     await handlers.registerSubscription(call, callback);
 
-    expect(subscriptionServiceMock.register).toHaveBeenCalled();
+    expect(notifyServiceMock.registerSubscription).toHaveBeenCalled();
     expect(callback).toHaveBeenCalledWith(null, { ok: true });
   });
 
@@ -59,7 +57,7 @@ describe('gRPC Handlers', () => {
 
     await handlers.unregisterSubscription(call, callback);
 
-    expect(subscriptionServiceMock.unregister).toHaveBeenCalledWith('u1', 'e1');
+    expect(notifyServiceMock.unregisterSubscription).toHaveBeenCalledWith('u1', 'e1');
     expect(callback).toHaveBeenCalledWith(null, { ok: true });
   });
 
@@ -78,13 +76,13 @@ describe('gRPC Handlers', () => {
   it('listSubscriptions should return subscriptions', async () => {
     const call = { request: { userId: 'u1' } };
     const callback = vi.fn();
-    subscriptionServiceMock.getSubscriptions.mockResolvedValue([
+    (notifyServiceMock.listSubscriptions as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([
       { endpoint: 'e1', keys: { p256dh: 'd1', auth: 'a1' } },
     ]);
 
     await handlers.listSubscriptions(call, callback);
 
-    expect(subscriptionServiceMock.getSubscriptions).toHaveBeenCalledWith('u1');
+    expect(notifyServiceMock.listSubscriptions).toHaveBeenCalledWith('u1');
     expect(callback).toHaveBeenCalledWith(
       null,
       expect.objectContaining({
@@ -111,11 +109,17 @@ describe('gRPC Handlers', () => {
       },
     };
     const callback = vi.fn();
-    pushServiceMock.sendToUser.mockResolvedValue({ success: 1, failure: 0 });
+    (notifyServiceMock.sendNotification as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      success: 1,
+      failure: 0,
+    });
 
     await handlers.sendNotification(call, callback);
 
-    expect(pushServiceMock.sendToUser).toHaveBeenCalled();
+    expect(notifyServiceMock.sendNotification).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ title: 'T', body: 'B' }),
+    );
     expect(callback).toHaveBeenCalledWith(
       null,
       expect.objectContaining({ ok: true, successCount: 1 }),
@@ -145,7 +149,9 @@ describe('gRPC Handlers', () => {
       },
     };
     const callback = vi.fn();
-    subscriptionServiceMock.register.mockRejectedValue(new Error('Internal Error'));
+    (notifyServiceMock.registerSubscription as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error('Internal Error'),
+    );
 
     await handlers.registerSubscription(call, callback);
 

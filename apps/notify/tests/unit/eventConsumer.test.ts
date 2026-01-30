@@ -1,31 +1,34 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EventConsumer } from '../../src/services/eventConsumer';
-import type { PushSenderService } from '../../src/services/pushSenderService';
-
-// Mock redis
-vi.mock('../../src/storage/redisClient', () => {
-  const xReadGroup = vi
-    .fn()
-    .mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve(null), 100)));
-  return {
-    getBlockingRedisClient: () =>
-      Promise.resolve({
-        xGroupCreate: vi.fn(),
-        xReadGroup,
-        xAck: vi.fn(),
-      }),
-  };
-});
+import { createGameEventHandlers } from '../../src/services/gameEventHandlers';
+import type { PushSender } from '../../src/services/pushSender';
+import type { RedisStreamConsumerClient } from '@specify-poker/shared/redis';
 
 describe('EventConsumer', () => {
   let consumer: EventConsumer;
-  let pushServiceMock: unknown;
+  let pushSenderMock: PushSender;
+  let runConsumer: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    pushServiceMock = {
-      sendToUser: vi.fn(),
-    };
-    consumer = new EventConsumer(pushServiceMock as unknown as PushSenderService);
+    const sendToUser = vi
+      .fn<PushSender['sendToUser']>()
+      .mockResolvedValue({ success: 0, failure: 0 });
+    pushSenderMock = { sendToUser };
+
+    runConsumer = vi.fn((signal: AbortSignal) => {
+      if (signal.aborted) {
+        return Promise.resolve();
+      }
+      return new Promise<void>((resolve) => {
+        signal.addEventListener('abort', () => resolve(), { once: true });
+      });
+    });
+
+    consumer = new EventConsumer(createGameEventHandlers(pushSenderMock), {
+      streamKey: 'events:game',
+      getRedisClient: async () => ({} as RedisStreamConsumerClient),
+      runConsumer: runConsumer as any,
+    });
   });
 
   it('should handle TURN_STARTED event', async () => {
@@ -35,10 +38,9 @@ describe('EventConsumer', () => {
       tableId: 't1',
     };
 
-    // Access private method for testing
-    await (consumer as unknown).handleEvent(message);
+    await consumer.handleMessage(message);
 
-    expect(pushServiceMock.sendToUser).toHaveBeenCalledWith(
+    expect(pushSenderMock.sendToUser).toHaveBeenCalledWith(
       'u1',
       expect.objectContaining({
         title: "It's your turn!",
@@ -53,9 +55,9 @@ describe('EventConsumer', () => {
       userId: 'u1',
     };
 
-    await (consumer as unknown).handleEvent(message);
+    await consumer.handleMessage(message);
 
-    expect(pushServiceMock.sendToUser).not.toHaveBeenCalled();
+    expect(pushSenderMock.sendToUser).not.toHaveBeenCalled();
   });
 
   it('should handle missing userId in event', async () => {
@@ -64,9 +66,9 @@ describe('EventConsumer', () => {
       tableId: 't1',
     };
 
-    await (consumer as unknown).handleEvent(message);
+    await consumer.handleMessage(message);
 
-    expect(pushServiceMock.sendToUser).not.toHaveBeenCalled();
+    expect(pushSenderMock.sendToUser).not.toHaveBeenCalled();
   });
 
   it('should handle errors in handleEvent gracefully', async () => {
@@ -74,10 +76,10 @@ describe('EventConsumer', () => {
       type: 'TURN_STARTED',
       userId: 'u1',
     };
-    pushServiceMock.sendToUser.mockRejectedValue(new Error('Push error'));
+    pushSenderMock.sendToUser.mockRejectedValue(new Error('Push error'));
 
     // Should not throw
-    await expect((consumer as unknown).handleEvent(message)).resolves.not.toThrow();
+    await expect(consumer.handleMessage(message)).resolves.not.toThrow();
   });
 
   it('should start and stop', async () => {
@@ -85,9 +87,51 @@ describe('EventConsumer', () => {
     // but we can test that it initializes correctly and sets isRunning.
     await consumer.start();
 
-    expect((consumer as unknown).isRunning).toBe(true);
+    expect(consumer.isRunning()).toBe(true);
 
-    consumer.stop();
-    expect((consumer as unknown).isRunning).toBe(false);
+    await consumer.stop();
+    expect(consumer.isRunning()).toBe(false);
+  });
+
+  it('should restart the poll loop after a crash', async () => {
+    const sleep = vi.fn(async () => {});
+    let runs = 0;
+
+    const crashingRunConsumer = vi.fn((signal: AbortSignal) => {
+      runs += 1;
+
+      if (runs === 1) {
+        return Promise.reject(new Error('boom'));
+      }
+
+      if (signal.aborted) {
+        return Promise.resolve();
+      }
+
+      return new Promise<void>((resolve) => {
+        signal.addEventListener('abort', () => resolve(), { once: true });
+      });
+    });
+
+    const restartable = new EventConsumer(createGameEventHandlers(pushSenderMock), {
+      streamKey: 'events:game',
+      getRedisClient: async () => ({} as RedisStreamConsumerClient),
+      runConsumer: crashingRunConsumer as any,
+      sleep,
+    });
+
+    await restartable.start();
+
+    for (let i = 0; i < 10; i += 1) {
+      if (crashingRunConsumer.mock.calls.length >= 2) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    expect(crashingRunConsumer).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledWith(1000);
+
+    await restartable.stop();
   });
 });

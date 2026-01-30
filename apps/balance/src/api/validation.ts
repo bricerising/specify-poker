@@ -1,21 +1,25 @@
 export function toNumber(value: unknown, fallback = 0): number {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value;
+  const candidate = Array.isArray(value) ? value[0] : value;
+
+  if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+    return candidate;
   }
-  if (typeof value === 'string') {
-    const parsed = Number(value);
+  if (typeof candidate === 'string') {
+    const parsed = Number(candidate);
     return Number.isFinite(parsed) ? parsed : fallback;
   }
   return fallback;
 }
 
 export function toNonEmptyString(value: unknown): string | null {
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
+  const candidate = Array.isArray(value) ? value[0] : value;
+
+  if (typeof candidate === 'string') {
+    const trimmed = candidate.trim();
     return trimmed.length > 0 ? trimmed : null;
   }
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return String(value);
+  if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+    return String(candidate);
   }
   return null;
 }

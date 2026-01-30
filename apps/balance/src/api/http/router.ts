@@ -1,17 +1,21 @@
 import { Router } from 'express';
 import healthRoutes from './routes/health';
-import accountRoutes from './routes/accounts';
 import { authMiddleware } from './middleware/auth';
+import type { BalanceService } from '../../services/balanceService';
+import { balanceService } from '../../services/balanceService';
+import { createAccountRoutes } from './routes/accounts';
 
-const router = Router();
+export function createHttpRouter(service: BalanceService = balanceService): Router {
+  const router = Router();
 
-// Health routes (no /api prefix needed)
-router.use('/api', healthRoutes);
+  // Health routes (no auth)
+  router.use('/api', healthRoutes);
 
-// Auth middleware for account routes
-router.use(authMiddleware);
+  // Auth middleware for account routes
+  router.use(authMiddleware);
 
-// Account routes
-router.use('/api/accounts', accountRoutes);
+  // Account routes
+  router.use('/api/accounts', createAccountRoutes(service));
 
-export default router;
+  return router;
+}

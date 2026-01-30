@@ -22,8 +22,10 @@ export const EVENT_TYPES = [
 
 export type EventType = (typeof EVENT_TYPES)[number];
 
+const EVENT_TYPE_SET: ReadonlySet<string> = new Set(EVENT_TYPES);
+
 export function isEventType(value: unknown): value is EventType {
-  return typeof value === 'string' && (EVENT_TYPES as readonly string[]).includes(value);
+  return typeof value === 'string' && EVENT_TYPE_SET.has(value);
 }
 
 export type Street = string;

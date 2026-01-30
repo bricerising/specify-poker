@@ -54,8 +54,8 @@ describe('profileService', () => {
     try {
       vi.mocked(deletedCache.isDeleted).mockResolvedValue(false);
       vi.mocked(profileCache.get).mockResolvedValue(baseProfile);
-      vi.mocked(nicknameService.validateNickname).mockImplementation(() => undefined);
-      vi.mocked(nicknameService.isAvailable).mockResolvedValue(true);
+      vi.mocked(nicknameService.normalizeNickname).mockReturnValue('NewNick');
+      vi.mocked(nicknameService.isAvailableForUser).mockResolvedValue(true);
       vi.mocked(profileRepository.update).mockResolvedValue({
         ...baseProfile,
         nickname: 'NewNick',

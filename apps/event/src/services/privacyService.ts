@@ -65,7 +65,7 @@ function redactEventForParticipant(event: GameEvent, requesterUserId: string): G
   return redactCardsPayload(event);
 }
 
-function createEventFilter(ctx: EventVisibilityContext): EventFilter {
+function buildEventFilter(ctx: EventVisibilityContext): EventFilter {
   if (ctx.isOperator) {
     return (event) => event;
   }
@@ -78,7 +78,21 @@ function createEventFilter(ctx: EventVisibilityContext): EventFilter {
   return redactEventForNonParticipant;
 }
 
+export type PrivacyServiceDependencies = {
+  eventStore: Pick<typeof eventStore, 'getShowdownReveals'>;
+};
+
 export class PrivacyService {
+  constructor(private readonly deps: PrivacyServiceDependencies = { eventStore }) {}
+
+  createEventFilter(options: {
+    requesterUserId?: string;
+    isOperator: boolean;
+    participantUserIds?: ReadonlySet<string>;
+  }): (event: GameEvent) => GameEvent {
+    return buildEventFilter(options);
+  }
+
   async filterHandRecord(
     record: HandRecord,
     requesterUserId?: string,
@@ -98,7 +112,7 @@ export class PrivacyService {
       };
     }
 
-    const revealedSeats = await eventStore.getShowdownReveals(record.handId);
+    const revealedSeats = await this.deps.eventStore.getShowdownReveals(record.handId);
 
     return {
       ...record,
@@ -116,8 +130,7 @@ export class PrivacyService {
     isOperator = false,
     participantUserIds?: ReadonlySet<string>,
   ): GameEvent {
-    const filter = createEventFilter({ requesterUserId, isOperator, participantUserIds });
-    return filter(event);
+    return this.createEventFilter({ requesterUserId, isOperator, participantUserIds })(event);
   }
 }
 

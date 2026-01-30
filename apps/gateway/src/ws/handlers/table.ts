@@ -1,34 +1,21 @@
 import type WebSocket from 'ws';
-import type { z } from 'zod';
-import { wsClientMessageSchema } from '@specify-poker/shared';
 
 import { grpcResult } from '../../grpc/unaryClients';
 import type { WsPubSubMessage } from '../pubsub';
-import { parseActionType, parseSeatId, parseTableId, checkWsRateLimit } from '../validators';
+import {
+  checkWsRateLimit,
+  parseActionType,
+  parseFiniteNumber,
+  parseSeatId,
+  parseTableId,
+} from '../validators';
 import { subscribeToChannel, unsubscribeFromChannel, unsubscribeAll } from '../subscriptions';
 import { sendToLocal, getLocalConnectionMeta } from '../localRegistry';
 import { deliverToSubscribers } from '../delivery';
 import logger from '../../observability/logger';
-import { parseJsonWithSchema } from '../messageParsing';
-import { attachWsRouter } from '../router';
+import { parseWsClientMessage, type WsClientMessage } from '../clientMessage';
+import { attachWsRouter, type WsHub } from '../router';
 import { toWireTableStateView } from '../transforms/gameWire';
-
-function parseAmount(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === 'string') {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return null;
-}
-
-type WsClientMessage = z.infer<typeof wsClientMessageSchema>;
-
-function parseClientMessage(data: WebSocket.RawData): WsClientMessage | null {
-  return parseJsonWithSchema(data, wsClientMessageSchema);
-}
 
 export async function handleTablePubSubEvent(message: WsPubSubMessage) {
   if (message.channel !== 'table' && message.channel !== 'timer') {
@@ -153,10 +140,14 @@ async function handleLeaveTable(userId: string, tableId: string) {
   });
 }
 
-export function attachTableHub(socket: WebSocket, userId: string, connectionId: string) {
-  attachWsRouter(socket, {
+export function createTableHub(params: {
+  connectionId: string;
+  userId: string;
+}): WsHub<WsClientMessage> {
+  const { connectionId, userId } = params;
+
+  return {
     hubName: 'table',
-    parseMessage: parseClientMessage,
     getAttributes: (message): Record<string, string> => {
       if ('tableId' in message && typeof message.tableId === 'string') {
         return { 'poker.table_id': message.tableId };
@@ -176,7 +167,7 @@ export function attachTableHub(socket: WebSocket, userId: string, connectionId: 
         if (seatId === null) {
           return;
         }
-        const buyInAmount = parseAmount(message.buyInAmount) ?? undefined;
+        const buyInAmount = parseFiniteNumber(message.buyInAmount) ?? undefined;
         await handleJoinSeat(connectionId, userId, {
           tableId: message.tableId,
           seatId,
@@ -203,7 +194,7 @@ export function attachTableHub(socket: WebSocket, userId: string, connectionId: 
         }
 
         const requiresAmount = actionType === 'BET' || actionType === 'RAISE';
-        const amount = parseAmount(message.amount);
+        const amount = parseFiniteNumber(message.amount);
         if (requiresAmount && amount === null) {
           sendToLocal(connectionId, {
             type: 'ActionResult',
@@ -224,6 +215,13 @@ export function attachTableHub(socket: WebSocket, userId: string, connectionId: 
         await handleSubscribe(connectionId, userId, message.tableId);
       },
     },
+  };
+}
+
+export function attachTableHub(socket: WebSocket, userId: string, connectionId: string) {
+  attachWsRouter(socket, {
+    ...createTableHub({ connectionId, userId }),
+    parseMessage: parseWsClientMessage,
     onClose: async () => {
       await unsubscribeAll(connectionId);
     },

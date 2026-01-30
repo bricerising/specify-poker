@@ -8,12 +8,13 @@ import type { Server as HttpServer } from 'http';
 import { startObservability, stopObservability } from './observability';
 import logger from './observability/logger';
 
-let metricsServer: HttpServer | null = null;
-let eventConsumerInstance: { stop(): Promise<void> } | null = null;
 let runningShutdown: ShutdownManager | null = null;
 
 export async function main() {
   const isTestEnv = process.env.NODE_ENV === 'test';
+
+  let metricsServer: HttpServer | null = null;
+  let eventConsumerInstance: { stop(): Promise<void> } | null = null;
 
   // Start OTel before importing instrumented subsystems (grpc/pg/redis/etc.).
   if (!isTestEnv) {

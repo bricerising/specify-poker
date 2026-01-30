@@ -1,5 +1,4 @@
-import { getRedisClient } from './redisClient';
-import logger from '../observability/logger';
+import { withRedisClient } from './redisClient';
 import { safeJsonParseRecord } from '../utils/json';
 
 export interface ConnectionInfo {
@@ -47,70 +46,76 @@ function parseConnectionInfo(raw: string): ConnectionInfo | null {
 }
 
 export async function saveConnection(info: ConnectionInfo) {
-  const redis = await getRedisClient();
-  if (!redis) return;
-
-  try {
-    await redis.hSet(CONNECTIONS_KEY, info.connectionId, JSON.stringify(info));
-    await redis.sAdd(`${USER_CONNECTIONS_KEY}:${info.userId}`, info.connectionId);
-  } catch (err) {
-    logger.error({ err, connectionId: info.connectionId }, 'Failed to save connection to Redis');
-  }
+  await withRedisClient(
+    async (redis) => {
+      await redis.hSet(CONNECTIONS_KEY, info.connectionId, JSON.stringify(info));
+      await redis.sAdd(`${USER_CONNECTIONS_KEY}:${info.userId}`, info.connectionId);
+    },
+    {
+      fallback: undefined,
+      logMessage: 'connection.save.failed',
+      context: { connectionId: info.connectionId },
+    },
+  );
 }
 
 export async function deleteConnection(connectionId: string, userId: string) {
-  const redis = await getRedisClient();
-  if (!redis) return;
-
-  try {
-    await redis.hDel(CONNECTIONS_KEY, connectionId);
-    await redis.sRem(`${USER_CONNECTIONS_KEY}:${userId}`, connectionId);
-  } catch (err) {
-    logger.error({ err, connectionId }, 'Failed to delete connection from Redis');
-  }
+  await withRedisClient(
+    async (redis) => {
+      await redis.hDel(CONNECTIONS_KEY, connectionId);
+      await redis.sRem(`${USER_CONNECTIONS_KEY}:${userId}`, connectionId);
+    },
+    {
+      fallback: undefined,
+      logMessage: 'connection.delete.failed',
+      context: { connectionId, userId },
+    },
+  );
 }
 
 export async function getConnection(connectionId: string): Promise<ConnectionInfo | null> {
-  const redis = await getRedisClient();
-  if (!redis) return null;
-
-  try {
-    const data = await redis.hGet(CONNECTIONS_KEY, connectionId);
-    return data ? parseConnectionInfo(data) : null;
-  } catch (err) {
-    logger.error({ err, connectionId }, 'Failed to get connection from Redis');
-    return null;
-  }
+  return await withRedisClient(
+    async (redis) => {
+      const data = await redis.hGet(CONNECTIONS_KEY, connectionId);
+      return data ? parseConnectionInfo(data) : null;
+    },
+    {
+      fallback: null,
+      logMessage: 'connection.get.failed',
+      context: { connectionId },
+    },
+  );
 }
 
 export async function getConnectionsByUser(userId: string): Promise<string[]> {
-  const redis = await getRedisClient();
-  if (!redis) return [];
-
-  try {
-    return await redis.sMembers(`${USER_CONNECTIONS_KEY}:${userId}`);
-  } catch (err) {
-    logger.error({ err, userId }, 'Failed to get user connections from Redis');
-    return [];
-  }
+  return await withRedisClient(
+    async (redis) => redis.sMembers(`${USER_CONNECTIONS_KEY}:${userId}`),
+    {
+      fallback: [],
+      logMessage: 'connection.listByUser.failed',
+      context: { userId },
+    },
+  );
 }
 
 export async function clearInstanceConnections(instanceId: string) {
-  const redis = await getRedisClient();
-  if (!redis) return;
-
-  try {
-    const all = await redis.hGetAll(CONNECTIONS_KEY);
-    for (const [connectionId, data] of Object.entries(all)) {
-      const info = parseConnectionInfo(data);
-      if (!info) {
-        continue;
+  await withRedisClient(
+    async (redis) => {
+      const all = await redis.hGetAll(CONNECTIONS_KEY);
+      for (const [connectionId, data] of Object.entries(all)) {
+        const info = parseConnectionInfo(data);
+        if (!info) {
+          continue;
+        }
+        if (info.instanceId === instanceId) {
+          await deleteConnection(connectionId, info.userId);
+        }
       }
-      if (info.instanceId === instanceId) {
-        await deleteConnection(connectionId, info.userId);
-      }
-    }
-  } catch (err) {
-    logger.error({ err, instanceId }, 'Failed to clear instance connections');
-  }
+    },
+    {
+      fallback: undefined,
+      logMessage: 'connection.clearInstanceConnections.failed',
+      context: { instanceId },
+    },
+  );
 }

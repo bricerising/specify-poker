@@ -166,3 +166,46 @@ export type ActionableStatus = (typeof ACTIONABLE_STATUSES)[number];
 export function isActionableStatus(status: SeatStatus): status is ActionableStatus {
   return status === 'ACTIVE';
 }
+
+// ============================================================================
+// Runtime Type Guards (boundary validation)
+// ============================================================================
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+export function isTable(value: unknown): value is Table {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.tableId === 'string' &&
+    typeof value.name === 'string' &&
+    typeof value.ownerId === 'string' &&
+    typeof value.createdAt === 'string' &&
+    typeof value.status === 'string' &&
+    isRecord(value.config)
+  );
+}
+
+export function isTableState(value: unknown): value is TableState {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const hand = value.hand;
+  if (hand !== null && hand !== undefined && !isRecord(hand)) {
+    return false;
+  }
+
+  return (
+    typeof value.tableId === 'string' &&
+    Array.isArray(value.seats) &&
+    Array.isArray(value.spectators) &&
+    typeof value.button === 'number' &&
+    typeof value.version === 'number' &&
+    typeof value.updatedAt === 'string'
+  );
+}

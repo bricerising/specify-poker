@@ -12,6 +12,7 @@ import { recordMaterializationLag } from '../observability/metrics';
 import logger from '../observability/logger';
 import { getErrorMessage, isRecord } from '../errors';
 import { aggregateHandRecord } from './handMaterializerAggregation';
+import { safeJsonParseRecord } from '../utils/json';
 
 export interface HandMaterializerDependencies {
   redisClient: RedisStreamConsumerClient;
@@ -80,7 +81,7 @@ export class HandMaterializer {
       return;
     }
 
-    const parsed = safeJsonParse(rawData);
+    const parsed = safeJsonParseRecord(rawData);
     if (!parsed) {
       logger.warn(
         { streamKey: this.streamRedisKey, group: this.groupName, messageId: message.id },
@@ -122,7 +123,7 @@ export class HandMaterializer {
       this.deps.recordMaterializationLag(Date.now() - record.completedAt.getTime());
       logger.info({ handId }, 'Hand record saved');
     } catch (err) {
-      logger.error({ error: err, handId }, 'Failed to materialize hand');
+      logger.error({ err, handId }, 'Failed to materialize hand');
     }
   }
 
@@ -165,13 +166,4 @@ function parseHandCompletedEvent(event: Record<string, unknown>): HandCompletedE
     return null;
   }
   return { type: 'HAND_COMPLETED', handId, tableId };
-}
-
-function safeJsonParse(raw: string): Record<string, unknown> | null {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return isRecord(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
 }

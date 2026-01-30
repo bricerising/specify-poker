@@ -10,6 +10,17 @@ const redis = {
 
 vi.mock('../../../src/storage/redisClient', () => ({
   getRedisClient: () => redis,
+  withRedisClient: async (operation: (client: typeof redis) => Promise<unknown>, options: any) => {
+    const client = redis;
+    if (!client) {
+      return options.fallback;
+    }
+    try {
+      return await operation(client);
+    } catch {
+      return options.fallback;
+    }
+  },
 }));
 
 vi.mock('../../../src/observability/logger', () => ({

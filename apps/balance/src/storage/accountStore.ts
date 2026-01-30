@@ -1,4 +1,6 @@
 import type { Account } from '../domain/types';
+import type { AccountErrorCode } from '../domain/errors';
+import { err, ok, type Result } from '../domain/result';
 import logger from '../observability/logger';
 import { createKeyedLock } from '../utils/keyedLock';
 import { tryJsonParse } from '../utils/json';
@@ -11,6 +13,23 @@ const ACCOUNTS_IDS_KEY = 'balance:accounts:ids';
 // In-memory cache
 const accounts = new Map<string, Account>();
 const accountLock = createKeyedLock();
+
+export async function withAccountLock<T>(accountId: string, work: () => Promise<T>): Promise<T> {
+  return accountLock.withLock(accountId, work);
+}
+
+export async function withAccountLocks<T>(accountIds: string[], work: () => Promise<T>): Promise<T> {
+  const uniqueSorted = Array.from(new Set(accountIds)).sort();
+  const run = async (idx: number): Promise<T> => {
+    const accountId = uniqueSorted[idx];
+    if (!accountId) {
+      return work();
+    }
+    return withAccountLock(accountId, async () => run(idx + 1));
+  };
+
+  return run(0);
+}
 
 export async function getAccount(accountId: string): Promise<Account | null> {
   // Check cache first
@@ -42,29 +61,31 @@ export async function ensureAccount(
   accountId: string,
   initialBalance: number = 0,
 ): Promise<{ account: Account; created: boolean }> {
-  const existing = await getAccount(accountId);
-  if (existing) {
-    return { account: existing, created: false };
-  }
+  return withAccountLock(accountId, async () => {
+    const existing = await getAccount(accountId);
+    if (existing) {
+      return { account: existing, created: false };
+    }
 
-  const account: Account = {
-    accountId,
-    balance: initialBalance,
-    currency: 'CHIPS',
-    version: 0,
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  };
+    const account: Account = {
+      accountId,
+      balance: initialBalance,
+      currency: 'CHIPS',
+      version: 0,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
 
-  accounts.set(accountId, account);
+    accounts.set(accountId, account);
 
-  const redis = await getRedisClient();
-  if (redis) {
-    await redis.hSet(ACCOUNTS_KEY, accountId, JSON.stringify(account));
-    await redis.sAdd(ACCOUNTS_IDS_KEY, accountId);
-  }
+    const redis = await getRedisClient();
+    if (redis) {
+      await redis.hSet(ACCOUNTS_KEY, accountId, JSON.stringify(account));
+      await redis.sAdd(ACCOUNTS_IDS_KEY, accountId);
+    }
 
-  return { account, created: true };
+    return { account, created: true };
+  });
 }
 
 export async function updateAccount(
@@ -94,23 +115,23 @@ export async function updateAccountWithVersion(
   accountId: string,
   expectedVersion: number,
   updater: (current: Account) => Account,
-): Promise<{ ok: boolean; account?: Account; error?: string }> {
+): Promise<Result<Account, AccountErrorCode>> {
   return accountLock.withLock(accountId, async () => {
     const current = await getAccount(accountId);
     if (!current) {
-      return { ok: false, error: 'ACCOUNT_NOT_FOUND' };
+      return err('ACCOUNT_NOT_FOUND');
     }
 
     if (current.version !== expectedVersion) {
-      return { ok: false, error: 'VERSION_CONFLICT' };
+      return err('VERSION_CONFLICT');
     }
 
     const updated = await updateAccount(accountId, updater);
     if (!updated) {
-      return { ok: false, error: 'UPDATE_FAILED' };
+      return err('UPDATE_FAILED');
     }
 
-    return { ok: true, account: updated };
+    return ok(updated);
   });
 }
 

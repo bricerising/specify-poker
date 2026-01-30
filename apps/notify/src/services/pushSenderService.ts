@@ -1,74 +1,70 @@
-import type { NotificationPayload } from '../domain/types';
+import type { NotificationPayload, UserPushSubscription } from '../domain/types';
 import type { SubscriptionStore } from '../storage/subscriptionStore';
-import logger from '../observability/logger';
-import { recordPushDelivery } from '../observability/metrics';
 import { createWebPushClient, type WebPushClient } from './webPushClient';
+import {
+  createPushDeliveryPipeline,
+  type PushDeliveryOutcome,
+  type PushDeliveryPipeline,
+} from './pushDeliveryPipeline';
+import type { PushSendResult, PushSender } from './pushSender';
 
-export class PushSenderService {
+export class PushSenderService implements PushSender {
+  private readonly deliveryPipeline: PushDeliveryPipeline;
+
   constructor(
     private readonly subscriptionStore: SubscriptionStore,
     private readonly webPushClient: WebPushClient = createWebPushClient(),
-  ) {}
+  ) {
+    this.deliveryPipeline = createPushDeliveryPipeline(subscriptionStore);
+  }
 
-  private getStatusCode(error: unknown): number | null {
-    if (!error || typeof error !== 'object') {
-      return null;
-    }
+  private async sendToSubscription(
+    userId: string,
+    payload: NotificationPayload,
+    payloadJson: string,
+    subscription: UserPushSubscription,
+  ): Promise<PushDeliveryOutcome> {
+    const sendResult = await this.webPushClient.sendNotification(subscription, payloadJson);
 
-    const statusCode = (error as { statusCode?: unknown }).statusCode;
-    if (typeof statusCode !== 'number') {
-      return null;
-    }
+    const outcome = await this.deliveryPipeline.handle({
+      userId,
+      subscription,
+      payload,
+      error: sendResult.ok ? undefined : sendResult.error,
+    });
 
-    return statusCode;
+    return outcome;
   }
 
   async sendToUser(
     userId: string,
     payload: NotificationPayload,
-  ): Promise<{ success: number; failure: number }> {
+  ): Promise<PushSendResult> {
     const subscriptions = await this.subscriptionStore.getSubscriptions(userId);
+    if (subscriptions.length === 0) {
+      return { success: 0, failure: 0 };
+    }
 
-    const results = await Promise.all(
-      subscriptions.map(async (sub) => {
-        try {
-          await this.webPushClient.sendNotification(sub, JSON.stringify(payload));
-          await this.subscriptionStore.incrementStat('success');
-          recordPushDelivery('success');
-          return 'success' as const;
-        } catch (error: unknown) {
-          const statusCode = this.getStatusCode(error);
-          if (statusCode === 404 || statusCode === 410) {
-            logger.info({ userId, endpoint: sub.endpoint }, 'Removing expired subscription');
-            await this.subscriptionStore.deleteSubscription(userId, sub.endpoint);
-            await this.subscriptionStore.incrementStat('cleanup');
-            recordPushDelivery('cleanup');
-            return 'failure' as const;
-          }
+    const payloadJson = JSON.stringify(payload);
 
-          logger.error(
-            { err: error, userId, endpoint: sub.endpoint },
-            'Failed to send notification',
-          );
-          await this.subscriptionStore.incrementStat('failure');
-          recordPushDelivery('failure');
-          return 'failure' as const;
-        }
-      }),
+    const outcomes = await Promise.all(
+      subscriptions.map((subscription) =>
+        this.sendToSubscription(userId, payload, payloadJson, subscription),
+      ),
     );
 
-    const counts = results.reduce(
-      (acc, result) => {
-        if (result === 'success') {
-          acc.success += 1;
-          return acc;
-        }
-        acc.failure += 1;
-        return acc;
-      },
-      { success: 0, failure: 0 },
-    );
+    let success = 0;
+    let failure = 0;
 
-    return counts;
+    for (const outcome of outcomes) {
+      if (outcome === 'success') {
+        success += 1;
+        continue;
+      }
+
+      failure += 1;
+    }
+
+    return { success, failure };
   }
 }

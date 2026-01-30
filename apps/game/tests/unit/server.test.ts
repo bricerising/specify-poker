@@ -39,6 +39,17 @@ vi.mock('../../src/storage/redisClient', () => ({
 
 vi.mock('../../src/observability/metrics', () => ({
   startMetricsServer: serverState.startMetricsServer,
+  recordGrpcRequest: vi.fn(),
+  recordHandStarted: vi.fn(),
+  recordHandCompleted: vi.fn(),
+  recordAction: vi.fn(),
+  recordSeatJoin: vi.fn(),
+  recordTurnTimeout: vi.fn(),
+  recordTurnTime: vi.fn(),
+  setActiveTables: vi.fn(),
+  setSeatedPlayers: vi.fn(),
+  setSpectatorCount: vi.fn(),
+  renderMetrics: vi.fn(async () => ''),
 }));
 
 vi.mock('../../src/observability/logger', () => ({

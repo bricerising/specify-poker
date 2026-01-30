@@ -82,23 +82,42 @@ export async function getTransactionsByAccount(
 
   const redis = await getRedisClient();
   if (redis) {
-    const total = await redis.zCard(`${TRANSACTIONS_BY_ACCOUNT_PREFIX}${accountId}`);
-    const txIds = await redis.zRange(
-      `${TRANSACTIONS_BY_ACCOUNT_PREFIX}${accountId}`,
-      offset,
-      offset + limit - 1,
-      { REV: true },
-    );
+    const key = `${TRANSACTIONS_BY_ACCOUNT_PREFIX}${accountId}`;
+    const totalInAccount = await redis.zCard(key);
+    if (totalInAccount === 0) {
+      return { transactions: [], total: 0 };
+    }
 
-    const result: Transaction[] = [];
-    for (const txId of txIds) {
-      const tx = await getTransaction(txId);
-      if (tx && (!type || tx.type === type)) {
-        result.push(tx);
+    if (!type) {
+      const txIds = await redis.zRange(key, offset, offset + limit - 1, { REV: true });
+      const txs = await Promise.all(txIds.map((txId) => getTransaction(txId)));
+      return { transactions: txs.filter((tx): tx is Transaction => tx !== null), total: totalInAccount };
+    }
+
+    const page: Transaction[] = [];
+    let totalMatching = 0;
+    const batchSize = 200;
+
+    for (let start = 0; start < totalInAccount; start += batchSize) {
+      const txIds = await redis.zRange(key, start, start + batchSize - 1, { REV: true });
+      if (txIds.length === 0) {
+        break;
+      }
+
+      const txs = await Promise.all(txIds.map((txId) => getTransaction(txId)));
+      for (const tx of txs) {
+        if (!tx || tx.type !== type) {
+          continue;
+        }
+
+        if (totalMatching >= offset && page.length < limit) {
+          page.push(tx);
+        }
+        totalMatching += 1;
       }
     }
 
-    return { transactions: result, total };
+    return { transactions: page, total: totalMatching };
   }
 
   // Fallback to in-memory

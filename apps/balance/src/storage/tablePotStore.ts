@@ -1,6 +1,7 @@
 import type { TablePot } from '../domain/types';
 import logger from '../observability/logger';
 import { tryJsonParse } from '../utils/json';
+import { createKeyedLock } from '../utils/keyedLock';
 import { getRedisClient } from './redisClient';
 
 const POTS_PREFIX = 'balance:pots:';
@@ -8,9 +9,18 @@ const POTS_ACTIVE_KEY = 'balance:pots:active';
 
 // In-memory cache
 const tablePots = new Map<string, TablePot>();
+const potLock = createKeyedLock();
 
 function getPotKey(tableId: string, handId: string): string {
   return `${tableId}:${handId}`;
+}
+
+export async function withTablePotLock<T>(
+  tableId: string,
+  handId: string,
+  work: () => Promise<T>,
+): Promise<T> {
+  return potLock.withLock(getPotKey(tableId, handId), work);
 }
 
 export async function getTablePot(tableId: string, handId: string): Promise<TablePot | null> {
@@ -60,16 +70,18 @@ export async function updateTablePot(
   handId: string,
   updater: (current: TablePot) => TablePot,
 ): Promise<TablePot | null> {
-  const current = await getTablePot(tableId, handId);
-  if (!current) {
-    return null;
-  }
+  return withTablePotLock(tableId, handId, async () => {
+    const current = await getTablePot(tableId, handId);
+    if (!current) {
+      return null;
+    }
 
-  const updated = updater(current);
-  updated.version = current.version + 1;
+    const updated = updater(current);
+    updated.version = current.version + 1;
 
-  await saveTablePot(updated);
-  return updated;
+    await saveTablePot(updated);
+    return updated;
+  });
 }
 
 export async function getActivePots(): Promise<TablePot[]> {
@@ -103,6 +115,7 @@ export async function deleteTablePot(tableId: string, handId: string): Promise<v
 
 export async function resetTablePots(): Promise<void> {
   tablePots.clear();
+  potLock.reset();
 
   const redis = await getRedisClient();
   if (redis) {

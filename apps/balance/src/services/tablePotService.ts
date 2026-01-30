@@ -6,18 +6,34 @@ import type {
   SettlementResultItem,
   TablePot,
 } from '../domain/types';
+import type { BalanceServiceErrorCode } from '../domain/errors';
+import { getConfig } from '../config';
 import { nowIso } from '../utils/time';
-import { getTablePot, saveTablePot, updateTablePot } from '../storage/tablePotStore';
-import { creditBalance } from './accountService';
+import {
+  getTablePot,
+  saveTablePot,
+  updateTablePot,
+  withTablePotLock,
+} from '../storage/tablePotStore';
+import { withAccountLocks } from '../storage/accountStore';
+import { creditBalance, debitBalance, ensureAccount } from './accountService';
 import { recordPotContribution, recordPotSettlement } from '../observability/metrics';
 import logger from '../observability/logger';
 import { withIdempotentResponse } from '../utils/idempotency';
+import { executeCommandsOrRollback, type UndoableCommand } from '../domain/command';
+import { err, ok, type Result } from '../domain/result';
 
 function calculateRake(totalPot: number): number {
-  if (totalPot <= 20) {
+  const config = getConfig();
+  if (config.rakeBasisPoints <= 0 || config.rakeCapChips <= 0) {
     return 0;
   }
-  return Math.min(Math.floor(totalPot * 0.05), 5);
+  if (totalPot <= config.rakeMinPotChips) {
+    return 0;
+  }
+
+  const rake = Math.floor((totalPot * config.rakeBasisPoints) / 10_000);
+  return Math.min(rake, config.rakeCapChips);
 }
 
 function normalizeWinners(winners: SettlementWinner[], targetTotal: number): SettlementWinner[] {
@@ -82,38 +98,45 @@ export async function recordContribution(
   idempotencyKey: string,
 ): Promise<ContributionResult> {
   return withIdempotentResponse(idempotencyKey, async () => {
-    if (amount <= 0) {
-      return { ok: false, error: 'INVALID_AMOUNT' };
-    }
+    return withTablePotLock(tableId, handId, async () => {
+      if (amount <= 0) {
+        return { ok: false, error: 'INVALID_AMOUNT' };
+      }
 
-    const pot = await ensurePot(tableId, handId);
-    if (pot.status !== 'ACTIVE') {
-      return { ok: false, error: 'POT_NOT_ACTIVE' };
-    }
+      const pot = await ensurePot(tableId, handId);
+      if (pot.status !== 'ACTIVE') {
+        return { ok: false, error: 'POT_NOT_ACTIVE' };
+      }
 
-    // Update contributions
-    const updated = await updateTablePot(tableId, handId, (current) => {
-      const newContributions = { ...current.contributions };
-      newContributions[seatId] = (newContributions[seatId] ?? 0) + amount;
+      // Update contributions
+      const updated = await updateTablePot(tableId, handId, (current) => {
+        const newContributions = { ...current.contributions };
+        newContributions[seatId] = (newContributions[seatId] ?? 0) + amount;
+        return {
+          ...current,
+          contributions: newContributions,
+        };
+      });
+
+      if (!updated) {
+        return { ok: false, error: 'UPDATE_FAILED' };
+      }
+
+      const totalPot = Object.values(updated.contributions).reduce((sum, c) => sum + c, 0);
+      const seatContribution = updated.contributions[seatId] ?? 0;
+      recordPotContribution(amount);
+
+      logger.debug(
+        { tableId, handId, seatId, accountId, amount, contributionType, totalPot },
+        'pot.contribution.recorded',
+      );
+
       return {
-        ...current,
-        contributions: newContributions,
+        ok: true,
+        totalPot,
+        seatContribution,
       };
     });
-
-    if (!updated) {
-      return { ok: false, error: 'UPDATE_FAILED' };
-    }
-
-    const totalPot = Object.values(updated.contributions).reduce((sum, c) => sum + c, 0);
-    const seatContribution = updated.contributions[seatId] ?? 0;
-    recordPotContribution(amount);
-
-    return {
-      ok: true,
-      totalPot,
-      seatContribution,
-    };
   });
 }
 
@@ -171,67 +194,135 @@ export async function settlePot(
   idempotencyKey: string,
 ): Promise<SettlePotResult> {
   return withIdempotentResponse(idempotencyKey, async () => {
-    const pot = await getTablePot(tableId, handId);
-    if (!pot) {
-      return { ok: false, error: 'POT_NOT_FOUND' };
-    }
-
-    if (pot.status === 'SETTLED') {
-      // Already settled - return success (idempotent)
-      return { ok: true, results: [] };
-    }
-
-    if (pot.status !== 'ACTIVE') {
-      return { ok: false, error: 'POT_NOT_ACTIVE' };
-    }
-
-    const totalPot = Object.values(pot.contributions).reduce((sum, amount) => sum + amount, 0);
-    const rakeAmount = calculateRake(totalPot);
-    const netPot = Math.max(totalPot - rakeAmount, 0);
-    const normalizedWinners = normalizeWinners(winners, netPot);
-
-    // Process each winner
-    const settlementResults: SettlementResultItem[] = [];
-
-    for (const winner of normalizedWinners) {
-      if (winner.amount <= 0) {
-        continue;
+    return withTablePotLock(tableId, handId, async () => {
+      const pot = await getTablePot(tableId, handId);
+      if (!pot) {
+        return { ok: false, error: 'POT_NOT_FOUND' };
       }
 
-      const creditResult = await creditBalance(
-        winner.accountId,
-        winner.amount,
-        'POT_WIN',
-        `${idempotencyKey}:${winner.seatId}`,
-        {
-          tableId,
-          handId,
-          seatId: winner.seatId,
-        },
-      );
-
-      if (!creditResult.ok) {
-        return { ok: false, error: creditResult.error };
+      if (pot.status === 'SETTLED') {
+        // Already settled - return success (idempotent)
+        return { ok: true, results: [] };
       }
 
-      settlementResults.push({
-        accountId: winner.accountId,
-        transactionId: creditResult.transaction.transactionId,
-        amount: winner.amount,
-        newBalance: creditResult.transaction.balanceAfter,
+      if (pot.status !== 'ACTIVE') {
+        return { ok: false, error: 'POT_NOT_ACTIVE' };
+      }
+
+      const totalPot = Object.values(pot.contributions).reduce((sum, amount) => sum + amount, 0);
+      const rakeAmount = calculateRake(totalPot);
+      const netPot = Math.max(totalPot - rakeAmount, 0);
+      const normalizedWinners = normalizeWinners(winners, netPot).filter((w) => w.amount > 0);
+
+      if (normalizedWinners.length === 0) {
+        // Mark pot as settled even if no payouts are issued.
+        await updateTablePot(tableId, handId, (current) => ({
+          ...current,
+          status: 'SETTLED',
+          rakeAmount,
+          settledAt: nowIso(),
+        }));
+        recordPotSettlement(totalPot, rakeAmount);
+        return { ok: true, results: [] };
+      }
+
+      const accountIds = normalizedWinners.map((w) => w.accountId);
+
+      return withAccountLocks(accountIds, async () => {
+        // Ensure all winner accounts exist before issuing any credits.
+        for (const accountId of accountIds) {
+          await ensureAccount(accountId, 0);
+        }
+
+        const creditCommands: UndoableCommand<SettlementResultItem, BalanceServiceErrorCode>[] =
+          normalizedWinners.map((winner) => ({
+            id: `credit:${winner.seatId}`,
+            execute: async () => {
+              const creditResult = await creditBalance(
+                winner.accountId,
+                winner.amount,
+                'POT_WIN',
+                `${idempotencyKey}:${winner.seatId}`,
+                {
+                  tableId,
+                  handId,
+                  seatId: winner.seatId,
+                },
+              );
+
+              if (!creditResult.ok) {
+                logger.warn(
+                  { tableId, handId, seatId: winner.seatId, error: creditResult.error },
+                  'pot.settlement.credit_failed',
+                );
+                return err(creditResult.error);
+              }
+
+              return ok({
+                accountId: winner.accountId,
+                transactionId: creditResult.value.transactionId,
+                amount: winner.amount,
+                newBalance: creditResult.value.balanceAfter,
+              });
+            },
+            undo: async () => {
+              const rollbackResult = await debitBalance(
+                winner.accountId,
+                winner.amount,
+                'REFUND',
+                `${idempotencyKey}:rollback:${winner.seatId}`,
+                {
+                  tableId,
+                  handId,
+                  seatId: winner.seatId,
+                  reason: 'pot_settlement_rollback',
+                },
+                { useAvailableBalance: false },
+              );
+
+              if (!rollbackResult.ok) {
+                logger.error(
+                  {
+                    tableId,
+                    handId,
+                    seatId: winner.seatId,
+                    accountId: winner.accountId,
+                    amount: winner.amount,
+                    error: rollbackResult.error,
+                  },
+                  'pot.settlement.rollback_failed',
+                );
+                return err(rollbackResult.error);
+              }
+
+              return ok<void>(undefined);
+            },
+          }));
+
+        let settlementResults: Result<SettlementResultItem[], BalanceServiceErrorCode>;
+        try {
+          settlementResults = await executeCommandsOrRollback(creditCommands);
+        } catch (error) {
+          logger.error({ tableId, handId, err: error }, 'pot.settlement.rollback_threw');
+          throw error;
+        }
+
+        if (!settlementResults.ok) {
+          return { ok: false, error: settlementResults.error };
+        }
+
+        // Mark pot as settled
+        await updateTablePot(tableId, handId, (current) => ({
+          ...current,
+          status: 'SETTLED',
+          rakeAmount,
+          settledAt: nowIso(),
+        }));
+        recordPotSettlement(totalPot, rakeAmount);
+
+        return { ok: true, results: settlementResults.value };
       });
-    }
-
-    // Mark pot as settled
-    await updateTablePot(tableId, handId, (current) => ({
-      ...current,
-      status: 'SETTLED',
-      rakeAmount,
-      settledAt: nowIso(),
-    }));
-    recordPotSettlement(totalPot, rakeAmount);
-
-    return { ok: true, results: settlementResults };
+    });
   });
 }
 
@@ -240,23 +331,29 @@ export async function cancelPot(
   handId: string,
   reason: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  const pot = await getTablePot(tableId, handId);
-  if (!pot) {
-    return { ok: false, error: 'POT_NOT_FOUND' };
-  }
+  return withTablePotLock(tableId, handId, async () => {
+    const pot = await getTablePot(tableId, handId);
+    if (!pot) {
+      return { ok: false, error: 'POT_NOT_FOUND' };
+    }
 
-  if (pot.status !== 'ACTIVE') {
-    return { ok: false, error: 'POT_NOT_ACTIVE' };
-  }
+    if (pot.status === 'CANCELLED') {
+      return { ok: true };
+    }
 
-  await updateTablePot(tableId, handId, (current) => ({
-    ...current,
-    status: 'CANCELLED',
-    settledAt: nowIso(),
-  }));
+    if (pot.status !== 'ACTIVE') {
+      return { ok: false, error: 'POT_NOT_ACTIVE' };
+    }
 
-  logger.info({ tableId, handId, reason }, 'pot.cancelled');
-  return { ok: true };
+    await updateTablePot(tableId, handId, (current) => ({
+      ...current,
+      status: 'CANCELLED',
+      settledAt: nowIso(),
+    }));
+
+    logger.info({ tableId, handId, reason }, 'pot.cancelled');
+    return { ok: true };
+  });
 }
 
 export async function getPotState(tableId: string, handId: string): Promise<TablePot | null> {

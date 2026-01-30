@@ -1,6 +1,7 @@
 import type { Reservation } from '../domain/types';
 import logger from '../observability/logger';
 import { tryJsonParse } from '../utils/json';
+import { createKeyedLock } from '../utils/keyedLock';
 import { getRedisClient } from './redisClient';
 
 const RESERVATIONS_KEY = 'balance:reservations';
@@ -10,6 +11,14 @@ const RESERVATIONS_EXPIRY_KEY = 'balance:reservations:expiry';
 // In-memory cache
 const reservations = new Map<string, Reservation>();
 const reservationsByAccount = new Map<string, Set<string>>();
+const reservationLock = createKeyedLock();
+
+export async function withReservationLock<T>(
+  reservationId: string,
+  work: () => Promise<T>,
+): Promise<T> {
+  return reservationLock.withLock(reservationId, work);
+}
 
 export async function getReservation(reservationId: string): Promise<Reservation | null> {
   const cached = reservations.get(reservationId);
@@ -153,6 +162,7 @@ export async function getExpiredReservations(beforeTimestamp: number): Promise<R
 export async function resetReservations(): Promise<void> {
   reservations.clear();
   reservationsByAccount.clear();
+  reservationLock.reset();
 
   const redis = await getRedisClient();
   if (redis) {

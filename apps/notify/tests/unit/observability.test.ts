@@ -25,11 +25,9 @@ vi.mock('@opentelemetry/exporter-metrics-otlp-grpc', () => ({
 
 describe('observability', () => {
   it('should start and stop observability', async () => {
-    startObservability();
+    await startObservability();
     expect(NodeSDK).toHaveBeenCalled();
 
     await stopObservability();
-    // We can't easily check internal calls on the mocked instance without more setup,
-    // but importing and calling the functions gives us coverage.
   });
 });

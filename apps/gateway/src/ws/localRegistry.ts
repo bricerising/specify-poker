@@ -31,11 +31,16 @@ export function getLocalConnectionMeta(connectionId: string) {
 export function sendToLocalText(connectionId: string, text: string) {
   const entry = localConnections.get(connectionId);
   const socket = entry?.socket;
-  if (socket && socket.readyState === WebSocket.OPEN) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    return false;
+  }
+
+  try {
     socket.send(text);
     return true;
+  } catch {
+    return false;
   }
-  return false;
 }
 
 export function sendToLocal(connectionId: string, message: unknown) {

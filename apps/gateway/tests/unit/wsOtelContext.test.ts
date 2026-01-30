@@ -53,7 +53,7 @@ describe('WebSocket OTEL context isolation', () => {
     }));
 
     vi.doMock('../../src/ws/handlers/table', () => ({
-      attachTableHub: vi.fn(),
+      createTableHub: vi.fn(),
       handleTablePubSubEvent: vi.fn(),
     }));
 
@@ -63,7 +63,7 @@ describe('WebSocket OTEL context isolation', () => {
     }));
 
     vi.doMock('../../src/ws/handlers/chat', () => ({
-      attachChatHub: vi.fn(),
+      createChatHub: vi.fn(),
       handleChatPubSubEvent: vi.fn(),
     }));
 

@@ -1,5 +1,7 @@
 import redisClient from './redisClient';
 import type { TableState } from '../domain/types';
+import { isTableState } from '../domain/types';
+import { safeJsonParse } from '../utils/json';
 
 const STATE_PREFIX = 'game:state:';
 const STATE_LOCK_PREFIX = 'game:state:lock:';
@@ -14,7 +16,8 @@ export class TableStateStore {
     const key = `${STATE_PREFIX}${tableId}`;
     const data = await redisClient.get(key);
     if (!data) return null;
-    return JSON.parse(data);
+    const parsed = safeJsonParse(data);
+    return isTableState(parsed) ? parsed : null;
   }
 
   async delete(tableId: string): Promise<void> {

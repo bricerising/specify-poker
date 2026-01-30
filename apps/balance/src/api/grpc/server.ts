@@ -1,8 +1,12 @@
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import * as path from 'path';
-import { addGrpcService, createGrpcServerLifecycle, type GrpcServerLifecycle } from '@specify-poker/shared';
-import { handlers } from './handlers';
+import {
+  addGrpcService,
+  createGrpcServerLifecycle,
+  type GrpcServerLifecycle,
+} from '@specify-poker/shared';
+import type { GrpcHandlers } from './handlers';
 import logger from '../../observability/logger';
 
 const PROTO_PATH = path.resolve(__dirname, '../../../proto/balance.proto');
@@ -17,7 +21,7 @@ type BalanceProto = {
 
 let lifecycle: GrpcServerLifecycle | null = null;
 
-export async function startGrpcServer(port: number): Promise<void> {
+export async function startGrpcServer(port: number, handlers: GrpcHandlers): Promise<void> {
   lifecycle?.stop();
   lifecycle = createGrpcServerLifecycle<BalanceProto>({
     grpc,

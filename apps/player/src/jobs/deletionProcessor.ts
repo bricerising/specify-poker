@@ -55,11 +55,17 @@ async function processExpiredDeletions(): Promise<number> {
 
 export function startDeletionProcessor(): void {
   const config = getConfig();
-  const intervalMs = config.deletionProcessorIntervalMs || 60 * 60 * 1000; // Default: 1 hour
-
-  logger.info({ intervalMs }, 'Starting deletion processor job');
+  const intervalMs = config.deletionProcessorIntervalMs;
 
   task?.stop();
+
+  if (intervalMs <= 0) {
+    task = null;
+    logger.info({ intervalMs }, 'Deletion processor disabled');
+    return;
+  }
+
+  logger.info({ intervalMs }, 'Starting deletion processor job');
 
   let isFirstRun = true;
 

@@ -6,7 +6,7 @@ const MIN_NICKNAME_LENGTH = 1;
 const MAX_NICKNAME_LENGTH = 30;
 const NICKNAME_PATTERN = /^[a-zA-Z0-9_\- ]+$/;
 
-export function validateNickname(nickname: string): void {
+export function normalizeNickname(nickname: string): string {
   const trimmed = nickname.trim();
   if (trimmed.length < MIN_NICKNAME_LENGTH || trimmed.length > MAX_NICKNAME_LENGTH) {
     throw new ValidationError('Nickname must be between 1 and 30 characters');
@@ -14,15 +14,33 @@ export function validateNickname(nickname: string): void {
   if (!NICKNAME_PATTERN.test(trimmed)) {
     throw new ValidationError('Nickname contains invalid characters');
   }
+
+  return trimmed;
+}
+
+export function validateNickname(nickname: string): string {
+  return normalizeNickname(nickname);
 }
 
 export async function isAvailable(nickname: string): Promise<boolean> {
-  const cached = await getUserIdByNickname(nickname);
+  const normalized = normalizeNickname(nickname);
+  const cached = await getUserIdByNickname(normalized);
   if (cached) {
     return false;
   }
-  const existing = await findByNickname(nickname);
+  const existing = await findByNickname(normalized);
   return !existing;
+}
+
+export async function isAvailableForUser(nickname: string, userId: string): Promise<boolean> {
+  const normalized = normalizeNickname(nickname);
+  const cachedUserId = await getUserIdByNickname(normalized);
+  if (cachedUserId) {
+    return cachedUserId === userId;
+  }
+
+  const existing = await findByNickname(normalized);
+  return !existing || existing.userId === userId;
 }
 
 export async function generateNickname(seed: string): Promise<string> {

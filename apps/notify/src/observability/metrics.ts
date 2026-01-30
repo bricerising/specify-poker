@@ -1,6 +1,7 @@
 import { startPrometheusMetricsServer } from '@specify-poker/shared';
 import type { Server } from 'http';
 import client, { Counter, Histogram, Registry } from 'prom-client';
+import type { NotificationType } from '../domain/types';
 import logger from './logger';
 
 const registry = new Registry();
@@ -29,7 +30,7 @@ const grpcRequestDuration = new Histogram({
   registers: [registry],
 });
 
-export function recordNotificationRequested(type: string) {
+export function recordNotificationRequested(type: NotificationType) {
   notificationRequests.inc({ type });
 }
 

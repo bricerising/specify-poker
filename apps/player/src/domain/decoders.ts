@@ -64,7 +64,7 @@ export function decodeProfile(value: unknown): Profile | null {
   const createdAt = readString(value, 'createdAt');
   const updatedAt = readString(value, 'updatedAt');
 
-  if (!userId || !username || !nickname || !createdAt || !updatedAt) {
+  if (!userId || username === null || !nickname || !createdAt || !updatedAt) {
     return null;
   }
 

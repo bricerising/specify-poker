@@ -38,6 +38,7 @@ describe('profileService consumer flows', () => {
     const cachedMap = new Map<string, typeof activeProfile>();
     cachedMap.set('user-1', activeProfile);
     vi.mocked(profileCache.getMulti).mockResolvedValue(cachedMap);
+    vi.mocked(deletedCache.isDeletedMulti).mockResolvedValue(new Set());
     vi.mocked(deletedCache.isDeleted).mockResolvedValue(false);
     vi.mocked(profileRepository.findByIds).mockResolvedValue([
       {
@@ -55,13 +56,25 @@ describe('profileService consumer flows', () => {
     expect(deletedCache.markDeleted).toHaveBeenCalledWith('user-2');
   });
 
+  it('returns a deleted placeholder when a cached profile is marked deleted', async () => {
+    const cachedMap = new Map<string, typeof activeProfile>();
+    cachedMap.set('user-1', { ...activeProfile, deletedAt: '2024-01-02T00:00:00Z' });
+    vi.mocked(profileCache.getMulti).mockResolvedValue(cachedMap);
+    vi.mocked(deletedCache.isDeletedMulti).mockResolvedValue(new Set());
+
+    const profiles = await profileService.getProfiles(['user-1']);
+
+    expect(profiles[0]?.nickname).toBe('Deleted User');
+    expect(deletedCache.markDeleted).toHaveBeenCalledWith('user-1');
+  });
+
   it('rejects nickname updates when unavailable', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-01-01T12:00:00Z'));
     vi.mocked(deletedCache.isDeleted).mockResolvedValue(false);
     vi.mocked(profileCache.get).mockResolvedValue(activeProfile);
-    vi.mocked(nicknameService.validateNickname).mockImplementation(() => undefined);
-    vi.mocked(nicknameService.isAvailable).mockResolvedValue(false);
+    vi.mocked(nicknameService.normalizeNickname).mockReturnValue('Taken');
+    vi.mocked(nicknameService.isAvailableForUser).mockResolvedValue(false);
 
     try {
       await expect(profileService.updateProfile('user-1', { nickname: 'Taken' })).rejects.toThrow(

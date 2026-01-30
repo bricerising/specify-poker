@@ -69,6 +69,9 @@ describe('HTTP proxy', () => {
   });
 
   it('injects auth headers on proxy requests', () => {
+    const app = { all: vi.fn() } as unknown as Router;
+    setupProxy(app);
+
     const proxyReq = { setHeader: vi.fn() };
     const req = { auth: { userId: 'user-1', claims: { role: 'player' } } } as Request;
 
@@ -83,6 +86,9 @@ describe('HTTP proxy', () => {
   });
 
   it('returns 502 on proxy errors', () => {
+    const app = { all: vi.fn() } as unknown as Router;
+    setupProxy(app);
+
     const req = new IncomingMessage(new Socket()) as Request;
     req.url = '/api/accounts';
     const res = new ServerResponse(req);

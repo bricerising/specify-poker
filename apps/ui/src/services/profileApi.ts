@@ -1,4 +1,6 @@
-import { apiFetchDecoded } from './apiClient';
+import { api } from './apiClient';
+import type { ApiClient } from './apiClient';
+import { createJsonApiClient } from './jsonApiClient';
 import { asRecord, readStringArray, readTrimmedString, toNumber } from '../utils/unknown';
 
 export interface UserProfile {
@@ -11,6 +13,11 @@ export interface UserProfile {
   };
   friends: string[];
 }
+
+export type ProfileApi = {
+  fetchProfile(): Promise<UserProfile>;
+  updateProfile(input: { avatarUrl: string | null }): Promise<UserProfile>;
+};
 
 function decodeUserProfile(payload: unknown): UserProfile {
   const record = asRecord(payload);
@@ -42,14 +49,25 @@ function decodeUserProfile(payload: unknown): UserProfile {
   };
 }
 
-export async function fetchProfile() {
-  return apiFetchDecoded('/api/me', decodeUserProfile);
+export function createProfileApi(client: ApiClient): ProfileApi {
+  const jsonClient = createJsonApiClient(client);
+
+  const fetchProfile: ProfileApi['fetchProfile'] = () => {
+    return jsonClient.requestDecoded('/api/me', decodeUserProfile);
+  };
+
+  const updateProfile: ProfileApi['updateProfile'] = (input) => {
+    return jsonClient.requestDecoded('/api/me', decodeUserProfile, {
+      method: 'PUT',
+      json: input,
+    });
+  };
+
+  return { fetchProfile, updateProfile };
 }
 
-export async function updateProfile(input: { avatarUrl: string | null }) {
-  return apiFetchDecoded('/api/me', decodeUserProfile, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  });
-}
+export const profileApi = createProfileApi(api);
+
+export const fetchProfile: ProfileApi['fetchProfile'] = (...args) => profileApi.fetchProfile(...args);
+export const updateProfile: ProfileApi['updateProfile'] = (...args) =>
+  profileApi.updateProfile(...args);

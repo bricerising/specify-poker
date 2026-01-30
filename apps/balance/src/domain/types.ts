@@ -1,3 +1,5 @@
+import type { BalanceServiceErrorCode } from './errors';
+
 // Account - User's chip balance
 export interface Account {
   accountId: string;
@@ -23,6 +25,26 @@ export type TransactionType =
   | 'REFUND';
 
 export type TransactionStatus = 'PENDING' | 'COMPLETED' | 'FAILED';
+
+export const TRANSACTION_TYPES = [
+  'DEPOSIT',
+  'WITHDRAW',
+  'BUY_IN',
+  'CASH_OUT',
+  'BLIND',
+  'BET',
+  'POT_WIN',
+  'RAKE',
+  'BONUS',
+  'REFERRAL',
+  'REFUND',
+] as const satisfies readonly TransactionType[];
+
+export const TRANSACTION_STATUSES = [
+  'PENDING',
+  'COMPLETED',
+  'FAILED',
+] as const satisfies readonly TransactionStatus[];
 
 export interface TransactionMetadata {
   tableId?: string;
@@ -56,6 +78,7 @@ export interface Reservation {
   amount: number;
   tableId: string;
   idempotencyKey: string;
+  transactionId?: string | null;
   expiresAt: string;
   status: ReservationStatus;
   createdAt: string;
@@ -100,7 +123,9 @@ export interface LedgerEntry {
 }
 
 // Service operation results - discriminated union for type-safe error handling
-export type OperationResult<T> = { ok: true; data: T } | { ok: false; error: string };
+export type OperationResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: BalanceServiceErrorCode };
 
 export interface BalanceInfo {
   accountId: string;
@@ -112,21 +137,23 @@ export interface BalanceInfo {
 
 export type ReservationResult =
   | { ok: true; reservationId: string; availableBalance: number }
-  | { ok: false; error: string; availableBalance?: number };
+  | { ok: false; error: BalanceServiceErrorCode; availableBalance?: number };
 
 export type CommitResult =
   | { ok: true; transactionId: string; newBalance?: number }
-  | { ok: false; error: string };
+  | { ok: false; error: BalanceServiceErrorCode };
 
-export type ReleaseResult = { ok: true; availableBalance?: number } | { ok: false; error: string };
+export type ReleaseResult =
+  | { ok: true; availableBalance?: number }
+  | { ok: false; error: BalanceServiceErrorCode };
 
 export type CashOutResult =
   | { ok: true; transactionId: string; newBalance: number }
-  | { ok: false; error: string };
+  | { ok: false; error: BalanceServiceErrorCode };
 
 export type ContributionResult =
   | { ok: true; totalPot: number; seatContribution: number }
-  | { ok: false; error: string };
+  | { ok: false; error: BalanceServiceErrorCode };
 
 export interface SettlementWinner {
   seatId: number;
@@ -143,4 +170,4 @@ export interface SettlementResultItem {
 
 export type SettlePotResult =
   | { ok: true; results: SettlementResultItem[] }
-  | { ok: false; error: string };
+  | { ok: false; error: BalanceServiceErrorCode };

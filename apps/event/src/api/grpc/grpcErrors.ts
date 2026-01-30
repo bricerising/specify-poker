@@ -40,6 +40,6 @@ export function toServiceError(error: unknown): grpc.ServiceError {
     ) as grpc.ServiceError;
   }
 
-  logger.error({ error }, 'Unhandled gRPC handler error');
+  logger.error({ err: error }, 'Unhandled gRPC handler error');
   return createGrpcServiceError(grpc.status.INTERNAL, message, error) as grpc.ServiceError;
 }

@@ -64,22 +64,25 @@ describe('gRPC handlers consumer flows', () => {
   });
 
   it('records deleted profile lookups', async () => {
-    vi.mocked(profileService.getProfile).mockResolvedValue({
-      userId: 'user-9',
-      username: 'Deleted User',
-      nickname: 'Deleted User',
-      avatarUrl: null,
-      preferences: {
-        soundEnabled: false,
-        chatEnabled: false,
-        showHandStrength: false,
-        theme: 'auto',
+    vi.mocked(profileService.getProfileWithLookupStatus).mockResolvedValue({
+      profile: {
+        userId: 'user-9',
+        username: 'Deleted User',
+        nickname: 'Deleted User',
+        avatarUrl: null,
+        preferences: {
+          soundEnabled: false,
+          chatEnabled: false,
+          showHandStrength: false,
+          theme: 'auto',
+        },
+        lastLoginAt: null,
+        referredBy: null,
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+        deletedAt: '2024-01-02T00:00:00Z',
       },
-      lastLoginAt: null,
-      referredBy: null,
-      createdAt: '2024-01-01T00:00:00Z',
-      updatedAt: '2024-01-01T00:00:00Z',
-      deletedAt: '2024-01-02T00:00:00Z',
+      lookupStatus: 'deleted',
     });
 
     const call = { request: { userId: 'user-9' } } as unknown as ServerUnaryCall<
@@ -89,6 +92,37 @@ describe('gRPC handlers consumer flows', () => {
     await handlers.GetProfile(call, callback);
 
     expect(metrics.recordProfileLookup).toHaveBeenCalledWith('deleted');
+  });
+
+  it('records created profile lookups', async () => {
+    vi.mocked(profileService.getProfileWithLookupStatus).mockResolvedValue({
+      profile: {
+        userId: 'user-new',
+        username: 'user-new',
+        nickname: 'NewUser',
+        avatarUrl: null,
+        preferences: {
+          soundEnabled: true,
+          chatEnabled: true,
+          showHandStrength: true,
+          theme: 'auto',
+        },
+        lastLoginAt: null,
+        referredBy: null,
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+        deletedAt: null,
+      },
+      lookupStatus: 'created',
+    });
+
+    const call = { request: { userId: 'user-new' } } as unknown as ServerUnaryCall<
+      { userId: string; referrerId?: string },
+      unknown
+    >;
+    await handlers.GetProfile(call, callback);
+
+    expect(metrics.recordProfileLookup).toHaveBeenCalledWith('created');
   });
 
   it('returns nicknames for batch nickname lookup', async () => {
@@ -197,6 +231,21 @@ describe('gRPC handlers consumer flows', () => {
     expect(metrics.recordStatisticsUpdate).not.toHaveBeenCalled();
   });
 
+  it('returns error for invalid statistic amount', async () => {
+    const call = {
+      request: { userId: 'user-1', type: 'STATISTIC_TYPE_HANDS_PLAYED', amount: Number.NaN },
+    } as unknown as ServerUnaryCall<{ userId: string; type: string; amount: number }, unknown>;
+    await handlers.IncrementStatistic(call, callback);
+
+    expect(callback).toHaveBeenCalledWith(expect.any(Error));
+    expect(metrics.recordGrpcRequest).toHaveBeenCalledWith(
+      'IncrementStatistic',
+      'error',
+      expect.any(Number),
+    );
+    expect(metrics.recordStatisticsUpdate).not.toHaveBeenCalled();
+  });
+
   it('increments statistics with a valid type', async () => {
     vi.mocked(statisticsService.incrementStatistic).mockResolvedValue({
       userId: 'user-1',
@@ -234,7 +283,7 @@ describe('gRPC handlers consumer flows', () => {
   });
 
   it('records errors when profile lookup fails', async () => {
-    vi.mocked(profileService.getProfile).mockRejectedValue(new Error('boom'));
+    vi.mocked(profileService.getProfileWithLookupStatus).mockRejectedValue(new Error('boom'));
 
     const call = { request: { userId: 'user-1' } } as unknown as ServerUnaryCall<
       { userId: string; referrerId?: string },

@@ -4,6 +4,7 @@ import {
   parseSeatId,
   parseActionType,
   parseChatMessage,
+  parseFiniteNumber,
 } from '../../src/ws/validators';
 
 describe('Validators', () => {
@@ -32,5 +33,14 @@ describe('Validators', () => {
     expect(parseChatMessage('Hello').ok).toBe(true);
     expect(parseChatMessage('').ok).toBe(false);
     expect(parseChatMessage('a'.repeat(501)).ok).toBe(false);
+  });
+
+  it('should parse finite numbers', () => {
+    expect(parseFiniteNumber(123)).toBe(123);
+    expect(parseFiniteNumber('456')).toBe(456);
+    expect(parseFiniteNumber('nope')).toBe(null);
+    expect(parseFiniteNumber(NaN)).toBe(null);
+    expect(parseFiniteNumber(Infinity)).toBe(null);
+    expect(parseFiniteNumber(null)).toBe(null);
   });
 });
