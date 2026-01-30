@@ -1,7 +1,7 @@
 import type { ActionInput, Seat, Table, TableState } from '../../domain/types';
 import { GameEventType, type GameEventType as GameEventTypeValue } from '../../domain/events';
 import type { ApplyActionResult } from '../../engine/handEngine';
-import { composeAsyncChain, type AsyncChainHandler } from '../../utils/asyncChain';
+import { composeAsyncChain, type AsyncChainHandler } from '@specify-poker/shared/pipeline';
 
 export type SubmitActionAcceptedResult = Extract<ApplyActionResult, { accepted: true }>;
 

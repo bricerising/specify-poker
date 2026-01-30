@@ -10,7 +10,7 @@ import type {
   ReserveForBuyInParams,
   ReserveResult,
 } from '../../clients/balanceClient';
-import { composeAsyncChain, type AsyncChainHandler } from '../../utils/asyncChain';
+import { composeAsyncChain, type AsyncChainHandler } from '@specify-poker/shared/pipeline';
 import { coerceNumber } from '../../utils/coerce';
 
 export type FinalizeReservedSeatJoinResult =

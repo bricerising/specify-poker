@@ -184,16 +184,19 @@ describe('gRPC handlers consumer flows', () => {
 
   it('normalizes empty avatar URLs on profile updates', async () => {
     vi.mocked(profileService.updateProfile).mockResolvedValue({
-      userId: 'user-1',
-      username: 'user-1',
-      nickname: 'Alpha',
-      avatarUrl: null,
-      preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: 'auto' },
-      lastLoginAt: null,
-      referredBy: null,
-      createdAt: '2024-01-01T00:00:00Z',
-      updatedAt: '2024-01-01T00:00:00Z',
-      deletedAt: null,
+      ok: true,
+      value: {
+        userId: 'user-1',
+        username: 'user-1',
+        nickname: 'Alpha',
+        avatarUrl: null,
+        preferences: { soundEnabled: true, chatEnabled: true, showHandStrength: true, theme: 'auto' },
+        lastLoginAt: null,
+        referredBy: null,
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+        deletedAt: null,
+      },
     });
 
     const call = {

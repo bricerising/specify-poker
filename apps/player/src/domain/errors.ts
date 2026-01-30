@@ -18,3 +18,16 @@ export function asError(error: unknown): Error {
   const message = typeof error === 'string' ? error : 'Unknown error';
   return new Error(message, { cause: error });
 }
+
+// ============================================================================
+// Typed Error Variants (for Result-based error handling)
+// ============================================================================
+
+/** Profile update error variants */
+export type UpdateProfileError =
+  | { type: 'NotFound' }
+  | { type: 'NicknameConflict'; nickname: string }
+  | { type: 'InvalidAvatarUrl'; url: string };
+
+/** Friend operation error variants */
+export type AddFriendError = { type: 'CannotAddSelf' };

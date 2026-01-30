@@ -5,10 +5,12 @@ import {
   isGrpcServiceErrorLike,
 } from '@specify-poker/shared';
 import {
+  eventValidationErrorMessage,
   getErrorMessage,
   InvalidArgumentError,
   NotFoundError,
   PermissionDeniedError,
+  type EventValidationError,
 } from '../../errors';
 import logger from '../../observability/logger';
 
@@ -42,4 +44,10 @@ export function toServiceError(error: unknown): grpc.ServiceError {
 
   logger.error({ err: error }, 'Unhandled gRPC handler error');
   return createGrpcServiceError(grpc.status.INTERNAL, message, error) as grpc.ServiceError;
+}
+
+/** Convert EventValidationError to gRPC service error */
+export function eventValidationErrorToGrpc(error: EventValidationError): grpc.ServiceError {
+  const message = eventValidationErrorMessage(error);
+  return createGrpcServiceError(grpc.status.INVALID_ARGUMENT, message) as grpc.ServiceError;
 }

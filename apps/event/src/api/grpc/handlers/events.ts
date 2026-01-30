@@ -10,6 +10,7 @@ import type {
 } from '../types';
 import { unary } from '../unary';
 import { NotFoundError } from '../../../errors';
+import { eventValidationErrorToGrpc } from '../grpcErrors';
 import type { EventServiceFacade } from '../../../services/facade';
 import {
   coerceNonNegativeInt,
@@ -36,7 +37,7 @@ export function createEventHandlers({ services }: CreateEventHandlersOptions) {
         const type = parseEventType(request.type);
         const tableId = requireNonEmptyString(request.tableId, 'tableId');
 
-        const event = await services.eventIngestion.ingestEvent({
+        const result = await services.eventIngestion.ingestEvent({
           type,
           tableId,
           handId: optionalNonEmptyString(request.handId),
@@ -46,7 +47,11 @@ export function createEventHandlers({ services }: CreateEventHandlersOptions) {
           idempotencyKey: optionalNonEmptyString(request.idempotencyKey),
         });
 
-        return { success: true, eventId: event.eventId };
+        if (!result.ok) {
+          throw eventValidationErrorToGrpc(result.error);
+        }
+
+        return { success: true, eventId: result.value.eventId };
       },
     ),
 
@@ -63,8 +68,11 @@ export function createEventHandlers({ services }: CreateEventHandlersOptions) {
           idempotencyKey: optionalNonEmptyString(req.idempotencyKey),
         }));
 
-        const results = await services.eventIngestion.ingestEvents(events);
-        return { success: true, eventIds: results.map((r) => r.eventId) };
+        const result = await services.eventIngestion.ingestEvents(events);
+        if (!result.ok) {
+          throw eventValidationErrorToGrpc(result.error);
+        }
+        return { success: true, eventIds: result.value.map((r) => r.eventId) };
       },
     ),
 

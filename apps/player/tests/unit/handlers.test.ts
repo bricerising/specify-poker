@@ -71,7 +71,7 @@ describe('gRPC Handlers', () => {
         updatedAt: '2024-01-01T00:00:00Z',
         deletedAt: null,
       };
-      vi.mocked(profileService.updateProfile).mockResolvedValue(mockProfile);
+      vi.mocked(profileService.updateProfile).mockResolvedValue({ ok: true, value: mockProfile });
 
       const call = {
         request: { userId: 'user1', nickname: 'NewNick' },
@@ -117,6 +117,8 @@ describe('gRPC Handlers', () => {
 
   describe('AddFriend', () => {
     it('should add friend', async () => {
+      vi.mocked(friendsService.addFriend).mockResolvedValue({ ok: true, value: undefined });
+
       const call = {
         request: { userId: 'user1', friendId: 'user2' },
       } as unknown as ServerUnaryCall<{ userId: string; friendId: string }, unknown>;

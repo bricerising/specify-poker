@@ -1,6 +1,6 @@
 import { seatAt } from '../../domain/seats';
 import type { Seat, Table, TableState } from '../../domain/types';
-import { composeAsyncChain, type AsyncChainHandler } from '../../utils/asyncChain';
+import { composeAsyncChain, type AsyncChainHandler } from '@specify-poker/shared/pipeline';
 
 export type JoinSeatResponse = { ok: true } | { ok: false; error: string };
 

@@ -77,9 +77,15 @@ describe('profileService consumer flows', () => {
     vi.mocked(nicknameService.isAvailableForUser).mockResolvedValue(false);
 
     try {
-      await expect(profileService.updateProfile('user-1', { nickname: 'Taken' })).rejects.toThrow(
-        'Nickname is not available',
-      );
+      const result = await profileService.updateProfile('user-1', { nickname: 'Taken' });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.type).toBe('NicknameConflict');
+        if (result.error.type === 'NicknameConflict') {
+          expect(result.error.nickname).toBe('Taken');
+        }
+      }
       expect(profileRepository.update).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();

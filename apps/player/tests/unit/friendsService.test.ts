@@ -14,9 +14,12 @@ describe('friendsService', () => {
   });
 
   it('blocks adding yourself as a friend', async () => {
-    await expect(friendsService.addFriend('user-1', 'user-1')).rejects.toThrow(
-      'Cannot add yourself as a friend',
-    );
+    const result = await friendsService.addFriend('user-1', 'user-1');
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.type).toBe('CannotAddSelf');
+    }
     expect(friendsRepository.addFriend).not.toHaveBeenCalled();
   });
 

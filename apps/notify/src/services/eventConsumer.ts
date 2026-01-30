@@ -1,6 +1,11 @@
 import logger from '../observability/logger';
 import { getErrorMessage, toError } from '../shared/errors';
-import { createAsyncLifecycle, type AsyncLifecycle } from '../shared/asyncLifecycle';
+import {
+  createAsyncLifecycle,
+  exponentialBackoff,
+  type AsyncLifecycle,
+  type RetryStrategy,
+} from '@specify-poker/shared';
 import { dispatchByTypeNoCtx } from '@specify-poker/shared/pipeline';
 import {
   runRedisStreamConsumer,
@@ -64,6 +69,10 @@ export class EventConsumer {
   }
 
   private async runPollLoop(signal: AbortSignal): Promise<void> {
+    const retryStrategy: RetryStrategy = exponentialBackoff({
+      baseMs: 1000,
+      maxMs: 30_000,
+    });
     let attempt = 0;
 
     while (!signal.aborted) {
@@ -100,7 +109,7 @@ export class EventConsumer {
         }
 
         attempt += 1;
-        const delayMs = Math.min(1000 * 2 ** (attempt - 1), 30_000);
+        const delayMs = retryStrategy.getDelayMs(attempt);
 
         logger.error(
           { err: toError(error), attempt, delayMs, streamKey: this.streamKey },

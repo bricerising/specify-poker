@@ -59,7 +59,10 @@ describe('gRPC Handlers', () => {
       timestamp: new Date(),
       sequence: null,
     };
-    vi.mocked(services.eventIngestion.ingestEvent).mockResolvedValue(persistedEvent);
+    vi.mocked(services.eventIngestion.ingestEvent).mockResolvedValue({
+      ok: true,
+      value: persistedEvent,
+    });
 
     await handlers.publishEvent(call as unknown as Record<string, unknown>, callback);
 
@@ -127,30 +130,33 @@ describe('gRPC Handlers', () => {
     } as unknown as Record<string, unknown>;
     const callback = vi.fn();
     const now = new Date();
-    vi.mocked(services.eventIngestion.ingestEvents).mockResolvedValue([
-      {
-        eventId: 'e1',
-        type: 'PLAYER_JOINED',
-        tableId: 't1',
-        handId: null,
-        userId: null,
-        seatId: null,
-        payload: {},
-        timestamp: now,
-        sequence: null,
-      },
-      {
-        eventId: 'e2',
-        type: 'PLAYER_LEFT',
-        tableId: 't1',
-        handId: null,
-        userId: null,
-        seatId: null,
-        payload: {},
-        timestamp: now,
-        sequence: null,
-      },
-    ]);
+    vi.mocked(services.eventIngestion.ingestEvents).mockResolvedValue({
+      ok: true,
+      value: [
+        {
+          eventId: 'e1',
+          type: 'PLAYER_JOINED',
+          tableId: 't1',
+          handId: null,
+          userId: null,
+          seatId: null,
+          payload: {},
+          timestamp: now,
+          sequence: null,
+        },
+        {
+          eventId: 'e2',
+          type: 'PLAYER_LEFT',
+          tableId: 't1',
+          handId: null,
+          userId: null,
+          seatId: null,
+          payload: {},
+          timestamp: now,
+          sequence: null,
+        },
+      ],
+    });
 
     await handlers.publishEvents(call as unknown as Record<string, unknown>, callback);
 
@@ -376,7 +382,27 @@ describe('gRPC Handlers', () => {
     );
   });
 
-  it('should handle publishEvent error', async () => {
+  it('should handle publishEvent validation error', async () => {
+    const call = {
+      request: { type: 'HAND_STARTED', tableId: 't1', payload: {} },
+    } as unknown as Record<string, unknown>;
+    const callback = vi.fn();
+    vi.mocked(services.eventIngestion.ingestEvent).mockResolvedValue({
+      ok: false,
+      error: { type: 'MissingHandId', eventType: 'HAND_STARTED' },
+    });
+
+    await handlers.publishEvent(call as unknown as Record<string, unknown>, callback);
+
+    expect(callback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 3, // INVALID_ARGUMENT
+        message: 'handId is required for event type HAND_STARTED',
+      }),
+    );
+  });
+
+  it('should handle publishEvent internal error', async () => {
     const call = {
       request: { type: 'PLAYER_JOINED', tableId: 't1', payload: {} },
     } as unknown as Record<string, unknown>;

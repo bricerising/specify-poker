@@ -1,3 +1,5 @@
+export * from './exhaustive';
+
 export type TableId = string;
 export type UserId = string;
 

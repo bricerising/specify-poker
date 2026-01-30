@@ -62,9 +62,12 @@ describe('profileService', () => {
         updatedAt: '2024-02-01T00:00:00Z',
       });
 
-      const updated = await profileService.updateProfile('user123', { nickname: 'NewNick' });
+      const result = await profileService.updateProfile('user123', { nickname: 'NewNick' });
 
-      expect(updated.nickname).toBe('NewNick');
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.nickname).toBe('NewNick');
+      }
       expect(profileCache.deleteNickname).toHaveBeenCalledWith('Player123');
     } finally {
       vi.useRealTimers();

@@ -11,7 +11,7 @@ import {
 import type { ServerUnaryCall, ServiceError } from '@grpc/grpc-js';
 import logger from '../../observability/logger';
 import { ValidationError } from '../../domain/errors';
-import { toGrpcServiceError } from './errors';
+import { toGrpcServiceError, updateProfileErrorToGrpc, addFriendErrorToGrpc } from './errors';
 import {
   createUnaryHandler,
   withUnaryErrorHandling,
@@ -100,12 +100,15 @@ export const handlers = {
     'UpdateProfile',
     decodeUpdateProfileRequest,
     async ({ userId, nickname, avatarUrl, preferences }) => {
-      const profile = await profileService.updateProfile(userId, {
+      const result = await profileService.updateProfile(userId, {
         nickname,
         avatarUrl,
         preferences,
       });
-      return { profile: toGrpcProfile(profile) };
+      if (!result.ok) {
+        throw updateProfileErrorToGrpc(result.error);
+      }
+      return { profile: toGrpcProfile(result.value) };
     },
     {
       onSuccess: () => recordProfileUpdate('ok'),
@@ -158,7 +161,10 @@ export const handlers = {
     'AddFriend',
     decodeAddFriendRequest,
     async ({ userId, friendId }) => {
-      await friendsService.addFriend(userId, friendId);
+      const result = await friendsService.addFriend(userId, friendId);
+      if (!result.ok) {
+        throw addFriendErrorToGrpc(result.error);
+      }
       return {};
     },
     {

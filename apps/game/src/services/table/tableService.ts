@@ -9,7 +9,7 @@ import type {
 } from '../../domain/types';
 import { isInHandStatus } from '../../domain/types';
 import { GameEventType, type GameEventType as GameEventTypeValue } from '../../domain/events';
-import { applyAction, startHand } from '../../engine/handEngine';
+import { applyAction } from '../../engine/handEngine';
 import { calculatePots } from '../../engine/potCalculator';
 import type { BalanceClient } from '../../clients/balanceClient';
 import type { PublishResult, GameEvent } from '../../clients/eventClient';
@@ -37,6 +37,7 @@ import {
   type FinalizeReservedSeatJoinResult,
   type SeatBuyInChainContext,
 } from './seatBuyInChain';
+import { createHandLifecycle, type HandLifecycle } from './handLifecycle';
 
 type LoggerLike = {
   info(meta: unknown, message?: string): void;
@@ -94,12 +95,6 @@ export type TableServiceDeps = {
 /** Default stack size when not specified in table config */
 const DEFAULT_STARTING_STACK = 200;
 
-/** Delay before starting next hand after one completes (ms) */
-const NEXT_HAND_DELAY_MS = 3000;
-
-/** Minimum players required to start a hand */
-const MIN_PLAYERS_FOR_HAND = 2;
-
 // ============================================================================
 // Types
 // ============================================================================
@@ -130,6 +125,7 @@ export class TableService {
     ctx: SeatBuyInChainContext,
   ) => Promise<FinalizeReservedSeatJoinResult>;
   private readonly tableTimers: TableTimers;
+  private readonly handLifecycle: HandLifecycle;
   private readonly tableTaskQueue = new KeyedTaskQueue();
   private readonly seatBuyInQueue = new KeyedTaskQueue();
 
@@ -144,7 +140,7 @@ export class TableService {
         this.submitActionUnlocked(tableId, userId, action),
       recordTurnTimeout: (street, actionType) =>
         this.deps.metrics.recordTurnTimeout(street, actionType),
-      startNextHandIfPossible: (tableId) => this.startNextHandIfPossible(tableId),
+      startNextHandIfPossible: (tableId) => this.handLifecycle.startNextHandIfPossible(tableId),
       logError: (meta, message) => this.deps.logger.error(meta, message),
     });
 
@@ -174,7 +170,7 @@ export class TableService {
         ),
       clearTurnTimer: (tableId) => this.tableTimers.clearTurnTimer(tableId),
       clearTurnStartMeta: (tableId) => this.tableTimers.clearTurnStartMeta(tableId),
-      handleHandEnded: (table, state) => this.handleHandEnded(table, state),
+      handleHandEnded: (table, state) => this.handLifecycle.handleHandEnded(table, state),
       startTurnTimer: (table, state) => this.tableTimers.startTurnTimer(table, state),
     });
 
@@ -186,6 +182,19 @@ export class TableService {
       recordSeatJoin: (result, metric) => this.deps.metrics.recordSeatJoin(result, metric),
     });
 
+    this.handLifecycle = createHandLifecycle({
+      tableStore: this.deps.tableStore,
+      tableStateStore: this.deps.tableStateStore,
+      publisher: this.deps.publisher,
+      tableEconomy: this.deps.tableEconomy,
+      tableTimers: this.tableTimers,
+      metrics: this.deps.metrics,
+      logger: this.deps.logger,
+      emitGameEvent: (tableId, handId, userId, seatId, type, payload, idempotencyKey) =>
+        this.emitGameEvent(tableId, handId, userId, seatId, type, payload, idempotencyKey),
+      touchState: (state) => this.touchState(state),
+    });
+
     this.seatBuyInChain = createSeatBuyInChain({
       runTableTask: (tableId, task) => this.runTableTask(tableId, task),
       loadTableState: (tableId) => this.deps.tableStateStore.get(tableId),
@@ -193,7 +202,7 @@ export class TableService {
       touchState: (state) => this.touchState(state),
       saveState: (state) => this.deps.tableStateStore.save(state),
       publishTableAndLobby: (table, state) => this.deps.publisher.publishTableAndLobby(table, state),
-      checkStartHand: (table, state) => this.checkStartHand(table, state),
+      checkStartHand: (table, state) => this.handLifecycle.checkStartHand(table, state),
       newIdempotencyKey: (prefix) => this.newIdempotencyKey(prefix),
       reserveForBuyIn: (params) => this.deps.balanceClient.reserveForBuyIn(params),
       commitReservation: (params) => this.deps.balanceClient.commitReservation(params),
@@ -619,7 +628,7 @@ export class TableService {
       }
 
       await this.deps.publisher.publishTableAndLobby(table, state);
-      await this.checkStartHand(table, state);
+      await this.handLifecycle.checkStartHand(table, state);
     });
   }
 
@@ -851,159 +860,6 @@ export class TableService {
     });
 
     return { ok: true };
-  }
-
-  private async checkStartHand(table: Table, state: TableState): Promise<void> {
-    if (table.status === 'PLAYING' || state.hand) {
-      return;
-    }
-
-    const activePlayers = state.seats.filter((seat) => seat.userId && seat.status === 'SEATED');
-    if (activePlayers.length < MIN_PLAYERS_FOR_HAND) {
-      return;
-    }
-
-    const updatedState = startHand(state, table.config);
-    table.status = 'PLAYING';
-    await this.deps.tableStore.save(table);
-    await this.deps.tableStateStore.save(updatedState);
-    await this.deps.publisher.publishTableAndLobby(table, updatedState);
-
-    if (updatedState.hand) {
-      this.deps.metrics.recordHandStarted(table.tableId);
-      this.tableTimers.noteHandStarted(table.tableId, updatedState.hand.handId);
-
-      const contributionResult = await this.deps.tableEconomy.recordHandStartContributions({
-        tableId: table.tableId,
-        handId: updatedState.hand.handId,
-        actions: updatedState.hand.actions,
-      });
-      if (contributionResult.type === 'unavailable') {
-        void this.emitGameEvent(
-          table.tableId,
-          updatedState.hand.handId,
-          undefined,
-          undefined,
-          GameEventType.BALANCE_UNAVAILABLE,
-          { action: 'RECORD_CONTRIBUTION' },
-        );
-      } else if (contributionResult.type === 'error') {
-        this.deps.logger.warn(
-          {
-            tableId: table.tableId,
-            handId: updatedState.hand.handId,
-            error: contributionResult.error,
-          },
-          'balance.contribution.failed',
-        );
-      }
-    }
-
-    const participants = updatedState.seats
-      .filter((seat) => seat.status === 'ACTIVE' || seat.status === 'ALL_IN')
-      .map((seat) => seat.userId)
-      .filter((value): value is string => Boolean(value));
-
-    const startedHandId = updatedState.hand?.handId;
-    void this.emitGameEvent(
-      table.tableId,
-      startedHandId,
-      undefined,
-      undefined,
-      GameEventType.HAND_STARTED,
-      {
-        buttonSeat: updatedState.button,
-        participants,
-      },
-      startedHandId ? `event:${GameEventType.HAND_STARTED}:${startedHandId}` : undefined,
-    );
-
-    await this.tableTimers.startTurnTimer(table, updatedState);
-  }
-
-  private async startNextHandIfPossible(tableId: string): Promise<void> {
-    try {
-      const [freshState, freshTable] = await Promise.all([
-        this.deps.tableStateStore.get(tableId),
-        this.deps.tableStore.get(tableId),
-      ]);
-      if (freshState && freshTable) {
-        await this.checkStartHand(freshTable, freshState);
-      }
-    } catch (error) {
-      this.deps.logger.error({ err: error, tableId }, 'hand.restart.failed');
-    }
-  }
-
-  private async handleHandEnded(table: Table, state: TableState): Promise<void> {
-    const hand = state.hand;
-    if (!hand) {
-      return;
-    }
-
-    const hadTimeout = this.tableTimers.consumeHandTimedOut(table.tableId, hand.handId);
-    const lastAction = hand.actions[hand.actions.length - 1];
-    const outcome = hadTimeout ? 'timeout' : lastAction?.type === 'FOLD' ? 'fold_win' : 'showdown';
-    this.deps.metrics.recordHandCompleted(table.tableId, outcome);
-
-    const winnerUserIds = (hand.winners || [])
-      .map((seatId) => seatAt(state.seats, seatId)?.userId)
-      .filter((value): value is string => Boolean(value));
-
-    void this.emitGameEvent(
-      table.tableId,
-      hand.handId,
-      undefined,
-      undefined,
-      GameEventType.HAND_ENDED,
-      {
-        winners: hand.winners ?? [],
-        winnerUserIds,
-        rakeAmount: hand.rakeAmount,
-      },
-      `event:${GameEventType.HAND_ENDED}:${hand.handId}`,
-    );
-
-    const settleResult = await this.deps.tableEconomy.settleHand({
-      tableId: table.tableId,
-      handId: hand.handId,
-      buttonSeat: state.button,
-      seats: state.seats,
-      pots: hand.pots,
-    });
-
-    if (settleResult.type === 'unavailable') {
-      void this.emitGameEvent(
-        table.tableId,
-        hand.handId,
-        undefined,
-        undefined,
-        GameEventType.BALANCE_UNAVAILABLE,
-        {
-          action: 'SETTLE_POT',
-        },
-      );
-    } else if (settleResult.type === 'error') {
-      void this.emitGameEvent(
-        table.tableId,
-        hand.handId,
-        undefined,
-        undefined,
-        GameEventType.SETTLEMENT_FAILED,
-        {
-          error: settleResult.error,
-        },
-      );
-    }
-
-    state.hand = null;
-    this.touchState(state);
-    table.status = 'WAITING';
-    await this.deps.tableStore.save(table);
-    await this.deps.tableStateStore.save(state);
-    await this.deps.publisher.publishTableAndLobby(table, state);
-
-    this.tableTimers.scheduleNextHandStart(state.tableId, NEXT_HAND_DELAY_MS);
   }
 
   private async emitGameEvent(

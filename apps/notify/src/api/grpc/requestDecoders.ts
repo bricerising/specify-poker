@@ -1,10 +1,10 @@
+import { err, ok, type Result } from '@specify-poker/shared';
 import {
   isNotificationType,
   type NotificationPayload,
   type PushSubscription,
 } from '../../domain/types';
 import { asNonEmptyString, asOptionalString, isRecord, isStringRecord } from '../../shared/decoders';
-import { err, ok, type Result } from '../../shared/result';
 
 function resolveNotificationData(data: unknown): NotificationPayload['data'] | undefined {
   if (!data || !isStringRecord(data) || Object.keys(data).length === 0) {

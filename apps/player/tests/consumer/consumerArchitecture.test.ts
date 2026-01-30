@@ -116,9 +116,15 @@ describe('Player service consumer architecture', () => {
       vi.mocked(deletedCache.isDeleted).mockResolvedValue(false);
       vi.mocked(profileCache.get).mockResolvedValue(baseProfile);
 
-      await expect(
-        profileService.updateProfile('user-1', { avatarUrl: 'not-a-url' }),
-      ).rejects.toThrow('Avatar URL is invalid');
+      const result = await profileService.updateProfile('user-1', { avatarUrl: 'not-a-url' });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.type).toBe('InvalidAvatarUrl');
+        if (result.error.type === 'InvalidAvatarUrl') {
+          expect(result.error.url).toBe('not-a-url');
+        }
+      }
       expect(profileRepository.update).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();

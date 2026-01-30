@@ -1,3 +1,4 @@
+import { err, ok, type Result } from '@specify-poker/shared';
 import { defaultProfile } from '../domain/defaults';
 import type { Profile, ProfileSummary, UserPreferences } from '../domain/types';
 import * as profileRepository from '../storage/profileRepository';
@@ -8,7 +9,7 @@ import { publishEvent } from './eventProducer';
 import { generateNickname, isAvailableForUser, normalizeNickname } from './nicknameService';
 import { incrementReferralCount } from './statisticsService';
 import { requestDeletion } from './deletionService';
-import { ConflictError, NotFoundError, ValidationError } from '../domain/errors';
+import { type UpdateProfileError } from '../domain/errors';
 import { createDeletedProfile } from '../domain/deletedUser';
 
 function getProfileRefresh(
@@ -338,10 +339,10 @@ export async function updateProfile(
     avatarUrl?: string | null;
     preferences?: Partial<UserPreferences>;
   },
-): Promise<Profile> {
+): Promise<Result<Profile, UpdateProfileError>> {
   const { profile: current, lookupStatus } = await getProfileWithLookupStatus(userId);
   if (lookupStatus === 'deleted' || current.deletedAt) {
-    throw new NotFoundError('Profile not found');
+    return err({ type: 'NotFound' });
   }
   const previousNickname = current.nickname;
   let nickname = current.nickname;
@@ -353,7 +354,7 @@ export async function updateProfile(
     if (nextNickname !== current.nickname) {
       const available = await isAvailableForUser(nextNickname, userId);
       if (!available) {
-        throw new ConflictError('Nickname is not available');
+        return err({ type: 'NicknameConflict', nickname: nextNickname });
       }
     }
     nickname = nextNickname;
@@ -361,7 +362,7 @@ export async function updateProfile(
 
   if (updates.avatarUrl !== undefined) {
     if (updates.avatarUrl && !isValidAvatarUrl(updates.avatarUrl)) {
-      throw new ValidationError('Avatar URL is invalid');
+      return err({ type: 'InvalidAvatarUrl', url: updates.avatarUrl });
     }
     avatarUrl = updates.avatarUrl ?? null;
   }
@@ -385,7 +386,7 @@ export async function updateProfile(
   if (previousNickname !== saved.nickname) {
     await profileStore.deleteNickname(previousNickname);
   }
-  return saved;
+  return ok(saved);
 }
 
 export async function deleteProfile(userId: string): Promise<void> {

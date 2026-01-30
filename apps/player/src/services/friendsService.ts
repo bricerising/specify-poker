@@ -1,7 +1,8 @@
+import { err, ok, type Result } from '@specify-poker/shared';
 import type { FriendProfile } from '../domain/types';
 import { friendsStore } from '../storage/friendsStore';
 import { getProfileSummaries } from './profileService';
-import { ValidationError } from '../domain/errors';
+import { type AddFriendError } from '../domain/errors';
 
 export async function getFriends(userId: string): Promise<FriendProfile[]> {
   const friendIds = await friendsStore.getFriendIds(userId);
@@ -18,11 +19,15 @@ export async function getFriends(userId: string): Promise<FriendProfile[]> {
   }));
 }
 
-export async function addFriend(userId: string, friendId: string): Promise<void> {
+export async function addFriend(
+  userId: string,
+  friendId: string,
+): Promise<Result<void, AddFriendError>> {
   if (userId === friendId) {
-    throw new ValidationError('Cannot add yourself as a friend');
+    return err({ type: 'CannotAddSelf' });
   }
   await friendsStore.addFriend(userId, friendId);
+  return ok(undefined);
 }
 
 export async function removeFriend(userId: string, friendId: string): Promise<void> {

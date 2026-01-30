@@ -5,7 +5,14 @@ import {
   isGrpcServiceErrorLike,
   type GrpcServiceError,
 } from '@specify-poker/shared';
-import { AppError, ConflictError, NotFoundError, ValidationError } from '../../domain/errors';
+import {
+  AppError,
+  ConflictError,
+  NotFoundError,
+  ValidationError,
+  type UpdateProfileError,
+  type AddFriendError,
+} from '../../domain/errors';
 
 export function toGrpcServiceError(error: unknown): GrpcServiceError {
   if (isGrpcServiceErrorLike(error)) {
@@ -29,4 +36,24 @@ export function toGrpcServiceError(error: unknown): GrpcServiceError {
   }
 
   return createGrpcServiceError(status.INTERNAL, 'Internal server error', error);
+}
+
+/** Convert UpdateProfileError to gRPC service error */
+export function updateProfileErrorToGrpc(error: UpdateProfileError): GrpcServiceError {
+  switch (error.type) {
+    case 'NotFound':
+      return createGrpcServiceError(status.NOT_FOUND, 'Profile not found');
+    case 'NicknameConflict':
+      return createGrpcServiceError(status.ALREADY_EXISTS, 'Nickname is not available');
+    case 'InvalidAvatarUrl':
+      return createGrpcServiceError(status.INVALID_ARGUMENT, 'Avatar URL is invalid');
+  }
+}
+
+/** Convert AddFriendError to gRPC service error */
+export function addFriendErrorToGrpc(error: AddFriendError): GrpcServiceError {
+  switch (error.type) {
+    case 'CannotAddSelf':
+      return createGrpcServiceError(status.INVALID_ARGUMENT, 'Cannot add yourself as a friend');
+  }
 }

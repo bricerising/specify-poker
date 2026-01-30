@@ -1,4 +1,4 @@
-import { closeHttpServer } from '@specify-poker/shared';
+import { closeHttpServer, createAsyncLifecycle } from '@specify-poker/shared';
 import type { Config } from './config';
 import { createGrpcServer } from './api/grpc/server';
 import logger from './observability/logger';
@@ -10,7 +10,6 @@ import { createPushSubsystem } from './services/pushSubsystem';
 import type { PushSenderService } from './services/pushSenderService';
 import { configureVapid } from './services/webPushClient';
 import { SubscriptionService } from './services/subscriptionService';
-import { createAsyncLifecycle } from './shared/asyncLifecycle';
 import { createRedisClientManager, type RedisClientManager } from './storage/redisClient';
 import { SubscriptionStore } from './storage/subscriptionStore';
 

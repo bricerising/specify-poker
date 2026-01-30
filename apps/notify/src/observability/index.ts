@@ -3,7 +3,7 @@ import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentation
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
 import { Resource } from '@opentelemetry/resources';
 import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
-import { createAsyncLifecycle } from '../shared/asyncLifecycle';
+import { createAsyncLifecycle } from '@specify-poker/shared';
 import logger from './logger';
 import { getObservabilityRuntimeConfig } from './runtimeConfig';
 

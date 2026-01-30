@@ -1,5 +1,5 @@
+import { err, ok, type Result } from '@specify-poker/shared';
 import { asNonEmptyString, asOptionalString, isRecord } from '../shared/decoders';
-import { err, ok, type Result } from '../shared/result';
 
 export type GameEvent = {
   type: 'TURN_STARTED';

@@ -1,9 +1,9 @@
 import webpush from 'web-push';
+import { err, ok, type Result } from '@specify-poker/shared';
 import type { PushSubscription } from '../domain/types';
 import logger from '../observability/logger';
 import { isRecord } from '../shared/decoders';
 import { getErrorMessage } from '../shared/errors';
-import { err, ok, type Result } from '../shared/result';
 
 export type WebPushSendError =
   | { type: 'ExpiredSubscription'; statusCode: 404 | 410; message: string }

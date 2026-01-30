@@ -1,8 +1,9 @@
+import { err, ok, type Result } from '@specify-poker/shared';
 import { eventStore } from '../storage/eventStore';
 import type { EventType, NewGameEvent } from '../domain/types';
 import { isEventType } from '../domain/types';
 import { recordIngestion } from '../observability/metrics';
-import { InvalidArgumentError, isRecord } from '../errors';
+import { isRecord, type EventValidationError } from '../errors';
 
 const HAND_EVENT_TYPES = new Set<EventType>([
   'HAND_STARTED',
@@ -18,67 +19,75 @@ const HAND_EVENT_TYPES = new Set<EventType>([
   'RAKE_DEDUCTED',
 ]);
 
-type EventValidator = (event: NewGameEvent) => void;
+type EventValidator = (event: NewGameEvent) => EventValidationError | null;
 
-function validateTypeIsPresent(event: NewGameEvent): void {
+function validateTypeIsPresent(event: NewGameEvent): EventValidationError | null {
   if (!event.type) {
-    throw new InvalidArgumentError('Event type is required');
+    return { type: 'MissingType' };
   }
+  return null;
 }
 
-function validateTypeIsKnown(event: NewGameEvent): void {
+function validateTypeIsKnown(event: NewGameEvent): EventValidationError | null {
   if (!isEventType(event.type)) {
-    throw new InvalidArgumentError(`Unknown event type: ${event.type}`);
+    return { type: 'UnknownType', eventType: String(event.type) };
   }
+  return null;
 }
 
-function validateTableId(event: NewGameEvent): void {
+function validateTableId(event: NewGameEvent): EventValidationError | null {
   if (typeof event.tableId !== 'string' || event.tableId.trim().length === 0) {
-    throw new InvalidArgumentError('Table ID is required');
+    return { type: 'MissingTableId' };
   }
+  return null;
 }
 
-function validatePayloadIsObject(event: NewGameEvent): void {
+function validatePayloadIsObject(event: NewGameEvent): EventValidationError | null {
   if (!isRecord(event.payload)) {
-    throw new InvalidArgumentError('Payload must be an object');
+    return { type: 'InvalidPayload' };
   }
+  return null;
 }
 
-function validateHandIdIfRequired(event: NewGameEvent): void {
+function validateHandIdIfRequired(event: NewGameEvent): EventValidationError | null {
   const requiresHandId = HAND_EVENT_TYPES.has(event.type);
   if (!requiresHandId) {
-    return;
+    return null;
   }
   if (typeof event.handId !== 'string' || event.handId.trim().length === 0) {
-    throw new InvalidArgumentError(`handId is required for event type ${event.type}`);
+    return { type: 'MissingHandId', eventType: event.type };
   }
+  return null;
 }
 
-function validateOptionalUserId(event: NewGameEvent): void {
+function validateOptionalUserId(event: NewGameEvent): EventValidationError | null {
   if (event.userId === undefined || event.userId === null) {
-    return;
+    return null;
   }
   if (typeof event.userId !== 'string' || event.userId.trim().length === 0) {
-    throw new InvalidArgumentError('userId must be a non-empty string when provided');
+    return { type: 'InvalidUserId' };
   }
+  return null;
 }
 
-function validateOptionalSeatId(event: NewGameEvent): void {
+function validateOptionalSeatId(event: NewGameEvent): EventValidationError | null {
   if (event.seatId === undefined || event.seatId === null) {
-    return;
+    return null;
   }
   if (typeof event.seatId !== 'number' || !Number.isFinite(event.seatId)) {
-    throw new InvalidArgumentError('seatId must be a number when provided');
+    return { type: 'InvalidSeatId' };
   }
+  return null;
 }
 
-function validateOptionalIdempotencyKey(event: NewGameEvent): void {
+function validateOptionalIdempotencyKey(event: NewGameEvent): EventValidationError | null {
   if (event.idempotencyKey === undefined || event.idempotencyKey === null) {
-    return;
+    return null;
   }
   if (typeof event.idempotencyKey !== 'string' || event.idempotencyKey.trim().length === 0) {
-    throw new InvalidArgumentError('idempotencyKey must be a non-empty string when provided');
+    return { type: 'InvalidIdempotencyKey' };
   }
+  return null;
 }
 
 const NEW_GAME_EVENT_VALIDATORS: readonly EventValidator[] = [
@@ -97,6 +106,13 @@ export type EventIngestionServiceDependencies = {
   recordIngestion: typeof recordIngestion;
 };
 
+type PublishEventResult = Awaited<
+  ReturnType<EventIngestionServiceDependencies['eventStore']['publishEvent']>
+>;
+type PublishEventsResult = Awaited<
+  ReturnType<EventIngestionServiceDependencies['eventStore']['publishEvents']>
+>;
+
 export class EventIngestionService {
   constructor(
     private readonly deps: EventIngestionServiceDependencies = { eventStore, recordIngestion },
@@ -104,28 +120,38 @@ export class EventIngestionService {
 
   async ingestEvent(
     event: NewGameEvent,
-  ): ReturnType<EventIngestionServiceDependencies['eventStore']['publishEvent']> {
-    this.validateEvent(event);
+  ): Promise<Result<PublishEventResult, EventValidationError>> {
+    const validation = this.validateEvent(event);
+    if (!validation.ok) {
+      return validation;
+    }
     const result = await this.deps.eventStore.publishEvent(event);
     this.deps.recordIngestion(event.type);
-    return result;
+    return ok(result);
   }
 
   async ingestEvents(
     events: NewGameEvent[],
-  ): ReturnType<EventIngestionServiceDependencies['eventStore']['publishEvents']> {
+  ): Promise<Result<PublishEventsResult, EventValidationError>> {
     for (const event of events) {
-      this.validateEvent(event);
+      const validation = this.validateEvent(event);
+      if (!validation.ok) {
+        return validation;
+      }
     }
     const results = await this.deps.eventStore.publishEvents(events);
     events.forEach((event) => this.deps.recordIngestion(event.type));
-    return results;
+    return ok(results);
   }
 
-  private validateEvent(event: NewGameEvent): void {
+  private validateEvent(event: NewGameEvent): Result<NewGameEvent, EventValidationError> {
     for (const validate of NEW_GAME_EVENT_VALIDATORS) {
-      validate(event);
+      const error = validate(event);
+      if (error) {
+        return err(error);
+      }
     }
+    return ok(event);
   }
 }
 

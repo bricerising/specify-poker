@@ -1,3 +1,4 @@
+import { createSubject, type Subject } from '@specify-poker/shared';
 import type { NotificationPayload, UserPushSubscription } from '../domain/types';
 import logger from '../observability/logger';
 import { recordPushDelivery } from '../observability/metrics';
@@ -14,26 +15,37 @@ export type PushDeliveryAttempt = {
   error?: WebPushSendError;
 };
 
+export type PushDeliveryResult = {
+  attempt: PushDeliveryAttempt;
+  outcome: PushDeliveryOutcome;
+};
+
 export type PushDeliveryPipeline = {
   handle(attempt: PushDeliveryAttempt): Promise<PushDeliveryOutcome>;
+  /** Subject for observing delivery outcomes. */
+  outcomes: Subject<PushDeliveryResult>;
 };
 
 type PushDeliveryHandler = (attempt: PushDeliveryAttempt) => Promise<PushDeliveryOutcome>;
 
-type PushDeliveryOutcomeRecorder = (outcome: PushDeliveryOutcome) => Promise<void>;
-
-function createOutcomeRecorder(store: SubscriptionStore): PushDeliveryOutcomeRecorder {
-  return async (status) => {
+/** Observer that records metrics for delivery outcomes */
+function createMetricsObserver() {
+  return ({ outcome }: PushDeliveryResult) => {
     try {
-      recordPushDelivery(status);
+      recordPushDelivery(outcome);
     } catch (error: unknown) {
-      logger.warn({ err: toError(error), status }, 'Failed to record push delivery metric');
+      logger.warn({ err: toError(error), outcome }, 'Failed to record push delivery metric');
     }
+  };
+}
 
+/** Observer that records stats to the store */
+function createStatsObserver(store: SubscriptionStore) {
+  return async ({ outcome }: PushDeliveryResult) => {
     try {
-      await store.incrementStat(status);
+      await store.incrementStat(outcome);
     } catch (error: unknown) {
-      logger.warn({ err: toError(error), status }, 'Failed to record push delivery stats');
+      logger.warn({ err: toError(error), outcome }, 'Failed to record push delivery stats');
     }
   };
 }
@@ -79,34 +91,38 @@ function createDeliveryHandler(store: SubscriptionStore): PushDeliveryHandler {
   };
 }
 
-function withOutcomeRecording(
-  handler: PushDeliveryHandler,
-  recordOutcome: PushDeliveryOutcomeRecorder,
-): PushDeliveryHandler {
-  return async (attempt) => {
-    let outcome: PushDeliveryOutcome;
-    try {
-      outcome = await handler(attempt);
-    } catch (error: unknown) {
-      logger.error(
-        {
-          err: toError(error),
-          userId: attempt.userId,
-          endpoint: attempt.subscription.endpoint,
-        },
-        'Unhandled error while handling push delivery attempt',
-      );
-      outcome = 'failure';
-    }
-
-    await recordOutcome(outcome);
-    return outcome;
-  };
-}
-
 export function createPushDeliveryPipeline(store: SubscriptionStore): PushDeliveryPipeline {
   const handler = createDeliveryHandler(store);
-  const recorder = createOutcomeRecorder(store);
+  const outcomes = createSubject<PushDeliveryResult>({
+    onError: (err, { outcome }) => {
+      logger.warn({ err: toError(err), outcome }, 'Push delivery observer error');
+    },
+  });
 
-  return { handle: withOutcomeRecording(handler, recorder) };
+  // Register default observers
+  outcomes.subscribe(createMetricsObserver());
+  outcomes.subscribe(createStatsObserver(store));
+
+  return {
+    outcomes,
+    async handle(attempt) {
+      let outcome: PushDeliveryOutcome;
+      try {
+        outcome = await handler(attempt);
+      } catch (error: unknown) {
+        logger.error(
+          {
+            err: toError(error),
+            userId: attempt.userId,
+            endpoint: attempt.subscription.endpoint,
+          },
+          'Unhandled error while handling push delivery attempt',
+        );
+        outcome = 'failure';
+      }
+
+      await outcomes.notify({ attempt, outcome });
+      return outcome;
+    },
+  };
 }

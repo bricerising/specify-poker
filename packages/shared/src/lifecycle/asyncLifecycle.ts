@@ -1,3 +1,28 @@
+/**
+ * Async lifecycle manager for coordinating start/stop operations.
+ *
+ * Provides a state machine that safely handles concurrent start/stop calls,
+ * ensuring proper sequencing and preventing race conditions.
+ *
+ * @example
+ * ```ts
+ * const lifecycle = createAsyncLifecycle({
+ *   start: async () => {
+ *     await connectToDatabase();
+ *     await startServer();
+ *   },
+ *   stop: async () => {
+ *     await stopServer();
+ *     await disconnectFromDatabase();
+ *   },
+ * });
+ *
+ * await lifecycle.start();
+ * // ... service is running
+ * await lifecycle.stop();
+ * ```
+ */
+
 export type LifecycleStatus = 'stopped' | 'starting' | 'running' | 'stopping';
 
 type LifecycleState =
@@ -7,16 +32,22 @@ type LifecycleState =
   | { status: 'stopping'; promise: Promise<void> };
 
 export type AsyncLifecycle = {
+  /** Start the lifecycle. Safe to call multiple times - will wait if already starting. */
   start(): Promise<void>;
+  /** Stop the lifecycle. Safe to call multiple times - will wait if already stopping. */
   stop(): Promise<void>;
+  /** Get the current lifecycle status. */
   getStatus(): LifecycleStatus;
+  /** Check if the lifecycle is currently running. */
   isRunning(): boolean;
 };
 
-export function createAsyncLifecycle(impl: {
+export type AsyncLifecycleImpl = {
   start: () => Promise<void>;
   stop: () => Promise<void>;
-}): AsyncLifecycle {
+};
+
+export function createAsyncLifecycle(impl: AsyncLifecycleImpl): AsyncLifecycle {
   let state: LifecycleState = { status: 'stopped' };
 
   const start = async (): Promise<void> => {
