@@ -91,7 +91,40 @@ function createDeliveryHandler(store: SubscriptionStore): PushDeliveryHandler {
   };
 }
 
-export function createPushDeliveryPipeline(store: SubscriptionStore): PushDeliveryPipeline {
+export type PushDeliveryObserver = (result: PushDeliveryResult) => void | Promise<void>;
+
+export type CreatePushDeliveryPipelineOptions = {
+  /**
+   * The subscription store for managing push subscriptions.
+   */
+  store: SubscriptionStore;
+
+  /**
+   * Custom observers to register instead of the default ones.
+   * If not provided, default metrics and stats observers will be used.
+   * Pass an empty array to disable all observers.
+   */
+  observers?: PushDeliveryObserver[];
+
+  /**
+   * Whether to include the default observers when custom observers are provided.
+   * Only applies when `observers` is provided. Defaults to false.
+   */
+  includeDefaultObservers?: boolean;
+};
+
+/**
+ * Creates the default set of observers for the push delivery pipeline.
+ */
+export function createDefaultObservers(store: SubscriptionStore): PushDeliveryObserver[] {
+  return [createMetricsObserver(), createStatsObserver(store)];
+}
+
+export function createPushDeliveryPipeline(
+  options: CreatePushDeliveryPipelineOptions,
+): PushDeliveryPipeline {
+  const { store, observers: customObservers, includeDefaultObservers = false } = options;
+
   const handler = createDeliveryHandler(store);
   const outcomes = createSubject<PushDeliveryResult>({
     onError: (err, { outcome }) => {
@@ -99,9 +132,24 @@ export function createPushDeliveryPipeline(store: SubscriptionStore): PushDelive
     },
   });
 
-  // Register default observers
-  outcomes.subscribe(createMetricsObserver());
-  outcomes.subscribe(createStatsObserver(store));
+  // Determine which observers to register
+  const observersToRegister: PushDeliveryObserver[] = [];
+
+  if (customObservers === undefined) {
+    // No custom observers provided - use defaults
+    observersToRegister.push(...createDefaultObservers(store));
+  } else {
+    // Custom observers provided
+    if (includeDefaultObservers) {
+      observersToRegister.push(...createDefaultObservers(store));
+    }
+    observersToRegister.push(...customObservers);
+  }
+
+  // Register all observers
+  for (const observer of observersToRegister) {
+    outcomes.subscribe(observer);
+  }
 
   return {
     outcomes,

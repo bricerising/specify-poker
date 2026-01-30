@@ -25,31 +25,49 @@ export enum StatisticType {
   ReferralCount = 'referral_count',
 }
 
-type StatisticUpdater = (stats: Statistics, amount: number) => void;
+/**
+ * Immutable statistic updater - returns partial update instead of mutating.
+ * This pattern improves predictability and makes testing easier.
+ */
+type StatisticUpdater = (stats: Readonly<Statistics>, amount: number) => Partial<Statistics>;
 
 const statisticUpdaters: Record<StatisticType, StatisticUpdater> = {
-  [StatisticType.HandsPlayed]: (stats, amount) => {
-    stats.handsPlayed += Math.max(0, Math.floor(amount));
-  },
-  [StatisticType.Wins]: (stats, amount) => {
-    stats.wins += Math.max(0, Math.floor(amount));
-  },
-  [StatisticType.Vpip]: (stats, amount) => {
-    stats.vpip = Math.max(0, Math.min(100, stats.vpip + amount));
-  },
-  [StatisticType.Pfr]: (stats, amount) => {
-    stats.pfr = Math.max(0, Math.min(100, stats.pfr + amount));
-  },
-  [StatisticType.AllIn]: (stats, amount) => {
-    stats.allInCount += Math.max(0, Math.floor(amount));
-  },
-  [StatisticType.BiggestPot]: (stats, amount) => {
-    stats.biggestPot = Math.max(stats.biggestPot, Math.floor(amount));
-  },
-  [StatisticType.ReferralCount]: (stats, amount) => {
-    stats.referralCount += Math.max(0, Math.floor(amount));
-  },
+  [StatisticType.HandsPlayed]: (stats, amount) => ({
+    handsPlayed: stats.handsPlayed + Math.max(0, Math.floor(amount)),
+  }),
+  [StatisticType.Wins]: (stats, amount) => ({
+    wins: stats.wins + Math.max(0, Math.floor(amount)),
+  }),
+  [StatisticType.Vpip]: (stats, amount) => ({
+    vpip: Math.max(0, Math.min(100, stats.vpip + amount)),
+  }),
+  [StatisticType.Pfr]: (stats, amount) => ({
+    pfr: Math.max(0, Math.min(100, stats.pfr + amount)),
+  }),
+  [StatisticType.AllIn]: (stats, amount) => ({
+    allInCount: stats.allInCount + Math.max(0, Math.floor(amount)),
+  }),
+  [StatisticType.BiggestPot]: (stats, amount) => ({
+    biggestPot: Math.max(stats.biggestPot, Math.floor(amount)),
+  }),
+  [StatisticType.ReferralCount]: (stats, amount) => ({
+    referralCount: stats.referralCount + Math.max(0, Math.floor(amount)),
+  }),
 };
+
+function applyStatisticUpdate(
+  stats: Readonly<Statistics>,
+  type: StatisticType,
+  amount: number,
+  timestamp: string,
+): Statistics {
+  const update = statisticUpdaters[type](stats, amount);
+  return {
+    ...stats,
+    ...update,
+    lastUpdated: timestamp,
+  };
+}
 
 export async function getStatistics(userId: string): Promise<Statistics> {
   const existing = await statisticsStore.get(userId);
@@ -67,10 +85,8 @@ export async function incrementStatistic(
   amount: number,
 ): Promise<Statistics> {
   const stats = await getStatistics(userId);
-  statisticUpdaters[type](stats, amount);
-
-  stats.lastUpdated = new Date().toISOString();
-  return statisticsStore.update(stats);
+  const updated = applyStatisticUpdate(stats, type, amount, new Date().toISOString());
+  return statisticsStore.update(updated);
 }
 
 export async function incrementHandsPlayed(userId: string): Promise<Statistics> {

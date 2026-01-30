@@ -15,7 +15,7 @@ export class PushSenderService implements PushSender {
     private readonly subscriptionStore: SubscriptionStore,
     private readonly webPushClient: WebPushClient = createWebPushClient(),
   ) {
-    this.deliveryPipeline = createPushDeliveryPipeline(subscriptionStore);
+    this.deliveryPipeline = createPushDeliveryPipeline({ store: subscriptionStore });
   }
 
   private async sendToSubscription(

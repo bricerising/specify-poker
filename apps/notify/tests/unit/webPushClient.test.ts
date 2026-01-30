@@ -8,7 +8,7 @@ vi.mock('web-push', () => ({
   },
 }));
 
-import { createWebPushClient } from '../../src/services/webPushClient';
+import { createRealWebPushClient } from '../../src/services/webPushClient';
 
 describe('WebPushClient', () => {
   beforeEach(() => {
@@ -18,7 +18,7 @@ describe('WebPushClient', () => {
   it('returns ok for successful sends', async () => {
     (webpush.sendNotification as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({});
 
-    const client = createWebPushClient();
+    const client = createRealWebPushClient();
     const result = await client.sendNotification(
       { endpoint: 'e1', keys: { p256dh: 'p', auth: 'a' } },
       'payload',
@@ -32,7 +32,7 @@ describe('WebPushClient', () => {
       statusCode: 410,
     });
 
-    const client = createWebPushClient();
+    const client = createRealWebPushClient();
     const result = await client.sendNotification(
       { endpoint: 'e1', keys: { p256dh: 'p', auth: 'a' } },
       'payload',
@@ -52,7 +52,7 @@ describe('WebPushClient', () => {
       new Error('boom'),
     );
 
-    const client = createWebPushClient();
+    const client = createRealWebPushClient();
     const result = await client.sendNotification(
       { endpoint: 'e1', keys: { p256dh: 'p', auth: 'a' } },
       'payload',

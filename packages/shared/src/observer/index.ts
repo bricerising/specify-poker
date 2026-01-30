@@ -53,9 +53,18 @@ export function createSubject<T>(options: SubjectOptions<T> = {}): Subject<T> {
     },
 
     async notify(event) {
-      const results = await Promise.allSettled(
-        Array.from(observers).map((observer) => observer(event)),
-      );
+      // Wrap each observer call to ensure synchronous throws are converted
+      // to rejected promises that Promise.allSettled can handle
+      const safeCall = (observer: Observer<T>): Promise<void> => {
+        try {
+          const result = observer(event);
+          return result instanceof Promise ? result : Promise.resolve();
+        } catch (err) {
+          return Promise.reject(err);
+        }
+      };
+
+      const results = await Promise.allSettled(Array.from(observers).map(safeCall));
 
       for (const result of results) {
         if (result.status === 'rejected') {

@@ -9,11 +9,71 @@ import * as statisticsCache from '../storage/statisticsCache';
 import * as deletedCache from '../storage/deletedCache';
 import * as statisticsRepository from '../storage/statisticsRepository';
 
+/**
+ * Command pattern with optional rollback support.
+ * Rollback is invoked if a subsequent command in the chain fails.
+ */
 type Command<TContext> = {
   name: string;
   execute(context: TContext): Promise<void>;
+  /**
+   * Optional rollback function to compensate for the command's effects.
+   * Called if a subsequent command fails after this command has executed.
+   */
+  rollback?(context: TContext): Promise<void>;
 };
 
+type CommandExecutionResult<TContext> = {
+  command: Command<TContext>;
+  executed: boolean;
+};
+
+/**
+ * Runs commands sequentially with automatic rollback on failure.
+ * If a command fails, all previously executed commands with rollback
+ * functions will have their rollback called in reverse order.
+ */
+async function runCommandsWithRollback<TContext>(
+  context: TContext,
+  commands: readonly Command<TContext>[],
+): Promise<void> {
+  const executed: CommandExecutionResult<TContext>[] = [];
+
+  for (const command of commands) {
+    try {
+      await command.execute(context);
+      executed.push({ command, executed: true });
+    } catch (error) {
+      // Rollback in reverse order
+      const rollbackErrors: Array<{ name: string; error: unknown }> = [];
+
+      for (let i = executed.length - 1; i >= 0; i -= 1) {
+        const { command: executedCommand } = executed[i]!;
+        if (executedCommand.rollback) {
+          try {
+            await executedCommand.rollback(context);
+          } catch (rollbackError) {
+            rollbackErrors.push({ name: executedCommand.name, error: rollbackError });
+          }
+        }
+      }
+
+      const baseError = new Error(`player.deletionService.command_failed:${command.name}`, {
+        cause: error,
+      });
+
+      if (rollbackErrors.length > 0) {
+        (baseError as Error & { rollbackErrors?: unknown[] }).rollbackErrors = rollbackErrors;
+      }
+
+      throw baseError;
+    }
+  }
+}
+
+/**
+ * Runs commands sequentially without rollback support (legacy behavior).
+ */
 async function runCommands<TContext>(
   context: TContext,
   commands: readonly Command<TContext>[],
@@ -68,6 +128,14 @@ function createSoftDeleteProfileCommand(): Command<RequestDeletionTxContext> {
     name: 'tx.soft_delete_profile',
     execute: async ({ client, userId, deletedAt }) => {
       await profileRepository.softDelete(userId, deletedAt, client);
+    },
+    rollback: async ({ client, profile }) => {
+      // Restore the original profile data if available.
+      // Note: Within a DB transaction, rollback is automatic on failure.
+      // This explicit rollback is useful when operations span multiple systems.
+      if (profile) {
+        await profileRepository.update(profile, client);
+      }
     },
   };
 }

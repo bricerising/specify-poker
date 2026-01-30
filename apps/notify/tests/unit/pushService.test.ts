@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PushSenderService } from '../../src/services/pushSenderService';
 import type { SubscriptionStore } from '../../src/storage/subscriptionStore';
+import { createRealWebPushClient } from '../../src/services/webPushClient';
 import webpush from 'web-push';
 
 vi.mock('web-push', () => ({
@@ -20,7 +21,11 @@ describe('PushSenderService', () => {
       deleteSubscription: vi.fn(),
       incrementStat: vi.fn(),
     };
-    pushService = new PushSenderService(storeMock as unknown as SubscriptionStore);
+    // Use real web push client to test actual behavior (mock controls web-push lib)
+    pushService = new PushSenderService(
+      storeMock as unknown as SubscriptionStore,
+      createRealWebPushClient(),
+    );
     vi.clearAllMocks();
   });
 
