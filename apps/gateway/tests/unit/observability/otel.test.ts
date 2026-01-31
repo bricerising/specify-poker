@@ -45,7 +45,7 @@ describe('OTEL init', () => {
   it('starts SDK once', async () => {
     sdkInstance.start.mockResolvedValue(undefined);
     const { initOTEL } = await import('../../../src/observability/otel');
-    initOTEL();
+    await initOTEL();
 
     expect(sdkInstance.start).toHaveBeenCalled();
   });
@@ -54,16 +54,15 @@ describe('OTEL init', () => {
     sdkInstance.start.mockRejectedValue(new Error('failed'));
     const logger = (await import('../../../src/observability/logger')).default;
     const { initOTEL } = await import('../../../src/observability/otel');
-    initOTEL();
+    await expect(initOTEL()).rejects.toThrow('failed');
 
-    await new Promise((resolve) => setImmediate(resolve));
     expect(logger.error).toHaveBeenCalled();
   });
 
   it('shuts down SDK when requested', async () => {
     sdkInstance.start.mockResolvedValue(undefined);
     const { initOTEL, shutdownOTEL } = await import('../../../src/observability/otel');
-    initOTEL();
+    await initOTEL();
 
     await shutdownOTEL();
     expect(sdkInstance.shutdown).toHaveBeenCalled();

@@ -2,14 +2,13 @@ import {
   createOtelBootstrapStep,
   createServiceBootstrapBuilder,
   ensureError,
-  runServiceMain,
+  isTestEnv,
+  runServiceMainIfDirectRun,
 } from '@specify-poker/shared';
 import type { EventApp } from './app';
 import { getConfig, type Config } from './config';
 import { startObservability, stopObservability } from './observability';
 import logger from './observability/logger';
-
-const isTestEnv = (): boolean => process.env.NODE_ENV === 'test';
 
 type EventServiceState = {
   config: Config;
@@ -61,9 +60,7 @@ export async function shutdown(): Promise<void> {
   await service.shutdown();
 }
 
-const isDirectRun =
+const isDirectRun = (): boolean =>
   typeof require !== 'undefined' && typeof module !== 'undefined' && require.main === module;
 
-if (isDirectRun && !isTestEnv()) {
-  runServiceMain({ logger, main, shutdown });
-}
+runServiceMainIfDirectRun({ logger, main, shutdown, isDirectRun });

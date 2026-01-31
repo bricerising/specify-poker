@@ -1,16 +1,15 @@
 import {
   closeHttpServer,
   createAsyncLifecycle,
-  createShutdownManager,
+  createServiceBootstrapBuilder,
   ensureError,
-  type ShutdownManager,
 } from '@specify-poker/shared';
 import express from 'express';
 import type { Server as HttpServer } from 'http';
 import type { Config } from './config';
 import { createBalanceApi } from './api/balanceApi';
 import type { BalanceService } from './services/balanceService';
-import { startGrpcServer, stopGrpcServer } from './api/grpc/server';
+import { createGrpcServer } from './api/grpc/server';
 import { startReservationExpiryJob, stopReservationExpiryJob } from './jobs/reservationExpiry';
 import { startLedgerVerificationJob, stopLedgerVerificationJob } from './jobs/ledgerVerification';
 import { recordHttpRequest, startMetricsServer } from './observability/metrics';
@@ -63,77 +62,73 @@ export function createBalanceApp(options: CreateBalanceAppOptions): BalanceApp {
   const api = createBalanceApi(options.service);
   const expressApp = createBalanceExpressApp(api.httpRouter);
 
-  type RunningResources = {
-    shutdown: ShutdownManager;
-    httpServer: HttpServer | null;
-    metricsServer: HttpServer | null;
-  };
+  let httpServer: HttpServer | null = null;
+  let metricsServer: HttpServer | null = null;
 
-  let resources: RunningResources | null = null;
-
-  const stopInternal = async (): Promise<void> => {
-    if (!resources) {
-      return;
-    }
-
-    const current = resources;
-    resources = null;
-    await current.shutdown.run();
-  };
-
-  const startInternal = async (): Promise<void> => {
-    const shutdown = createShutdownManager({ logger });
-    const started: RunningResources = { shutdown, httpServer: null, metricsServer: null };
-
-    shutdown.add('redis.close', async () => {
-      await closeRedisClient();
-    });
-    shutdown.add('metrics.close', async () => {
-      if (!started.metricsServer) {
-        return;
-      }
-      await closeHttpServer(started.metricsServer);
-      started.metricsServer = null;
-    });
-    shutdown.add('http.close', async () => {
-      if (!started.httpServer) {
-        return;
-      }
-      await closeHttpServer(started.httpServer);
-      started.httpServer = null;
-    });
-    shutdown.add('grpc.stop', () => {
-      stopGrpcServer();
-    });
-    shutdown.add('jobs.stop', () => {
-      stopReservationExpiryJob();
-      stopLedgerVerificationJob();
-    });
-
-    try {
-      started.httpServer = expressApp.listen(options.config.httpPort, () => {
+  const bootstrap = createServiceBootstrapBuilder({ logger, serviceName: 'balance.app' })
+    .step('redis.close', ({ onShutdown }) => {
+      onShutdown('redis.close', async () => {
+        await closeRedisClient();
+      });
+    })
+    .step('http.listen', ({ onShutdown }) => {
+      httpServer = expressApp.listen(options.config.httpPort, () => {
         logger.info({ port: options.config.httpPort }, 'Balance HTTP server listening');
       });
 
-      await startGrpcServer(options.config.grpcPort, api.grpcHandlers);
+      onShutdown('http.close', async () => {
+        if (!httpServer) {
+          return;
+        }
+        await closeHttpServer(httpServer);
+        httpServer = null;
+      });
+    })
+    .step('grpc.server.start', async ({ onShutdown }) => {
+      const grpcServer = createGrpcServer({
+        port: options.config.grpcPort,
+        handlers: api.grpcHandlers,
+      });
 
-      started.metricsServer = startMetricsServer(options.config.metricsPort);
+      onShutdown('grpc.stop', () => {
+        grpcServer.stop();
+      });
+
+      await grpcServer.start();
+    })
+    .step('metrics.start', ({ onShutdown }) => {
+      metricsServer = startMetricsServer(options.config.metricsPort);
+
+      onShutdown('metrics.close', async () => {
+        if (!metricsServer) {
+          return;
+        }
+        await closeHttpServer(metricsServer);
+        metricsServer = null;
+      });
+    })
+    .step('jobs.start', ({ onShutdown }) => {
+      onShutdown('jobs.stop', () => {
+        stopReservationExpiryJob();
+        stopLedgerVerificationJob();
+      });
 
       startReservationExpiryJob();
       startLedgerVerificationJob();
+    })
+    .build({
+      run: async () => undefined,
+      onStartWhileRunning: 'throw',
+    });
 
-      resources = started;
-    } catch (error: unknown) {
-      try {
-        await shutdown.run();
-      } finally {
-        resources = null;
-      }
-      throw error;
-    }
-  };
-
-  const lifecycle = createAsyncLifecycle({ start: startInternal, stop: stopInternal });
+  const lifecycle = createAsyncLifecycle({
+    start: async () => {
+      await bootstrap.main();
+    },
+    stop: async () => {
+      await bootstrap.shutdown();
+    },
+  });
 
   return { expressApp, start: lifecycle.start, stop: lifecycle.stop };
 }

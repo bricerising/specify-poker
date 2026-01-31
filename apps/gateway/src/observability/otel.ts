@@ -3,32 +3,31 @@ import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
 import { Resource } from '@opentelemetry/resources';
 import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
 import { NodeSDK } from '@opentelemetry/sdk-node';
-import { createOtelSdkLifecycle } from '@specify-poker/shared';
+import { createNodeSdkOtelLifecycle } from '@specify-poker/shared';
 import logger from './logger';
 
-const lifecycle = createOtelSdkLifecycle({
+const lifecycle = createNodeSdkOtelLifecycle({
   logger,
-  createSdk: () =>
-    new NodeSDK({
-      resource: new Resource({
-        [SemanticResourceAttributes.SERVICE_NAME]: 'gateway-service',
-      }),
-      traceExporter: new OTLPTraceExporter({
-        url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4317',
-      }),
-      instrumentations: [getNodeAutoInstrumentations()],
-    }),
+  deps: {
+    NodeSDK,
+    getNodeAutoInstrumentations,
+    OTLPTraceExporter,
+    Resource,
+    SemanticResourceAttributes,
+  },
+  getRuntimeConfig: () => ({
+    serviceName: 'gateway-service',
+    otelExporterEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4317',
+  }),
   onShutdownAfterStartError: (err: unknown) => {
     logger.error({ err }, 'Failed to shut down OpenTelemetry SDK after start failure');
   },
 });
 
-export function initOTEL() {
-  void lifecycle.start().catch(() => {
-    // Errors are reported via lifecycle hooks; avoid unhandled rejections.
-  });
+export async function initOTEL(): Promise<void> {
+  await lifecycle.start();
 }
 
-export async function shutdownOTEL() {
+export async function shutdownOTEL(): Promise<void> {
   await lifecycle.stop();
 }

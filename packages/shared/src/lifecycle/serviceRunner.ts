@@ -18,6 +18,45 @@ export type RunServiceMainOptions = {
   fatalExitCode?: number;
 };
 
+export function isTestEnv(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.NODE_ENV === 'test';
+}
+
+export function isDirectRun(): boolean {
+  return typeof require !== 'undefined' && typeof module !== 'undefined' && require.main === module;
+}
+
+export type RunServiceMainIfDirectRunOptions = RunServiceMainOptions & {
+  isTestEnv?: () => boolean;
+  isDirectRun?: () => boolean;
+};
+
+/**
+ * Factory Method: conditionally runs {@link runServiceMain} only when this module
+ * is executed directly (and not under tests).
+ *
+ * This keeps service `server.ts` entrypoints small and consistent while preserving
+ * the ability to inject `process`/`exit` for tests.
+ */
+export function runServiceMainIfDirectRun(options: RunServiceMainIfDirectRunOptions): void {
+  const shouldSkipForTests = options.isTestEnv ?? (() => isTestEnv());
+  const shouldRunDirectly = options.isDirectRun ?? (() => isDirectRun());
+
+  if (!shouldRunDirectly() || shouldSkipForTests()) {
+    return;
+  }
+
+  runServiceMain({
+    main: options.main,
+    shutdown: options.shutdown,
+    logger: options.logger,
+    process: options.process,
+    exit: options.exit,
+    signals: options.signals,
+    fatalExitCode: options.fatalExitCode,
+  });
+}
+
 export function runServiceMain(options: RunServiceMainOptions): void {
   const proc = options.process ?? process;
   const exit = options.exit ?? process.exit;
@@ -44,7 +83,11 @@ export function runServiceMain(options: RunServiceMainOptions): void {
       options.logger?.error?.({ err: error }, 'service.failed');
     }
 
-    safeShutdown().finally(() => exit(code));
+    safeShutdown()
+      .catch((shutdownError: unknown) => {
+        options.logger?.error?.({ err: shutdownError }, 'service.shutdown.failed');
+      })
+      .finally(() => exit(code));
   };
 
   proc.on('uncaughtException', (error: unknown) => {

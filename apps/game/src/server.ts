@@ -2,13 +2,12 @@ import {
   closeHttpServer,
   createOtelBootstrapStep,
   createServiceBootstrapBuilder,
-  runServiceMain,
+  isTestEnv,
+  runServiceMainIfDirectRun,
 } from '@specify-poker/shared';
 import { getConfig } from './config';
 import { startObservability, stopObservability } from './observability';
 import logger from './observability/logger';
-
-const isTestEnv = (): boolean => process.env.NODE_ENV === 'test';
 
 const service = createServiceBootstrapBuilder({ logger, serviceName: 'game' })
   // Initialize OpenTelemetry before loading instrumented modules (grpc, redis, http, etc.).
@@ -30,13 +29,16 @@ const service = createServiceBootstrapBuilder({ logger, serviceName: 'game' })
     logger.info('Connected to Redis');
   })
   .step('grpc.server.start', async ({ onShutdown }) => {
-    const { startGrpcServer, stopGrpcServer } = await import('./api/grpc/server');
-    onShutdown('grpc.stop', () => {
-      stopGrpcServer();
-    });
+    const { createGrpcServer } = await import('./api/grpc/server');
 
     const config = getConfig();
-    await startGrpcServer(config.port);
+
+    const grpcServer = createGrpcServer({ port: config.port });
+    onShutdown('grpc.stop', () => {
+      grpcServer.stop();
+    });
+
+    await grpcServer.start();
     logger.info({ port: config.port }, 'Game Service gRPC server started');
   })
   .step('metrics.start', async ({ onShutdown }) => {
@@ -73,9 +75,7 @@ export async function shutdown() {
   await service.shutdown();
 }
 
-const isDirectRun =
+const isDirectRun = (): boolean =>
   typeof require !== 'undefined' && typeof module !== 'undefined' && require.main === module;
 
-if (isDirectRun && process.env.NODE_ENV !== 'test') {
-  runServiceMain({ logger, main, shutdown });
-}
+runServiceMainIfDirectRun({ logger, main, shutdown, isDirectRun });

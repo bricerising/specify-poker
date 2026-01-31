@@ -72,9 +72,10 @@ describe('gRPC server lifecycle', () => {
   });
 
   it('starts and registers services', async () => {
-    const grpc = await import('../../src/api/grpc/server');
+    const { createGrpcServer } = await import('../../src/api/grpc/server');
 
-    await grpc.startGrpcServer(50052);
+    const server = createGrpcServer({ port: 50052 });
+    await server.start();
 
     expect(addService).toHaveBeenCalledTimes(2);
     expect(bindAsync).toHaveBeenCalledWith(
@@ -85,10 +86,11 @@ describe('gRPC server lifecycle', () => {
   });
 
   it('stops the server gracefully', async () => {
-    const grpc = await import('../../src/api/grpc/server');
+    const { createGrpcServer } = await import('../../src/api/grpc/server');
 
-    await grpc.startGrpcServer(50052);
-    grpc.stopGrpcServer();
+    const server = createGrpcServer({ port: 50052 });
+    await server.start();
+    server.stop();
 
     expect(forceShutdown).toHaveBeenCalled();
   });

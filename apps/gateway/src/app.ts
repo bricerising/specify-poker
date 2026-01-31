@@ -1,4 +1,9 @@
-import { closeHttpServer, createAsyncLifecycle, createShutdownManager } from '@specify-poker/shared';
+import {
+  closeHttpServer,
+  createAsyncLifecycle,
+  createServiceBootstrapBuilder,
+  type ShutdownAction,
+} from '@specify-poker/shared';
 import { collectDefaultMetrics } from 'prom-client';
 import type { Server as HttpServer } from 'http';
 import type { WebSocketServer } from 'ws';
@@ -20,14 +25,6 @@ export type CreateGatewayAppOptions = {
 let defaultMetricsInitialized = false;
 
 export function createGatewayApp(options: CreateGatewayAppOptions): GatewayApp {
-  type RunningResources = {
-    shutdown: ReturnType<typeof createShutdownManager>;
-    httpServer: HttpServer | null;
-    wsServer: WebSocketServer | null;
-  };
-
-  let resources: RunningResources | null = null;
-
   const initDefaultMetrics = (): void => {
     if (defaultMetricsInitialized) {
       return;
@@ -37,47 +34,40 @@ export function createGatewayApp(options: CreateGatewayAppOptions): GatewayApp {
     defaultMetricsInitialized = true;
   };
 
-  const stopInternal = async (): Promise<void> => {
-    if (!resources) {
-      return;
-    }
+  let httpServer: HttpServer | null = null;
+  let wsServer: WebSocketServer | null = null;
 
-    const current = resources;
-    resources = null;
-    await current.shutdown.run();
-  };
+  type OnShutdown = (name: string, action: ShutdownAction) => void;
 
   const startGatewayRuntime = async (
     deps: GatewayRuntimeDeps,
-    started: RunningResources,
+    onShutdown: OnShutdown,
   ): Promise<void> => {
-    const shutdown = started.shutdown;
-
-    shutdown.add('redis.close', async () => {
+    onShutdown('redis.close', async () => {
       await deps.closeRedisClient();
     });
-    shutdown.add('ws.pubsub.close', async () => {
+    onShutdown('ws.pubsub.close', async () => {
       await deps.closeWsPubSub();
     });
-    shutdown.add('grpc.clients.close', () => {
+    onShutdown('grpc.clients.close', () => {
       deps.closeGrpcClients();
     });
 
-    shutdown.add('http.close', async () => {
-      if (!started.httpServer) {
+    onShutdown('http.close', async () => {
+      if (!httpServer) {
         return;
       }
-      await closeHttpServer(started.httpServer);
-      started.httpServer = null;
+      await closeHttpServer(httpServer);
+      httpServer = null;
     });
 
     const app = deps.createExpressApp();
     const server = deps.createHttpServer(app);
-    started.httpServer = server;
+    httpServer = server;
 
     // Instance Registry
     await deps.registerInstance();
-    shutdown.add('instanceRegistry.unregister', async () => {
+    onShutdown('instanceRegistry.unregister', async () => {
       await deps.unregisterInstance();
     });
 
@@ -96,13 +86,13 @@ export function createGatewayApp(options: CreateGatewayAppOptions): GatewayApp {
     app.use(deps.createRouter());
 
     // WebSocket Server
-    started.wsServer = await deps.initWsServer(server);
-    shutdown.add('ws.close', async () => {
-      const wss = started.wsServer;
+    wsServer = await deps.initWsServer(server);
+    onShutdown('ws.close', async () => {
+      const wss = wsServer;
       if (!wss) {
         return;
       }
-      started.wsServer = null;
+      wsServer = null;
 
       for (const client of wss.clients) {
         try {
@@ -123,25 +113,27 @@ export function createGatewayApp(options: CreateGatewayAppOptions): GatewayApp {
     });
   };
 
-  const startInternal = async (): Promise<void> => {
-    const shutdown = createShutdownManager({ logger });
-    const started: RunningResources = { shutdown, httpServer: null, wsServer: null };
-
-    try {
+  const bootstrap = createServiceBootstrapBuilder({ logger, serviceName: 'gateway.app' })
+    .stepWithState('deps.load', async () => {
       const deps = options.deps ?? (await loadGatewayRuntimeDeps());
-      await startGatewayRuntime(deps, started);
-      resources = started;
-    } catch (error: unknown) {
-      try {
-        await shutdown.run();
-      } finally {
-        resources = null;
-      }
-      throw error;
-    }
-  };
+      return { deps };
+    })
+    .step('gateway.start', async ({ state, onShutdown }) => {
+      await startGatewayRuntime(state.deps, onShutdown);
+    })
+    .build({
+      run: async () => undefined,
+      onStartWhileRunning: 'throw',
+    });
 
-  const lifecycle = createAsyncLifecycle({ start: startInternal, stop: stopInternal });
+  const lifecycle = createAsyncLifecycle({
+    start: async () => {
+      await bootstrap.main();
+    },
+    stop: async () => {
+      await bootstrap.shutdown();
+    },
+  });
 
   return { start: lifecycle.start, stop: lifecycle.stop };
 }

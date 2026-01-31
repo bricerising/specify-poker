@@ -3,23 +3,22 @@ import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentation
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
 import { Resource } from '@opentelemetry/resources';
 import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
-import { createOtelSdkLifecycle } from '@specify-poker/shared';
+import { createNodeSdkOtelLifecycle } from '@specify-poker/shared';
 import logger from './logger';
 import { getObservabilityRuntimeConfig } from './runtimeConfig';
 
-const lifecycle = createOtelSdkLifecycle({
+const lifecycle = createNodeSdkOtelLifecycle({
   logger,
-  createSdk: () => {
+  deps: {
+    NodeSDK,
+    getNodeAutoInstrumentations,
+    OTLPTraceExporter,
+    Resource,
+    SemanticResourceAttributes,
+  },
+  getRuntimeConfig: () => {
     const config = getObservabilityRuntimeConfig();
-    return new NodeSDK({
-      resource: new Resource({
-        [SemanticResourceAttributes.SERVICE_NAME]: config.serviceName,
-      }),
-      traceExporter: new OTLPTraceExporter({
-        url: config.otelExporterEndpoint,
-      }),
-      instrumentations: [getNodeAutoInstrumentations()],
-    });
+    return { serviceName: config.serviceName, otelExporterEndpoint: config.otelExporterEndpoint };
   },
 });
 

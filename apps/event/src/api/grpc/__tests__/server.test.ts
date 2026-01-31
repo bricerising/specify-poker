@@ -43,7 +43,7 @@ vi.mock('../handlers', () => ({
   createHandlers,
 }));
 
-import { startGrpcServer, stopGrpcServer } from '../server';
+import { createGrpcServer } from '../server';
 
 describe('event gRPC server', () => {
   beforeEach(() => {
@@ -57,7 +57,8 @@ describe('event gRPC server', () => {
       },
     );
 
-    await startGrpcServer(50054);
+    const server = createGrpcServer({ port: 50054 });
+    await server.start();
 
     expect(createHandlers).toHaveBeenCalledTimes(1);
     expect(addService).toHaveBeenCalledWith(
@@ -80,7 +81,8 @@ describe('event gRPC server', () => {
       },
     );
 
-    await expect(startGrpcServer(50054)).rejects.toThrow('bind fail');
+    const server = createGrpcServer({ port: 50054 });
+    await expect(server.start()).rejects.toThrow('bind fail');
   });
 
   it('can be stopped', async () => {
@@ -90,8 +92,9 @@ describe('event gRPC server', () => {
       },
     );
 
-    await startGrpcServer(50054);
-    stopGrpcServer();
+    const server = createGrpcServer({ port: 50054 });
+    await server.start();
+    server.stop();
 
     expect(forceShutdown).toHaveBeenCalledTimes(1);
   });

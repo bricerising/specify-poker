@@ -1,7 +1,11 @@
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import * as path from 'path';
-import { addGrpcService, createGrpcServerLifecycle } from '@specify-poker/shared';
+import {
+  addGrpcService,
+  createGrpcServerLifecycle,
+  type GrpcServerLifecycle,
+} from '@specify-poker/shared';
 import { createHandlers } from './handlers';
 import { createHealthHandlers } from './health';
 import type { NotifyService } from '../../services/notifyService';
@@ -10,10 +14,7 @@ import logger from '../../observability/logger';
 const PROTO_PATH = path.resolve(__dirname, '../../../proto/notify.proto');
 const HEALTH_PROTO_PATH = path.resolve(__dirname, '../../../proto/health.proto');
 
-export type GrpcServer = {
-  start(): Promise<void>;
-  stop(): void;
-};
+export type GrpcServer = GrpcServerLifecycle;
 
 type CreateGrpcServerParams = {
   port: number;
@@ -26,7 +27,7 @@ type NotifyProto = {
 };
 
 export function createGrpcServer(params: CreateGrpcServerParams): GrpcServer {
-  const lifecycle = createGrpcServerLifecycle<NotifyProto>({
+  return createGrpcServerLifecycle<NotifyProto>({
     grpc,
     protoLoader,
     protoPath: [PROTO_PATH, HEALTH_PROTO_PATH],
@@ -60,26 +61,4 @@ export function createGrpcServer(params: CreateGrpcServerParams): GrpcServer {
     logger,
     logMessage: 'Notify gRPC server listening',
   });
-
-  return lifecycle;
-}
-
-let defaultServer: GrpcServer | null = null;
-
-export async function startGrpcServer(
-  port: number,
-  notifyService: NotifyService,
-): Promise<void> {
-  if (defaultServer) {
-    defaultServer.stop();
-    defaultServer = null;
-  }
-
-  defaultServer = createGrpcServer({ port, notifyService });
-  await defaultServer.start();
-}
-
-export function stopGrpcServer(): void {
-  defaultServer?.stop();
-  defaultServer = null;
 }

@@ -1,17 +1,13 @@
 import {
   createOtelBootstrapStep,
   createServiceBootstrapBuilder,
-  runServiceMain,
+  isTestEnv,
+  runServiceMainIfDirectRun,
 } from '@specify-poker/shared';
 import type { BalanceApp } from './app';
 import type { Config } from './config';
 import { startObservability, stopObservability } from './observability';
 import logger from './observability/logger';
-
-const isDirectRun =
-  typeof require !== 'undefined' && typeof module !== 'undefined' && require.main === module;
-
-const isTestEnv = (): boolean => process.env.NODE_ENV === 'test';
 
 type BalanceServiceState = {
   config: Config;
@@ -66,7 +62,7 @@ export async function shutdown() {
   logger.info('Balance service shut down complete');
 }
 
-// Only start if this is the main module
-if (isDirectRun && !isTestEnv()) {
-  runServiceMain({ logger, main: start, shutdown });
-}
+const isDirectRun = (): boolean =>
+  typeof require !== 'undefined' && typeof module !== 'undefined' && require.main === module;
+
+runServiceMainIfDirectRun({ logger, main: start, shutdown, isDirectRun });

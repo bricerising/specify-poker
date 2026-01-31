@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { startGrpcServer, stopGrpcServer } from '../../src/api/grpc/server';
+import { createGrpcServer } from '../../src/api/grpc/server';
 import * as grpc from '@grpc/grpc-js';
 import type { NotifyService } from '../../src/services/notifyService';
 
@@ -42,9 +42,10 @@ describe('gRPC Server', () => {
   it('should start and stop gRPC server', async () => {
     const notifyServiceMock = {} as unknown as NotifyService;
 
-    await startGrpcServer(50055, notifyServiceMock);
+    const server = createGrpcServer({ port: 50055, notifyService: notifyServiceMock });
+    await server.start();
     expect(grpc.Server).toHaveBeenCalled();
 
-    stopGrpcServer();
+    server.stop();
   });
 });

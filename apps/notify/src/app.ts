@@ -1,4 +1,8 @@
-import { closeHttpServer, createAsyncLifecycle } from '@specify-poker/shared';
+import {
+  closeHttpServer,
+  createAsyncLifecycle,
+  createServiceBootstrapBuilder,
+} from '@specify-poker/shared';
 import type { Config } from './config';
 import { createGrpcServer } from './api/grpc/server';
 import logger from './observability/logger';
@@ -8,7 +12,11 @@ import { createGameEventHandlers } from './services/gameEventHandlers';
 import { createNotifyService, type NotifyService } from './services/notifyService';
 import { createPushSubsystem } from './services/pushSubsystem';
 import type { PushSenderService } from './services/pushSenderService';
-import { configureVapid } from './services/webPushClient';
+import {
+  createWebPushClient,
+  type VapidDetails,
+  type WebPushClient,
+} from './services/webPushClient';
 import { SubscriptionService } from './services/subscriptionService';
 import { createRedisClientManager, type RedisClientManager } from './storage/redisClient';
 import { SubscriptionStore } from './storage/subscriptionStore';
@@ -28,6 +36,7 @@ export type NotifyApp = {
 export type CreateNotifyAppOptions = {
   config: Config;
   redis?: RedisClientManager;
+  webPushClient?: WebPushClient;
 };
 
 export function createNotifyApp(options: CreateNotifyAppOptions): NotifyApp {
@@ -36,13 +45,17 @@ export function createNotifyApp(options: CreateNotifyAppOptions): NotifyApp {
   const subscriptionStore = new SubscriptionStore({ getClient: () => redis.getClient() });
   const subscriptionService = new SubscriptionService(subscriptionStore);
 
-  configureVapid({
+  const vapidDetails: VapidDetails = {
     subject: options.config.vapidSubject,
     publicKey: options.config.vapidPublicKey,
     privateKey: options.config.vapidPrivateKey,
-  });
+  };
 
-  const { pushSenderService, pushSender } = createPushSubsystem({ subscriptionStore });
+  const webPushClient = options.webPushClient ?? createWebPushClient({ vapidDetails });
+  const { pushSenderService, pushSender } = createPushSubsystem({
+    subscriptionStore,
+    webPushClient,
+  });
   const notifyService = createNotifyService({ subscriptionService, pushSender });
   const eventConsumer = new EventConsumer(createGameEventHandlers(pushSender), {
     streamKey: options.config.eventStreamKey,
@@ -56,28 +69,47 @@ export function createNotifyApp(options: CreateNotifyAppOptions): NotifyApp {
 
   let metricsServer: ReturnType<typeof startMetricsServer> | null = null;
 
-  const stopInternal = async (): Promise<void> => {
-    grpcServer.stop();
-    await eventConsumer.stop();
-    if (metricsServer) {
-      await closeHttpServer(metricsServer);
-      metricsServer = null;
-    }
-    await redis.close();
-  };
-
-  const startInternal = async (): Promise<void> => {
-    try {
+  const bootstrap = createServiceBootstrapBuilder({ logger, serviceName: 'notify.app' })
+    .step('redis.close', ({ onShutdown }) => {
+      onShutdown('redis.close', async () => {
+        await redis.close();
+      });
+    })
+    .step('grpc.server.start', async ({ onShutdown }) => {
       await grpcServer.start();
+      onShutdown('grpc.stop', () => {
+        grpcServer.stop();
+      });
+    })
+    .step('metrics.start', ({ onShutdown }) => {
       metricsServer = startMetricsServer(options.config.metricsPort);
+      onShutdown('metrics.close', async () => {
+        if (!metricsServer) {
+          return;
+        }
+        await closeHttpServer(metricsServer);
+        metricsServer = null;
+      });
+    })
+    .step('eventConsumer.start', async ({ onShutdown }) => {
       await eventConsumer.start();
-    } catch (error: unknown) {
-      await stopInternal();
-      throw error;
-    }
-  };
+      onShutdown('eventConsumer.stop', async () => {
+        await eventConsumer.stop();
+      });
+    })
+    .build({
+      run: async () => undefined,
+      onStartWhileRunning: 'throw',
+    });
 
-  const lifecycle = createAsyncLifecycle({ start: startInternal, stop: stopInternal });
+  const lifecycle = createAsyncLifecycle({
+    start: async () => {
+      await bootstrap.main();
+    },
+    stop: async () => {
+      await bootstrap.shutdown();
+    },
+  });
 
   return {
     services: {

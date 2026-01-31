@@ -5,7 +5,8 @@ const {
   connectRedis,
   closeRedis,
   closePgPool,
-  startGrpcServer,
+  createGrpcServer,
+  grpcServerStart,
   startMetricsServer,
   handMaterializerStart,
   archiverStart,
@@ -17,7 +18,8 @@ const {
   connectRedis: vi.fn(),
   closeRedis: vi.fn(),
   closePgPool: vi.fn(),
-  startGrpcServer: vi.fn(),
+  createGrpcServer: vi.fn(),
+  grpcServerStart: vi.fn(),
   startMetricsServer: vi.fn(),
   handMaterializerStart: vi.fn(),
   archiverStart: vi.fn(),
@@ -59,8 +61,7 @@ vi.mock('../jobs/archiver', () => ({
 }));
 
 vi.mock('../api/grpc/server', () => ({
-  startGrpcServer,
-  stopGrpcServer: vi.fn(),
+  createGrpcServer,
 }));
 
 vi.mock('../observability/metrics', () => ({
@@ -98,7 +99,8 @@ describe('event server main', () => {
     const { main } = await import('../server');
 
     process.env.NODE_ENV = 'production';
-    startGrpcServer.mockResolvedValue(undefined);
+    createGrpcServer.mockReturnValue({ start: grpcServerStart, stop: vi.fn() });
+    grpcServerStart.mockResolvedValue(undefined);
 
     await main();
 
@@ -107,7 +109,7 @@ describe('event server main', () => {
     expect(handMaterializerStart).toHaveBeenCalledTimes(1);
     expect(archiverStart).toHaveBeenCalledTimes(1);
     expect(startMetricsServer).toHaveBeenCalledWith(9090);
-    expect(startGrpcServer).toHaveBeenCalledWith(50054);
+    expect(createGrpcServer).toHaveBeenCalledWith({ port: 50054 });
     expect(loggerInfo).toHaveBeenCalledWith({ port: 50054 }, 'Event Service is running');
   });
 
@@ -116,7 +118,8 @@ describe('event server main', () => {
     const { main } = await import('../server');
 
     process.env.NODE_ENV = 'test';
-    startGrpcServer.mockResolvedValue(undefined);
+    createGrpcServer.mockReturnValue({ start: grpcServerStart, stop: vi.fn() });
+    grpcServerStart.mockResolvedValue(undefined);
 
     await main();
 
@@ -125,7 +128,7 @@ describe('event server main', () => {
     expect(archiverStart).not.toHaveBeenCalled();
     expect(startMetricsServer).not.toHaveBeenCalled();
     expect(connectRedis).toHaveBeenCalledTimes(1);
-    expect(startGrpcServer).toHaveBeenCalledWith(50054);
+    expect(createGrpcServer).toHaveBeenCalledWith({ port: 50054 });
   });
 
   it('logs and rethrows errors in test mode', async () => {
@@ -133,7 +136,8 @@ describe('event server main', () => {
     const { main } = await import('../server');
 
     process.env.NODE_ENV = 'test';
-    startGrpcServer.mockRejectedValue(new Error('boom'));
+    createGrpcServer.mockReturnValue({ start: grpcServerStart, stop: vi.fn() });
+    grpcServerStart.mockRejectedValue(new Error('boom'));
 
     await expect(main()).rejects.toThrow('boom');
     expect(loggerError).toHaveBeenCalledWith(

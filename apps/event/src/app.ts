@@ -1,8 +1,7 @@
 import {
   closeHttpServer,
   createAsyncLifecycle,
-  createShutdownManager,
-  type ShutdownManager,
+  createServiceBootstrapBuilder,
 } from '@specify-poker/shared';
 import type { Server as HttpServer } from 'http';
 import type { Config } from './config';
@@ -19,94 +18,86 @@ export type CreateEventAppOptions = {
 };
 
 export function createEventApp(options: CreateEventAppOptions): EventApp {
-  type RunningResources = {
-    shutdown: ShutdownManager;
-    metricsServer: HttpServer | null;
-  };
+  let metricsServer: HttpServer | null = null;
 
-  let resources: RunningResources | null = null;
-
-  const startInternal = async (resources: RunningResources): Promise<void> => {
-    const shutdown = resources.shutdown;
-
-    const { closePgPool } = await import('./storage/pgClient');
-    shutdown.add('pg.close', async () => {
-      await closePgPool();
-    });
-
-    const { runMigrations } = await import('./storage/migrations');
-    const { connectRedis, closeRedis } = await import('./storage/redisClient');
-    const { handMaterializer } = await import('./jobs/handMaterializer');
-    const { archiver } = await import('./jobs/archiver');
-    const { startMetricsServer } = await import('./observability/metrics');
-    const { startGrpcServer, stopGrpcServer } = await import('./api/grpc/server');
-
-    if (!options.isTest) {
-      await runMigrations();
-    }
-
-    await connectRedis();
-    shutdown.add('redis.close', async () => {
-      await closeRedis();
-    });
-
-    if (!options.isTest) {
-      await handMaterializer.start();
-      await archiver.start();
-      shutdown.add('jobs.stop', async () => {
-        await handMaterializer.stop();
-        archiver.stop();
+  const bootstrap = createServiceBootstrapBuilder({ logger, serviceName: 'event.app' })
+    .step('pg.close', async ({ onShutdown }) => {
+      const { closePgPool } = await import('./storage/pgClient');
+      onShutdown('pg.close', async () => {
+        await closePgPool();
       });
-
-      resources.metricsServer = startMetricsServer(options.config.metricsPort);
-      shutdown.add('metrics.close', async () => {
-        if (!resources.metricsServer) {
-          return;
-        }
-        await closeHttpServer(resources.metricsServer);
-        resources.metricsServer = null;
-      });
-    }
-
-    await startGrpcServer(options.config.grpcPort);
-    shutdown.add('grpc.stop', () => {
-      stopGrpcServer();
-    });
-  };
-
-  const lifecycle = createAsyncLifecycle({
-    start: async () => {
-      const shutdown = createShutdownManager({ logger });
-      const startedResources: RunningResources = { shutdown, metricsServer: null };
-
-      try {
-        await startInternal(startedResources);
-        resources = startedResources;
-      } catch (error: unknown) {
-        try {
-          await shutdown.run();
-        } catch (shutdownError: unknown) {
-          logger.error({ err: shutdownError }, 'EventApp shutdown failed after start error');
-        } finally {
-          resources = null;
-        }
-
-        throw error;
-      }
-    },
-    stop: async () => {
-      if (!resources) {
+    })
+    .step('migrations.run', async () => {
+      if (options.isTest) {
         return;
       }
 
-      const current = resources;
-      try {
-        await current.shutdown.run();
-      } finally {
-        resources = null;
+      const { runMigrations } = await import('./storage/migrations');
+      await runMigrations();
+    })
+    .step('redis.connect', async ({ onShutdown }) => {
+      const { connectRedis, closeRedis } = await import('./storage/redisClient');
+
+      await connectRedis();
+      onShutdown('redis.close', async () => {
+        await closeRedis();
+      });
+    })
+    .step('jobs.start', async ({ onShutdown }) => {
+      if (options.isTest) {
+        return;
       }
+
+      const { handMaterializer } = await import('./jobs/handMaterializer');
+      const { archiver } = await import('./jobs/archiver');
+
+      await handMaterializer.start();
+      await archiver.start();
+
+      onShutdown('jobs.stop', async () => {
+        await handMaterializer.stop();
+        archiver.stop();
+      });
+    })
+    .step('metrics.start', async ({ onShutdown }) => {
+      if (options.isTest) {
+        return;
+      }
+
+      const { startMetricsServer } = await import('./observability/metrics');
+
+      metricsServer = startMetricsServer(options.config.metricsPort);
+      onShutdown('metrics.close', async () => {
+        if (!metricsServer) {
+          return;
+        }
+        await closeHttpServer(metricsServer);
+        metricsServer = null;
+      });
+    })
+    .step('grpc.server.start', async ({ onShutdown }) => {
+      const { createGrpcServer } = await import('./api/grpc/server');
+
+      const grpcServer = createGrpcServer({ port: options.config.grpcPort });
+      onShutdown('grpc.stop', () => {
+        grpcServer.stop();
+      });
+
+      await grpcServer.start();
+    })
+    .build({
+      run: async () => undefined,
+      onStartWhileRunning: 'throw',
+    });
+
+  const lifecycle = createAsyncLifecycle({
+    start: async () => {
+      await bootstrap.main();
+    },
+    stop: async () => {
+      await bootstrap.shutdown();
     },
   });
 
-  return { start: () => lifecycle.start(), stop: () => lifecycle.stop() };
+  return { start: lifecycle.start, stop: lifecycle.stop };
 }

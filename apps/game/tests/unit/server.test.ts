@@ -3,8 +3,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const serverState = vi.hoisted(() => ({
   connectRedis: vi.fn(async () => undefined),
   closeRedisClient: vi.fn(async () => undefined),
-  startGrpcServer: vi.fn(async () => undefined),
-  stopGrpcServer: vi.fn(),
+  grpcServer: {
+    start: vi.fn(async () => undefined),
+    stop: vi.fn(),
+  },
+  createGrpcServer: vi.fn(),
   closeGrpcClients: vi.fn(),
   startMetricsServer: vi.fn(() => ({
     close: vi.fn((callback?: (err?: Error) => void) => {
@@ -22,8 +25,7 @@ vi.mock('../../src/observability', () => ({
 }));
 
 vi.mock('../../src/api/grpc/server', () => ({
-  startGrpcServer: serverState.startGrpcServer,
-  stopGrpcServer: serverState.stopGrpcServer,
+  createGrpcServer: serverState.createGrpcServer,
 }));
 
 vi.mock('../../src/api/grpc/clients', () => ({
@@ -71,13 +73,15 @@ describe('server lifecycle', () => {
     const server = await import('../../src/server');
 
     process.env.NODE_ENV = 'production';
+    serverState.createGrpcServer.mockReturnValue(serverState.grpcServer);
     await server.main();
     expect(serverState.connectRedis).toHaveBeenCalledTimes(1);
-    expect(serverState.startGrpcServer).toHaveBeenCalledWith(50053);
+    expect(serverState.createGrpcServer).toHaveBeenCalledWith({ port: 50053 });
+    expect(serverState.grpcServer.start).toHaveBeenCalledTimes(1);
     expect(serverState.startMetricsServer).toHaveBeenCalledWith(9105);
 
     await server.shutdown();
-    expect(serverState.stopGrpcServer).toHaveBeenCalledTimes(1);
+    expect(serverState.grpcServer.stop).toHaveBeenCalledTimes(1);
     expect(serverState.closeGrpcClients).toHaveBeenCalledTimes(1);
     expect(serverState.closeRedisClient).toHaveBeenCalledTimes(1);
     expect(serverState.stopObservability).toHaveBeenCalledTimes(1);

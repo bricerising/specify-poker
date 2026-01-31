@@ -19,11 +19,13 @@ type BalanceProto = {
   };
 };
 
-let lifecycle: GrpcServerLifecycle | null = null;
+export type BalanceGrpcServer = GrpcServerLifecycle;
 
-export async function startGrpcServer(port: number, handlers: GrpcHandlers): Promise<void> {
-  lifecycle?.stop();
-  lifecycle = createGrpcServerLifecycle<BalanceProto>({
+export function createGrpcServer(options: {
+  port: number;
+  handlers: GrpcHandlers;
+}): BalanceGrpcServer {
+  return createGrpcServerLifecycle<BalanceProto>({
     grpc,
     protoLoader,
     protoPath: PROTO_PATH,
@@ -34,24 +36,17 @@ export async function startGrpcServer(port: number, handlers: GrpcHandlers): Pro
       defaults: true,
       oneofs: true,
     },
-    port,
+    port: options.port,
     loadProto: (loaded) => loaded as BalanceProto,
     register: (server, proto) => {
       addGrpcService({
         server,
         service: proto.balance.BalanceService.service,
-        handlers,
+        handlers: options.handlers,
         serviceName: 'BalanceService',
       });
     },
     logger,
     logMessage: 'Balance gRPC server listening',
   });
-
-  await lifecycle.start();
-}
-
-export function stopGrpcServer(): void {
-  lifecycle?.stop();
-  lifecycle = null;
 }

@@ -34,13 +34,14 @@ vi.mock('../../src/observability/logger', () => ({
 
 describe('gRPC server', () => {
   it('starts and stops the server', async () => {
-    const { startGrpcServer, stopGrpcServer } = await import('../../src/api/grpc/server');
+    const { createGrpcServer } = await import('../../src/api/grpc/server');
 
-    await startGrpcServer(5555);
+    const server = createGrpcServer({ port: 5555 });
+    await server.start();
     expect(grpcState.addService).toHaveBeenCalledTimes(1);
     expect(grpcState.bindAsync).toHaveBeenCalledTimes(1);
 
-    stopGrpcServer();
+    server.stop();
     expect(grpcState.forceShutdown).toHaveBeenCalledTimes(1);
   });
 });

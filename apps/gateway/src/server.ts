@@ -1,15 +1,11 @@
 import {
   createOtelBootstrapStep,
   createServiceBootstrapBuilder,
-  runServiceMain,
+  isTestEnv,
+  runServiceMainIfDirectRun,
 } from '@specify-poker/shared';
 import logger from './observability/logger';
 import { initOTEL, shutdownOTEL } from './observability/otel';
-
-const isDirectRun =
-  typeof require !== 'undefined' && typeof module !== 'undefined' && require.main === module;
-
-const isTestEnv = (): boolean => process.env.NODE_ENV === 'test';
 
 const service = createServiceBootstrapBuilder({ logger, serviceName: 'gateway' })
   // Initialize OpenTelemetry before importing instrumented modules (http/express/ws/redis/etc.).
@@ -50,6 +46,7 @@ export async function shutdown(): Promise<void> {
   await service.shutdown();
 }
 
-if (isDirectRun && !isTestEnv()) {
-  runServiceMain({ logger, main: startServer, shutdown });
-}
+const isDirectRun = (): boolean =>
+  typeof require !== 'undefined' && typeof module !== 'undefined' && require.main === module;
+
+runServiceMainIfDirectRun({ logger, main: startServer, shutdown, isDirectRun });

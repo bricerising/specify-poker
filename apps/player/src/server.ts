@@ -2,13 +2,12 @@ import {
   closeHttpServer,
   createOtelBootstrapStep,
   createServiceBootstrapBuilder,
-  runServiceMain,
+  isTestEnv,
+  runServiceMainIfDirectRun,
 } from '@specify-poker/shared';
 import type { Config } from './config';
 import { startObservability, stopObservability } from './observability';
 import logger from './observability/logger';
-
-const isTestEnv = (): boolean => process.env.NODE_ENV === 'test';
 
 type PlayerServiceState = {
   config: Config;
@@ -45,13 +44,14 @@ const service = createServiceBootstrapBuilder({ logger, serviceName: 'player' })
     await runMigrations();
   })
   .step('grpc.server.start', async ({ onShutdown, state }) => {
-    const { startGrpcServer, stopGrpcServer } = await import('./api/grpc/server');
+    const { createGrpcServer } = await import('./api/grpc/server');
 
+    const grpcServer = createGrpcServer({ port: state.config.grpcPort });
     onShutdown('grpc.stop', () => {
-      stopGrpcServer();
+      grpcServer.stop();
     });
 
-    await startGrpcServer(state.config.grpcPort);
+    await grpcServer.start();
   })
   .step('metrics.start', async ({ onShutdown, state }) => {
     const { startMetricsServer } = await import('./observability/metrics');
@@ -93,9 +93,7 @@ export async function shutdown() {
   await service.shutdown();
 }
 
-const isDirectRun =
+const isDirectRun = (): boolean =>
   typeof require !== 'undefined' && typeof module !== 'undefined' && require.main === module;
 
-if (isDirectRun && process.env.NODE_ENV !== 'test') {
-  runServiceMain({ logger, main, shutdown });
-}
+runServiceMainIfDirectRun({ logger, main, shutdown, isDirectRun });

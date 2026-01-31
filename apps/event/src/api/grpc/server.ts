@@ -15,11 +15,10 @@ type EventProto = {
   event: { EventService: { service: grpc.ServiceDefinition } };
 };
 
-let lifecycle: GrpcServerLifecycle | null = null;
+export type EventGrpcServer = GrpcServerLifecycle;
 
-export async function startGrpcServer(port: number): Promise<void> {
-  lifecycle?.stop();
-  lifecycle = createGrpcServerLifecycle<EventProto>({
+export function createGrpcServer(options: { port: number }): EventGrpcServer {
+  return createGrpcServerLifecycle<EventProto>({
     grpc,
     protoLoader,
     protoPath: PROTO_PATH,
@@ -30,7 +29,7 @@ export async function startGrpcServer(port: number): Promise<void> {
       defaults: true,
       oneofs: true,
     },
-    port,
+    port: options.port,
     loadProto: (loaded) => loaded as EventProto,
     register: (server, proto) => {
       addGrpcService({
@@ -43,11 +42,4 @@ export async function startGrpcServer(port: number): Promise<void> {
     logger,
     logMessage: 'Event gRPC server listening',
   });
-
-  await lifecycle.start();
-}
-
-export function stopGrpcServer(): void {
-  lifecycle?.stop();
-  lifecycle = null;
 }

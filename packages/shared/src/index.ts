@@ -32,6 +32,7 @@ export * from './config/index';
 export * from './proxy/boundTargetProxy';
 export * from './http/closeHttpServer';
 export * from './observability/metricsServer';
+export * from './observability/nodeSdkOtelLifecycle';
 export * from './observability/otelSdkLifecycle';
 export * from './observability/pinoLogger';
 export * from './auth/keycloakKeys';
