@@ -8,6 +8,7 @@ import { getConfig } from '../config';
 import logger from './logger';
 
 const lifecycle = createOtelSdkLifecycle({
+  logger,
   createSdk: () => {
     const config = getConfig();
     return new NodeSDK({
@@ -19,12 +20,6 @@ const lifecycle = createOtelSdkLifecycle({
       }),
       instrumentations: [getNodeAutoInstrumentations()],
     });
-  },
-  onStarted: () => {
-    logger.info('OpenTelemetry SDK started');
-  },
-  onStopped: () => {
-    logger.info('OpenTelemetry SDK shut down');
   },
 });
 

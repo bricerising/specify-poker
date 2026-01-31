@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createGrpcServiceClientFactory } from '../src/grpc/clientFactory';
+import {
+  createGrpcServiceClientFactory,
+  createGrpcServiceClientFactoryBuilder,
+} from '../src/grpc/clientFactory';
 
 describe('createGrpcServiceClientFactory', () => {
   it('loads the proto once and constructs clients', () => {
@@ -45,5 +48,88 @@ describe('createGrpcServiceClientFactory', () => {
     expect(client1).toBeInstanceOf(ExampleServiceClient);
     expect(client1.address).toBe('localhost:1234');
     expect(client2.address).toBe('localhost:5678');
+  });
+});
+
+describe('createGrpcServiceClientFactoryBuilder', () => {
+  it('creates service factories using shared defaults', () => {
+    const loadSync = vi.fn(() => ({}));
+
+    class ExampleServiceClient {
+      constructor(
+        public address: string,
+        public credentials: unknown,
+      ) {}
+    }
+
+    const loadPackageDefinition = vi.fn(() => ({
+      example: { ExampleService: ExampleServiceClient },
+    }));
+
+    type ExampleProto = {
+      example: {
+        ExampleService: new (address: string, credentials: unknown) => ExampleServiceClient;
+      };
+    };
+
+    const builder = createGrpcServiceClientFactoryBuilder({
+      grpc: { loadPackageDefinition },
+      protoLoader: { loadSync },
+      protoLoaderOptions: { keepCase: true },
+    });
+
+    const factory = builder.service<ExampleProto, ExampleServiceClient>({
+      protoPath: 'example.proto',
+      getServiceConstructor: (proto) => proto.example.ExampleService,
+    });
+
+    factory.createClient({
+      address: 'localhost:1234',
+      credentials: { token: 'a' },
+    });
+
+    expect(loadSync).toHaveBeenCalledWith('example.proto', { keepCase: true });
+    expect(loadPackageDefinition).toHaveBeenCalledTimes(1);
+  });
+
+  it('supports per-service protoLoaderOptions overrides', () => {
+    const loadSync = vi.fn(() => ({}));
+
+    class ExampleServiceClient {
+      constructor(
+        public address: string,
+        public credentials: unknown,
+      ) {}
+    }
+
+    const loadPackageDefinition = vi.fn(() => ({
+      example: { ExampleService: ExampleServiceClient },
+    }));
+
+    type ExampleProto = {
+      example: {
+        ExampleService: new (address: string, credentials: unknown) => ExampleServiceClient;
+      };
+    };
+
+    const builder = createGrpcServiceClientFactoryBuilder({
+      grpc: { loadPackageDefinition },
+      protoLoader: { loadSync },
+      protoLoaderOptions: { keepCase: true },
+    });
+
+    const factory = builder.service<ExampleProto, ExampleServiceClient>({
+      protoPath: 'example.proto',
+      protoLoaderOptions: { keepCase: false },
+      getServiceConstructor: (proto) => proto.example.ExampleService,
+    });
+
+    factory.createClient({
+      address: 'localhost:1234',
+      credentials: { token: 'a' },
+    });
+
+    expect(loadSync).toHaveBeenCalledWith('example.proto', { keepCase: false });
+    expect(loadPackageDefinition).toHaveBeenCalledTimes(1);
   });
 });

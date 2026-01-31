@@ -449,6 +449,13 @@ Builds a small factory that:
 - caches the service constructor after the first load
 - constructs concrete client instances on demand
 
+#### `createGrpcServiceClientFactoryBuilder`
+
+Builds an Abstract Factory for `createGrpcServiceClientFactory(...)` that:
+
+- shares `grpc`, `protoLoader`, and default `protoLoaderOptions` across many services
+- optionally allows per-service `protoLoaderOptions` overrides
+
 #### `createGrpcServerLifecycle`
 
 Facade for grpc server setup:
@@ -546,6 +553,29 @@ Resolution order:
 4. Else → fetch realm public key PEM → `{ algorithms: ['RS256'] }`
 
 This is designed for services that support both “local/dev HS256” and “production RS256 via Keycloak”.
+
+---
+
+## Postgres helpers
+
+Entrypoint: `@specify-poker/shared/pg`
+
+### `createPgPoolManager`
+
+File: `src/pg/pgPoolManager.ts`
+
+Manages a Postgres pool with:
+
+- lazy initialization
+- pool-level error logging hooks (when supported)
+- idempotent shutdown via `close()` / `end()`
+
+API highlights:
+
+- `isInitialized()`
+- `query(text, params?)`
+- `connect()`
+- `close()` / `end()`
 
 ---
 

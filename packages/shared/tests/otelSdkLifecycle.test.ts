@@ -25,6 +25,30 @@ describe('createOtelSdkLifecycle', () => {
     expect(onStopped).toHaveBeenCalledTimes(1);
   });
 
+  it('logs lifecycle events when logger is provided and hooks are omitted', async () => {
+    const start = vi.fn();
+    const shutdown = vi.fn();
+
+    const logger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    };
+
+    const lifecycle = createOtelSdkLifecycle({
+      createSdk: () => ({ start, shutdown }),
+      logger,
+    });
+
+    await lifecycle.start();
+    await lifecycle.stop();
+
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(shutdown).toHaveBeenCalledTimes(1);
+    expect(logger.info).toHaveBeenNthCalledWith(1, 'OpenTelemetry SDK started');
+    expect(logger.info).toHaveBeenNthCalledWith(2, 'OpenTelemetry SDK shut down');
+  });
+
   it('does not create SDK when stopped before start', async () => {
     const createSdk = vi.fn();
     const lifecycle = createOtelSdkLifecycle({ createSdk });
@@ -48,7 +72,8 @@ describe('createOtelSdkLifecycle', () => {
       shutdown: vi.fn(),
     };
 
-    const createSdk = vi.fn()
+    const createSdk = vi
+      .fn()
       .mockImplementationOnce(() => sdkA)
       .mockImplementationOnce(() => sdkB);
 
@@ -65,4 +90,3 @@ describe('createOtelSdkLifecycle', () => {
     expect(sdkB.shutdown).toHaveBeenCalledTimes(1);
   });
 });
-

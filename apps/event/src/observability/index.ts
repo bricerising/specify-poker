@@ -4,12 +4,14 @@ import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
 import { Resource } from '@opentelemetry/resources';
 import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
 import { createOtelSdkLifecycle } from '@specify-poker/shared';
-import { config } from '../config';
+import { getConfig } from '../config';
 import logger from './logger';
 
 const lifecycle = createOtelSdkLifecycle({
-  createSdk: () =>
-    new NodeSDK({
+  logger,
+  createSdk: () => {
+    const config = getConfig();
+    return new NodeSDK({
       resource: new Resource({
         [SemanticResourceAttributes.SERVICE_NAME]: 'event-service',
       }),
@@ -17,12 +19,7 @@ const lifecycle = createOtelSdkLifecycle({
         url: config.otelExporterEndpoint,
       }),
       instrumentations: [getNodeAutoInstrumentations()],
-    }),
-  onStarted: () => {
-    logger.info('OpenTelemetry SDK started');
-  },
-  onStopped: () => {
-    logger.info('OpenTelemetry SDK shut down');
+    });
   },
 });
 

@@ -1,7 +1,5 @@
 import dotenv from 'dotenv';
-import { createConfigBuilder } from '@specify-poker/shared';
-
-dotenv.config();
+import { createConfigAccessors, createConfigBuilder } from '@specify-poker/shared';
 
 export type Config = {
   grpcPort: number;
@@ -13,6 +11,8 @@ export type Config = {
 };
 
 export function loadConfig(): Config {
+  dotenv.config();
+
   const config: Config = createConfigBuilder(process.env)
     .int('grpcPort', 'GRPC_PORT', 50054, { min: 1, max: 65535, onInvalid: 'throw' })
     .int('metricsPort', 'METRICS_PORT', 9104, { min: 1, max: 65535, onInvalid: 'throw' })
@@ -29,4 +29,12 @@ export function loadConfig(): Config {
   return config;
 }
 
-export const config = loadConfig();
+const configAccessors = createConfigAccessors(loadConfig);
+
+export function getConfig(): Config {
+  return configAccessors.getConfig();
+}
+
+export function resetConfigForTests(): void {
+  configAccessors.resetConfigForTests();
+}

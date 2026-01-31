@@ -8,6 +8,7 @@ import logger from './logger';
 import { getObservabilityRuntimeConfig } from './runtimeConfig';
 
 const lifecycle = createOtelSdkLifecycle({
+  logger,
   createSdk: () => {
     const config = getObservabilityRuntimeConfig();
     return new NodeSDK({
@@ -19,18 +20,6 @@ const lifecycle = createOtelSdkLifecycle({
       }),
       instrumentations: [getNodeAutoInstrumentations()],
     });
-  },
-  onStarted: () => {
-    logger.info('OpenTelemetry SDK started');
-  },
-  onStopped: () => {
-    logger.info('OpenTelemetry SDK shut down');
-  },
-  onShutdownAfterStartError: (shutdownError: unknown) => {
-    logger.warn(
-      { err: shutdownError },
-      'OpenTelemetry SDK shutdown failed after start error',
-    );
   },
 });
 

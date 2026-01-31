@@ -57,7 +57,7 @@ vi.mock('../../src/observability/logger', () => ({
 }));
 
 vi.mock('../../src/config', () => ({
-  config: { port: 50053, metricsPort: 9105 },
+  getConfig: () => ({ port: 50053, metricsPort: 9105 }),
 }));
 
 describe('server lifecycle', () => {

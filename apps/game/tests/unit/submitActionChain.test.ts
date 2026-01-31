@@ -91,6 +91,11 @@ describe('submitActionChain', () => {
       handComplete: false,
     } as SubmitActionAcceptedResult;
 
+    const eventEmitter = {
+      emit: vi.fn(async () => undefined),
+      emitDetached: vi.fn(),
+    };
+
     const deps = {
       recordTurnTime: vi.fn(),
       recordAction: vi.fn(),
@@ -98,7 +103,7 @@ describe('submitActionChain', () => {
       publishTableState: vi.fn(async () => undefined),
       recordActionContribution: vi.fn(async () => ({ type: 'ok' as const })),
       warn: vi.fn(),
-      emitGameEvent: vi.fn(async () => undefined),
+      eventEmitter,
       clearTurnTimer: vi.fn(),
       clearTurnStartMeta: vi.fn(),
       handleHandEnded: vi.fn(async () => undefined),
@@ -118,11 +123,10 @@ describe('submitActionChain', () => {
       result: accepted,
     });
 
-    expect(deps.emitGameEvent).toHaveBeenCalledWith(
+    expect(eventEmitter.emitDetached).toHaveBeenCalledWith(
       expect.objectContaining({
         idempotencyKey: 'event:ACTION_TAKEN:action-123',
       }),
     );
   });
 });
-

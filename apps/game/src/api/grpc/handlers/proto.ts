@@ -53,6 +53,10 @@ export type ProtoHandState = {
   pots: ProtoPot[];
   current_bet: number;
   min_raise: number;
+  round_contributions: Record<number, number>;
+  acted_seats: number[];
+  raise_capped: boolean;
+  big_blind: number;
   turn: number;
   last_aggressor: number;
   actions: ProtoAction[];
@@ -163,6 +167,10 @@ function toProtoHand(hand: HandState): ProtoHandState {
     pots: hand.pots.map(toProtoPot),
     current_bet: hand.currentBet,
     min_raise: hand.minRaise,
+    round_contributions: hand.roundContributions,
+    acted_seats: hand.actedSeats,
+    raise_capped: hand.raiseCapped,
+    big_blind: hand.bigBlind,
     turn: hand.turn,
     last_aggressor: hand.lastAggressor,
     actions: hand.actions.map(toProtoAction),

@@ -57,6 +57,22 @@ function normalizeNumberArray(value: unknown) {
     .filter((entry) => Number.isFinite(entry));
 }
 
+function normalizeNumberRecord(value: unknown): Record<number, number> {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+
+  const record: Record<number, number> = {};
+  for (const [key, rawValue] of Object.entries(value as Record<string, unknown>)) {
+    const parsedKey = Number(key);
+    if (!Number.isFinite(parsedKey)) {
+      continue;
+    }
+    record[parsedKey] = toNumber(rawValue, 0);
+  }
+  return record;
+}
+
 export function normalizeTableSummary(raw: UnknownRecord): TableSummary {
   return {
     tableId: String(raw.tableId ?? raw.table_id ?? ''),
@@ -172,10 +188,7 @@ export function normalizeHand(
     currentBet: toNumber(raw.currentBet ?? raw.current_bet, 0),
     minRaise: toNumber(raw.minRaise ?? raw.min_raise, 0),
     raiseCapped: Boolean(raw.raiseCapped ?? raw.raise_capped ?? false),
-    roundContributions: (raw.roundContributions ?? raw.round_contributions ?? {}) as Record<
-      number,
-      number
-    >,
+    roundContributions: normalizeNumberRecord(raw.roundContributions ?? raw.round_contributions),
     actedSeats: normalizeNumberArray(raw.actedSeats ?? raw.acted_seats),
     communityCards,
     pots,

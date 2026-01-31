@@ -65,7 +65,9 @@ export function createAsyncLifecycle(impl: AsyncLifecycleImpl): AsyncLifecycle {
           continue;
         }
         case 'stopped': {
-          const promise = impl.start();
+          const promise = (async () => {
+            await impl.start();
+          })();
           state = { status: 'starting', promise };
           try {
             await promise;
@@ -99,7 +101,9 @@ export function createAsyncLifecycle(impl: AsyncLifecycleImpl): AsyncLifecycle {
           continue;
         }
         case 'running': {
-          const promise = impl.stop();
+          const promise = (async () => {
+            await impl.stop();
+          })();
           state = { status: 'stopping', promise };
           try {
             await promise;

@@ -1,7 +1,9 @@
 import type { ActionInput, Seat, Table, TableState } from '../../domain/types';
-import { GameEventType, type GameEventType as GameEventTypeValue } from '../../domain/events';
+import { GameEventType } from '../../domain/events';
 import type { ApplyActionResult } from '../../engine/handEngine';
 import { composeAsyncChain, type AsyncChainHandler } from '@specify-poker/shared/pipeline';
+import { fireAndForget } from '@specify-poker/shared';
+import type { GameEventEmitter } from './gameEventEmitter';
 
 export type SubmitActionAcceptedResult = Extract<ApplyActionResult, { accepted: true }>;
 
@@ -38,15 +40,7 @@ export type SubmitActionChainDeps = {
     | { readonly type: 'error'; readonly error: string }
   >;
   warn(meta: unknown, message: string): void;
-  emitGameEvent(params: {
-    tableId: string;
-    handId: string | undefined;
-    userId: string | undefined;
-    seatId: number | undefined;
-    type: GameEventTypeValue;
-    payload: Record<string, unknown>;
-    idempotencyKey?: string;
-  }): Promise<void>;
+  eventEmitter: GameEventEmitter;
   clearTurnTimer(tableId: string): void;
   clearTurnStartMeta(tableId: string): void;
   handleHandEnded(table: Table, state: TableState): Promise<void>;
@@ -94,36 +88,24 @@ function recordContributionIfNeeded(deps: SubmitActionChainDeps): SubmitActionHa
       return;
     }
 
-    void deps
-      .recordActionContribution({
-        tableId: ctx.tableId,
-        handId: hand.handId,
-        action: ctx.result.action,
-        amount: contributionDelta,
-      })
-      .then((contributionResult) => {
+    fireAndForget(
+      async () => {
+        const contributionResult = await deps.recordActionContribution({
+          tableId: ctx.tableId,
+          handId: hand.handId,
+          action: ctx.result.action,
+          amount: contributionDelta,
+        });
+
         if (contributionResult.type === 'unavailable') {
-          void deps
-            .emitGameEvent({
-              tableId: ctx.tableId,
-              handId: hand.handId,
-              userId: ctx.userId,
-              seatId,
-              type: GameEventType.BALANCE_UNAVAILABLE,
-              payload: { action: 'RECORD_CONTRIBUTION' },
-            })
-            .catch((error: unknown) => {
-              deps.warn(
-                {
-                  err: error,
-                  tableId: ctx.tableId,
-                  handId: hand.handId,
-                  seatId,
-                  type: GameEventType.BALANCE_UNAVAILABLE,
-                },
-                'game_event.emit.failed',
-              );
-            });
+          deps.eventEmitter.emitDetached({
+            tableId: ctx.tableId,
+            handId: hand.handId,
+            userId: ctx.userId,
+            seatId,
+            type: GameEventType.BALANCE_UNAVAILABLE,
+            payload: { action: 'RECORD_CONTRIBUTION' },
+          });
           return;
         }
 
@@ -137,13 +119,14 @@ function recordContributionIfNeeded(deps: SubmitActionChainDeps): SubmitActionHa
             'balance.contribution.failed',
           );
         }
-      })
-      .catch((error: unknown) => {
+      },
+      (error: unknown) => {
         deps.warn(
           { err: error, tableId: ctx.tableId, handId: hand.handId },
           'balance.contribution.failed',
         );
-      });
+      },
+    );
 
     await next();
   };
@@ -156,34 +139,21 @@ function emitActionTakenEvent(deps: SubmitActionChainDeps): SubmitActionHandler 
     const actedSeat = ctx.result.state.seats[ctx.actingSeat.seatId];
     const isAllIn = actedSeat?.status === 'ALL_IN' || ctx.result.action.type === 'ALL_IN';
 
-    void deps
-      .emitGameEvent({
-        tableId: ctx.tableId,
-        handId: hand?.handId,
-        userId: ctx.userId,
+    deps.eventEmitter.emitDetached({
+      tableId: ctx.tableId,
+      handId: hand?.handId,
+      userId: ctx.userId,
+      seatId: ctx.actingSeat.seatId,
+      type: GameEventType.ACTION_TAKEN,
+      payload: {
         seatId: ctx.actingSeat.seatId,
-        type: GameEventType.ACTION_TAKEN,
-        payload: {
-          seatId: ctx.actingSeat.seatId,
-          action: ctx.result.action.type,
-          amount: ctx.result.action.amount,
-          isAllIn,
-          street: ctx.actionStreet,
-        },
-        idempotencyKey: `event:${GameEventType.ACTION_TAKEN}:${ctx.result.action.actionId}`,
-      })
-      .catch((error: unknown) => {
-        deps.warn(
-          {
-            err: error,
-            tableId: ctx.tableId,
-            handId: hand?.handId,
-            seatId: ctx.actingSeat.seatId,
-            type: GameEventType.ACTION_TAKEN,
-          },
-          'game_event.emit.failed',
-        );
-      });
+        action: ctx.result.action.type,
+        amount: ctx.result.action.amount,
+        isAllIn,
+        street: ctx.actionStreet,
+      },
+      idempotencyKey: `event:${GameEventType.ACTION_TAKEN}:${ctx.result.action.actionId}`,
+    });
 
     await next();
   };

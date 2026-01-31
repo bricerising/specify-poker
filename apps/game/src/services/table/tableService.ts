@@ -7,12 +7,13 @@ import type {
   TableState,
   TableSummary,
 } from '../../domain/types';
-import { GameEventType, type GameEventType as GameEventTypeValue } from '../../domain/events';
+import { GameEventType } from '../../domain/events';
 import { applyAction } from '../../engine/handEngine';
 import type { BalanceClient } from '../../clients/balanceClient';
 import type { PublishResult, GameEvent } from '../../clients/eventClient';
 import { coerceNumber } from '../../utils/coerce';
 import { KeyedTaskQueue } from '../../utils/keyedTaskQueue';
+import { fireAndForget } from '@specify-poker/shared';
 import type { TableQueries } from './tableQueries';
 import type { TablePublisher } from './tablePublisher';
 import { redactTableState } from './tableViewBuilder';
@@ -37,6 +38,7 @@ import {
   type SeatBuyInChainContext,
 } from './seatBuyInChain';
 import { createHandLifecycle, type HandLifecycle } from './handLifecycle';
+import { createGameEventEmitter, type GameEventEmitter } from './gameEventEmitter';
 
 type LoggerLike = {
   info(meta: unknown, message?: string): void;
@@ -108,6 +110,7 @@ type GetTableStateResponse = {
 
 export class TableService {
   private readonly deps: TableServiceDeps;
+  private readonly eventEmitter: GameEventEmitter;
 
   private readonly submitActionChain: (ctx: SubmitActionChainContext) => Promise<void>;
   private readonly joinSeatChain: (ctx: JoinSeatChainContext) => Promise<JoinSeatChainResult>;
@@ -125,6 +128,32 @@ export class TableService {
 
   constructor(deps: TableServiceDeps) {
     this.deps = deps;
+    this.eventEmitter = createGameEventEmitter({
+      emit: async (event) => {
+        await this.deps.publishEvent({
+          type: event.type,
+          tableId: event.tableId,
+          handId: event.handId,
+          userId: event.userId,
+          seatId: event.seatId,
+          payload: event.payload,
+          idempotencyKey: event.idempotencyKey,
+        });
+      },
+      onError: (error, event) => {
+        this.deps.logger.error(
+          {
+            err: error,
+            tableId: event.tableId,
+            handId: event.handId,
+            userId: event.userId,
+            seatId: event.seatId,
+            type: event.type,
+          },
+          'game_event.emit.failed',
+        );
+      },
+    });
 
     this.tableTimers = createTableTimers({
       runTableTask: (tableId, task) => this.runTableTask(tableId, task),
@@ -152,16 +181,7 @@ export class TableService {
           amount: params.amount,
         }),
       warn: (meta, message) => this.deps.logger.warn(meta, message),
-      emitGameEvent: (params) =>
-        this.emitGameEvent(
-          params.tableId,
-          params.handId,
-          params.userId,
-          params.seatId,
-          params.type,
-          params.payload,
-          params.idempotencyKey,
-        ),
+      eventEmitter: this.eventEmitter,
       clearTurnTimer: (tableId) => this.tableTimers.clearTurnTimer(tableId),
       clearTurnStartMeta: (tableId) => this.tableTimers.clearTurnStartMeta(tableId),
       handleHandEnded: (table, state) => this.handLifecycle.handleHandEnded(table, state),
@@ -185,8 +205,7 @@ export class TableService {
       tableTimers: this.tableTimers,
       metrics: this.deps.metrics,
       logger: this.deps.logger,
-      emitGameEvent: (tableId, handId, userId, seatId, type, payload, idempotencyKey) =>
-        this.emitGameEvent(tableId, handId, userId, seatId, type, payload, idempotencyKey),
+      eventEmitter: this.eventEmitter,
       touchState: (state) => this.touchState(state),
     });
 
@@ -206,16 +225,7 @@ export class TableService {
       rollbackSeat: (params) =>
         this.rollbackSeat(params.tableId, params.seatId, params.userId, params.reservationId),
       logError: (meta, message) => this.deps.logger.error(meta, message),
-      emitGameEvent: (params) =>
-        this.emitGameEvent(
-          params.tableId,
-          params.handId,
-          params.userId,
-          params.seatId,
-          params.type,
-          params.payload,
-          params.idempotencyKey,
-        ),
+      eventEmitter: this.eventEmitter,
     });
 
     this.leaveSeatChain = createLeaveSeatChain({
@@ -269,25 +279,6 @@ export class TableService {
     return `${prefix}:${this.deps.ids.randomUUID()}`;
   }
 
-  private emitGameEventDetached(
-    tableId: string,
-    handId: string | undefined,
-    userId: string | undefined,
-    seatId: number | undefined,
-    type: GameEventTypeValue,
-    payload: Record<string, unknown>,
-    idempotencyKey?: string,
-  ): void {
-    void this.emitGameEvent(tableId, handId, userId, seatId, type, payload, idempotencyKey).catch(
-      (error: unknown) => {
-        this.deps.logger.error(
-          { err: error, tableId, handId, userId, seatId, type },
-          'game_event.emit.failed',
-        );
-      },
-    );
-  }
-
   private cashOutIdempotencyKey(tableId: string, userId: string, seatId: number): string {
     return this.newIdempotencyKey(`cashout:${tableId}:${userId}:${seatId}`);
   }
@@ -312,20 +303,25 @@ export class TableService {
     });
 
     if (!cashOutCall.ok) {
-      this.emitGameEventDetached(
+      this.eventEmitter.emitDetached({
         tableId,
-        undefined,
+        handId: undefined,
         userId,
         seatId,
-        GameEventType.BALANCE_UNAVAILABLE,
-        { action: 'CASH_OUT' },
-      );
+        type: GameEventType.BALANCE_UNAVAILABLE,
+        payload: { action: 'CASH_OUT' },
+      });
       return;
     }
 
     if (!cashOutCall.value.ok) {
-      this.emitGameEventDetached(tableId, undefined, userId, seatId, GameEventType.CASHOUT_FAILED, {
-        amount,
+      this.eventEmitter.emitDetached({
+        tableId,
+        handId: undefined,
+        userId,
+        seatId,
+        type: GameEventType.CASHOUT_FAILED,
+        payload: { amount },
       });
     }
   }
@@ -515,20 +511,24 @@ export class TableService {
     }
 
     if (state.hand && !this.tableTimers.hasTurnTimer(tableId)) {
-      void this.runTableTask(tableId, async () => {
-        if (this.tableTimers.hasTurnTimer(tableId)) {
-          return;
-        }
+      fireAndForget(
+        () =>
+          this.runTableTask(tableId, async () => {
+            if (this.tableTimers.hasTurnTimer(tableId)) {
+              return;
+            }
 
-        const loaded = await this.deps.tableQueries.loadTableAndState(tableId);
-        if (!loaded) {
-          return;
-        }
+            const loaded = await this.deps.tableQueries.loadTableAndState(tableId);
+            if (!loaded) {
+              return;
+            }
 
-        await this.tableTimers.startTurnTimer(loaded.table, loaded.state);
-      }).catch((error: unknown) => {
-        this.deps.logger.error({ err: error, tableId }, 'turn.timer.rearm.failed');
-      });
+            await this.tableTimers.startTurnTimer(loaded.table, loaded.state);
+          }),
+        (error: unknown) => {
+          this.deps.logger.error({ err: error, tableId }, 'turn.timer.rearm.failed');
+        },
+      );
     }
 
     const seat = userId ? this.resolveSeatForUser(state, userId) : undefined;
@@ -641,16 +641,16 @@ export class TableService {
       this.touchState(state);
       await this.deps.tableStateStore.save(state);
 
-      this.emitGameEventDetached(
+      this.eventEmitter.emitDetached({
         tableId,
-        undefined,
+        handId: undefined,
         userId,
         seatId,
-        GameEventType.BALANCE_UNAVAILABLE,
-        {
+        type: GameEventType.BALANCE_UNAVAILABLE,
+        payload: {
           action: 'BUY_IN',
         },
-      );
+      });
 
       const table = await this.deps.tableStore.get(tableId);
       if (!table) {
@@ -669,17 +669,19 @@ export class TableService {
     reservationId?: string,
   ): Promise<void> {
     if (reservationId) {
-      void this.deps.balanceClient
-        .releaseReservation({
-          reservationId,
-          reason: 'buy_in_failed',
-        })
-        .catch((error: unknown) => {
+      fireAndForget(
+        () =>
+          this.deps.balanceClient.releaseReservation({
+            reservationId,
+            reason: 'buy_in_failed',
+          }),
+        (error: unknown) => {
           this.deps.logger.warn(
             { err: error, tableId, seatId, userId, reservationId },
             'balance.reservation.release.failed',
           );
-        });
+        },
+      );
     }
 
     await this.runTableTask(tableId, async () => {
@@ -711,14 +713,14 @@ export class TableService {
       return result;
     }
 
-    this.emitGameEventDetached(
+    this.eventEmitter.emitDetached({
       tableId,
-      result.handId,
+      handId: result.handId,
       userId,
-      result.seatId,
-      GameEventType.PLAYER_LEFT,
-      { stack: result.remainingStack },
-    );
+      seatId: result.seatId,
+      type: GameEventType.PLAYER_LEFT,
+      payload: { stack: result.remainingStack },
+    });
 
     if (result.remainingStack > 0) {
       await this.cashOutSeatStack({
@@ -841,23 +843,4 @@ export class TableService {
     return { ok: true };
   }
 
-  private async emitGameEvent(
-    tableId: string,
-    handId: string | undefined,
-    userId: string | undefined,
-    seatId: number | undefined,
-    type: GameEventTypeValue,
-    payload: Record<string, unknown>,
-    idempotencyKey?: string,
-  ): Promise<void> {
-    await this.deps.publishEvent({
-      type,
-      tableId,
-      handId,
-      userId,
-      seatId,
-      payload,
-      idempotencyKey,
-    });
-  }
 }

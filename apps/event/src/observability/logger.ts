@@ -1,20 +1,8 @@
-import pino from 'pino';
-import { context, trace } from '@opentelemetry/api';
-import { config } from '../config';
+import { createPinoLogger } from '@specify-poker/shared';
+import { getConfig } from '../config';
 
-const logger = pino({
-  level: process.env.NODE_ENV === 'test' ? 'silent' : config.logLevel,
-  mixin() {
-    const span = trace.getSpan(context.active());
-    if (!span) {
-      return {};
-    }
-    const spanContext = span.spanContext();
-    return {
-      traceId: spanContext.traceId,
-      spanId: spanContext.spanId,
-    };
-  },
+const logger = createPinoLogger({
+  level: process.env.NODE_ENV === 'test' ? 'silent' : getConfig().logLevel,
 });
 
 export default logger;

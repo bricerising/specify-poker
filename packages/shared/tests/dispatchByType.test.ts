@@ -25,6 +25,19 @@ describe('dispatchByType', () => {
     expect(handlers.A).toHaveBeenCalledTimes(1);
     expect(handlers.B).toHaveBeenCalledTimes(1);
   });
+
+  it('throws a helpful error when a handler is missing at runtime', () => {
+    type Ctx = { requestId: string };
+    type Event = { type: 'A'; value: number } | { type: 'B'; text: string };
+
+    const handlers = {
+      A: vi.fn((_ctx: Ctx, event: Extract<Event, { type: 'A' }>) => `A:${event.value}`),
+    } as unknown as DispatchByTypeHandlerMap<Ctx, Event, string>;
+
+    expect(() =>
+      dispatchByType(handlers, { requestId: 'req-1' }, { type: 'B', text: 'hi' } as Event),
+    ).toThrowError('dispatchByType.missing_handler:B');
+  });
 });
 
 describe('dispatchByTypeNoCtx', () => {
@@ -41,5 +54,17 @@ describe('dispatchByTypeNoCtx', () => {
 
     expect(handlers.A).toHaveBeenCalledTimes(1);
     expect(handlers.B).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws a helpful error when a handler is missing at runtime', () => {
+    type Event = { type: 'A'; value: number } | { type: 'B'; text: string };
+
+    const handlers = {
+      A: vi.fn((event: Extract<Event, { type: 'A' }>) => `A:${event.value}`),
+    } as unknown as DispatchByTypeNoCtxHandlerMap<Event, string>;
+
+    expect(() => dispatchByTypeNoCtx(handlers, { type: 'B', text: 'hi' } as Event)).toThrowError(
+      'dispatchByTypeNoCtx.missing_handler:B',
+    );
   });
 });

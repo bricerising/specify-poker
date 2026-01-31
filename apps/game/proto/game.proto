@@ -98,6 +98,10 @@ message HandState {
   repeated Action actions = 10;
   int64 rake_amount = 11;
   google.protobuf.Timestamp started_at = 12;
+  map<int32, int64> round_contributions = 13;
+  repeated int32 acted_seats = 14;
+  bool raise_capped = 15;
+  int64 big_blind = 16;
 }
 
 message TableState {

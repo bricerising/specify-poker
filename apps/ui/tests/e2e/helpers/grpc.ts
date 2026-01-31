@@ -1,6 +1,10 @@
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import path from 'path';
+import {
+  createGrpcServiceClientFactoryBuilder,
+  type GrpcClientConstructor,
+} from '@specify-poker/shared';
 
 type UnaryCallback<TResponse> = (err: grpc.ServiceError | null, response: TResponse) => void;
 
@@ -35,28 +39,35 @@ export type BalanceServiceClient = {
   ): void;
 };
 
-type GrpcClientConstructor<TClient> = new (
-  address: string,
-  credentials: grpc.ChannelCredentials,
-) => TClient;
+type ChannelClientConstructor<TClient> = GrpcClientConstructor<TClient, grpc.ChannelCredentials>;
 
-type BalanceProto = { balance: { BalanceService: GrpcClientConstructor<BalanceServiceClient> } };
+type BalanceProto = { balance: { BalanceService: ChannelClientConstructor<BalanceServiceClient> } };
 
-function loadProto(protoPath: string) {
-  const packageDefinition = protoLoader.loadSync(protoPath, {
-    keepCase: true,
-    longs: Number,
-    enums: String,
-    defaults: true,
-    oneofs: true,
-  });
-  return grpc.loadPackageDefinition(packageDefinition);
-}
+const PROTO_LOADER_OPTIONS: protoLoader.Options = {
+  keepCase: true,
+  longs: Number,
+  enums: String,
+  defaults: true,
+  oneofs: true,
+};
+
+const grpcClientFactoryBuilder = createGrpcServiceClientFactoryBuilder<grpc.ChannelCredentials>({
+  grpc,
+  protoLoader,
+  protoLoaderOptions: PROTO_LOADER_OPTIONS,
+});
+
+const protoPath = path.resolve(__dirname, '../../../..', 'balance/proto/balance.proto');
+const balanceClientFactory = grpcClientFactoryBuilder.service<BalanceProto, BalanceServiceClient>({
+  protoPath,
+  getServiceConstructor: (proto) => proto.balance.BalanceService,
+});
 
 export function createBalanceClient(address = 'localhost:50051'): BalanceServiceClient {
-  const protoPath = path.resolve(__dirname, '../../../..', 'balance/proto/balance.proto');
-  const balanceProto = loadProto(protoPath) as unknown as BalanceProto;
-  return new balanceProto.balance.BalanceService(address, grpc.credentials.createInsecure());
+  return balanceClientFactory.createClient({
+    address,
+    credentials: grpc.credentials.createInsecure(),
+  });
 }
 
 export function grpcCall<TRequest, TResponse>(

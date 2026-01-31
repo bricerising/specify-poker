@@ -21,9 +21,9 @@ vi.mock('@opentelemetry/api', () => ({
 vi.mock('pino', () => ({ default: pinoFactory }));
 
 vi.mock('../../config', () => ({
-  config: {
+  getConfig: () => ({
     logLevel: 'info',
-  },
+  }),
 }));
 
 import logger from '../logger';

@@ -1,10 +1,28 @@
+import { createAsyncDisposableLazyValue } from '@specify-poker/shared';
+import { createPgPoolManager, type PgPool } from '@specify-poker/shared/pg';
 import type { PoolClient, QueryResult, QueryResultRow } from 'pg';
-import { Pool } from 'pg';
 import { getConfig } from '../config';
+import logger from '../observability/logger';
 
-const pool = new Pool({
-  connectionString: getConfig().databaseUrl,
-});
+type PgManager = ReturnType<typeof createPgPoolManager>;
+
+const defaultPgManager = createAsyncDisposableLazyValue<PgManager>(
+  () => {
+    const config = getConfig();
+    return createPgPoolManager({
+      connectionString: config.databaseUrl,
+      log: logger,
+      name: 'player-db',
+    });
+  },
+  (manager) => manager.close(),
+);
+
+const pool: PgPool = {
+  query: (text, params) => defaultPgManager.get().query(text, params),
+  connect: () => defaultPgManager.get().connect(),
+  end: () => defaultPgManager.dispose(),
+};
 
 export async function query<T extends QueryResultRow>(
   text: string,
@@ -21,11 +39,23 @@ export async function transaction<T>(fn: (client: PoolClient) => Promise<T>): Pr
     await client.query('COMMIT');
     return result;
   } catch (error) {
-    await client.query('ROLLBACK');
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError: unknown) {
+      logger.error({ err: rollbackError }, 'Postgres transaction rollback failed');
+    }
     throw error;
   } finally {
     client.release();
   }
+}
+
+export async function closeDb(): Promise<void> {
+  await defaultPgManager.dispose();
+}
+
+export function resetDbForTests(): void {
+  defaultPgManager.reset();
 }
 
 export default pool;

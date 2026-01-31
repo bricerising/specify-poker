@@ -7,6 +7,7 @@ import { createOtelSdkLifecycle } from '@specify-poker/shared';
 import logger from './logger';
 
 const lifecycle = createOtelSdkLifecycle({
+  logger,
   createSdk: () =>
     new NodeSDK({
       resource: new Resource({
@@ -17,18 +18,6 @@ const lifecycle = createOtelSdkLifecycle({
       }),
       instrumentations: [getNodeAutoInstrumentations()],
     }),
-  onStarted: () => {
-    logger.info('OpenTelemetry SDK started');
-  },
-  onStartError: (err: unknown) => {
-    logger.error({ err }, 'Failed to start OpenTelemetry SDK');
-  },
-  onStopped: () => {
-    logger.info('OpenTelemetry SDK shut down');
-  },
-  onStopError: (err: unknown) => {
-    logger.error({ err }, 'Failed to shut down OpenTelemetry SDK');
-  },
   onShutdownAfterStartError: (err: unknown) => {
     logger.error({ err }, 'Failed to shut down OpenTelemetry SDK after start failure');
   },

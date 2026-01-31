@@ -1,25 +1,13 @@
-import pino from 'pino';
-import { context, trace } from '@opentelemetry/api';
+import { createPinoLogger } from '@specify-poker/shared';
 
-const logger = pino({
+const logger = createPinoLogger({
   level: process.env.LOG_LEVEL || 'info',
   formatters: {
     level: (label) => {
       return { level: label };
     },
   },
-  timestamp: pino.stdTimeFunctions.isoTime,
-  mixin() {
-    const span = trace.getSpan(context.active());
-    if (!span) {
-      return {};
-    }
-    const spanContext = span.spanContext();
-    return {
-      traceId: spanContext.traceId,
-      spanId: spanContext.spanId,
-    };
-  },
+  timestamp: 'isoTime',
 });
 
 export default logger;

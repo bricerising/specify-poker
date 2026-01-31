@@ -6,7 +6,7 @@ type ProtoLoaderModuleLike = {
   loadSync(filename: string | string[], options?: unknown): unknown;
 };
 
-type GrpcClientConstructor<TClient, TCredentials = unknown> = new (
+export type GrpcClientConstructor<TClient, TCredentials = unknown> = new (
   address: string,
   credentials: TCredentials,
 ) => TClient;
@@ -23,6 +23,42 @@ type CreateGrpcServiceClientFactoryOptions<TProto, TClient, TCredentials = unkno
   loadProto?: (loaded: unknown) => TProto;
   getServiceConstructor: (proto: TProto) => GrpcClientConstructor<TClient, TCredentials>;
 };
+
+export type GrpcServiceClientFactoryBuilder<TCredentials = unknown> = {
+  service<TProto, TClient>(options: {
+    protoPath: string | string[];
+    protoLoaderOptions?: unknown;
+    loadProto?: (loaded: unknown) => TProto;
+    getServiceConstructor: (proto: TProto) => GrpcClientConstructor<TClient, TCredentials>;
+  }): GrpcServiceClientFactory<TClient, TCredentials>;
+};
+
+/**
+ * Abstract Factory: create multiple compatible service client factories
+ * that share the same grpc/proto-loader modules and default loader options.
+ */
+export function createGrpcServiceClientFactoryBuilder<TCredentials = unknown>(options: {
+  grpc: GrpcModuleLike;
+  protoLoader: ProtoLoaderModuleLike;
+  protoLoaderOptions: unknown;
+}): GrpcServiceClientFactoryBuilder<TCredentials> {
+  return {
+    service: <TProto, TClient>(serviceOptions: {
+      protoPath: string | string[];
+      protoLoaderOptions?: unknown;
+      loadProto?: (loaded: unknown) => TProto;
+      getServiceConstructor: (proto: TProto) => GrpcClientConstructor<TClient, TCredentials>;
+    }): GrpcServiceClientFactory<TClient, TCredentials> =>
+      createGrpcServiceClientFactory<TProto, TClient, TCredentials>({
+        grpc: options.grpc,
+        protoLoader: options.protoLoader,
+        protoPath: serviceOptions.protoPath,
+        protoLoaderOptions: serviceOptions.protoLoaderOptions ?? options.protoLoaderOptions,
+        loadProto: serviceOptions.loadProto,
+        getServiceConstructor: serviceOptions.getServiceConstructor,
+      }),
+  };
+}
 
 export function createGrpcServiceClientFactory<TProto, TClient, TCredentials = unknown>(
   options: CreateGrpcServiceClientFactoryOptions<TProto, TClient, TCredentials>,

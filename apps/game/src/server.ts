@@ -4,7 +4,7 @@ import {
   runServiceMain,
 } from '@specify-poker/shared';
 import type { Server as HttpServer } from 'http';
-import { config } from './config';
+import { getConfig } from './config';
 import { startObservability, stopObservability } from './observability';
 import logger from './observability/logger';
 
@@ -38,6 +38,7 @@ const service = createServiceBootstrapBuilder({ logger, serviceName: 'game' })
       stopGrpcServer();
     });
 
+    const config = getConfig();
     await startGrpcServer(config.port);
     logger.info({ port: config.port }, 'Game Service gRPC server started');
   })
@@ -51,7 +52,7 @@ const service = createServiceBootstrapBuilder({ logger, serviceName: 'game' })
       metricsServer = null;
     });
 
-    metricsServer = startMetricsServer(config.metricsPort);
+    metricsServer = startMetricsServer(getConfig().metricsPort);
   })
   .step('grpc.clients.close', async ({ onShutdown }) => {
     const { closeGrpcClients } = await import('./api/grpc/clients');

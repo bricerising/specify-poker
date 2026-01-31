@@ -1,5 +1,5 @@
 import { seatAt } from '../../domain/seats';
-import { GameEventType, type GameEventType as GameEventTypeValue } from '../../domain/events';
+import { GameEventType } from '../../domain/events';
 import type { Table, TableState } from '../../domain/types';
 import type {
   BalanceCall,
@@ -11,8 +11,10 @@ import type {
   ReserveResult,
 } from '../../clients/balanceClient';
 import { composeAsyncChain, type AsyncChainHandler } from '@specify-poker/shared/pipeline';
+import { fireAndForget } from '@specify-poker/shared';
 import { coerceNumber } from '../../utils/coerce';
 import { buyInIdempotencyKeyPrefix } from './idempotency';
+import type { GameEventEmitter } from './gameEventEmitter';
 
 export type FinalizeReservedSeatJoinResult =
   | { readonly type: 'ok'; readonly wasAlreadySeated?: boolean }
@@ -48,15 +50,7 @@ export type SeatBuyInChainDeps = {
     reservationId?: string;
   }): Promise<void>;
   logError(meta: unknown, message: string): void;
-  emitGameEvent(params: {
-    tableId: string;
-    handId: string | undefined;
-    userId: string | undefined;
-    seatId: number | undefined;
-    type: GameEventTypeValue;
-    payload: Record<string, unknown>;
-    idempotencyKey?: string;
-  }): Promise<void>;
+  eventEmitter: GameEventEmitter;
 };
 
 type SeatBuyInHandler = AsyncChainHandler<SeatBuyInChainContext, FinalizeReservedSeatJoinResult>;
@@ -191,14 +185,15 @@ function reserveBalanceIfNeeded(deps: SeatBuyInChainDeps): SeatBuyInHandler {
     );
 
     if (persistedReservation.type === 'error') {
-      void deps
-        .releaseReservation({ reservationId, reason: 'seat_lost' })
-        .catch((error: unknown) => {
+      fireAndForget(
+        () => deps.releaseReservation({ reservationId, reason: 'seat_lost' }),
+        (error: unknown) => {
           deps.logError(
             { err: error, tableId: ctx.tableId, seatId: ctx.seatId, reservationId },
             'balance.reservation.release.failed',
           );
-        });
+        },
+      );
       return persistedReservation;
     }
 
@@ -277,24 +272,17 @@ function finalizeSeat(deps: SeatBuyInChainDeps): SeatBuyInHandler {
         await deps.saveState(state);
         await deps.publishTableAndLobby(table, state);
 
-        void deps
-          .emitGameEvent({
-            tableId: ctx.tableId,
-            handId: undefined,
-            userId: ctx.userId,
-            seatId: ctx.seatId,
-            type: GameEventType.PLAYER_JOINED,
-            payload: {
-              stack: buyInAmount,
-            },
-            idempotencyKey: `event:${GameEventType.PLAYER_JOINED}:${buyInIdempotencyKey}`,
-          })
-          .catch((error: unknown) => {
-            deps.logError(
-              { err: error, tableId: ctx.tableId, seatId: ctx.seatId },
-              'game_event.emit.failed',
-            );
-          });
+        deps.eventEmitter.emitDetached({
+          tableId: ctx.tableId,
+          handId: undefined,
+          userId: ctx.userId,
+          seatId: ctx.seatId,
+          type: GameEventType.PLAYER_JOINED,
+          payload: {
+            stack: buyInAmount,
+          },
+          idempotencyKey: `event:${GameEventType.PLAYER_JOINED}:${buyInIdempotencyKey}`,
+        });
 
         await deps.checkStartHand(table, state);
 

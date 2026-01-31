@@ -1,19 +1,17 @@
 import {
-  closeHttpServer,
   createServiceBootstrapBuilder,
   runServiceMain,
 } from '@specify-poker/shared';
-import { collectDefaultMetrics } from 'prom-client';
-import { getConfig } from './config';
 import logger from './observability/logger';
 import { initOTEL, shutdownOTEL } from './observability/otel';
+import type { GatewayApp } from './app';
 
 const isDirectRun =
   typeof require !== 'undefined' && typeof module !== 'undefined' && require.main === module;
 
 const isTestEnv = (): boolean => process.env.NODE_ENV === 'test';
 
-let defaultMetricsInitialized = false;
+let runningApp: GatewayApp | null = null;
 
 const service = createServiceBootstrapBuilder({ logger, serviceName: 'gateway' })
   .step('otel.init', async ({ onShutdown }) => {
@@ -27,89 +25,24 @@ const service = createServiceBootstrapBuilder({ logger, serviceName: 'gateway' }
       await shutdownOTEL();
     });
   })
-  .step('gateway.start', async ({ onShutdown }) => {
-    const config = getConfig();
-
-    const [
-      { default: express },
-      { default: cors },
-      http,
-      { createRouter },
-      { initWsServer },
-      { closeWsPubSub },
-      { closeGrpcClients },
-      { registerInstance, unregisterInstance },
-      { closeRedisClient },
-    ] = await Promise.all([
-      import('express'),
-      import('cors'),
-      import('http'),
-      import('./http/router'),
-      import('./ws/server'),
-      import('./ws/pubsub'),
-      import('./grpc/clients'),
-      import('./storage/instanceRegistry'),
-      import('./storage/redisClient'),
+  .step('app.start', async ({ onShutdown }) => {
+    const [{ getConfig }, { createGatewayApp }] = await Promise.all([
+      import('./config'),
+      import('./app'),
     ]);
 
-    const app = express();
-    const server = http.createServer(app);
+    const config = getConfig();
 
-    onShutdown('redis.close', async () => {
-      await closeRedisClient();
-    });
-    onShutdown('ws.pubsub.close', async () => {
-      await closeWsPubSub();
-    });
-    onShutdown('grpc.clients.close', () => {
-      closeGrpcClients();
-    });
-    onShutdown('http.close', async () => {
-      await closeHttpServer(server);
+    const app = createGatewayApp({ config });
+    runningApp = app;
+
+    onShutdown('app.stop', async () => {
+      const current = runningApp;
+      runningApp = null;
+      await current?.stop();
     });
 
-    // Instance Registry
-    await registerInstance();
-    onShutdown('instanceRegistry.unregister', async () => {
-      await unregisterInstance();
-    });
-
-    // Observability
-    if (!defaultMetricsInitialized) {
-      collectDefaultMetrics();
-      defaultMetricsInitialized = true;
-    }
-
-    // Security
-    app.use(
-      cors({
-        origin: config.corsOrigin,
-        credentials: true,
-      }),
-    );
-
-    // Router
-    app.use(createRouter());
-
-    // WebSocket Server
-    const wss = await initWsServer(server);
-    onShutdown('ws.close', async () => {
-      for (const client of wss.clients) {
-        try {
-          client.terminate();
-        } catch {
-          // Ignore.
-        }
-      }
-      await new Promise<void>((resolve) => wss.close(() => resolve()));
-    });
-
-    await new Promise<void>((resolve) => {
-      server.listen(config.port, () => {
-        logger.info({ port: config.port }, 'Gateway service started');
-        resolve();
-      });
-    });
+    await app.start();
   })
   .build({
     run: async () => {},
@@ -122,6 +55,7 @@ export async function startServer(): Promise<void> {
 
 export async function shutdown(): Promise<void> {
   await service.shutdown();
+  runningApp = null;
 }
 
 if (isDirectRun && !isTestEnv()) {

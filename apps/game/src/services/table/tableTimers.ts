@@ -1,4 +1,4 @@
-import { TimeoutRegistry } from '@specify-poker/shared';
+import { fireAndForget, TimeoutRegistry } from '@specify-poker/shared';
 
 import type { ActionInput, Seat, Table, TableState } from '../../domain/types';
 import { deriveLegalActions } from '../../engine/actionRules';
@@ -197,13 +197,27 @@ export function createTableTimers(deps: TableTimersDeps): TableTimers {
     }
 
     const timer = setTimeout(() => {
-      void deps.runTableTask(repairedState.tableId, () =>
-        handleTurnTimeout({
-          table,
-          tableId: repairedState.tableId,
-          handId: repairedHand.handId,
-          turnSeatId: repairedHand.turn,
-        }),
+      fireAndForget(
+        () =>
+          deps.runTableTask(repairedState.tableId, () =>
+            handleTurnTimeout({
+              table,
+              tableId: repairedState.tableId,
+              handId: repairedHand.handId,
+              turnSeatId: repairedHand.turn,
+            }),
+          ),
+        (error: unknown) => {
+          deps.logError(
+            {
+              err: error,
+              tableId: repairedState.tableId,
+              handId: repairedHand.handId,
+              turnSeatId: repairedHand.turn,
+            },
+            'turn.timeout.task.failed',
+          );
+        },
       );
     }, timeoutMs);
 
@@ -218,7 +232,12 @@ export function createTableTimers(deps: TableTimersDeps): TableTimers {
     clearNextHandTimer(tableId);
     const timer = setTimeout(() => {
       nextHandTimers.delete(tableId);
-      void deps.runTableTask(tableId, () => deps.startNextHandIfPossible(tableId));
+      fireAndForget(
+        () => deps.runTableTask(tableId, () => deps.startNextHandIfPossible(tableId)),
+        (error: unknown) => {
+          deps.logError({ err: error, tableId }, 'next_hand.start.failed');
+        },
+      );
     }, delayMs);
     nextHandTimers.set(tableId, timer);
   };
@@ -244,4 +263,3 @@ export function createTableTimers(deps: TableTimersDeps): TableTimers {
     scheduleNextHandStart,
   };
 }
-

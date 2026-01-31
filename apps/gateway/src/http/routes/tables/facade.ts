@@ -1,8 +1,7 @@
 import { grpc as defaultGrpc, type GatewayGrpc } from '../../../grpc/unaryClients';
-import { getConfig } from '../../../config';
 import logger from '../../../observability/logger';
-import { toHttpUrl } from '../../../utils/httpUrl';
 import { isRecord } from '../../../utils/json';
+import { createBalanceHttpClient, type BalanceHttpClient } from '../../../clients/balanceHttpClient';
 
 export type JoinSeatResponse = { ok: boolean; error?: string };
 
@@ -25,7 +24,7 @@ type LoggerLike = Pick<typeof logger, 'warn'>;
 type TablesFacadeDeps = {
   grpcGame: GatewayGrpc['game'];
   logger: LoggerLike;
-  fetch: typeof fetch;
+  balanceHttp: BalanceHttpClient;
   now: () => Date;
   dailyLoginBonusChips: number;
   dailyLoginBonusErrors: ReadonlySet<string>;
@@ -68,16 +67,11 @@ function isoDate(now: () => Date): string {
   return now().toISOString().slice(0, 10);
 }
 
-function balanceBaseUrl(): string {
-  const config = getConfig();
-  return toHttpUrl(config.balanceServiceHttpUrl);
-}
-
 export function createTablesFacade(overrides: Partial<TablesFacadeDeps> = {}): TablesFacade {
   const deps: TablesFacadeDeps = {
     grpcGame: overrides.grpcGame ?? defaultGrpc.game,
     logger: overrides.logger ?? logger,
-    fetch: overrides.fetch ?? fetch,
+    balanceHttp: overrides.balanceHttp ?? createBalanceHttpClient(),
     now: overrides.now ?? (() => new Date()),
     dailyLoginBonusChips: overrides.dailyLoginBonusChips ?? 1000,
     dailyLoginBonusErrors: overrides.dailyLoginBonusErrors ?? DEFAULT_DAILY_LOGIN_BONUS_ERRORS,
@@ -87,33 +81,23 @@ export function createTablesFacade(overrides: Partial<TablesFacadeDeps> = {}): T
   async function ensureDailyLoginBonus(userId: string): Promise<void> {
     const date = isoDate(deps.now);
     const idempotencyKey = `bonus:daily_login:lobby:${userId}:${date}`;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), deps.dailyLoginBonusTimeoutMs);
 
     try {
-      const response = await deps.fetch(
-        `${balanceBaseUrl()}/api/accounts/${encodeURIComponent(userId)}/deposit`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Idempotency-Key': idempotencyKey,
-            'x-gateway-user-id': userId,
-          },
-          body: JSON.stringify({ amount: deps.dailyLoginBonusChips, source: 'BONUS' }),
-          signal: controller.signal,
-        },
-      );
+      const depositResult = await deps.balanceHttp.deposit({
+        accountId: userId,
+        amount: deps.dailyLoginBonusChips,
+        source: 'BONUS',
+        idempotencyKey,
+        gatewayUserId: userId,
+        timeoutMs: deps.dailyLoginBonusTimeoutMs,
+      });
 
-      if (!response.ok) {
-        const body = await response.text().catch(() => '');
-        deps.logger.warn({ userId, status: response.status, body }, 'daily_login_bonus.failed');
+      if (!depositResult.ok) {
+        deps.logger.warn({ userId, error: depositResult.error }, 'daily_login_bonus.failed');
       }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'unknown';
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'unknown';
       deps.logger.warn({ userId, message }, 'daily_login_bonus.error');
-    } finally {
-      clearTimeout(timeout);
     }
   }
 

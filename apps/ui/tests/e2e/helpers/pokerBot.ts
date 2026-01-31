@@ -987,16 +987,16 @@ export async function playHandsWithBots(
       });
     }
 
-	    const afterApplied = await waitForHandActionAppend({
-	      request,
-	      tableId: options.tableId,
-	      token: observerToken,
-	      handId: baselineHandId,
-	      baselineActionsLen,
-	      baselineVersion: version,
-	      timeoutMs: decision.kind === 'timeout' ? 20_000 : 10_000,
-	      fallback: tableSummary,
-	    });
+    const afterApplied = await waitForHandActionAppend({
+      request,
+      tableId: options.tableId,
+      token: observerToken,
+      handId: baselineHandId,
+      baselineActionsLen,
+      baselineVersion: version,
+      timeoutMs: decision.kind === 'timeout' ? 20_000 : 10_000,
+      fallback: tableSummary,
+    });
 
     const afterHand = afterApplied.tableState.hand;
     if (!afterHand || afterHand.handId !== baselineHandId) {
@@ -1088,8 +1088,15 @@ export async function playHandsWithBots(
         );
       }
 
+      const allowSameTurnSeat =
+        (strictExpected?.kind === 'in_hand' && strictExpected.currentTurnSeat === turnSeat) ||
+        (tableState.seats.length === 2 &&
+          tableState.hand?.currentStreet === 'PREFLOP' &&
+          afterHand.currentStreet === 'FLOP' &&
+          nextActiveSeat(tableState.seats, tableState.button) === turnSeat);
+
       assertInvariant(
-        afterHand.currentTurnSeat !== turnSeat,
+        allowSameTurnSeat || afterHand.currentTurnSeat !== turnSeat,
         `Expected turn to advance from seat ${turnSeat}, but it did not.`,
       );
     }

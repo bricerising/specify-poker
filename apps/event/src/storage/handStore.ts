@@ -66,7 +66,9 @@ export class HandStore {
   }
 
   async getHandRecord(handId: string): Promise<HandRecord | null> {
-    const res = await pool.query('SELECT * FROM hand_records WHERE hand_id = $1', [handId]);
+    const res = await pool.query<HandRow>('SELECT * FROM hand_records WHERE hand_id = $1', [
+      handId,
+    ]);
     return res.rows[0] ? mapRowToHandRecord(res.rows[0]) : null;
   }
 
@@ -80,7 +82,7 @@ export class HandStore {
     ]);
     const total = parseInt(countRes.rows[0].count, 10);
 
-    const res = await pool.query(
+    const res = await pool.query<HandRow>(
       'SELECT * FROM hand_records WHERE table_id = $1 ORDER BY completed_at DESC LIMIT $2 OFFSET $3',
       [tableId, limit, offset],
     );
@@ -98,7 +100,7 @@ export class HandStore {
     );
     const total = parseInt(countRes.rows[0].count, 10);
 
-    const res = await pool.query(
+    const res = await pool.query<HandRow>(
       'SELECT * FROM hand_records WHERE participants @> $1 ORDER BY completed_at DESC LIMIT $2 OFFSET $3',
       [JSON.stringify([{ userId }]), limit, offset],
     );

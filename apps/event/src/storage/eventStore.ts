@@ -155,7 +155,7 @@ class PgEventPersistence implements EventPersistence {
     const offset = filters.offset ?? 0;
 
     const pagingParams = [...params, limit, offset];
-    const res = await this.deps.pool.query(
+    const res = await this.deps.pool.query<EventRow>(
       `SELECT * FROM events ${whereText} ORDER BY timestamp ASC, sequence ASC LIMIT $${
         pagingParams.length - 1
       } OFFSET $${pagingParams.length}`,
@@ -166,12 +166,14 @@ class PgEventPersistence implements EventPersistence {
   }
 
   async getEventById(eventId: string): Promise<GameEvent | null> {
-    const res = await this.deps.pool.query('SELECT * FROM events WHERE event_id = $1', [eventId]);
+    const res = await this.deps.pool.query<EventRow>('SELECT * FROM events WHERE event_id = $1', [
+      eventId,
+    ]);
     return res.rows[0] ? mapRowToEvent(res.rows[0]) : null;
   }
 
   async getShowdownReveals(handId: string): Promise<Set<number>> {
-    const res = await this.deps.pool.query(
+    const res = await this.deps.pool.query<{ payload: unknown }>(
       'SELECT payload FROM events WHERE hand_id = $1 AND type = $2 ORDER BY timestamp DESC LIMIT 1',
       [handId, 'SHOWDOWN'],
     );
@@ -196,14 +198,14 @@ class PgEventPersistence implements EventPersistence {
     if (!idempotencyKey) {
       return null;
     }
-    const existing = await client.query(
+    const existing = await client.query<{ event_id: string }>(
       'SELECT event_id FROM event_idempotency WHERE idempotency_key = $1',
       [idempotencyKey],
     );
     if (!existing.rows[0]) {
       return null;
     }
-    const existingEvent = await client.query('SELECT * FROM events WHERE event_id = $1', [
+    const existingEvent = await client.query<EventRow>('SELECT * FROM events WHERE event_id = $1', [
       existing.rows[0].event_id,
     ]);
     if (!existingEvent.rows[0]) {

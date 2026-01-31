@@ -10,6 +10,11 @@
       "import": "./dist/index.js",
       "require": "./dist/cjs/index.js"
     },
+    "./pg": {
+      "types": "./dist/pg/index.d.ts",
+      "import": "./dist/pg/index.js",
+      "require": "./dist/cjs/pg/index.js"
+    },
     "./schemas": {
       "types": "./dist/schemas/index.d.ts",
       "import": "./dist/schemas/index.js",
@@ -33,6 +38,7 @@
   },
   "typesVersions": {
     "*": {
+      "pg": ["dist/pg/index.d.ts"],
       "observer": ["dist/observer/index.d.ts"],
       "pipeline": ["dist/pipeline/index.d.ts"],
       "redis": ["dist/redis/index.d.ts"]
@@ -42,12 +48,21 @@
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.cjs.json && node -e \"const fs=require('node:fs'); fs.mkdirSync('dist/cjs',{recursive:true}); fs.writeFileSync('dist/cjs/package.json', JSON.stringify({type:'commonjs'}, null, 2));\""
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.8.0",
+    "pino": "^9.0.0",
     "zod": "^3.22.4"
   },
+  "devDependencies": {
+    "@types/pg": "^8.11.0"
+  },
   "peerDependencies": {
+    "pg": "^8.11.0",
     "redis": "^4.6.13"
   },
   "peerDependenciesMeta": {
+    "pg": {
+      "optional": true
+    },
     "redis": {
       "optional": true
     }

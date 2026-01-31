@@ -1,6 +1,8 @@
 import { isInHandStatus, type Seat, type Table, type TableState } from '../../domain/types';
 import { calculatePots } from '../../engine/potCalculator';
+import { getFoldedSeatIds } from '../../engine/handEngine.seats';
 import { composeAsyncChain, type AsyncChainHandler } from '@specify-poker/shared/pipeline';
+import { fireAndForget } from '@specify-poker/shared';
 
 export type LeaveSeatUnlockedResult =
   | { readonly ok: false; readonly error: string }
@@ -38,6 +40,30 @@ export type LeaveSeatChainDeps = {
 
 type LeaveSeatHandler = AsyncChainHandler<LeaveSeatChainContext, LeaveSeatUnlockedResult>;
 
+type LoadedLeaveSeatContext = {
+  readonly table: Table;
+  readonly state: TableState;
+  readonly seat: Seat;
+  readonly seatId: number;
+  readonly remainingStack: number;
+};
+
+function readLoadedLeaveSeatContext(
+  ctx: LeaveSeatChainContext,
+): LoadedLeaveSeatContext | null {
+  const table = ctx.table;
+  const state = ctx.state;
+  const seat = ctx.seat;
+  const seatId = ctx.seatId;
+  const remainingStack = ctx.remainingStack;
+
+  if (!table || !state || !seat || seatId === undefined || remainingStack === undefined) {
+    return null;
+  }
+
+  return { table, state, seat, seatId, remainingStack };
+}
+
 function loadSeatAndTable(deps: LeaveSeatChainDeps): LeaveSeatHandler {
   return async (ctx, next) => {
     const loaded = await deps.loadTableAndState(ctx.tableId);
@@ -55,14 +81,15 @@ function loadSeatAndTable(deps: LeaveSeatChainDeps): LeaveSeatHandler {
 
     if (seat.status === 'RESERVED' && seat.reservationId) {
       const reservationId = seat.reservationId;
-      void deps
-        .releaseReservation({ reservationId, reason: 'player_left' })
-        .catch((error: unknown) => {
+      fireAndForget(
+        () => deps.releaseReservation({ reservationId, reason: 'player_left' }),
+        (error: unknown) => {
           deps.warn(
             { err: error, tableId: ctx.tableId, userId: ctx.userId, reservationId },
             'balance.reservation.release.failed',
           );
-        });
+        },
+      );
     }
 
     ctx.seat = seat;
@@ -75,15 +102,11 @@ function loadSeatAndTable(deps: LeaveSeatChainDeps): LeaveSeatHandler {
 
 function leaveSeatDuringHand(deps: LeaveSeatChainDeps): LeaveSeatHandler {
   return async (ctx, next) => {
-    const table = ctx.table;
-    const state = ctx.state;
-    const seat = ctx.seat;
-    const seatId = ctx.seatId;
-    const remainingStack = ctx.remainingStack;
-
-    if (!table || !state || !seat || seatId === undefined || remainingStack === undefined) {
+    const loaded = readLoadedLeaveSeatContext(ctx);
+    if (!loaded) {
       return { ok: false, error: 'INTERNAL' };
     }
+    const { table, state, seat, seatId, remainingStack } = loaded;
 
     const hand = state.hand;
     if (!hand) {
@@ -103,10 +126,7 @@ function leaveSeatDuringHand(deps: LeaveSeatChainDeps): LeaveSeatHandler {
     if (!wasInHand) {
       seat.status = 'EMPTY';
     } else {
-      const foldedSeatIds = new Set(
-        state.seats.filter((entry) => entry.status === 'FOLDED').map((entry) => entry.seatId),
-      );
-      hand.pots = calculatePots(hand.totalContributions, foldedSeatIds);
+      hand.pots = calculatePots(hand.totalContributions, getFoldedSeatIds(state.seats));
     }
 
     if (wasTurnSeat) {
@@ -130,15 +150,11 @@ function leaveSeatDuringHand(deps: LeaveSeatChainDeps): LeaveSeatHandler {
 
 function leaveSeatOutsideHand(deps: LeaveSeatChainDeps): LeaveSeatHandler {
   return async (ctx) => {
-    const table = ctx.table;
-    const state = ctx.state;
-    const seat = ctx.seat;
-    const seatId = ctx.seatId;
-    const remainingStack = ctx.remainingStack;
-
-    if (!table || !state || !seat || seatId === undefined || remainingStack === undefined) {
+    const loaded = readLoadedLeaveSeatContext(ctx);
+    if (!loaded) {
       return { ok: false, error: 'INTERNAL' };
     }
+    const { table, state, seat, seatId, remainingStack } = loaded;
 
     deps.clearSeatOwnership(seat);
     seat.status = 'EMPTY';

@@ -33,9 +33,9 @@ vi.mock('../logger', () => ({
 }));
 
 vi.mock('../../config', () => ({
-  config: {
+  getConfig: () => ({
     otelExporterEndpoint: 'http://localhost:4317',
-  },
+  }),
 }));
 
 describe('observability', () => {

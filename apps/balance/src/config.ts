@@ -1,7 +1,5 @@
 import dotenv from 'dotenv';
-import { createConfigBuilder, createLazyValue } from '@specify-poker/shared';
-
-dotenv.config();
+import { createConfigAccessors, createConfigBuilder } from '@specify-poker/shared';
 
 export interface Config {
   httpPort: number;
@@ -22,6 +20,8 @@ export interface Config {
 }
 
 export function loadConfig(): Config {
+  dotenv.config();
+
   const config: Config = createConfigBuilder(process.env)
     .int('httpPort', 'HTTP_PORT', 3002, { min: 1, max: 65535 })
     .int('grpcPort', 'GRPC_PORT', 50051, { min: 1, max: 65535 })
@@ -43,12 +43,12 @@ export function loadConfig(): Config {
   return config;
 }
 
-const cachedConfig = createLazyValue(loadConfig);
+const configAccessors = createConfigAccessors(loadConfig);
 
 export function getConfig(): Config {
-  return cachedConfig.get();
+  return configAccessors.getConfig();
 }
 
 export function resetConfigForTests(): void {
-  cachedConfig.reset();
+  configAccessors.resetConfigForTests();
 }

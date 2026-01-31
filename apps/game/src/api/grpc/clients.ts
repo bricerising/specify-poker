@@ -4,10 +4,11 @@ import * as path from 'path';
 import {
   closeGrpcClient,
   createGrpcClientsFacade,
-  createGrpcServiceClientFactory,
+  createGrpcServiceClientFactoryBuilder,
+  type GrpcClientConstructor,
 } from '@specify-poker/shared';
 
-import { config } from '../../config';
+import { getConfig, type Config } from '../../config';
 
 const BALANCE_PROTO_PATH = path.resolve(__dirname, '../../../../balance/proto/balance.proto');
 const EVENT_PROTO_PATH = path.resolve(__dirname, '../../../../event/proto/event.proto');
@@ -180,42 +181,31 @@ export interface EventServiceClient {
   ): void;
 }
 
-type GrpcClientConstructor<TClient> = new (
-  address: string,
-  credentials: grpc.ChannelCredentials,
-) => TClient;
+type ChannelClientConstructor<TClient> = GrpcClientConstructor<TClient, grpc.ChannelCredentials>;
 
-type BalanceProto = { balance: { BalanceService: GrpcClientConstructor<BalanceServiceClient> } };
-type EventProto = { event: { EventService: GrpcClientConstructor<EventServiceClient> } };
+type BalanceProto = { balance: { BalanceService: ChannelClientConstructor<BalanceServiceClient> } };
+type EventProto = { event: { EventService: ChannelClientConstructor<EventServiceClient> } };
 
-type GrpcClientsConfig = Pick<typeof config, 'balanceServiceAddr' | 'eventServiceAddr'>;
+type GrpcClientsConfig = Pick<Config, 'balanceServiceAddr' | 'eventServiceAddr'>;
 
 export interface GrpcClients {
   balanceClient: BalanceServiceClient;
   eventClient: EventServiceClient;
 }
 
-const balanceClientFactory = createGrpcServiceClientFactory<
-  BalanceProto,
-  BalanceServiceClient,
-  grpc.ChannelCredentials
->({
+const grpcClientFactoryBuilder = createGrpcServiceClientFactoryBuilder<grpc.ChannelCredentials>({
   grpc,
   protoLoader,
-  protoPath: BALANCE_PROTO_PATH,
   protoLoaderOptions: PROTO_LOADER_OPTIONS,
+});
+
+const balanceClientFactory = grpcClientFactoryBuilder.service<BalanceProto, BalanceServiceClient>({
+  protoPath: BALANCE_PROTO_PATH,
   getServiceConstructor: (proto) => proto.balance.BalanceService,
 });
 
-const eventClientFactory = createGrpcServiceClientFactory<
-  EventProto,
-  EventServiceClient,
-  grpc.ChannelCredentials
->({
-  grpc,
-  protoLoader,
+const eventClientFactory = grpcClientFactoryBuilder.service<EventProto, EventServiceClient>({
   protoPath: EVENT_PROTO_PATH,
-  protoLoaderOptions: PROTO_LOADER_OPTIONS,
   getServiceConstructor: (proto) => proto.event.EventService,
 });
 
@@ -234,7 +224,7 @@ export function createEventClient(options: CreateGrpcServiceClientOptions): Even
   return eventClientFactory.createClient({ address: options.address, credentials });
 }
 
-export function createGrpcClients(configOverride: GrpcClientsConfig = config): GrpcClients {
+export function createGrpcClients(configOverride: GrpcClientsConfig = getConfig()): GrpcClients {
   const credentials = grpc.credentials.createInsecure();
   return {
     balanceClient: createBalanceClient({ address: configOverride.balanceServiceAddr, credentials }),
@@ -247,7 +237,7 @@ const defaultGrpcClients = createGrpcClientsFacade<
   grpc.ChannelCredentials,
   GrpcClients
 >({
-  getConfig: () => config,
+  getConfig,
   createCredentials: () => grpc.credentials.createInsecure(),
   disposeClient: closeGrpcClient,
   definitions: {

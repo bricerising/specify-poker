@@ -4,8 +4,8 @@ import * as path from 'path';
 import {
   closeGrpcClient,
   createGrpcClientsFacade,
-  createGrpcServiceClientFactory,
-  type GrpcServiceClientFactory,
+  createGrpcServiceClientFactoryBuilder,
+  type GrpcClientConstructor,
 } from '@specify-poker/shared';
 import { getConfig, type Config } from '../config';
 import type {
@@ -32,50 +32,40 @@ function resolveProtoPath(protoName: ProtoName): string {
   return path.resolve(PROTO_DIR, `${protoName}.proto`);
 }
 
-type GrpcClientConstructor<TClient> = new (
-  address: string,
-  credentials: grpc.ChannelCredentials,
-) => TClient;
+type ChannelClientConstructor<TClient> = GrpcClientConstructor<TClient, grpc.ChannelCredentials>;
 
-type GameProto = { game: { GameService: GrpcClientConstructor<GameServiceClient> } };
-type PlayerProto = { player: { PlayerService: GrpcClientConstructor<PlayerServiceClient> } };
-type BalanceProto = { balance: { BalanceService: GrpcClientConstructor<BalanceServiceClient> } };
-type EventProto = { event: { EventService: GrpcClientConstructor<EventServiceClient> } };
-type NotifyProto = { notify: { NotifyService: GrpcClientConstructor<NotifyServiceClient> } };
+type GameProto = { game: { GameService: ChannelClientConstructor<GameServiceClient> } };
+type PlayerProto = { player: { PlayerService: ChannelClientConstructor<PlayerServiceClient> } };
+type BalanceProto = { balance: { BalanceService: ChannelClientConstructor<BalanceServiceClient> } };
+type EventProto = { event: { EventService: ChannelClientConstructor<EventServiceClient> } };
+type NotifyProto = { notify: { NotifyService: ChannelClientConstructor<NotifyServiceClient> } };
 
-function createClientFactory<TProto, TClient>(
-  protoName: ProtoName,
-  getServiceConstructor: (proto: TProto) => GrpcClientConstructor<TClient>,
-): GrpcServiceClientFactory<TClient, grpc.ChannelCredentials> {
-  return createGrpcServiceClientFactory<TProto, TClient, grpc.ChannelCredentials>({
-    grpc,
-    protoLoader,
-    protoPath: resolveProtoPath(protoName),
-    protoLoaderOptions: PROTO_LOADER_OPTIONS,
-    getServiceConstructor,
-  });
-}
+const grpcClientFactoryBuilder = createGrpcServiceClientFactoryBuilder<grpc.ChannelCredentials>({
+  grpc,
+  protoLoader,
+  protoLoaderOptions: PROTO_LOADER_OPTIONS,
+});
 
-const gameClientFactory = createClientFactory<GameProto, GameServiceClient>(
-  'game',
-  (proto) => proto.game.GameService,
-);
-const playerClientFactory = createClientFactory<PlayerProto, PlayerServiceClient>(
-  'player',
-  (proto) => proto.player.PlayerService,
-);
-const balanceClientFactory = createClientFactory<BalanceProto, BalanceServiceClient>(
-  'balance',
-  (proto) => proto.balance.BalanceService,
-);
-const eventClientFactory = createClientFactory<EventProto, EventServiceClient>(
-  'event',
-  (proto) => proto.event.EventService,
-);
-const notifyClientFactory = createClientFactory<NotifyProto, NotifyServiceClient>(
-  'notify',
-  (proto) => proto.notify.NotifyService,
-);
+const gameClientFactory = grpcClientFactoryBuilder.service<GameProto, GameServiceClient>({
+  protoPath: resolveProtoPath('game'),
+  getServiceConstructor: (proto) => proto.game.GameService,
+});
+const playerClientFactory = grpcClientFactoryBuilder.service<PlayerProto, PlayerServiceClient>({
+  protoPath: resolveProtoPath('player'),
+  getServiceConstructor: (proto) => proto.player.PlayerService,
+});
+const balanceClientFactory = grpcClientFactoryBuilder.service<BalanceProto, BalanceServiceClient>({
+  protoPath: resolveProtoPath('balance'),
+  getServiceConstructor: (proto) => proto.balance.BalanceService,
+});
+const eventClientFactory = grpcClientFactoryBuilder.service<EventProto, EventServiceClient>({
+  protoPath: resolveProtoPath('event'),
+  getServiceConstructor: (proto) => proto.event.EventService,
+});
+const notifyClientFactory = grpcClientFactoryBuilder.service<NotifyProto, NotifyServiceClient>({
+  protoPath: resolveProtoPath('notify'),
+  getServiceConstructor: (proto) => proto.notify.NotifyService,
+});
 
 type GrpcClientsConfig = Pick<
   Config,

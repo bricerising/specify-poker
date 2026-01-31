@@ -75,10 +75,10 @@ vi.mock('../observability/logger', () => ({
 }));
 
 vi.mock('../config', () => ({
-  config: {
+  getConfig: () => ({
     grpcPort: 50054,
     metricsPort: 9090,
-  },
+  }),
 }));
 
 describe('event server main', () => {

@@ -1,5 +1,5 @@
 import { createServiceBootstrapBuilder, ensureError, runServiceMain } from '@specify-poker/shared';
-import { config } from './config';
+import { getConfig } from './config';
 import { startObservability, stopObservability } from './observability';
 import type { EventApp } from './app';
 import logger from './observability/logger';
@@ -23,6 +23,7 @@ const service = createServiceBootstrapBuilder({ logger, serviceName: 'event' })
   .step('app.start', async ({ onShutdown }) => {
     const { createEventApp } = await import('./app');
 
+    const config = getConfig();
     const app = createEventApp({ config, isTest: isTestEnv() });
     runningApp = app;
 
@@ -36,7 +37,7 @@ const service = createServiceBootstrapBuilder({ logger, serviceName: 'event' })
   })
   .build({
     run: async () => {
-      logger.info({ port: config.grpcPort }, 'Event Service is running');
+      logger.info({ port: getConfig().grpcPort }, 'Event Service is running');
     },
     onStartWhileRunning: 'restart',
   });

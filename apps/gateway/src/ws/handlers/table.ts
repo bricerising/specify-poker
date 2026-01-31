@@ -1,5 +1,6 @@
 import type WebSocket from 'ws';
 
+import { fireAndForget } from '@specify-poker/shared';
 import { grpcResult } from '../../grpc/unaryClients';
 import type { WsPubSubMessage } from '../pubsub';
 import {
@@ -29,7 +30,12 @@ async function handleSubscribe(connectionId: string, userId: string, tableId: st
   const channel = `table:${tableId}`;
   await subscribeToChannel(connectionId, channel);
 
-  void grpcResult.game.JoinSpectator({ table_id: tableId, user_id: userId });
+  fireAndForget(
+    () => grpcResult.game.JoinSpectator({ table_id: tableId, user_id: userId }),
+    (error: unknown) => {
+      logger.warn({ err: error, tableId, userId }, 'spectator.join.failed');
+    },
+  );
 
   const [tableResult, stateResult] = await Promise.all([
     grpcResult.game.GetTable({ table_id: tableId }),
@@ -159,7 +165,15 @@ export function createTableHub(params: {
         await handleSubscribe(connectionId, userId, message.tableId);
       },
       UnsubscribeTable: async (message) => {
-        void grpcResult.game.LeaveSpectator({ table_id: message.tableId, user_id: userId });
+        fireAndForget(
+          () => grpcResult.game.LeaveSpectator({ table_id: message.tableId, user_id: userId }),
+          (error: unknown) => {
+            logger.warn(
+              { err: error, tableId: message.tableId, userId },
+              'spectator.leave.failed',
+            );
+          },
+        );
         await handleUnsubscribe(connectionId, message.tableId);
       },
       JoinSeat: async (message) => {

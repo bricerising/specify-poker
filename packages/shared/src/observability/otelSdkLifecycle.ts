@@ -5,6 +5,12 @@ export type OtelSdkLike = {
   shutdown: () => unknown;
 };
 
+export type OtelSdkLifecycleLogger = {
+  info?: (...args: unknown[]) => unknown;
+  warn?: (...args: unknown[]) => unknown;
+  error?: (...args: unknown[]) => unknown;
+};
+
 export type CreateOtelSdkLifecycleOptions<TSdk extends OtelSdkLike> = {
   /**
    * Creates a fresh SDK instance.
@@ -13,6 +19,12 @@ export type CreateOtelSdkLifecycleOptions<TSdk extends OtelSdkLike> = {
    * attempt failed or after a stop.
    */
   createSdk: () => TSdk;
+  /**
+   * Optional logger used for default start/stop/error hooks.
+   *
+   * If you pass a logger but also pass explicit hooks, the explicit hooks win.
+   */
+  logger?: OtelSdkLifecycleLogger;
   onStarted?: () => void;
   onStopped?: () => void;
   onStartError?: (error: unknown) => void;
@@ -33,6 +45,40 @@ export function createOtelSdkLifecycle<TSdk extends OtelSdkLike>(
 ): AsyncLifecycle {
   let sdk: TSdk | null = null;
 
+  const logger = options.logger;
+  const logInfo = logger?.info;
+  const logWarn = logger?.warn ?? logger?.error;
+  const logError = logger?.error ?? logger?.warn;
+
+  const onStarted =
+    options.onStarted ??
+    (logInfo ? () => void logInfo.call(logger, 'OpenTelemetry SDK started') : undefined);
+  const onStopped =
+    options.onStopped ??
+    (logInfo ? () => void logInfo.call(logger, 'OpenTelemetry SDK shut down') : undefined);
+  const onStartError =
+    options.onStartError ??
+    (logError
+      ? (error: unknown) =>
+          void logError.call(logger, { err: error }, 'Failed to start OpenTelemetry SDK')
+      : undefined);
+  const onStopError =
+    options.onStopError ??
+    (logError
+      ? (error: unknown) =>
+          void logError.call(logger, { err: error }, 'Failed to shut down OpenTelemetry SDK')
+      : undefined);
+  const onShutdownAfterStartError =
+    options.onShutdownAfterStartError ??
+    (logWarn
+      ? (error: unknown) =>
+          void logWarn.call(
+            logger,
+            { err: error },
+            'OpenTelemetry SDK shutdown failed after start error',
+          )
+      : undefined);
+
   const getOrCreateSdk = (): TSdk => {
     if (sdk) {
       return sdk;
@@ -46,13 +92,13 @@ export function createOtelSdkLifecycle<TSdk extends OtelSdkLike>(
       const currentSdk = getOrCreateSdk();
       try {
         await Promise.resolve(currentSdk.start());
-        options.onStarted?.();
+        onStarted?.();
       } catch (error: unknown) {
-        options.onStartError?.(error);
+        onStartError?.(error);
         try {
           await Promise.resolve(currentSdk.shutdown());
         } catch (shutdownError: unknown) {
-          options.onShutdownAfterStartError?.(shutdownError);
+          onShutdownAfterStartError?.(shutdownError);
         } finally {
           sdk = null;
         }
@@ -68,12 +114,11 @@ export function createOtelSdkLifecycle<TSdk extends OtelSdkLike>(
 
       try {
         await Promise.resolve(currentSdk.shutdown());
-        options.onStopped?.();
+        onStopped?.();
       } catch (error: unknown) {
-        options.onStopError?.(error);
+        onStopError?.(error);
         throw error;
       }
     },
   });
 }
-

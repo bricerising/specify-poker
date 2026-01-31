@@ -1,9 +1,10 @@
 import { seatAt } from '../../domain/seats';
 import type { Table, TableState } from '../../domain/types';
-import { GameEventType, type GameEventType as GameEventTypeValue } from '../../domain/events';
+import { GameEventType } from '../../domain/events';
 import { startHand } from '../../engine/handEngine';
 import type { TableEconomy } from './tableEconomy';
 import type { TableTimers } from './tableTimers';
+import type { GameEventEmitter } from './gameEventEmitter';
 
 /** Minimum players required to start a hand */
 const MIN_PLAYERS_FOR_HAND = 2;
@@ -35,16 +36,6 @@ type TableStateStoreLike = {
   get(tableId: string): Promise<TableState | null>;
 };
 
-type EmitGameEventFn = (
-  tableId: string,
-  handId: string | undefined,
-  userId: string | undefined,
-  seatId: number | undefined,
-  type: GameEventTypeValue,
-  payload: Record<string, unknown>,
-  idempotencyKey?: string,
-) => Promise<void>;
-
 export type HandLifecycleDeps = {
   readonly tableStore: TableStoreLike;
   readonly tableStateStore: TableStateStoreLike;
@@ -53,7 +44,7 @@ export type HandLifecycleDeps = {
   readonly tableTimers: TableTimers;
   readonly metrics: MetricsLike;
   readonly logger: LoggerLike;
-  readonly emitGameEvent: EmitGameEventFn;
+  readonly eventEmitter: GameEventEmitter;
   readonly touchState: (state: TableState) => void;
 };
 
@@ -72,16 +63,9 @@ export function createHandLifecycle(deps: HandLifecycleDeps): HandLifecycle {
     tableTimers,
     metrics,
     logger,
-    emitGameEvent,
+    eventEmitter,
     touchState,
   } = deps;
-
-  const emitGameEventDetached = (...args: Parameters<EmitGameEventFn>): void => {
-    const [tableId, handId, userId, seatId, type] = args;
-    void emitGameEvent(...args).catch((error: unknown) => {
-      logger.error({ err: error, tableId, handId, userId, seatId, type }, 'game_event.emit.failed');
-    });
-  };
 
   async function checkStartHand(table: Table, state: TableState): Promise<void> {
     if (table.status === 'PLAYING' || state.hand) {
@@ -109,14 +93,14 @@ export function createHandLifecycle(deps: HandLifecycleDeps): HandLifecycle {
         actions: updatedState.hand.actions,
       });
       if (contributionResult.type === 'unavailable') {
-        emitGameEventDetached(
-          table.tableId,
-          updatedState.hand.handId,
-          undefined,
-          undefined,
-          GameEventType.BALANCE_UNAVAILABLE,
-          { action: 'RECORD_CONTRIBUTION' },
-        );
+        eventEmitter.emitDetached({
+          tableId: table.tableId,
+          handId: updatedState.hand.handId,
+          userId: undefined,
+          seatId: undefined,
+          type: GameEventType.BALANCE_UNAVAILABLE,
+          payload: { action: 'RECORD_CONTRIBUTION' },
+        });
       } else if (contributionResult.type === 'error') {
         logger.warn(
           {
@@ -135,18 +119,20 @@ export function createHandLifecycle(deps: HandLifecycleDeps): HandLifecycle {
       .filter((value): value is string => Boolean(value));
 
     const startedHandId = updatedState.hand?.handId;
-    emitGameEventDetached(
-      table.tableId,
-      startedHandId,
-      undefined,
-      undefined,
-      GameEventType.HAND_STARTED,
-      {
+    eventEmitter.emitDetached({
+      tableId: table.tableId,
+      handId: startedHandId,
+      userId: undefined,
+      seatId: undefined,
+      type: GameEventType.HAND_STARTED,
+      payload: {
         buttonSeat: updatedState.button,
         participants,
       },
-      startedHandId ? `event:${GameEventType.HAND_STARTED}:${startedHandId}` : undefined,
-    );
+      idempotencyKey: startedHandId
+        ? `event:${GameEventType.HAND_STARTED}:${startedHandId}`
+        : undefined,
+    });
 
     await tableTimers.startTurnTimer(table, updatedState);
   }
@@ -180,19 +166,19 @@ export function createHandLifecycle(deps: HandLifecycleDeps): HandLifecycle {
       .map((seatId) => seatAt(state.seats, seatId)?.userId)
       .filter((value): value is string => Boolean(value));
 
-    emitGameEventDetached(
-      table.tableId,
-      hand.handId,
-      undefined,
-      undefined,
-      GameEventType.HAND_ENDED,
-      {
+    eventEmitter.emitDetached({
+      tableId: table.tableId,
+      handId: hand.handId,
+      userId: undefined,
+      seatId: undefined,
+      type: GameEventType.HAND_ENDED,
+      payload: {
         winners: hand.winners ?? [],
         winnerUserIds,
         rakeAmount: hand.rakeAmount,
       },
-      `event:${GameEventType.HAND_ENDED}:${hand.handId}`,
-    );
+      idempotencyKey: `event:${GameEventType.HAND_ENDED}:${hand.handId}`,
+    });
 
     const settleResult = await tableEconomy.settleHand({
       tableId: table.tableId,
@@ -203,27 +189,27 @@ export function createHandLifecycle(deps: HandLifecycleDeps): HandLifecycle {
     });
 
     if (settleResult.type === 'unavailable') {
-      emitGameEventDetached(
-        table.tableId,
-        hand.handId,
-        undefined,
-        undefined,
-        GameEventType.BALANCE_UNAVAILABLE,
-        {
+      eventEmitter.emitDetached({
+        tableId: table.tableId,
+        handId: hand.handId,
+        userId: undefined,
+        seatId: undefined,
+        type: GameEventType.BALANCE_UNAVAILABLE,
+        payload: {
           action: 'SETTLE_POT',
         },
-      );
+      });
     } else if (settleResult.type === 'error') {
-      emitGameEventDetached(
-        table.tableId,
-        hand.handId,
-        undefined,
-        undefined,
-        GameEventType.SETTLEMENT_FAILED,
-        {
+      eventEmitter.emitDetached({
+        tableId: table.tableId,
+        handId: hand.handId,
+        userId: undefined,
+        seatId: undefined,
+        type: GameEventType.SETTLEMENT_FAILED,
+        payload: {
           error: settleResult.error,
         },
-      );
+      });
     }
 
     state.hand = null;

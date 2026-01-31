@@ -22,6 +22,12 @@ export type VapidDetails = {
   privateKey: string | null;
 };
 
+function hasVapidKeys(
+  details: VapidDetails | undefined,
+): details is VapidDetails & { publicKey: string; privateKey: string } {
+  return Boolean(details?.publicKey && details.privateKey);
+}
+
 function getHttpStatusCode(error: unknown): number | null {
   if (!isRecord(error)) {
     return null;
@@ -89,7 +95,7 @@ export function createRealWebPushClient(): WebPushClient {
 export type CreateWebPushClientOptions = {
   /**
    * VAPID details for authentication. If not provided or keys are missing,
-   * returns a no-op client in non-production environments.
+   * returns a no-op client outside production.
    */
   vapidDetails?: VapidDetails;
 
@@ -100,31 +106,51 @@ export type CreateWebPushClientOptions = {
   forceReal?: boolean;
 };
 
+type WebPushClientVariant = 'real' | 'noop';
+
+function resolveWebPushClientVariant(
+  options: CreateWebPushClientOptions,
+  nodeEnv: string | undefined,
+): WebPushClientVariant {
+  if (hasVapidKeys(options.vapidDetails)) {
+    return 'real';
+  }
+
+  if (options.forceReal) {
+    return 'real';
+  }
+
+  if (nodeEnv === 'production') {
+    return 'real';
+  }
+
+  return 'noop';
+}
+
 /**
  * Creates a WebPushClient, automatically falling back to a no-op client
- * when VAPID keys are not configured (in non-test environments).
+ * when VAPID keys are not configured outside production.
  */
 export function createWebPushClient(options: CreateWebPushClientOptions = {}): WebPushClient {
-  const { vapidDetails, forceReal = false } = options;
+  const nodeEnv = process.env.NODE_ENV;
 
-  // If VAPID details are provided and valid, configure and return real client
-  if (vapidDetails?.publicKey && vapidDetails?.privateKey) {
-    configureVapid(vapidDetails);
-    return createRealWebPushClient();
-  }
+  const variant = resolveWebPushClientVariant(options, nodeEnv);
 
-  // If forceReal is set, return real client regardless
-  if (forceReal) {
-    return createRealWebPushClient();
-  }
-
-  // In test environment, return no-op client silently
-  if (process.env.NODE_ENV === 'test') {
+  if (variant === 'noop') {
+    if (nodeEnv !== 'test') {
+      logger.warn('VAPID keys not set. Push notifications are disabled (no-op).');
+    }
     return createNoOpWebPushClient();
   }
 
-  // In non-test environment without VAPID, log warning and return real client
-  // (which will fail, but that's the existing behavior)
-  logger.warn('VAPID keys not set. Push notifications will fail.');
+  if (hasVapidKeys(options.vapidDetails)) {
+    configureVapid(options.vapidDetails);
+    return createRealWebPushClient();
+  }
+
+  if (!options.forceReal) {
+    logger.warn('VAPID keys not set. Push notifications will fail.');
+  }
+
   return createRealWebPushClient();
 }
