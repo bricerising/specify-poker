@@ -1,43 +1,48 @@
-import { createServiceBootstrapBuilder, ensureError, runServiceMain } from '@specify-poker/shared';
-import { getConfig } from './config';
-import { startObservability, stopObservability } from './observability';
+import {
+  createOtelBootstrapStep,
+  createServiceBootstrapBuilder,
+  ensureError,
+  runServiceMain,
+} from '@specify-poker/shared';
 import type { EventApp } from './app';
+import { getConfig, type Config } from './config';
+import { startObservability, stopObservability } from './observability';
 import logger from './observability/logger';
-
-let runningApp: EventApp | null = null;
 
 const isTestEnv = (): boolean => process.env.NODE_ENV === 'test';
 
-const service = createServiceBootstrapBuilder({ logger, serviceName: 'event' })
-  .step('otel.start', async ({ onShutdown }) => {
-    // Start OTel before importing instrumented subsystems (pg/redis/grpc/etc.).
-    if (isTestEnv()) {
-      return;
-    }
+type EventServiceState = {
+  config: Config;
+  app: EventApp;
+};
 
-    await startObservability();
-    onShutdown('otel.shutdown', async () => {
-      await stopObservability();
-    });
-  })
-  .step('app.start', async ({ onShutdown }) => {
+const service = createServiceBootstrapBuilder({ logger, serviceName: 'event' })
+  // Start OTel before importing instrumented subsystems (pg/redis/grpc/etc.).
+  .step(
+    'otel.start',
+    createOtelBootstrapStep({
+      isEnabled: () => !isTestEnv(),
+      start: startObservability,
+      stop: stopObservability,
+    }),
+  )
+  .stepWithState('app.start', async ({ onShutdown }): Promise<EventServiceState> => {
     const { createEventApp } = await import('./app');
 
     const config = getConfig();
     const app = createEventApp({ config, isTest: isTestEnv() });
-    runningApp = app;
 
     onShutdown('app.stop', async () => {
-      const current = runningApp;
-      runningApp = null;
-      await current?.stop();
+      await app.stop();
     });
 
     await app.start();
+
+    return { config, app };
   })
   .build({
-    run: async () => {
-      logger.info({ port: getConfig().grpcPort }, 'Event Service is running');
+    run: async ({ state }) => {
+      logger.info({ port: state.config.grpcPort }, 'Event Service is running');
     },
     onStartWhileRunning: 'restart',
   });
@@ -54,7 +59,6 @@ export async function main(): Promise<void> {
 
 export async function shutdown(): Promise<void> {
   await service.shutdown();
-  runningApp = null;
 }
 
 const isDirectRun =

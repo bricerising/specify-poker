@@ -1,41 +1,32 @@
 import {
   closeHttpServer,
+  createOtelBootstrapStep,
   createServiceBootstrapBuilder,
   runServiceMain,
 } from '@specify-poker/shared';
-import type { Server as HttpServer } from 'http';
 import type { Config } from './config';
 import { startObservability, stopObservability } from './observability';
 import logger from './observability/logger';
 
 const isTestEnv = (): boolean => process.env.NODE_ENV === 'test';
 
-let metricsServer: HttpServer | null = null;
-let eventConsumerInstance: { stop(): Promise<void> } | null = null;
-let runningConfig: Config | null = null;
-
-const requireConfig = (): Config => {
-  if (!runningConfig) {
-    throw new Error('Player config is not loaded');
-  }
-  return runningConfig;
+type PlayerServiceState = {
+  config: Config;
 };
 
 const service = createServiceBootstrapBuilder({ logger, serviceName: 'player' })
-  .step('otel.start', async ({ onShutdown }) => {
-    // Start OTel before importing instrumented subsystems (grpc/pg/redis/etc.).
-    if (isTestEnv()) {
-      return;
-    }
-
-    await startObservability();
-    onShutdown('otel.shutdown', async () => {
-      await stopObservability();
-    });
-  })
-  .step('config.load', async () => {
+  // Start OTel before importing instrumented subsystems (grpc/pg/redis/etc.).
+  .step(
+    'otel.start',
+    createOtelBootstrapStep({
+      isEnabled: () => !isTestEnv(),
+      start: startObservability,
+      stop: stopObservability,
+    }),
+  )
+  .stepWithState('config.load', async (): Promise<PlayerServiceState> => {
     const { getConfig } = await import('./config');
-    runningConfig = getConfig();
+    return { config: getConfig() };
   })
   .step('storage.init', async ({ onShutdown }) => {
     const [{ closeRedisClient }, { default: pool }, { runMigrations }] = await Promise.all([
@@ -53,40 +44,29 @@ const service = createServiceBootstrapBuilder({ logger, serviceName: 'player' })
 
     await runMigrations();
   })
-  .step('grpc.server.start', async ({ onShutdown }) => {
-    const config = requireConfig();
+  .step('grpc.server.start', async ({ onShutdown, state }) => {
     const { startGrpcServer, stopGrpcServer } = await import('./api/grpc/server');
 
     onShutdown('grpc.stop', () => {
       stopGrpcServer();
     });
 
-    await startGrpcServer(config.grpcPort);
+    await startGrpcServer(state.config.grpcPort);
   })
-  .step('metrics.start', async ({ onShutdown }) => {
-    const config = requireConfig();
+  .step('metrics.start', async ({ onShutdown, state }) => {
     const { startMetricsServer } = await import('./observability/metrics');
 
+    const metricsServer = startMetricsServer(state.config.metricsPort);
     onShutdown('metrics.close', async () => {
-      if (!metricsServer) {
-        return;
-      }
       await closeHttpServer(metricsServer);
-      metricsServer = null;
     });
-
-    metricsServer = startMetricsServer(config.metricsPort);
   })
   .step('eventConsumer.start', async ({ onShutdown }) => {
     const { EventConsumer } = await import('./services/eventConsumer');
-    onShutdown('eventConsumer.stop', () => {
-      const consumer = eventConsumerInstance;
-      eventConsumerInstance = null;
-      return consumer?.stop();
-    });
-
     const consumer = new EventConsumer();
-    eventConsumerInstance = consumer;
+    onShutdown('eventConsumer.stop', async () => {
+      await consumer.stop();
+    });
     await consumer.start();
   })
   .step('jobs.start', async ({ onShutdown }) => {
@@ -99,9 +79,8 @@ const service = createServiceBootstrapBuilder({ logger, serviceName: 'player' })
     startDeletionProcessor();
   })
   .build({
-    run: async () => {
-      const config = requireConfig();
-      logger.info({ port: config.grpcPort }, 'Player Service is running');
+    run: async ({ state }) => {
+      logger.info({ port: state.config.grpcPort }, 'Player Service is running');
     },
   });
 
@@ -112,7 +91,6 @@ export async function main() {
 export async function shutdown() {
   logger.info('Shutting down Player Service');
   await service.shutdown();
-  runningConfig = null;
 }
 
 const isDirectRun =

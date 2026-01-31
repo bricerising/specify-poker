@@ -1,24 +1,19 @@
-import { createRedisClientManager } from '@specify-poker/shared/redis';
-import { createAsyncDisposableLazyValue } from '@specify-poker/shared';
+import { createRedisClientsFacade } from '@specify-poker/shared/redis';
 import { getConfig } from '../config';
 import logger from '../observability/logger';
 
-type RedisManager = ReturnType<typeof createRedisClientManager>;
-
-const defaultRedisManager = createAsyncDisposableLazyValue<RedisManager>(
-  () => {
-    const config = getConfig();
-    return createRedisClientManager({ url: config.redisUrl, log: logger, name: 'gateway' });
-  },
-  (manager) => manager.close(),
-);
+const redis = createRedisClientsFacade({
+  getUrl: () => getConfig().redisUrl,
+  log: logger,
+  name: 'gateway',
+});
 
 export async function getRedisClient() {
-  return defaultRedisManager.get().getClientOrNull();
+  return redis.getClientOrNull();
 }
 
 export async function closeRedisClient(): Promise<void> {
-  await defaultRedisManager.dispose();
+  await redis.close();
 }
 
 export type RedisClient = NonNullable<Awaited<ReturnType<typeof getRedisClient>>>;
@@ -47,5 +42,5 @@ export async function withRedisClient<T>(
 }
 
 export function resetRedisClientForTests(): void {
-  defaultRedisManager.reset();
+  redis.resetForTests();
 }

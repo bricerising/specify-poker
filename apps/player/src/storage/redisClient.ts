@@ -1,10 +1,10 @@
-import { createAsyncDisposableLazyValue } from '@specify-poker/shared';
-import { createRedisClientManager as createSharedRedisClientManager } from '@specify-poker/shared/redis';
-import type {
-  RedisClientLogger,
-  RedisClientManager as SharedRedisClientManager,
+import {
+  createRedisClientManager as createSharedRedisClientManager,
+  createRedisClientsFacade,
+  type RedisClient,
+  type RedisClientLogger,
+  type RedisClientManager as SharedRedisClientManager,
 } from '@specify-poker/shared/redis';
-import type { RedisClientType } from 'redis';
 import { getConfig } from '../config';
 import logger from '../observability/logger';
 
@@ -39,23 +39,20 @@ export function isRedisEnabled(): boolean {
   return Boolean(getRedisUrl());
 }
 
-const defaultManager = createAsyncDisposableLazyValue(
-  () => createRedisClientManager({ url: getRedisUrl() }),
-  (manager) => manager.close(),
-);
+const redis = createRedisClientsFacade({
+  getUrl: () => getRedisUrl(),
+  log: logger,
+  name: 'player',
+});
 
-function getDefaultManager(): RedisClientManager {
-  return defaultManager.get();
+export async function getRedisClient(): Promise<RedisClient | null> {
+  return redis.getClientOrNull();
 }
 
-export async function getRedisClient(): Promise<RedisClientType | null> {
-  return getDefaultManager().getClientOrNull();
-}
-
-export async function getBlockingRedisClient(): Promise<RedisClientType | null> {
-  return getDefaultManager().getBlockingClientOrNull();
+export async function getBlockingRedisClient(): Promise<RedisClient | null> {
+  return redis.getBlockingClientOrNull();
 }
 
 export async function closeRedisClient(): Promise<void> {
-  await defaultManager.dispose();
+  await redis.close();
 }

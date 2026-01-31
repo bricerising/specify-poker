@@ -1,14 +1,25 @@
 import { createShutdownManager, type ShutdownAction, type ShutdownManager } from './shutdown';
 
+type ServiceBootstrapState = Record<string, unknown>;
+type EmptyServiceBootstrapState = Record<string, never>;
+
 export type ServiceBootstrapLogger = {
   info?: (...args: unknown[]) => void;
   warn?: (...args: unknown[]) => void;
   error?: (...args: unknown[]) => void;
 };
 
-export type ServiceBootstrapContext = {
+export type ServiceBootstrapContext<TState extends ServiceBootstrapState = EmptyServiceBootstrapState> =
+  {
   shutdown: ShutdownManager;
   onShutdown: (name: string, action: ShutdownAction) => void;
+  /**
+   * Mutable state bag shared across steps for a single service start.
+   *
+   * Use {@link ServiceBootstrapBuilder.stepWithState} to add strongly-typed
+   * state from earlier steps (e.g. loaded config, created app instances).
+   */
+  state: TState;
 };
 
 export type ServiceBootstrap<TResult> = {
@@ -17,15 +28,21 @@ export type ServiceBootstrap<TResult> = {
   isRunning(): boolean;
 };
 
-export type ServiceBootstrapStep = {
+export type ServiceBootstrapStep<TState extends ServiceBootstrapState = EmptyServiceBootstrapState> =
+  {
   name: string;
-  run: (ctx: ServiceBootstrapContext) => void | Promise<void>;
+  run: (ctx: ServiceBootstrapContext<TState>) => void | Promise<void>;
 };
 
-export type ServiceBootstrapBuilder = {
-  step(name: string, run: ServiceBootstrapStep['run']): ServiceBootstrapBuilder;
+export type ServiceBootstrapBuilder<TState extends ServiceBootstrapState = EmptyServiceBootstrapState> =
+  {
+  step(name: string, run: ServiceBootstrapStep<TState>['run']): ServiceBootstrapBuilder<TState>;
+  stepWithState<TAdded extends ServiceBootstrapState>(
+    name: string,
+    run: (ctx: ServiceBootstrapContext<TState>) => TAdded | Promise<TAdded>,
+  ): ServiceBootstrapBuilder<TState & TAdded>;
   build<TResult>(options: {
-    run: (ctx: ServiceBootstrapContext) => Promise<TResult>;
+    run: (ctx: ServiceBootstrapContext<TState>) => Promise<TResult>;
     onStartWhileRunning?: 'restart' | 'throw';
   }): ServiceBootstrap<TResult>;
 };
@@ -33,17 +50,43 @@ export type ServiceBootstrapBuilder = {
 type BuilderState = {
   logger?: ServiceBootstrapLogger;
   serviceName?: string;
-  steps: readonly ServiceBootstrapStep[];
+  steps: readonly ServiceBootstrapStep<ServiceBootstrapState>[];
 };
 
-function createBuilder(state: BuilderState): ServiceBootstrapBuilder {
+function createBuilder<TState extends ServiceBootstrapState>(
+  state: BuilderState,
+): ServiceBootstrapBuilder<TState> {
   return {
-    step: (name, run) => createBuilder({ ...state, steps: [...state.steps, { name, run }] }),
+    step: (name, run) =>
+      createBuilder<TState>({
+        ...state,
+        steps: [
+          ...state.steps,
+          { name, run: run as unknown as ServiceBootstrapStep<ServiceBootstrapState>['run'] },
+        ],
+      }),
+    stepWithState: <TAdded extends ServiceBootstrapState>(
+      name: string,
+      run: (ctx: ServiceBootstrapContext<TState>) => TAdded | Promise<TAdded>,
+    ): ServiceBootstrapBuilder<TState & TAdded> =>
+      createBuilder<TState & TAdded>({
+        ...state,
+        steps: [
+          ...state.steps,
+          {
+            name,
+            run: async (ctx) => {
+              const added = await run(ctx as unknown as ServiceBootstrapContext<TState>);
+              Object.assign(ctx.state, added);
+            },
+          },
+        ],
+      }),
     build: <TResult>({
       run,
       onStartWhileRunning,
     }: {
-      run: (ctx: ServiceBootstrapContext) => Promise<TResult>;
+      run: (ctx: ServiceBootstrapContext<TState>) => Promise<TResult>;
       onStartWhileRunning?: 'restart' | 'throw';
     }): ServiceBootstrap<TResult> => {
       const mode = onStartWhileRunning ?? 'restart';
@@ -78,9 +121,10 @@ function createBuilder(state: BuilderState): ServiceBootstrapBuilder {
         const shutdownManager = createShutdownManager({ logger: state.logger });
         runningShutdown = shutdownManager;
 
-        const ctx: ServiceBootstrapContext = {
+        const ctx: ServiceBootstrapContext<TState> = {
           shutdown: shutdownManager,
           onShutdown: (name, action) => shutdownManager.add(name, action),
+          state: Object.create(null) as TState,
         };
 
         let currentStep: string | null = null;
@@ -88,7 +132,7 @@ function createBuilder(state: BuilderState): ServiceBootstrapBuilder {
         try {
           for (const step of state.steps) {
             currentStep = step.name;
-            await step.run(ctx);
+            await (step.run as unknown as ServiceBootstrapStep<TState>['run'])(ctx);
           }
 
           currentStep = 'run';
@@ -122,5 +166,9 @@ export function createServiceBootstrapBuilder(options: {
   logger?: ServiceBootstrapLogger;
   serviceName?: string;
 }): ServiceBootstrapBuilder {
-  return createBuilder({ logger: options.logger, serviceName: options.serviceName, steps: [] });
+  return createBuilder<EmptyServiceBootstrapState>({
+    logger: options.logger,
+    serviceName: options.serviceName,
+    steps: [],
+  });
 }

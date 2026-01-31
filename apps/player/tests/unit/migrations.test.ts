@@ -34,6 +34,52 @@ describe('migrations runner', () => {
     connect.mockResolvedValue({ query, release });
   });
 
+  it('retries the database connection before running migrations', async () => {
+    const failingConnect = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('db not ready'))
+      .mockRejectedValueOnce(new Error('still not ready'))
+      .mockResolvedValue({ query: vi.fn(), release: vi.fn() });
+
+    let nowMs = 0;
+    const clock = {
+      now: () => nowMs,
+      sleep: async (ms: number) => {
+        nowMs += ms;
+      },
+    };
+
+    const logger = {
+      info: vi.fn(),
+      error: vi.fn(),
+    };
+
+    const { createMigrationsRunner } = await import('../../src/storage/migrations');
+
+    const runner = createMigrationsRunner({
+      env: {},
+      pool: { connect: failingConnect },
+      logger,
+      clock,
+      migrationsDir: '/migrations',
+      retryConfig: { timeoutMs: 1000, baseDelayMs: 100, maxDelayMs: 200 },
+      fs: {
+        existsSync: vi.fn(() => true),
+        readdirSync: vi.fn(() => []),
+        readFileSync: vi.fn(() => ''),
+      },
+      path: {
+        resolve: vi.fn(() => '/migrations'),
+        join: vi.fn(() => '/migrations/001_initial.sql'),
+      },
+    });
+
+    await runner.runMigrations();
+
+    expect(failingConnect).toHaveBeenCalledTimes(3);
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
   it('runs migrations successfully', async () => {
     const { runMigrations } = await import('../../src/storage/migrations');
 

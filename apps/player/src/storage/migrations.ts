@@ -1,80 +1,159 @@
 import fs from 'fs';
 import path from 'path';
+import { readIntEnv, type Env } from '@specify-poker/shared';
 import pool from './db';
 import logger from '../observability/logger';
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+type Logger = {
+  info: (obj: Record<string, unknown>, msg: string) => void;
+  error: (obj: Record<string, unknown>, msg: string) => void;
+};
+
+type DbClient = {
+  query: (text: string) => Promise<unknown>;
+  release: () => void;
+};
+
+type DbPool = {
+  connect: () => Promise<DbClient>;
+};
+
+type Clock = {
+  now: () => number;
+  sleep: (ms: number) => Promise<void>;
+};
+
+type DbConnectRetryConfig = {
+  timeoutMs: number;
+  baseDelayMs: number;
+  maxDelayMs: number;
+};
+
+export type MigrationsRunnerDeps = {
+  env: Env;
+  pool: DbPool;
+  logger: Logger;
+  fs: Pick<typeof fs, 'existsSync' | 'readdirSync' | 'readFileSync'>;
+  path: Pick<typeof path, 'resolve' | 'join'>;
+  clock?: Clock;
+  migrationsDir?: string;
+  retryConfig?: DbConnectRetryConfig;
+};
+
+export type MigrationsRunner = {
+  runMigrations: () => Promise<void>;
+};
+
+const defaultClock: Clock = {
+  now: () => Date.now(),
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+};
+
+function loadDbConnectRetryConfig(env: Env): DbConnectRetryConfig {
+  return {
+    timeoutMs: readIntEnv(env, 'PLAYER_DB_CONNECT_TIMEOUT_MS', 120_000, { min: 0 }),
+    baseDelayMs: readIntEnv(env, 'PLAYER_DB_CONNECT_RETRY_MS', 500, { min: 0 }),
+    maxDelayMs: readIntEnv(env, 'PLAYER_DB_CONNECT_MAX_RETRY_MS', 5_000, { min: 0 }),
+  };
 }
 
-async function connectWithRetry() {
-  const timeoutMs = Number(process.env.PLAYER_DB_CONNECT_TIMEOUT_MS ?? 120_000);
-  const baseDelayMs = Number(process.env.PLAYER_DB_CONNECT_RETRY_MS ?? 500);
-  const maxDelayMs = Number(process.env.PLAYER_DB_CONNECT_MAX_RETRY_MS ?? 5_000);
+function createDbConnectorWithRetry(options: {
+  pool: DbPool;
+  logger: Logger;
+  retryConfig: DbConnectRetryConfig;
+  clock: Clock;
+}): { connect: () => Promise<DbClient> } {
+  return {
+    connect: async () => {
+      const { timeoutMs, baseDelayMs, maxDelayMs } = options.retryConfig;
 
-  const startedAt = Date.now();
-  let attempt = 0;
-  let lastError: unknown = null;
+      const startedAt = options.clock.now();
+      let attempt = 0;
+      let lastError: unknown = null;
 
-  while (Date.now() - startedAt < timeoutMs) {
-    attempt += 1;
-    try {
-      const client = await pool.connect();
-      if (attempt > 1) {
-        logger.info({ attempt }, 'Database connection established');
+      while (options.clock.now() - startedAt < timeoutMs) {
+        attempt += 1;
+        try {
+          const client = await options.pool.connect();
+          if (attempt > 1) {
+            options.logger.info({ attempt }, 'Database connection established');
+          }
+          return client;
+        } catch (err) {
+          lastError = err;
+          const elapsedMs = options.clock.now() - startedAt;
+          const remainingMs = Math.max(0, timeoutMs - elapsedMs);
+          const delayMs = Math.min(maxDelayMs, baseDelayMs * attempt, remainingMs);
+          options.logger.info({ err, attempt, delayMs }, 'Database not ready; retrying');
+          await options.clock.sleep(delayMs);
+        }
       }
-      return client;
-    } catch (err) {
-      lastError = err;
-      const elapsedMs = Date.now() - startedAt;
-      const delayMs = Math.min(maxDelayMs, baseDelayMs * attempt, timeoutMs - elapsedMs);
-      logger.info({ err, attempt, delayMs }, 'Database not ready; retrying');
-      await sleep(delayMs);
-    }
-  }
 
-  const elapsedMs = Date.now() - startedAt;
-  logger.error({ err: lastError, attempt, elapsedMs }, 'Database connection timed out');
-  throw lastError instanceof Error ? lastError : new Error('Database connection timed out');
+      const elapsedMs = options.clock.now() - startedAt;
+      options.logger.error({ err: lastError, attempt, elapsedMs }, 'Database connection timed out');
+      throw lastError instanceof Error ? lastError : new Error('Database connection timed out');
+    },
+  };
 }
 
-export async function runMigrations() {
-  const client = await connectWithRetry();
-  try {
-    logger.info('Running database migrations...');
+export function createMigrationsRunner(deps: MigrationsRunnerDeps): MigrationsRunner {
+  const clock = deps.clock ?? defaultClock;
+  const retryConfig = deps.retryConfig ?? loadDbConnectRetryConfig(deps.env);
+  const migrationsDir = deps.migrationsDir ?? deps.path.resolve(__dirname, '../../migrations');
+  const connector = createDbConnectorWithRetry({
+    pool: deps.pool,
+    logger: deps.logger,
+    retryConfig,
+    clock,
+  });
 
-    const migrationsDir = path.resolve(__dirname, '../../migrations');
-    logger.info({ path: migrationsDir }, 'Loading migration directory');
+  return {
+    runMigrations: async () => {
+      const client = await connector.connect();
+      try {
+        deps.logger.info({}, 'Running database migrations...');
 
-    if (!fs.existsSync(migrationsDir)) {
-      throw new Error(`Migrations directory not found at ${migrationsDir}`);
-    }
+        deps.logger.info({ path: migrationsDir }, 'Loading migration directory');
 
-    const files = fs
-      .readdirSync(migrationsDir)
-      .filter((file) => file.endsWith('.sql'))
-      .sort((a, b) => a.localeCompare(b));
+        if (!deps.fs.existsSync(migrationsDir)) {
+          throw new Error(`Migrations directory not found at ${migrationsDir}`);
+        }
 
-    if (files.length === 0) {
-      logger.info({ path: migrationsDir }, 'No migration files found');
-      return;
-    }
+        const files = deps.fs
+          .readdirSync(migrationsDir)
+          .filter((file) => file.endsWith('.sql'))
+          .sort((a, b) => a.localeCompare(b));
 
-    await client.query('BEGIN');
-    for (const file of files) {
-      const migrationFile = path.join(migrationsDir, file);
-      logger.info({ path: migrationFile }, 'Running migration file');
-      const sql = fs.readFileSync(migrationFile, 'utf8');
-      await client.query(sql);
-    }
-    await client.query('COMMIT');
+        if (files.length === 0) {
+          deps.logger.info({ path: migrationsDir }, 'No migration files found');
+          return;
+        }
 
-    logger.info('Migrations completed successfully');
-  } catch (err) {
-    await client.query('ROLLBACK');
-    logger.error({ err }, 'Migration failed');
-    throw err;
-  } finally {
-    client.release();
-  }
+        await client.query('BEGIN');
+        for (const file of files) {
+          const migrationFile = deps.path.join(migrationsDir, file);
+          deps.logger.info({ path: migrationFile }, 'Running migration file');
+          const sql = deps.fs.readFileSync(migrationFile, 'utf8');
+          await client.query(sql);
+        }
+        await client.query('COMMIT');
+
+        deps.logger.info({}, 'Migrations completed successfully');
+      } catch (err: unknown) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError: unknown) {
+          deps.logger.error({ err: rollbackError }, 'Migration rollback failed');
+        }
+        deps.logger.error({ err }, 'Migration failed');
+        throw err;
+      } finally {
+        client.release();
+      }
+    },
+  };
+}
+
+export async function runMigrations(): Promise<void> {
+  await createMigrationsRunner({ env: process.env, pool, logger, fs, path }).runMigrations();
 }

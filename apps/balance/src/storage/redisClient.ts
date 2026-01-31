@@ -1,4 +1,4 @@
-import { createRedisClientManager } from '@specify-poker/shared/redis';
+import { createRedisClientsFacade } from '@specify-poker/shared/redis';
 import { getConfig } from '../config';
 import logger from '../observability/logger';
 
@@ -10,7 +10,11 @@ export function isRedisEnabled(): boolean {
   return Boolean(getRedisUrl());
 }
 
-const redis = createRedisClientManager({ url: getRedisUrl(), log: logger, name: 'balance' });
+const redis = createRedisClientsFacade({
+  getUrl: () => getRedisUrl(),
+  log: logger,
+  name: 'balance',
+});
 
 export async function getRedisClient() {
   return redis.getClientOrNull();

@@ -5,6 +5,8 @@ export type {
   RedisClientManager,
 } from './redisClientManager';
 export { createRedisClientManager } from './redisClientManager';
+export type { RedisClientsFacade } from './redisClientsFacade';
+export { createRedisClientsFacade } from './redisClientsFacade';
 export { createAsyncMethodProxy } from '../proxy/asyncMethodProxy';
 export type {
   RedisStreamConsumerClient,

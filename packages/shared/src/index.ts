@@ -4,6 +4,7 @@ export * from './protobuf/struct';
 export * from './lifecycle/shutdown';
 export * from './lifecycle/serviceRunner';
 export * from './lifecycle/serviceBootstrap';
+export * from './lifecycle/otelBootstrapStep';
 export * from './lifecycle/periodicTask';
 export * from './lifecycle/timeoutRegistry';
 export * from './lifecycle/lazyValue';
