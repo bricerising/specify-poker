@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { start, shutdown, loggerInfo } = vi.hoisted(() => ({
   start: vi.fn(),
@@ -38,10 +38,14 @@ vi.mock('../../config', () => ({
   },
 }));
 
-import { startObservability, stopObservability } from '../index';
-
 describe('observability', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+  });
+
   it('starts and logs', async () => {
+    const { startObservability } = await import('../index');
     await startObservability();
 
     expect(start).toHaveBeenCalledTimes(1);
@@ -49,6 +53,8 @@ describe('observability', () => {
   });
 
   it('stops and logs', async () => {
+    const { startObservability, stopObservability } = await import('../index');
+    await startObservability();
     await stopObservability();
 
     expect(shutdown).toHaveBeenCalledTimes(1);

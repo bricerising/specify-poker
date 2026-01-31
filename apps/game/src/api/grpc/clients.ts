@@ -3,7 +3,7 @@ import * as protoLoader from '@grpc/proto-loader';
 import * as path from 'path';
 import {
   closeGrpcClient,
-  createDisposableLazyValue,
+  createGrpcClientsFacade,
   createGrpcServiceClientFactory,
 } from '@specify-poker/shared';
 
@@ -242,29 +242,38 @@ export function createGrpcClients(configOverride: GrpcClientsConfig = config): G
   };
 }
 
-const defaultBalanceClient = createDisposableLazyValue(
-  () => createBalanceClient({ address: config.balanceServiceAddr }),
-  closeGrpcClient,
-);
-const defaultEventClient = createDisposableLazyValue(
-  () => createEventClient({ address: config.eventServiceAddr }),
-  closeGrpcClient,
-);
+const defaultGrpcClients = createGrpcClientsFacade<
+  GrpcClientsConfig,
+  grpc.ChannelCredentials,
+  GrpcClients
+>({
+  getConfig: () => config,
+  createCredentials: () => grpc.credentials.createInsecure(),
+  disposeClient: closeGrpcClient,
+  definitions: {
+    balanceClient: {
+      factory: balanceClientFactory,
+      selectAddress: (currentConfig) => currentConfig.balanceServiceAddr,
+    },
+    eventClient: {
+      factory: eventClientFactory,
+      selectAddress: (currentConfig) => currentConfig.eventServiceAddr,
+    },
+  },
+});
 
 export function getBalanceClient(): BalanceServiceClient {
-  return defaultBalanceClient.get();
+  return defaultGrpcClients.getClient('balanceClient');
 }
 
 export function getEventClient(): EventServiceClient {
-  return defaultEventClient.get();
+  return defaultGrpcClients.getClient('eventClient');
 }
 
 export function resetGrpcClientsForTests(): void {
-  defaultBalanceClient.reset();
-  defaultEventClient.reset();
+  defaultGrpcClients.resetForTests();
 }
 
 export function closeGrpcClients(): void {
-  defaultBalanceClient.dispose();
-  defaultEventClient.dispose();
+  defaultGrpcClients.close();
 }

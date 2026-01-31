@@ -1,38 +1,59 @@
+import { createServiceBootstrapBuilder, ensureError, runServiceMain } from '@specify-poker/shared';
 import { config } from './config';
+import { startObservability, stopObservability } from './observability';
+import type { EventApp } from './app';
 import logger from './observability/logger';
-import { createEventApp, type EventApp } from './app';
-import { runServiceMain } from '@specify-poker/shared';
 
 let runningApp: EventApp | null = null;
 
-function isTestEnv(): boolean {
-  return process.env.NODE_ENV === 'test';
-}
+const isTestEnv = (): boolean => process.env.NODE_ENV === 'test';
 
-export async function main() {
-  const isTest = isTestEnv();
+const service = createServiceBootstrapBuilder({ logger, serviceName: 'event' })
+  .step('otel.start', async ({ onShutdown }) => {
+    // Start OTel before importing instrumented subsystems (pg/redis/grpc/etc.).
+    if (isTestEnv()) {
+      return;
+    }
 
-  if (runningApp) {
-    logger.warn('Event Service is already running; restarting');
-    await shutdown();
-  }
+    await startObservability();
+    onShutdown('otel.shutdown', async () => {
+      await stopObservability();
+    });
+  })
+  .step('app.start', async ({ onShutdown }) => {
+    const { createEventApp } = await import('./app');
 
-  const app = createEventApp({ config, isTest });
-  try {
-    await app.start();
+    const app = createEventApp({ config, isTest: isTestEnv() });
     runningApp = app;
-    logger.info({ port: config.grpcPort }, 'Event Service is running');
+
+    onShutdown('app.stop', async () => {
+      const current = runningApp;
+      runningApp = null;
+      await current?.stop();
+    });
+
+    await app.start();
+  })
+  .build({
+    run: async () => {
+      logger.info({ port: config.grpcPort }, 'Event Service is running');
+    },
+    onStartWhileRunning: 'restart',
+  });
+
+export async function main(): Promise<void> {
+  try {
+    await service.main();
   } catch (error: unknown) {
-    logger.error({ err: error }, 'Failed to start Event Service');
-    await app.stop();
-    throw error;
+    const ensuredError = ensureError(error);
+    logger.error({ err: ensuredError }, 'Failed to start Event Service');
+    throw ensuredError;
   }
 }
 
 export async function shutdown(): Promise<void> {
-  const app = runningApp;
+  await service.shutdown();
   runningApp = null;
-  await app?.stop();
 }
 
 const isDirectRun =

@@ -48,6 +48,29 @@ describe('createSubject', () => {
     expect(order).toContain(2);
   });
 
+  it('awaits thenable observers', async () => {
+    const subject = createSubject<string>();
+    let resolved = false;
+
+    subject.subscribe(() => {
+      const thenable: PromiseLike<void> = {
+        then: (onFulfilled) => {
+          setTimeout(() => {
+            resolved = true;
+            onFulfilled();
+          }, 10);
+          return Promise.resolve();
+        },
+      };
+
+      return thenable as unknown as Promise<void>;
+    });
+
+    await subject.notify('test');
+
+    expect(resolved).toBe(true);
+  });
+
   it('catches observer errors and reports via onError', async () => {
     const onError = vi.fn();
     const subject = createSubject<string>({ onError });

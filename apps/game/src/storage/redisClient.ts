@@ -1,17 +1,23 @@
+import { createAsyncDisposableLazyValue } from '@specify-poker/shared';
 import { createAsyncMethodProxy, createRedisClientManager } from '@specify-poker/shared/redis';
 import { config } from '../config';
 import logger from '../observability/logger';
 
-const redis = createRedisClientManager({ url: config.redisUrl, log: logger, name: 'game' });
+type RedisManager = ReturnType<typeof createRedisClientManager>;
 
-const client = createAsyncMethodProxy(() => redis.getClient());
+const defaultRedisManager = createAsyncDisposableLazyValue<RedisManager>(
+  () => createRedisClientManager({ url: config.redisUrl, log: logger, name: 'game' }),
+  (manager) => manager.close(),
+);
 
-export const connectRedis = async () => {
-  await redis.getClient();
+const client = createAsyncMethodProxy(() => defaultRedisManager.get().getClient());
+
+export const connectRedis = async (): Promise<void> => {
+  await defaultRedisManager.get().getClient();
 };
 
-export const closeRedisClient = async () => {
-  await redis.close();
+export const closeRedisClient = async (): Promise<void> => {
+  await defaultRedisManager.dispose();
 };
 
 export default client;

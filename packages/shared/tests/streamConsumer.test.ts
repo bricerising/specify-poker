@@ -102,4 +102,32 @@ describe('runRedisStreamConsumer', () => {
 
     expect(client.xReadGroup).toHaveBeenCalled();
   });
+
+  it('supports ack strategies (can skip ack)', async () => {
+    const controller = new AbortController();
+
+    const client: RedisStreamConsumerClient = {
+      xGroupCreate: vi.fn(async () => 'OK'),
+      xReadGroup: vi.fn(async () => [
+        { name: 'events:all', messages: [{ id: '1-0', message: { data: 'hello' } }] },
+      ]),
+      xAck: vi.fn(async () => 1),
+    };
+
+    await runRedisStreamConsumer(controller.signal, {
+      streamKey: 'events:all',
+      groupName: 'group',
+      consumerName: 'consumer',
+      getClient: async () => client,
+      onMessage: async () => {
+        controller.abort();
+      },
+      shouldAck: () => false,
+      blockMs: 0,
+      readCount: 1,
+      sleep: async () => undefined,
+    });
+
+    expect(client.xAck).not.toHaveBeenCalled();
+  });
 });

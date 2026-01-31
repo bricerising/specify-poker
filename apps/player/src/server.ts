@@ -1,58 +1,73 @@
 import {
   closeHttpServer,
-  createShutdownManager,
+  createServiceBootstrapBuilder,
   runServiceMain,
-  type ShutdownManager,
 } from '@specify-poker/shared';
 import type { Server as HttpServer } from 'http';
+import type { Config } from './config';
 import { startObservability, stopObservability } from './observability';
 import logger from './observability/logger';
 
-let runningShutdown: ShutdownManager | null = null;
+const isTestEnv = (): boolean => process.env.NODE_ENV === 'test';
 
-export async function main() {
-  const isTestEnv = process.env.NODE_ENV === 'test';
+let metricsServer: HttpServer | null = null;
+let eventConsumerInstance: { stop(): Promise<void> } | null = null;
+let runningConfig: Config | null = null;
 
-  let metricsServer: HttpServer | null = null;
-  let eventConsumerInstance: { stop(): Promise<void> } | null = null;
-
-  // Start OTel before importing instrumented subsystems (grpc/pg/redis/etc.).
-  if (!isTestEnv) {
-    startObservability();
+const requireConfig = (): Config => {
+  if (!runningConfig) {
+    throw new Error('Player config is not loaded');
   }
+  return runningConfig;
+};
 
-  const shutdownManager = createShutdownManager({ logger });
-  runningShutdown = shutdownManager;
-  shutdownManager.add('otel.shutdown', async () => {
-    if (!isTestEnv) {
-      await stopObservability();
+const service = createServiceBootstrapBuilder({ logger, serviceName: 'player' })
+  .step('otel.start', async ({ onShutdown }) => {
+    // Start OTel before importing instrumented subsystems (grpc/pg/redis/etc.).
+    if (isTestEnv()) {
+      return;
     }
-  });
 
-  try {
-    const [{ getConfig }, { closeRedisClient }] = await Promise.all([
-      import('./config'),
+    await startObservability();
+    onShutdown('otel.shutdown', async () => {
+      await stopObservability();
+    });
+  })
+  .step('config.load', async () => {
+    const { getConfig } = await import('./config');
+    runningConfig = getConfig();
+  })
+  .step('storage.init', async ({ onShutdown }) => {
+    const [{ closeRedisClient }, { default: pool }, { runMigrations }] = await Promise.all([
       import('./storage/redisClient'),
+      import('./storage/db'),
+      import('./storage/migrations'),
     ]);
 
-    const config = getConfig();
-
-    shutdownManager.add('redis.close', async () => {
+    onShutdown('redis.close', async () => {
       await closeRedisClient();
     });
-
-    const { default: pool } = await import('./storage/db');
-    shutdownManager.add('db.close', async () => {
+    onShutdown('db.close', async () => {
       await pool.end();
     });
 
+    await runMigrations();
+  })
+  .step('grpc.server.start', async ({ onShutdown }) => {
+    const config = requireConfig();
     const { startGrpcServer, stopGrpcServer } = await import('./api/grpc/server');
-    shutdownManager.add('grpc.stop', () => {
+
+    onShutdown('grpc.stop', () => {
       stopGrpcServer();
     });
 
+    await startGrpcServer(config.grpcPort);
+  })
+  .step('metrics.start', async ({ onShutdown }) => {
+    const config = requireConfig();
     const { startMetricsServer } = await import('./observability/metrics');
-    shutdownManager.add('metrics.close', async () => {
+
+    onShutdown('metrics.close', async () => {
       if (!metricsServer) {
         return;
       }
@@ -60,45 +75,44 @@ export async function main() {
       metricsServer = null;
     });
 
+    metricsServer = startMetricsServer(config.metricsPort);
+  })
+  .step('eventConsumer.start', async ({ onShutdown }) => {
     const { EventConsumer } = await import('./services/eventConsumer');
-    shutdownManager.add('eventConsumer.stop', () => {
+    onShutdown('eventConsumer.stop', () => {
       const consumer = eventConsumerInstance;
       eventConsumerInstance = null;
       return consumer?.stop();
     });
 
-    const { startDeletionProcessor, stopDeletionProcessor } =
-      await import('./jobs/deletionProcessor');
-    shutdownManager.add('deletionProcessor.stop', () => {
-      stopDeletionProcessor();
-    });
-
-    const { runMigrations } = await import('./storage/migrations');
-
-    await runMigrations();
-    await startGrpcServer(config.grpcPort);
-    metricsServer = startMetricsServer(config.metricsPort);
-
     const consumer = new EventConsumer();
     eventConsumerInstance = consumer;
     await consumer.start();
+  })
+  .step('jobs.start', async ({ onShutdown }) => {
+    const { startDeletionProcessor, stopDeletionProcessor } =
+      await import('./jobs/deletionProcessor');
+    onShutdown('deletionProcessor.stop', () => {
+      stopDeletionProcessor();
+    });
 
-    // Start background jobs
     startDeletionProcessor();
+  })
+  .build({
+    run: async () => {
+      const config = requireConfig();
+      logger.info({ port: config.grpcPort }, 'Player Service is running');
+    },
+  });
 
-    logger.info({ port: config.grpcPort }, 'Player Service is running');
-  } catch (error: unknown) {
-    logger.error({ err: error }, 'Failed to start Player Service');
-    await shutdownManager.run();
-    runningShutdown = null;
-    throw error;
-  }
+export async function main() {
+  await service.main();
 }
 
 export async function shutdown() {
   logger.info('Shutting down Player Service');
-  await runningShutdown?.run();
-  runningShutdown = null;
+  await service.shutdown();
+  runningConfig = null;
 }
 
 const isDirectRun =

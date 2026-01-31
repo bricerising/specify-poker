@@ -3,10 +3,9 @@ import * as protoLoader from '@grpc/proto-loader';
 import * as path from 'path';
 import {
   closeGrpcClient,
-  createBoundTargetProxy,
-  createDisposableLazyValue,
+  createGrpcClientsFacade,
   createGrpcServiceClientFactory,
-  createLazyValue,
+  type GrpcServiceClientFactory,
 } from '@specify-poker/shared';
 import { getConfig, type Config } from '../config';
 import type {
@@ -47,7 +46,7 @@ type NotifyProto = { notify: { NotifyService: GrpcClientConstructor<NotifyServic
 function createClientFactory<TProto, TClient>(
   protoName: ProtoName,
   getServiceConstructor: (proto: TProto) => GrpcClientConstructor<TClient>,
-) {
+): GrpcServiceClientFactory<TClient, grpc.ChannelCredentials> {
   return createGrpcServiceClientFactory<TProto, TClient, grpc.ChannelCredentials>({
     grpc,
     protoLoader,
@@ -115,91 +114,27 @@ export function createGrpcClients(config: GrpcClientsConfig): GrpcClients {
   };
 }
 
-type ServiceClientFactory<TClient> = {
-  createClient(options: { address: string; credentials: grpc.ChannelCredentials }): TClient;
-};
-
-type LazyGrpcClient<TClient extends object> = {
-  get(): TClient;
-  proxy: TClient;
-  reset(): void;
-  dispose(): void;
-};
-
-function createLazyGrpcClient<TClient extends object>(
-  create: () => TClient,
-): LazyGrpcClient<TClient> {
-  const lazy = createDisposableLazyValue(create, closeGrpcClient);
-  return {
-    get: lazy.get,
-    proxy: createBoundTargetProxy(lazy.get),
-    reset: lazy.reset,
-    dispose: lazy.dispose,
-  };
-}
-
-type DefaultGrpcClientsFacade = {
-  clients: GrpcClients;
-  getClient<K extends keyof GrpcClients>(key: K): GrpcClients[K];
-  close(): void;
-  resetForTests(): void;
-};
-
-function createDefaultGrpcClientsFacade(): DefaultGrpcClientsFacade {
-  const credentials = createLazyValue<grpc.ChannelCredentials>(() =>
-    grpc.credentials.createInsecure(),
-  );
-
-  const createDefaultClient = <TClient>(
-    factory: ServiceClientFactory<TClient>,
-    selectAddress: (config: Config) => string,
-  ): TClient => {
-    const config = getConfig();
-    return factory.createClient({ address: selectAddress(config), credentials: credentials.get() });
-  };
-
-  const lazyClients: { [K in keyof GrpcClients]: LazyGrpcClient<GrpcClients[K]> } = {
-    gameClient: createLazyGrpcClient(() =>
-      createDefaultClient(gameClientFactory, (config) => config.gameServiceUrl),
-    ),
-    playerClient: createLazyGrpcClient(() =>
-      createDefaultClient(playerClientFactory, (config) => config.playerServiceUrl),
-    ),
-    balanceClient: createLazyGrpcClient(() =>
-      createDefaultClient(balanceClientFactory, (config) => config.balanceServiceUrl),
-    ),
-    eventClient: createLazyGrpcClient(() =>
-      createDefaultClient(eventClientFactory, (config) => config.eventServiceUrl),
-    ),
-    notifyClient: createLazyGrpcClient(() =>
-      createDefaultClient(notifyClientFactory, (config) => config.notifyServiceUrl),
-    ),
-  };
-
-  return {
-    clients: {
-      gameClient: lazyClients.gameClient.proxy,
-      playerClient: lazyClients.playerClient.proxy,
-      balanceClient: lazyClients.balanceClient.proxy,
-      eventClient: lazyClients.eventClient.proxy,
-      notifyClient: lazyClients.notifyClient.proxy,
+const defaultGrpcClients = createGrpcClientsFacade<Config, grpc.ChannelCredentials, GrpcClients>({
+  getConfig,
+  createCredentials: () => grpc.credentials.createInsecure(),
+  disposeClient: closeGrpcClient,
+  definitions: {
+    gameClient: { factory: gameClientFactory, selectAddress: (config) => config.gameServiceUrl },
+    playerClient: {
+      factory: playerClientFactory,
+      selectAddress: (config) => config.playerServiceUrl,
     },
-    getClient: (key) => lazyClients[key].get(),
-    close: () => {
-      for (const lazy of Object.values(lazyClients)) {
-        lazy.dispose();
-      }
+    balanceClient: {
+      factory: balanceClientFactory,
+      selectAddress: (config) => config.balanceServiceUrl,
     },
-    resetForTests: () => {
-      credentials.reset();
-      for (const lazy of Object.values(lazyClients)) {
-        lazy.reset();
-      }
+    eventClient: { factory: eventClientFactory, selectAddress: (config) => config.eventServiceUrl },
+    notifyClient: {
+      factory: notifyClientFactory,
+      selectAddress: (config) => config.notifyServiceUrl,
     },
-  };
-}
-
-const defaultGrpcClients = createDefaultGrpcClientsFacade();
+  },
+});
 
 export const gameClient = defaultGrpcClients.clients.gameClient;
 export const playerClient = defaultGrpcClients.clients.playerClient;

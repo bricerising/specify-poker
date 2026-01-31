@@ -10,6 +10,15 @@ export type RedisStreamConsumerMessage = {
   fields: Record<string, unknown>;
 };
 
+export type RedisStreamConsumerMessageOutcome =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly error: unknown };
+
+export type RedisStreamConsumerAckStrategy = (params: {
+  readonly message: RedisStreamConsumerMessage;
+  readonly outcome: RedisStreamConsumerMessageOutcome;
+}) => boolean;
+
 export type RedisStreamConsumerLogger = {
   debug?: (obj: Record<string, unknown>, msg: string) => void;
   info?: (obj: Record<string, unknown>, msg: string) => void;
@@ -23,6 +32,7 @@ export type RedisStreamConsumerOptions = {
   consumerName: string;
   getClient: () => Promise<RedisStreamConsumerClient>;
   onMessage: (message: RedisStreamConsumerMessage) => Promise<void> | void;
+  shouldAck?: RedisStreamConsumerAckStrategy;
 
   readCount?: number;
   blockMs?: number;
@@ -62,14 +72,23 @@ export async function runRedisStreamConsumer(
   const logger = options.logger;
 
   const logWarn = (obj: Record<string, unknown>, msg: string) => {
-    (logger?.warn ?? logger?.error)?.(obj, msg);
+    const fn = logger?.warn ?? logger?.error;
+    fn?.call(logger, obj, msg);
   };
+
+  const aborted = new Promise<void>((resolve) => {
+    if (signal.aborted) {
+      resolve();
+      return;
+    }
+    signal.addEventListener('abort', () => resolve(), { once: true });
+  });
 
   const sleepUnlessAborted = async (ms: number): Promise<void> => {
     if (signal.aborted) {
       return;
     }
-    await sleep(ms);
+    await Promise.race([sleep(ms), aborted]);
   };
 
   const toStringMessageId = (id: unknown): string => {
@@ -81,6 +100,8 @@ export async function runRedisStreamConsumer(
     }
     return String(id);
   };
+
+  const shouldAck: RedisStreamConsumerAckStrategy = options.shouldAck ?? (() => true);
 
   while (!signal.aborted) {
     let client: RedisStreamConsumerClient;
@@ -134,15 +155,38 @@ export async function runRedisStreamConsumer(
     for (const stream of streams as RedisStreamReadGroupResponse) {
       for (const message of stream.messages) {
         const messageId = toStringMessageId(message.id);
+        const consumerMessage: RedisStreamConsumerMessage = {
+          id: messageId,
+          fields: message.message,
+        };
+        let outcome: RedisStreamConsumerMessageOutcome = { ok: true };
 
         try {
-          await options.onMessage({ id: messageId, fields: message.message });
+          await options.onMessage(consumerMessage);
         } catch (error: unknown) {
-          (logger?.error ?? logger?.warn)?.(
+          outcome = { ok: false, error };
+          const fn = logger?.error ?? logger?.warn;
+          fn?.call(
+            logger,
             { err: error, streamKey: options.streamKey, messageId },
             'redis_stream_consumer.message.failed',
           );
-        } finally {
+        }
+
+        let shouldAckMessage: boolean;
+        try {
+          shouldAckMessage = shouldAck({ message: consumerMessage, outcome });
+        } catch (error: unknown) {
+          shouldAckMessage = true;
+          const fn = logger?.error ?? logger?.warn;
+          fn?.call(
+            logger,
+            { err: error, streamKey: options.streamKey, messageId },
+            'redis_stream_consumer.should_ack.failed',
+          );
+        }
+
+        if (shouldAckMessage) {
           try {
             await client.xAck(options.streamKey, options.groupName, messageId);
           } catch (error: unknown) {

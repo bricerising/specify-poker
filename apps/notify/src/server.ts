@@ -1,40 +1,32 @@
-import { createShutdownManager, runServiceMain, type ShutdownManager } from '@specify-poker/shared';
+import { createServiceBootstrapBuilder, runServiceMain } from '@specify-poker/shared';
 import { getConfig } from './config';
 import logger from './observability/logger';
 import { startObservability, stopObservability } from './observability';
-import { toError } from './shared/errors';
 import type { NotifyApp } from './app';
 
 let runningApp: NotifyApp | null = null;
-let runningShutdown: ShutdownManager | null = null;
+const isTestEnv = (): boolean => process.env.NODE_ENV === 'test';
 
-export async function main(): Promise<NotifyApp['services']> {
-  const isTestEnv = process.env.NODE_ENV === 'test';
+const service = createServiceBootstrapBuilder({ logger, serviceName: 'notify' })
+  .step('app.stop.register', async ({ onShutdown }) => {
+    onShutdown('app.stop', async () => {
+      const app = runningApp;
+      runningApp = null;
+      await app?.stop();
+    });
+  })
+  .step('otel.start', async ({ onShutdown }) => {
+    if (isTestEnv()) {
+      return;
+    }
 
-  if (runningApp) {
-    logger.warn('Notify Service is already running; restarting');
-    await shutdown();
-  }
-
-  const shutdownManager = createShutdownManager({ logger });
-  runningShutdown = shutdownManager;
-  shutdownManager.add('otel.shutdown', async () => {
-    if (!isTestEnv) {
+    // Start OTel before importing instrumented subsystems (grpc, redis, etc.).
+    await startObservability();
+    onShutdown('otel.shutdown', async () => {
       await stopObservability();
-    }
-  });
-  shutdownManager.add('app.stop', async () => {
-    const app = runningApp;
-    runningApp = null;
-    await app?.stop();
-  });
-
-  try {
-    if (!isTestEnv) {
-      // Start OTel before importing instrumented subsystems (grpc, redis, etc.).
-      await startObservability();
-    }
-
+    });
+  })
+  .step('app.start', async () => {
     const config = getConfig();
 
     const { createNotifyApp } = await import('./app');
@@ -42,21 +34,28 @@ export async function main(): Promise<NotifyApp['services']> {
     runningApp = app;
 
     await app.start();
+  })
+  .build({
+    run: async () => {
+      const config = getConfig();
+      const app = runningApp;
+      if (!app) {
+        throw new Error('Notify app did not start');
+      }
 
-    logger.info({ port: config.grpcPort }, 'Notify Service is running');
-    return app.services;
-  } catch (error: unknown) {
-    logger.error({ err: toError(error) }, 'Failed to start Notify Service');
-    await shutdownManager.run();
-    runningShutdown = null;
-    throw error;
-  }
+      logger.info({ port: config.grpcPort }, 'Notify Service is running');
+      return app.services;
+    },
+  });
+
+export async function main(): Promise<NotifyApp['services']> {
+  return service.main();
 }
 
 export async function shutdown(): Promise<void> {
   logger.info('Shutting down Notify Service');
-  await runningShutdown?.run();
-  runningShutdown = null;
+  await service.shutdown();
+  runningApp = null;
 }
 
 const isDirectRun =

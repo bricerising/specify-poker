@@ -103,14 +103,27 @@ function recordContributionIfNeeded(deps: SubmitActionChainDeps): SubmitActionHa
       })
       .then((contributionResult) => {
         if (contributionResult.type === 'unavailable') {
-          void deps.emitGameEvent({
-            tableId: ctx.tableId,
-            handId: hand.handId,
-            userId: ctx.userId,
-            seatId,
-            type: GameEventType.BALANCE_UNAVAILABLE,
-            payload: { action: 'RECORD_CONTRIBUTION' },
-          });
+          void deps
+            .emitGameEvent({
+              tableId: ctx.tableId,
+              handId: hand.handId,
+              userId: ctx.userId,
+              seatId,
+              type: GameEventType.BALANCE_UNAVAILABLE,
+              payload: { action: 'RECORD_CONTRIBUTION' },
+            })
+            .catch((error: unknown) => {
+              deps.warn(
+                {
+                  err: error,
+                  tableId: ctx.tableId,
+                  handId: hand.handId,
+                  seatId,
+                  type: GameEventType.BALANCE_UNAVAILABLE,
+                },
+                'game_event.emit.failed',
+              );
+            });
           return;
         }
 
@@ -143,21 +156,34 @@ function emitActionTakenEvent(deps: SubmitActionChainDeps): SubmitActionHandler 
     const actedSeat = ctx.result.state.seats[ctx.actingSeat.seatId];
     const isAllIn = actedSeat?.status === 'ALL_IN' || ctx.result.action.type === 'ALL_IN';
 
-    void deps.emitGameEvent({
-      tableId: ctx.tableId,
-      handId: hand?.handId,
-      userId: ctx.userId,
-      seatId: ctx.actingSeat.seatId,
-      type: GameEventType.ACTION_TAKEN,
-      payload: {
+    void deps
+      .emitGameEvent({
+        tableId: ctx.tableId,
+        handId: hand?.handId,
+        userId: ctx.userId,
         seatId: ctx.actingSeat.seatId,
-        action: ctx.result.action.type,
-        amount: ctx.result.action.amount,
-        isAllIn,
-        street: ctx.actionStreet,
-      },
-      idempotencyKey: `event:${GameEventType.ACTION_TAKEN}:${ctx.result.action.actionId}`,
-    });
+        type: GameEventType.ACTION_TAKEN,
+        payload: {
+          seatId: ctx.actingSeat.seatId,
+          action: ctx.result.action.type,
+          amount: ctx.result.action.amount,
+          isAllIn,
+          street: ctx.actionStreet,
+        },
+        idempotencyKey: `event:${GameEventType.ACTION_TAKEN}:${ctx.result.action.actionId}`,
+      })
+      .catch((error: unknown) => {
+        deps.warn(
+          {
+            err: error,
+            tableId: ctx.tableId,
+            handId: hand?.handId,
+            seatId: ctx.actingSeat.seatId,
+            type: GameEventType.ACTION_TAKEN,
+          },
+          'game_event.emit.failed',
+        );
+      });
 
     await next();
   };

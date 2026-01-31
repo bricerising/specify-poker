@@ -2,12 +2,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EventConsumer } from '../../src/services/eventConsumer';
 import { createGameEventHandlers } from '../../src/services/gameEventHandlers';
 import type { PushSender } from '../../src/services/pushSender';
-import type { RedisStreamConsumerClient } from '@specify-poker/shared/redis';
+import type { RedisStreamConsumerClient, RedisStreamConsumerOptions } from '@specify-poker/shared/redis';
 
 describe('EventConsumer', () => {
+  type RunConsumer = (signal: AbortSignal, options: RedisStreamConsumerOptions) => Promise<void>;
+
   let consumer: EventConsumer;
   let pushSenderMock: PushSender;
-  let runConsumer: ReturnType<typeof vi.fn>;
+  let runConsumer: RunConsumer;
 
   beforeEach(() => {
     const sendToUser = vi
@@ -15,11 +17,11 @@ describe('EventConsumer', () => {
       .mockResolvedValue({ success: 0, failure: 0 });
     pushSenderMock = { sendToUser };
 
-    runConsumer = vi.fn((signal: AbortSignal) => {
+    runConsumer = vi.fn<RunConsumer>(async (signal, _options) => {
       if (signal.aborted) {
-        return Promise.resolve();
+        return;
       }
-      return new Promise<void>((resolve) => {
+      await new Promise<void>((resolve) => {
         signal.addEventListener('abort', () => resolve(), { once: true });
       });
     });
@@ -27,7 +29,7 @@ describe('EventConsumer', () => {
     consumer = new EventConsumer(createGameEventHandlers(pushSenderMock), {
       streamKey: 'events:game',
       getRedisClient: async () => ({} as RedisStreamConsumerClient),
-      runConsumer: runConsumer as any,
+      runConsumer,
     });
   });
 
@@ -97,18 +99,18 @@ describe('EventConsumer', () => {
     const sleep = vi.fn(async () => {});
     let runs = 0;
 
-    const crashingRunConsumer = vi.fn((signal: AbortSignal) => {
+    const crashingRunConsumer = vi.fn<RunConsumer>(async (signal, _options) => {
       runs += 1;
 
       if (runs === 1) {
-        return Promise.reject(new Error('boom'));
+        throw new Error('boom');
       }
 
       if (signal.aborted) {
-        return Promise.resolve();
+        return;
       }
 
-      return new Promise<void>((resolve) => {
+      await new Promise<void>((resolve) => {
         signal.addEventListener('abort', () => resolve(), { once: true });
       });
     });
@@ -116,7 +118,7 @@ describe('EventConsumer', () => {
     const restartable = new EventConsumer(createGameEventHandlers(pushSenderMock), {
       streamKey: 'events:game',
       getRedisClient: async () => ({} as RedisStreamConsumerClient),
-      runConsumer: crashingRunConsumer as any,
+      runConsumer: crashingRunConsumer,
       sleep,
     });
 

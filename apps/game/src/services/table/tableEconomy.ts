@@ -68,16 +68,16 @@ export function createBalanceTableEconomy(options: CreateBalanceTableEconomyOpti
       );
 
       const results = await Promise.all(calls);
-      const unavailable = results.find((result) => result.type === 'unavailable');
-      if (unavailable?.type === 'unavailable') {
-        return unavailable;
+      const unavailable = results.find((result) => !result.ok);
+      if (unavailable && !unavailable.ok) {
+        return { type: 'unavailable', error: unavailable.error };
       }
 
-      const failed = results.find((result) => result.type === 'available' && !result.response.ok);
-      if (failed?.type === 'available') {
+      const failed = results.find((result) => result.ok && !result.value.ok);
+      if (failed && failed.ok) {
         return {
           type: 'error',
-          error: failed.response.error || 'CONTRIBUTION_FAILED',
+          error: failed.value.error || 'CONTRIBUTION_FAILED',
         };
       }
 
@@ -99,12 +99,12 @@ export function createBalanceTableEconomy(options: CreateBalanceTableEconomyOpti
         idempotencyKey: makeContributionIdempotencyKey(tableId, handId, action.actionId),
       });
 
-      if (call.type === 'unavailable') {
-        return call;
+      if (!call.ok) {
+        return { type: 'unavailable', error: call.error };
       }
 
-      if (!call.response.ok) {
-        return { type: 'error', error: call.response.error || 'CONTRIBUTION_FAILED' };
+      if (!call.value.ok) {
+        return { type: 'error', error: call.value.error || 'CONTRIBUTION_FAILED' };
       }
 
       return { type: 'ok' };
@@ -149,12 +149,12 @@ export function createBalanceTableEconomy(options: CreateBalanceTableEconomyOpti
         idempotencyKey: makeSettlementIdempotencyKey(tableId, handId),
       });
 
-      if (settleCall.type === 'unavailable') {
-        return settleCall;
+      if (!settleCall.ok) {
+        return { type: 'unavailable', error: settleCall.error };
       }
 
-      if (!settleCall.response.ok) {
-        return { type: 'error', error: settleCall.response.error || 'UNKNOWN' };
+      if (!settleCall.value.ok) {
+        return { type: 'error', error: settleCall.value.error || 'UNKNOWN' };
       }
 
       return { type: 'ok' };

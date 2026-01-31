@@ -1,7 +1,10 @@
 import {
-  runRedisStreamConsumer,
-  type RedisStreamConsumerClient,
-  type RedisStreamConsumerMessage,
+  createRedisStreamConsumerLifecycle,
+} from '@specify-poker/shared/redis';
+import type {
+  RedisStreamConsumerClient,
+  RedisStreamConsumerLifecycle,
+  RedisStreamConsumerMessage,
 } from '@specify-poker/shared/redis';
 
 import { blockingRedisClient } from '../storage/redisClient';
@@ -22,30 +25,13 @@ export interface HandMaterializerDependencies {
 }
 
 export class HandMaterializer {
-  constructor(private readonly deps: HandMaterializerDependencies) {}
-
-  private isRunning = false;
   private streamRedisKey = streamKey('all');
   private groupName = 'hand-materializer';
   private consumerName = `materializer-${process.pid}`;
-  private pollPromise: Promise<void> | null = null;
-  private abortController: AbortController | null = null;
+  private readonly lifecycle: RedisStreamConsumerLifecycle;
 
-  async start(): Promise<void> {
-    if (this.isRunning) {
-      return;
-    }
-    this.isRunning = true;
-
-    logger.info(
-      { streamKey: this.streamRedisKey, group: this.groupName },
-      'HandMaterializer starting',
-    );
-
-    const controller = new AbortController();
-    this.abortController = controller;
-
-    this.pollPromise = runRedisStreamConsumer(controller.signal, {
+  constructor(private readonly deps: HandMaterializerDependencies) {
+    this.lifecycle = createRedisStreamConsumerLifecycle({
       streamKey: this.streamRedisKey,
       groupName: this.groupName,
       consumerName: this.consumerName,
@@ -58,17 +44,25 @@ export class HandMaterializer {
       },
       logger,
       isBusyGroupError: (error: unknown) => getErrorMessage(error).includes('BUSYGROUP'),
-    }).catch((error: unknown) => {
-      if (!this.isRunning || controller.signal.aborted) {
-        return;
-      }
-      logger.error({ err: error }, 'HandMaterializer poll loop crashed');
     });
+  }
+
+  async start(): Promise<void> {
+    const wasRunning = this.lifecycle.isRunning();
 
     logger.info(
       { streamKey: this.streamRedisKey, group: this.groupName },
-      'HandMaterializer started',
+      'HandMaterializer starting',
     );
+
+    await this.lifecycle.start();
+
+    if (!wasRunning && this.lifecycle.isRunning()) {
+      logger.info(
+        { streamKey: this.streamRedisKey, group: this.groupName },
+        'HandMaterializer started',
+      );
+    }
   }
 
   private async handleStreamMessage(message: RedisStreamConsumerMessage): Promise<void> {
@@ -128,13 +122,7 @@ export class HandMaterializer {
   }
 
   async stop(): Promise<void> {
-    this.isRunning = false;
-    this.abortController?.abort();
-    this.abortController = null;
-
-    const pollPromise = this.pollPromise;
-    this.pollPromise = null;
-    await pollPromise?.catch(() => undefined);
+    await this.lifecycle.stop();
   }
 }
 

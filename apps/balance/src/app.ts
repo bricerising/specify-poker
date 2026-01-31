@@ -1,6 +1,8 @@
 import {
   closeHttpServer,
+  createAsyncLifecycle,
   createShutdownManager,
+  ensureError,
   type ShutdownManager,
 } from '@specify-poker/shared';
 import express from 'express';
@@ -24,7 +26,6 @@ export type BalanceApp = {
 export type CreateBalanceAppOptions = {
   config: Config;
   service?: BalanceService;
-  stopObservability?: () => Promise<void>;
 };
 
 function createBalanceExpressApp(httpRouter: express.Router): express.Express {
@@ -45,8 +46,9 @@ function createBalanceExpressApp(httpRouter: express.Router): express.Express {
   app.use(httpRouter);
 
   app.use(
-    (err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
-      logger.error({ err, path: req.path }, 'Unhandled error');
+    (err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+      const error = ensureError(err);
+      logger.error({ err: error, path: req.path }, 'Unhandled error');
       res.status(500).json({
         error: 'INTERNAL_ERROR',
         message: 'An unexpected error occurred',
@@ -61,100 +63,77 @@ export function createBalanceApp(options: CreateBalanceAppOptions): BalanceApp {
   const api = createBalanceApi(options.service);
   const expressApp = createBalanceExpressApp(api.httpRouter);
 
-  let httpServer: HttpServer | null = null;
-  let metricsServer: HttpServer | null = null;
-  let shutdownManager: ShutdownManager | null = null;
-  let isStarted = false;
-  let startPromise: Promise<void> | null = null;
+  type RunningResources = {
+    shutdown: ShutdownManager;
+    httpServer: HttpServer | null;
+    metricsServer: HttpServer | null;
+  };
 
-  const stop = async (): Promise<void> => {
-    const shutdown = shutdownManager;
-    if (!shutdown) {
-      isStarted = false;
-      startPromise = null;
-      httpServer = null;
-      metricsServer = null;
+  let resources: RunningResources | null = null;
+
+  const stopInternal = async (): Promise<void> => {
+    if (!resources) {
       return;
     }
+
+    const current = resources;
+    resources = null;
+    await current.shutdown.run();
+  };
+
+  const startInternal = async (): Promise<void> => {
+    const shutdown = createShutdownManager({ logger });
+    const started: RunningResources = { shutdown, httpServer: null, metricsServer: null };
+
+    shutdown.add('redis.close', async () => {
+      await closeRedisClient();
+    });
+    shutdown.add('metrics.close', async () => {
+      if (!started.metricsServer) {
+        return;
+      }
+      await closeHttpServer(started.metricsServer);
+      started.metricsServer = null;
+    });
+    shutdown.add('http.close', async () => {
+      if (!started.httpServer) {
+        return;
+      }
+      await closeHttpServer(started.httpServer);
+      started.httpServer = null;
+    });
+    shutdown.add('grpc.stop', () => {
+      stopGrpcServer();
+    });
+    shutdown.add('jobs.stop', () => {
+      stopReservationExpiryJob();
+      stopLedgerVerificationJob();
+    });
 
     try {
-      await shutdown.run();
-    } finally {
-      shutdownManager = null;
-      isStarted = false;
-      startPromise = null;
-      httpServer = null;
-      metricsServer = null;
-    }
-  };
-
-  const start = async (): Promise<void> => {
-    if (isStarted) {
-      return;
-    }
-    if (startPromise) {
-      return startPromise;
-    }
-
-    startPromise = (async () => {
-      const shutdown = createShutdownManager({ logger });
-      shutdownManager = shutdown;
-
-      if (options.stopObservability) {
-        shutdown.add('otel.shutdown', async () => {
-          await options.stopObservability?.();
-        });
-      }
-      shutdown.add('redis.close', async () => {
-        await closeRedisClient();
-      });
-      shutdown.add('metrics.close', async () => {
-        if (!metricsServer) {
-          return;
-        }
-        await closeHttpServer(metricsServer);
-        metricsServer = null;
-      });
-      shutdown.add('http.close', async () => {
-        if (!httpServer) {
-          return;
-        }
-        await closeHttpServer(httpServer);
-        httpServer = null;
-      });
-      shutdown.add('grpc.stop', () => {
-        stopGrpcServer();
-      });
-      shutdown.add('jobs.stop', () => {
-        stopReservationExpiryJob();
-        stopLedgerVerificationJob();
+      started.httpServer = expressApp.listen(options.config.httpPort, () => {
+        logger.info({ port: options.config.httpPort }, 'Balance HTTP server listening');
       });
 
+      await startGrpcServer(options.config.grpcPort, api.grpcHandlers);
+
+      started.metricsServer = startMetricsServer(options.config.metricsPort);
+
+      startReservationExpiryJob();
+      startLedgerVerificationJob();
+
+      resources = started;
+    } catch (error: unknown) {
       try {
-        httpServer = expressApp.listen(options.config.httpPort, () => {
-          logger.info({ port: options.config.httpPort }, 'Balance HTTP server listening');
-        });
-
-        await startGrpcServer(options.config.grpcPort, api.grpcHandlers);
-
-        metricsServer = startMetricsServer(options.config.metricsPort);
-
-        startReservationExpiryJob();
-        startLedgerVerificationJob();
-
-        isStarted = true;
-        logger.info('Balance service started successfully');
-      } catch (error: unknown) {
-        logger.error({ err: error }, 'Failed to start balance service');
-        await stop();
-        throw error;
+        await shutdown.run();
       } finally {
-        startPromise = null;
+        resources = null;
       }
-    })();
-
-    return startPromise;
+      throw error;
+    }
   };
 
-  return { expressApp, start, stop };
+  const lifecycle = createAsyncLifecycle({ start: startInternal, stop: stopInternal });
+
+  return { expressApp, start: lifecycle.start, stop: lifecycle.stop };
 }

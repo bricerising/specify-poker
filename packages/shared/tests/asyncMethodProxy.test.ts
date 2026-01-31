@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createAsyncMethodProxy } from '../src/redis/asyncMethodProxy';
+import { createAsyncMethodProxy } from '../src/proxy/asyncMethodProxy';
 
 describe('createAsyncMethodProxy', () => {
   it('delegates method calls to the resolved target', async () => {
@@ -23,6 +23,16 @@ describe('createAsyncMethodProxy', () => {
     }));
 
     expect((proxy as { then?: unknown }).then).toBeUndefined();
+  });
+
+  it('caches method wrappers by property name', () => {
+    const proxy = createAsyncMethodProxy(async () => ({
+      ping: async () => 'pong',
+    }));
+
+    const pingA = (proxy as { ping: (...args: unknown[]) => Promise<unknown> }).ping;
+    const pingB = (proxy as { ping: (...args: unknown[]) => Promise<unknown> }).ping;
+    expect(pingA).toBe(pingB);
   });
 
   it('throws when calling a non-function property', async () => {

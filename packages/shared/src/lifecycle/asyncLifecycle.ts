@@ -51,7 +51,7 @@ export function createAsyncLifecycle(impl: AsyncLifecycleImpl): AsyncLifecycle {
   let state: LifecycleState = { status: 'stopped' };
 
   const start = async (): Promise<void> => {
-    while (true) {
+    for (;;) {
       switch (state.status) {
         case 'running': {
           return;
@@ -81,7 +81,7 @@ export function createAsyncLifecycle(impl: AsyncLifecycleImpl): AsyncLifecycle {
   };
 
   const stop = async (): Promise<void> => {
-    while (true) {
+    for (;;) {
       switch (state.status) {
         case 'stopped': {
           return;

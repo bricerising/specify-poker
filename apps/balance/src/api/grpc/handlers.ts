@@ -1,4 +1,4 @@
-import * as grpc from '@grpc/grpc-js';
+import type * as grpc from '@grpc/grpc-js';
 import {
   createUnaryHandler,
   withUnaryErrorHandling,

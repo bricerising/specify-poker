@@ -1,4 +1,4 @@
-import { createLazyUnaryCallResultProxy } from '@specify-poker/shared';
+import { createLazyUnaryCallResultProxy, mapResult, type Result } from '@specify-poker/shared';
 import { getBalanceClient } from '../api/grpc/clients';
 
 type NumericString = string | number;
@@ -13,17 +13,7 @@ function parseNumeric(value: NumericString | undefined): number {
 
 const unaryBalanceClient = createLazyUnaryCallResultProxy(getBalanceClient);
 
-export type BalanceCall<TResponse> =
-  | { type: 'available'; response: TResponse }
-  | { type: 'unavailable'; error: unknown };
-
-function unavailable<TResponse>(error: unknown): BalanceCall<TResponse> {
-  return { type: 'unavailable', error };
-}
-
-function available<TResponse>(response: TResponse): BalanceCall<TResponse> {
-  return { type: 'available', response };
-}
+export type BalanceCall<TResponse> = Result<TResponse, unknown>;
 
 export interface ReserveResult {
   ok: boolean;
@@ -129,17 +119,12 @@ export async function reserveForBuyIn(
     timeout_seconds: params.timeoutSeconds ?? 30,
   });
 
-  if (!call.ok) {
-    return unavailable(call.error);
-  }
-
-  const response = call.value;
-  return available({
+  return mapResult(call, (response) => ({
     ok: response.ok,
     reservationId: response.reservation_id,
     error: response.error,
     availableBalance: parseNumeric(response.available_balance),
-  });
+  }));
 }
 
 export async function commitReservation(
@@ -149,17 +134,12 @@ export async function commitReservation(
     reservation_id: params.reservationId,
   });
 
-  if (!call.ok) {
-    return unavailable(call.error);
-  }
-
-  const response = call.value;
-  return available({
+  return mapResult(call, (response) => ({
     ok: response.ok,
     transactionId: response.transaction_id,
     error: response.error,
     newBalance: parseNumeric(response.new_balance),
-  });
+  }));
 }
 
 export async function releaseReservation(
@@ -170,12 +150,7 @@ export async function releaseReservation(
     reason: params.reason,
   });
 
-  if (!call.ok) {
-    return unavailable(call.error);
-  }
-
-  const response = call.value;
-  return available({ ok: response.ok, error: response.error });
+  return mapResult(call, (response) => ({ ok: response.ok, error: response.error }));
 }
 
 export async function processCashOut(
@@ -190,17 +165,12 @@ export async function processCashOut(
     hand_id: params.handId,
   });
 
-  if (!call.ok) {
-    return unavailable(call.error);
-  }
-
-  const response = call.value;
-  return available({
+  return mapResult(call, (response) => ({
     ok: response.ok,
     transactionId: response.transaction_id,
     error: response.error,
     newBalance: parseNumeric(response.new_balance),
-  });
+  }));
 }
 
 export async function recordContribution(
@@ -216,17 +186,12 @@ export async function recordContribution(
     idempotency_key: params.idempotencyKey,
   });
 
-  if (!call.ok) {
-    return unavailable(call.error);
-  }
-
-  const response = call.value;
-  return available({
+  return mapResult(call, (response) => ({
     ok: response.ok,
     error: response.error,
     totalPot: parseNumeric(response.total_pot),
     seatContribution: parseNumeric(response.seat_contribution),
-  });
+  }));
 }
 
 export async function settlePot(
@@ -243,12 +208,7 @@ export async function settlePot(
     idempotency_key: params.idempotencyKey,
   });
 
-  if (!call.ok) {
-    return unavailable(call.error);
-  }
-
-  const response = call.value;
-  return available({
+  return mapResult(call, (response) => ({
     ok: response.ok,
     error: response.error,
     results: response.results?.map((r) => ({
@@ -257,7 +217,7 @@ export async function settlePot(
       amount: parseNumeric(r.amount),
       newBalance: parseNumeric(r.new_balance),
     })),
-  });
+  }));
 }
 
 export async function cancelPot(
@@ -269,12 +229,7 @@ export async function cancelPot(
     reason: params.reason,
   });
 
-  if (!call.ok) {
-    return unavailable(call.error);
-  }
-
-  const response = call.value;
-  return available({ ok: response.ok, error: response.error });
+  return mapResult(call, (response) => ({ ok: response.ok, error: response.error }));
 }
 
 export const balanceClient = {

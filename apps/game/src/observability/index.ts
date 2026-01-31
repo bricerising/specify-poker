@@ -3,27 +3,35 @@ import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentation
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
 import { Resource } from '@opentelemetry/resources';
 import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
+import { createOtelSdkLifecycle } from '@specify-poker/shared';
 import { getConfig } from '../config';
 import logger from './logger';
 
-const config = getConfig();
-
-const sdk = new NodeSDK({
-  resource: new Resource({
-    [SemanticResourceAttributes.SERVICE_NAME]: 'game-service',
-  }),
-  traceExporter: new OTLPTraceExporter({
-    url: config.otelExporterEndpoint,
-  }),
-  instrumentations: [getNodeAutoInstrumentations()],
+const lifecycle = createOtelSdkLifecycle({
+  createSdk: () => {
+    const config = getConfig();
+    return new NodeSDK({
+      resource: new Resource({
+        [SemanticResourceAttributes.SERVICE_NAME]: 'game-service',
+      }),
+      traceExporter: new OTLPTraceExporter({
+        url: config.otelExporterEndpoint,
+      }),
+      instrumentations: [getNodeAutoInstrumentations()],
+    });
+  },
+  onStarted: () => {
+    logger.info('OpenTelemetry SDK started');
+  },
+  onStopped: () => {
+    logger.info('OpenTelemetry SDK shut down');
+  },
 });
 
-export function startObservability() {
-  sdk.start();
-  logger.info('OpenTelemetry SDK started');
+export async function startObservability(): Promise<void> {
+  await lifecycle.start();
 }
 
-export async function stopObservability() {
-  await sdk.shutdown();
-  logger.info('OpenTelemetry SDK shut down');
+export async function stopObservability(): Promise<void> {
+  await lifecycle.stop();
 }

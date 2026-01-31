@@ -84,4 +84,23 @@ describe('gRPC clients', () => {
     expect(createInsecure).toHaveBeenCalledTimes(1);
     expect(ctor).toHaveBeenCalledWith('game:1234', 'creds');
   });
+
+  it('resetGrpcClientsForTests closes any created clients', async () => {
+    const close = vi.fn();
+    const ctor = vi.fn().mockImplementation(() => ({ close }));
+    loadPackageDefinition.mockReturnValue({
+      game: { GameService: ctor },
+      player: { PlayerService: ctor },
+      balance: { BalanceService: ctor },
+      event: { EventService: ctor },
+      notify: { NotifyService: ctor },
+    });
+
+    const module = await import('../../../src/grpc/clients');
+
+    void (module.gameClient as unknown as { ListTables?: unknown }).ListTables;
+    module.resetGrpcClientsForTests();
+
+    expect(close).toHaveBeenCalledTimes(1);
+  });
 });

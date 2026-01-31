@@ -6,7 +6,7 @@ function createMockBalanceService(
   overrides: Partial<Record<keyof BalanceService, unknown>> = {},
 ): BalanceService {
   const notImplemented = (name: string) =>
-    vi.fn(async (..._args: any[]) => {
+    vi.fn(async (..._args: unknown[]) => {
       throw new Error(`Not implemented: ${name}`);
     });
 

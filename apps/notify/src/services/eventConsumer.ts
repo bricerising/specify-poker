@@ -1,15 +1,11 @@
 import logger from '../observability/logger';
 import { getErrorMessage, toError } from '../shared/errors';
-import {
-  createAsyncLifecycle,
-  exponentialBackoff,
-  type AsyncLifecycle,
-  type RetryStrategy,
-} from '@specify-poker/shared';
+import { createRedisStreamConsumerLifecycle } from '@specify-poker/shared/redis';
 import { dispatchByTypeNoCtx } from '@specify-poker/shared/pipeline';
-import {
-  runRedisStreamConsumer,
-  type RedisStreamConsumerClient,
+import type {
+  RedisStreamConsumerClient,
+  RedisStreamConsumerLifecycle,
+  RedisStreamConsumerOptions,
 } from '@specify-poker/shared/redis';
 import type { GameEventHandlers } from './gameEventHandlers';
 import { decodeGameEvent, type GameEvent, type GameEventDecodeResult } from './gameEvents';
@@ -22,7 +18,7 @@ type EventConsumerOptions = {
   blockMs?: number;
   readCount?: number;
   sleep?: (ms: number) => Promise<void>;
-  runConsumer?: typeof runRedisStreamConsumer;
+  runConsumer?: (signal: AbortSignal, options: RedisStreamConsumerOptions) => Promise<void>;
 };
 
 export class EventConsumer {
@@ -33,11 +29,8 @@ export class EventConsumer {
   private readonly blockMs: number;
   private readonly readCount: number;
   private readonly sleep: (ms: number) => Promise<void>;
-  private readonly runConsumer: typeof runRedisStreamConsumer;
-  private pollPromise: Promise<void> | null = null;
   private readonly eventHandlers: GameEventHandlers;
-  private abortController: AbortController | null = null;
-  private readonly lifecycle: AsyncLifecycle;
+  private readonly lifecycle: RedisStreamConsumerLifecycle;
 
   constructor(handlers: GameEventHandlers, options: EventConsumerOptions) {
     this.streamKey = options.streamKey;
@@ -47,77 +40,30 @@ export class EventConsumer {
     this.blockMs = options.blockMs ?? 5000;
     this.readCount = options.readCount ?? 1;
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
-    this.runConsumer = options.runConsumer ?? runRedisStreamConsumer;
     this.eventHandlers = handlers;
-    this.lifecycle = createAsyncLifecycle({
-      start: () => this.startInternal(),
-      stop: () => this.stopInternal(),
+
+    this.lifecycle = createRedisStreamConsumerLifecycle({
+      streamKey: this.streamKey,
+      groupName: this.groupName,
+      consumerName: this.consumerName,
+      getClient: this.getClient,
+      onMessage: async ({ id, fields }) => {
+        await this.handleMessage(fields, id);
+      },
+      blockMs: this.blockMs,
+      readCount: this.readCount,
+      sleep: this.sleep,
+      runConsumer: options.runConsumer,
+      logger,
+      isBusyGroupError: (error: unknown) => getErrorMessage(error).includes('BUSYGROUP'),
     });
   }
 
   async start(): Promise<void> {
-    await this.lifecycle.start();
-  }
-
-  private async startInternal(): Promise<void> {
-    logger.info({ streamKey: this.streamKey }, 'EventConsumer starting');
-
-    const controller = new AbortController();
-    this.abortController = controller;
-
-    this.pollPromise = this.runPollLoop(controller.signal);
-  }
-
-  private async runPollLoop(signal: AbortSignal): Promise<void> {
-    const retryStrategy: RetryStrategy = exponentialBackoff({
-      baseMs: 1000,
-      maxMs: 30_000,
-    });
-    let attempt = 0;
-
-    while (!signal.aborted) {
-      try {
-        await this.runConsumer(signal, {
-          streamKey: this.streamKey,
-          groupName: this.groupName,
-          consumerName: this.consumerName,
-          getClient: this.getClient,
-          onMessage: async ({ id, fields }) => {
-            await this.handleMessage(fields, id);
-          },
-          blockMs: this.blockMs,
-          readCount: this.readCount,
-          sleep: this.sleep,
-          logger,
-          isBusyGroupError: (error: unknown) => getErrorMessage(error).includes('BUSYGROUP'),
-        });
-
-        if (signal.aborted) {
-          return;
-        }
-
-        attempt = 0;
-        logger.warn(
-          { streamKey: this.streamKey },
-          'EventConsumer stream consumer exited unexpectedly; restarting',
-        );
-        await this.sleep(1000);
-        continue;
-      } catch (error: unknown) {
-        if (signal.aborted) {
-          return;
-        }
-
-        attempt += 1;
-        const delayMs = retryStrategy.getDelayMs(attempt);
-
-        logger.error(
-          { err: toError(error), attempt, delayMs, streamKey: this.streamKey },
-          'EventConsumer poll loop crashed; restarting',
-        );
-        await this.sleep(delayMs);
-      }
+    if (!this.lifecycle.isRunning()) {
+      logger.info({ streamKey: this.streamKey }, 'EventConsumer starting');
     }
+    await this.lifecycle.start();
   }
 
   async handleMessage(message: unknown, messageId?: string): Promise<void> {
@@ -160,15 +106,6 @@ export class EventConsumer {
 
   async stop(): Promise<void> {
     await this.lifecycle.stop();
-  }
-
-  private async stopInternal(): Promise<void> {
-    this.abortController?.abort();
-    this.abortController = null;
-    if (this.pollPromise) {
-      await this.pollPromise;
-      this.pollPromise = null;
-    }
   }
 
   isRunning(): boolean {

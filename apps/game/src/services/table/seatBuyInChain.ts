@@ -12,6 +12,7 @@ import type {
 } from '../../clients/balanceClient';
 import { composeAsyncChain, type AsyncChainHandler } from '@specify-poker/shared/pipeline';
 import { coerceNumber } from '../../utils/coerce';
+import { buyInIdempotencyKeyPrefix } from './idempotency';
 
 export type FinalizeReservedSeatJoinResult =
   | { readonly type: 'ok'; readonly wasAlreadySeated?: boolean }
@@ -46,6 +47,7 @@ export type SeatBuyInChainDeps = {
     userId: string;
     reservationId?: string;
   }): Promise<void>;
+  logError(meta: unknown, message: string): void;
   emitGameEvent(params: {
     tableId: string;
     handId: string | undefined;
@@ -58,6 +60,22 @@ export type SeatBuyInChainDeps = {
 };
 
 type SeatBuyInHandler = AsyncChainHandler<SeatBuyInChainContext, FinalizeReservedSeatJoinResult>;
+
+type PreparedBuyIn = {
+  readonly buyInAmount: number;
+  readonly buyInIdempotencyKey: string;
+};
+
+function readPreparedBuyIn(
+  ctx: SeatBuyInChainContext,
+): PreparedBuyIn | Extract<FinalizeReservedSeatJoinResult, { type: 'error' }> {
+  const buyInAmount = ctx.buyInAmount;
+  const buyInIdempotencyKey = ctx.buyInIdempotencyKey;
+  if (buyInAmount === undefined || !buyInIdempotencyKey) {
+    return { type: 'error', error: 'INTERNAL' };
+  }
+  return { buyInAmount, buyInIdempotencyKey };
+}
 
 function prepareSeat(deps: SeatBuyInChainDeps): SeatBuyInHandler {
   return async (ctx, next) => {
@@ -86,12 +104,11 @@ function prepareSeat(deps: SeatBuyInChainDeps): SeatBuyInHandler {
       }
 
       const pendingBuyInAmount = coerceNumber(seat.pendingBuyInAmount, ctx.fallbackBuyInAmount);
-      const buyInAmount =
-        pendingBuyInAmount > 0 ? pendingBuyInAmount : ctx.fallbackBuyInAmount;
+      const buyInAmount = pendingBuyInAmount > 0 ? pendingBuyInAmount : ctx.fallbackBuyInAmount;
 
       const buyInIdempotencyKey =
         seat.buyInIdempotencyKey ??
-        deps.newIdempotencyKey(`buyin:${ctx.tableId}:${ctx.seatId}:${ctx.userId}`);
+        deps.newIdempotencyKey(buyInIdempotencyKeyPrefix(ctx.tableId, ctx.seatId, ctx.userId));
 
       if (!seat.buyInIdempotencyKey) {
         seat.buyInIdempotencyKey = buyInIdempotencyKey;
@@ -126,11 +143,11 @@ function reserveBalanceIfNeeded(deps: SeatBuyInChainDeps): SeatBuyInHandler {
       return next();
     }
 
-    const buyInAmount = ctx.buyInAmount ?? ctx.fallbackBuyInAmount;
-    const buyInIdempotencyKey = ctx.buyInIdempotencyKey;
-    if (!buyInIdempotencyKey) {
-      return { type: 'error', error: 'INTERNAL' };
+    const preparedBuyIn = readPreparedBuyIn(ctx);
+    if ('type' in preparedBuyIn) {
+      return preparedBuyIn;
     }
+    const { buyInAmount, buyInIdempotencyKey } = preparedBuyIn;
 
     const reservationCall = await deps.reserveForBuyIn({
       accountId: ctx.userId,
@@ -140,11 +157,11 @@ function reserveBalanceIfNeeded(deps: SeatBuyInChainDeps): SeatBuyInHandler {
       timeoutSeconds: 30,
     });
 
-    if (reservationCall.type === 'unavailable') {
+    if (!reservationCall.ok) {
       return { type: 'balance_unavailable', error: reservationCall.error };
     }
 
-    const reservation = reservationCall.response;
+    const reservation = reservationCall.value;
     const reservationId = reservation.reservationId;
     if (!reservation.ok || !reservationId) {
       await deps.rollbackSeat({ tableId: ctx.tableId, seatId: ctx.seatId, userId: ctx.userId });
@@ -153,7 +170,9 @@ function reserveBalanceIfNeeded(deps: SeatBuyInChainDeps): SeatBuyInHandler {
 
     const persistedReservation = await deps.runTableTask(
       ctx.tableId,
-      async (): Promise<{ readonly type: 'ok' } | { readonly type: 'error'; readonly error: string }> => {
+      async (): Promise<
+        { readonly type: 'ok' } | { readonly type: 'error'; readonly error: string }
+      > => {
         const state = await deps.loadTableState(ctx.tableId);
         if (!state) {
           return { type: 'error', error: 'TABLE_LOST' };
@@ -172,7 +191,14 @@ function reserveBalanceIfNeeded(deps: SeatBuyInChainDeps): SeatBuyInHandler {
     );
 
     if (persistedReservation.type === 'error') {
-      void deps.releaseReservation({ reservationId, reason: 'seat_lost' });
+      void deps
+        .releaseReservation({ reservationId, reason: 'seat_lost' })
+        .catch((error: unknown) => {
+          deps.logError(
+            { err: error, tableId: ctx.tableId, seatId: ctx.seatId, reservationId },
+            'balance.reservation.release.failed',
+          );
+        });
       return persistedReservation;
     }
 
@@ -191,13 +217,18 @@ function commitBalanceReservation(deps: SeatBuyInChainDeps): SeatBuyInHandler {
     }
 
     const commitCall = await deps.commitReservation({ reservationId });
-    if (commitCall.type === 'unavailable') {
+    if (!commitCall.ok) {
       return { type: 'balance_unavailable', error: commitCall.error };
     }
 
-    const commit = commitCall.response;
+    const commit = commitCall.value;
     if (!commit.ok) {
-      await deps.rollbackSeat({ tableId: ctx.tableId, seatId: ctx.seatId, userId: ctx.userId, reservationId });
+      await deps.rollbackSeat({
+        tableId: ctx.tableId,
+        seatId: ctx.seatId,
+        userId: ctx.userId,
+        reservationId,
+      });
       return { type: 'error', error: commit.error || 'COMMIT_FAILED' };
     }
 
@@ -208,16 +239,21 @@ function commitBalanceReservation(deps: SeatBuyInChainDeps): SeatBuyInHandler {
 function finalizeSeat(deps: SeatBuyInChainDeps): SeatBuyInHandler {
   return async (ctx, _next) => {
     const reservationId = ctx.reservationId;
-    const buyInAmount = ctx.buyInAmount ?? ctx.fallbackBuyInAmount;
-    const buyInIdempotencyKey = ctx.buyInIdempotencyKey;
-
-    if (!reservationId || !buyInIdempotencyKey) {
+    if (!reservationId) {
       return { type: 'error', error: 'INTERNAL' };
     }
 
+    const preparedBuyIn = readPreparedBuyIn(ctx);
+    if ('type' in preparedBuyIn) {
+      return preparedBuyIn;
+    }
+    const { buyInAmount, buyInIdempotencyKey } = preparedBuyIn;
+
     const finalizeResult = await deps.runTableTask(
       ctx.tableId,
-      async (): Promise<{ readonly type: 'ok' } | { readonly type: 'error'; readonly error: string }> => {
+      async (): Promise<
+        { readonly type: 'ok' } | { readonly type: 'error'; readonly error: string }
+      > => {
         const [table, state] = await Promise.all([
           deps.loadTable(ctx.tableId),
           deps.loadTableState(ctx.tableId),
@@ -241,17 +277,24 @@ function finalizeSeat(deps: SeatBuyInChainDeps): SeatBuyInHandler {
         await deps.saveState(state);
         await deps.publishTableAndLobby(table, state);
 
-        void deps.emitGameEvent({
-          tableId: ctx.tableId,
-          handId: undefined,
-          userId: ctx.userId,
-          seatId: ctx.seatId,
-          type: GameEventType.PLAYER_JOINED,
-          payload: {
-            stack: buyInAmount,
-          },
-          idempotencyKey: `event:${GameEventType.PLAYER_JOINED}:${buyInIdempotencyKey}`,
-        });
+        void deps
+          .emitGameEvent({
+            tableId: ctx.tableId,
+            handId: undefined,
+            userId: ctx.userId,
+            seatId: ctx.seatId,
+            type: GameEventType.PLAYER_JOINED,
+            payload: {
+              stack: buyInAmount,
+            },
+            idempotencyKey: `event:${GameEventType.PLAYER_JOINED}:${buyInIdempotencyKey}`,
+          })
+          .catch((error: unknown) => {
+            deps.logError(
+              { err: error, tableId: ctx.tableId, seatId: ctx.seatId },
+              'game_event.emit.failed',
+            );
+          });
 
         await deps.checkStartHand(table, state);
 
@@ -279,4 +322,3 @@ export function createSeatBuyInChain(
 
   return composeAsyncChain(handlers, async () => ({ type: 'error', error: 'INTERNAL' }));
 }
-

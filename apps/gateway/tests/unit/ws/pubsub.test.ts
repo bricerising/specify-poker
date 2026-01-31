@@ -69,6 +69,20 @@ describe('WS pubsub', () => {
     expect(handlers.onTableEvent).toHaveBeenCalledWith(expect.objectContaining({ tableId: 't1' }));
   });
 
+  it('is safe to init concurrently', async () => {
+    const { initWsPubSub } = await import('../../../src/ws/pubsub');
+    const handlers = {
+      onTableEvent: vi.fn(),
+      onChatEvent: vi.fn(),
+      onTimerEvent: vi.fn(),
+      onLobbyEvent: vi.fn(),
+    };
+
+    await Promise.all([initWsPubSub(handlers), initWsPubSub(handlers)]);
+
+    expect(subClient.subscribe).toHaveBeenCalledTimes(1);
+  });
+
   it('ignores messages from the same instance', async () => {
     const { initWsPubSub } = await import('../../../src/ws/pubsub');
     const handlers = {

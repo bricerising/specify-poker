@@ -108,28 +108,28 @@ describe('balance client', () => {
       amount: 50,
       idempotencyKey: 'key-1',
     });
-    expect(reserveCall.type).toBe('available');
-    if (reserveCall.type === 'available') {
-      expect(reserveCall.response.ok).toBe(true);
-      expect(reserveCall.response.reservationId).toBe('res-1');
-      expect(reserveCall.response.availableBalance).toBe(500);
+    expect(reserveCall.ok).toBe(true);
+    if (reserveCall.ok) {
+      expect(reserveCall.value.ok).toBe(true);
+      expect(reserveCall.value.reservationId).toBe('res-1');
+      expect(reserveCall.value.availableBalance).toBe(500);
     }
 
     const commitCall = await client.commitReservation({ reservationId: 'res-1' });
-    expect(commitCall.type).toBe('available');
-    if (commitCall.type === 'available') {
-      expect(commitCall.response.ok).toBe(true);
-      expect(commitCall.response.transactionId).toBe('tx-1');
-      expect(commitCall.response.newBalance).toBe(450);
+    expect(commitCall.ok).toBe(true);
+    if (commitCall.ok) {
+      expect(commitCall.value.ok).toBe(true);
+      expect(commitCall.value.transactionId).toBe('tx-1');
+      expect(commitCall.value.newBalance).toBe(450);
     }
 
     const releaseCall = await client.releaseReservation({
       reservationId: 'res-1',
       reason: 'timeout',
     });
-    expect(releaseCall.type).toBe('available');
-    if (releaseCall.type === 'available') {
-      expect(releaseCall.response.ok).toBe(true);
+    expect(releaseCall.ok).toBe(true);
+    if (releaseCall.ok) {
+      expect(releaseCall.value.ok).toBe(true);
     }
 
     const cashOutCall = await client.processCashOut({
@@ -139,10 +139,10 @@ describe('balance client', () => {
       amount: 20,
       idempotencyKey: 'key-2',
     });
-    expect(cashOutCall.type).toBe('available');
-    if (cashOutCall.type === 'available') {
-      expect(cashOutCall.response.ok).toBe(true);
-      expect(cashOutCall.response.newBalance).toBe(600);
+    expect(cashOutCall.ok).toBe(true);
+    if (cashOutCall.ok) {
+      expect(cashOutCall.value.ok).toBe(true);
+      expect(cashOutCall.value.newBalance).toBe(600);
     }
 
     const contributionCall = await client.recordContribution({
@@ -154,10 +154,10 @@ describe('balance client', () => {
       contributionType: 'BET',
       idempotencyKey: 'key-3',
     });
-    expect(contributionCall.type).toBe('available');
-    if (contributionCall.type === 'available') {
-      expect(contributionCall.response.ok).toBe(true);
-      expect(contributionCall.response.totalPot).toBe(20);
+    expect(contributionCall.ok).toBe(true);
+    if (contributionCall.ok) {
+      expect(contributionCall.value.ok).toBe(true);
+      expect(contributionCall.value.totalPot).toBe(20);
     }
 
     const settleCall = await client.settlePot({
@@ -166,10 +166,10 @@ describe('balance client', () => {
       winners: [{ seatId: 0, accountId: 'player-1', amount: 10 }],
       idempotencyKey: 'key-4',
     });
-    expect(settleCall.type).toBe('available');
-    if (settleCall.type === 'available') {
-      expect(settleCall.response.ok).toBe(true);
-      expect(settleCall.response.results?.[0].newBalance).toBe(610);
+    expect(settleCall.ok).toBe(true);
+    if (settleCall.ok) {
+      expect(settleCall.value.ok).toBe(true);
+      expect(settleCall.value.results?.[0].newBalance).toBe(610);
     }
 
     const cancelCall = await client.cancelPot({
@@ -177,9 +177,9 @@ describe('balance client', () => {
       handId: 'hand-1',
       reason: 'table_disbanded',
     });
-    expect(cancelCall.type).toBe('available');
-    if (cancelCall.type === 'available') {
-      expect(cancelCall.response.ok).toBe(true);
+    expect(cancelCall.ok).toBe(true);
+    if (cancelCall.ok) {
+      expect(cancelCall.value.ok).toBe(true);
     }
   });
 
@@ -199,16 +199,16 @@ describe('balance client', () => {
       amount: 50,
       idempotencyKey: 'key-1',
     });
-    expect(reserveCall.type).toBe('unavailable');
+    expect(reserveCall.ok).toBe(false);
 
     const commitCall = await client.commitReservation({ reservationId: 'res-1' });
-    expect(commitCall.type).toBe('unavailable');
+    expect(commitCall.ok).toBe(false);
 
     const releaseCall = await client.releaseReservation({
       reservationId: 'res-1',
       reason: 'timeout',
     });
-    expect(releaseCall.type).toBe('unavailable');
+    expect(releaseCall.ok).toBe(false);
 
     const cashOutCall = await client.processCashOut({
       accountId: 'player-1',
@@ -217,7 +217,7 @@ describe('balance client', () => {
       amount: 20,
       idempotencyKey: 'key-2',
     });
-    expect(cashOutCall.type).toBe('unavailable');
+    expect(cashOutCall.ok).toBe(false);
 
     const contributionCall = await client.recordContribution({
       tableId: 'table-1',
@@ -228,7 +228,7 @@ describe('balance client', () => {
       contributionType: 'BET',
       idempotencyKey: 'key-3',
     });
-    expect(contributionCall.type).toBe('unavailable');
+    expect(contributionCall.ok).toBe(false);
 
     const settleCall = await client.settlePot({
       tableId: 'table-1',
@@ -236,13 +236,13 @@ describe('balance client', () => {
       winners: [{ seatId: 0, accountId: 'player-1', amount: 10 }],
       idempotencyKey: 'key-4',
     });
-    expect(settleCall.type).toBe('unavailable');
+    expect(settleCall.ok).toBe(false);
 
     const cancelCall = await client.cancelPot({
       tableId: 'table-1',
       handId: 'hand-1',
       reason: 'table_disbanded',
     });
-    expect(cancelCall.type).toBe('unavailable');
+    expect(cancelCall.ok).toBe(false);
   });
 });

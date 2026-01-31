@@ -7,10 +7,8 @@ import type {
   TableState,
   TableSummary,
 } from '../../domain/types';
-import { isInHandStatus } from '../../domain/types';
 import { GameEventType, type GameEventType as GameEventTypeValue } from '../../domain/events';
 import { applyAction } from '../../engine/handEngine';
-import { calculatePots } from '../../engine/potCalculator';
 import type { BalanceClient } from '../../clients/balanceClient';
 import type { PublishResult, GameEvent } from '../../clients/eventClient';
 import { coerceNumber } from '../../utils/coerce';
@@ -20,6 +18,7 @@ import type { TablePublisher } from './tablePublisher';
 import { redactTableState } from './tableViewBuilder';
 import { resolveSeatForUser as resolveSeatForUserInState } from './seatResolver';
 import type { TableEconomy } from './tableEconomy';
+import { createLeaveSeatChain, type LeaveSeatUnlockedResult } from './leaveSeatChain';
 import {
   createSubmitActionChain,
   type SubmitActionChainContext,
@@ -99,15 +98,6 @@ const DEFAULT_STARTING_STACK = 200;
 // Types
 // ============================================================================
 
-type LeaveSeatUnlockedResult =
-  | { readonly ok: false; readonly error: string }
-  | {
-      readonly ok: true;
-      readonly seatId: number;
-      readonly handId: string | undefined;
-      readonly remainingStack: number;
-    };
-
 type OkResult = { readonly ok: true };
 type ErrorResult = { readonly ok: false; readonly error: string };
 
@@ -124,6 +114,10 @@ export class TableService {
   private readonly seatBuyInChain: (
     ctx: SeatBuyInChainContext,
   ) => Promise<FinalizeReservedSeatJoinResult>;
+  private readonly leaveSeatChain: (ctx: {
+    tableId: string;
+    userId: string;
+  }) => Promise<LeaveSeatUnlockedResult>;
   private readonly tableTimers: TableTimers;
   private readonly handLifecycle: HandLifecycle;
   private readonly tableTaskQueue = new KeyedTaskQueue();
@@ -178,7 +172,8 @@ export class TableService {
       newIdempotencyKey: (prefix) => this.newIdempotencyKey(prefix),
       touchState: (state) => this.touchState(state),
       saveState: (state) => this.deps.tableStateStore.save(state),
-      publishTableAndLobby: (table, state) => this.deps.publisher.publishTableAndLobby(table, state),
+      publishTableAndLobby: (table, state) =>
+        this.deps.publisher.publishTableAndLobby(table, state),
       recordSeatJoin: (result, metric) => this.deps.metrics.recordSeatJoin(result, metric),
     });
 
@@ -201,7 +196,8 @@ export class TableService {
       loadTable: (tableId) => this.deps.tableStore.get(tableId),
       touchState: (state) => this.touchState(state),
       saveState: (state) => this.deps.tableStateStore.save(state),
-      publishTableAndLobby: (table, state) => this.deps.publisher.publishTableAndLobby(table, state),
+      publishTableAndLobby: (table, state) =>
+        this.deps.publisher.publishTableAndLobby(table, state),
       checkStartHand: (table, state) => this.handLifecycle.checkStartHand(table, state),
       newIdempotencyKey: (prefix) => this.newIdempotencyKey(prefix),
       reserveForBuyIn: (params) => this.deps.balanceClient.reserveForBuyIn(params),
@@ -209,6 +205,7 @@ export class TableService {
       releaseReservation: (params) => this.deps.balanceClient.releaseReservation(params),
       rollbackSeat: (params) =>
         this.rollbackSeat(params.tableId, params.seatId, params.userId, params.reservationId),
+      logError: (meta, message) => this.deps.logger.error(meta, message),
       emitGameEvent: (params) =>
         this.emitGameEvent(
           params.tableId,
@@ -219,6 +216,20 @@ export class TableService {
           params.payload,
           params.idempotencyKey,
         ),
+    });
+
+    this.leaveSeatChain = createLeaveSeatChain({
+      loadTableAndState: (tableId) => this.deps.tableQueries.loadTableAndState(tableId),
+      resolveSeatForUser: (state, userId) => this.resolveSeatForUser(state, userId),
+      releaseReservation: (params) => this.deps.balanceClient.releaseReservation(params),
+      warn: (meta, message) => this.deps.logger.warn(meta, message),
+      clearSeatOwnership: (seat) => this.clearSeatOwnership(seat),
+      touchState: (state) => this.touchState(state),
+      saveState: (state) => this.deps.tableStateStore.save(state),
+      publishTableAndLobby: (table, state) =>
+        this.deps.publisher.publishTableAndLobby(table, state),
+      startTurnTimer: (table, state) => this.tableTimers.startTurnTimer(table, state),
+      findNextActiveTurn: (seats, startSeatId) => this.findNextActiveTurn(seats, startSeatId),
     });
   }
 
@@ -258,6 +269,25 @@ export class TableService {
     return `${prefix}:${this.deps.ids.randomUUID()}`;
   }
 
+  private emitGameEventDetached(
+    tableId: string,
+    handId: string | undefined,
+    userId: string | undefined,
+    seatId: number | undefined,
+    type: GameEventTypeValue,
+    payload: Record<string, unknown>,
+    idempotencyKey?: string,
+  ): void {
+    void this.emitGameEvent(tableId, handId, userId, seatId, type, payload, idempotencyKey).catch(
+      (error: unknown) => {
+        this.deps.logger.error(
+          { err: error, tableId, handId, userId, seatId, type },
+          'game_event.emit.failed',
+        );
+      },
+    );
+  }
+
   private cashOutIdempotencyKey(tableId: string, userId: string, seatId: number): string {
     return this.newIdempotencyKey(`cashout:${tableId}:${userId}:${seatId}`);
   }
@@ -281,8 +311,8 @@ export class TableService {
       idempotencyKey: this.cashOutIdempotencyKey(tableId, userId, seatId),
     });
 
-    if (cashOutCall.type === 'unavailable') {
-      void this.emitGameEvent(
+    if (!cashOutCall.ok) {
+      this.emitGameEventDetached(
         tableId,
         undefined,
         userId,
@@ -293,8 +323,8 @@ export class TableService {
       return;
     }
 
-    if (!cashOutCall.response.ok) {
-      void this.emitGameEvent(tableId, undefined, userId, seatId, GameEventType.CASHOUT_FAILED, {
+    if (!cashOutCall.value.ok) {
+      this.emitGameEventDetached(tableId, undefined, userId, seatId, GameEventType.CASHOUT_FAILED, {
         amount,
       });
     }
@@ -611,7 +641,7 @@ export class TableService {
       this.touchState(state);
       await this.deps.tableStateStore.save(state);
 
-      void this.emitGameEvent(
+      this.emitGameEventDetached(
         tableId,
         undefined,
         userId,
@@ -639,10 +669,17 @@ export class TableService {
     reservationId?: string,
   ): Promise<void> {
     if (reservationId) {
-      void this.deps.balanceClient.releaseReservation({
-        reservationId,
-        reason: 'buy_in_failed',
-      });
+      void this.deps.balanceClient
+        .releaseReservation({
+          reservationId,
+          reason: 'buy_in_failed',
+        })
+        .catch((error: unknown) => {
+          this.deps.logger.warn(
+            { err: error, tableId, seatId, userId, reservationId },
+            'balance.reservation.release.failed',
+          );
+        });
     }
 
     await this.runTableTask(tableId, async () => {
@@ -674,7 +711,7 @@ export class TableService {
       return result;
     }
 
-    void this.emitGameEvent(
+    this.emitGameEventDetached(
       tableId,
       result.handId,
       userId,
@@ -695,82 +732,21 @@ export class TableService {
     return { ok: true };
   }
 
-  private async leaveSeatUnlocked(tableId: string, userId: string): Promise<LeaveSeatUnlockedResult> {
-    const loaded = await this.deps.tableQueries.loadTableAndState(tableId);
-    if (!loaded) {
-      return { ok: false, error: 'TABLE_NOT_FOUND' };
-    }
-
-    const { table, state } = loaded;
-
-    const seat = this.resolveSeatForUser(state, userId);
-    if (!seat) {
-      return { ok: false, error: 'PLAYER_NOT_AT_TABLE' };
-    }
-
-    if (seat.status === 'RESERVED' && seat.reservationId) {
-      void this.deps.balanceClient.releaseReservation({
-        reservationId: seat.reservationId,
-        reason: 'player_left',
-      });
-    }
-
-    const seatId = seat.seatId;
-    const remainingStack = seat.stack;
-
-    if (state.hand) {
-      const handId = state.hand.handId;
-      const wasTurnSeat = state.hand.turn === seatId;
-      const wasInHand = isInHandStatus(seat.status);
-
-      if (wasInHand && seat.status !== 'FOLDED') {
-        seat.status = 'FOLDED';
-      }
-
-      this.clearSeatOwnership(seat);
-
-      if (!wasInHand) {
-        seat.status = 'EMPTY';
-      } else {
-        const foldedSeatIds = new Set(
-          state.seats.filter((entry) => entry.status === 'FOLDED').map((entry) => entry.seatId),
-        );
-        state.hand.pots = calculatePots(state.hand.totalContributions, foldedSeatIds);
-      }
-
-      if (wasTurnSeat) {
-        const nextTurn = this.findNextActiveTurn(state.seats, state.hand.turn);
-        if (nextTurn !== null) {
-          state.hand.turn = nextTurn;
-        }
-      }
-
-      this.touchState(state);
-      await this.deps.tableStateStore.save(state);
-      await this.deps.publisher.publishTableAndLobby(table, state);
-
-      if (wasTurnSeat) {
-        await this.tableTimers.startTurnTimer(table, state);
-      }
-
-      return { ok: true, seatId, handId, remainingStack };
-    }
-
-    this.clearSeatOwnership(seat);
-    seat.status = 'EMPTY';
-    this.touchState(state);
-
-    await this.deps.tableStateStore.save(state);
-    await this.deps.publisher.publishTableAndLobby(table, state);
-
-    return { ok: true, seatId, handId: undefined, remainingStack };
+  private async leaveSeatUnlocked(
+    tableId: string,
+    userId: string,
+  ): Promise<LeaveSeatUnlockedResult> {
+    return this.leaveSeatChain({ tableId, userId });
   }
 
   async joinSpectator(tableId: string, userId: string): Promise<OkResult | ErrorResult> {
     return this.runTableTask(tableId, () => this.joinSpectatorUnlocked(tableId, userId));
   }
 
-  private async joinSpectatorUnlocked(tableId: string, userId: string): Promise<OkResult | ErrorResult> {
+  private async joinSpectatorUnlocked(
+    tableId: string,
+    userId: string,
+  ): Promise<OkResult | ErrorResult> {
     const loaded = await this.deps.tableQueries.loadTableAndState(tableId);
     if (!loaded) {
       return { ok: false, error: 'TABLE_NOT_FOUND' };
@@ -795,7 +771,10 @@ export class TableService {
     return this.runTableTask(tableId, () => this.leaveSpectatorUnlocked(tableId, userId));
   }
 
-  private async leaveSpectatorUnlocked(tableId: string, userId: string): Promise<OkResult | ErrorResult> {
+  private async leaveSpectatorUnlocked(
+    tableId: string,
+    userId: string,
+  ): Promise<OkResult | ErrorResult> {
     const loaded = await this.deps.tableQueries.loadTableAndState(tableId);
     if (!loaded) {
       return { ok: false, error: 'TABLE_NOT_FOUND' };

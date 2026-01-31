@@ -21,7 +21,7 @@ export function createDisposableLazyValue<T>(
     ...lazy,
     dispose: () => {
       const value = lazy.peek();
-      if (!value) {
+      if (value === undefined) {
         lazy.reset();
         return;
       }
@@ -34,4 +34,3 @@ export function createDisposableLazyValue<T>(
     },
   };
 }
-

@@ -57,10 +57,9 @@ export function createSubject<T>(options: SubjectOptions<T> = {}): Subject<T> {
       // to rejected promises that Promise.allSettled can handle
       const safeCall = (observer: Observer<T>): Promise<void> => {
         try {
-          const result = observer(event);
-          return result instanceof Promise ? result : Promise.resolve();
-        } catch (err) {
-          return Promise.reject(err);
+          return Promise.resolve(observer(event)).then(() => undefined);
+        } catch (error) {
+          return Promise.reject(error);
         }
       };
 

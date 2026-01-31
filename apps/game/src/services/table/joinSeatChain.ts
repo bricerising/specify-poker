@@ -1,6 +1,7 @@
 import { seatAt } from '../../domain/seats';
 import type { Seat, Table, TableState } from '../../domain/types';
 import { composeAsyncChain, type AsyncChainHandler } from '@specify-poker/shared/pipeline';
+import { buyInIdempotencyKeyPrefix } from './idempotency';
 
 export type JoinSeatResponse = { ok: true } | { ok: false; error: string };
 
@@ -68,7 +69,9 @@ function handleReserveEmptySeat(deps: JoinSeatChainDeps): JoinSeatHandler {
     seat.userId = ctx.userId;
     seat.status = 'RESERVED';
     seat.pendingBuyInAmount = ctx.buyInAmount;
-    seat.buyInIdempotencyKey = deps.newIdempotencyKey(`buyin:${ctx.tableId}:${ctx.seatId}:${ctx.userId}`);
+    seat.buyInIdempotencyKey = deps.newIdempotencyKey(
+      buyInIdempotencyKeyPrefix(ctx.tableId, ctx.seatId, ctx.userId),
+    );
 
     deps.touchState(ctx.state);
     await deps.saveState(ctx.state);

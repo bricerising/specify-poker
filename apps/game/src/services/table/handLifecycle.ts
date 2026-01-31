@@ -1,5 +1,5 @@
 import { seatAt } from '../../domain/seats';
-import type { Seat, Table, TableState } from '../../domain/types';
+import type { Table, TableState } from '../../domain/types';
 import { GameEventType, type GameEventType as GameEventTypeValue } from '../../domain/events';
 import { startHand } from '../../engine/handEngine';
 import type { TableEconomy } from './tableEconomy';
@@ -76,6 +76,13 @@ export function createHandLifecycle(deps: HandLifecycleDeps): HandLifecycle {
     touchState,
   } = deps;
 
+  const emitGameEventDetached = (...args: Parameters<EmitGameEventFn>): void => {
+    const [tableId, handId, userId, seatId, type] = args;
+    void emitGameEvent(...args).catch((error: unknown) => {
+      logger.error({ err: error, tableId, handId, userId, seatId, type }, 'game_event.emit.failed');
+    });
+  };
+
   async function checkStartHand(table: Table, state: TableState): Promise<void> {
     if (table.status === 'PLAYING' || state.hand) {
       return;
@@ -102,7 +109,7 @@ export function createHandLifecycle(deps: HandLifecycleDeps): HandLifecycle {
         actions: updatedState.hand.actions,
       });
       if (contributionResult.type === 'unavailable') {
-        void emitGameEvent(
+        emitGameEventDetached(
           table.tableId,
           updatedState.hand.handId,
           undefined,
@@ -128,7 +135,7 @@ export function createHandLifecycle(deps: HandLifecycleDeps): HandLifecycle {
       .filter((value): value is string => Boolean(value));
 
     const startedHandId = updatedState.hand?.handId;
-    void emitGameEvent(
+    emitGameEventDetached(
       table.tableId,
       startedHandId,
       undefined,
@@ -173,7 +180,7 @@ export function createHandLifecycle(deps: HandLifecycleDeps): HandLifecycle {
       .map((seatId) => seatAt(state.seats, seatId)?.userId)
       .filter((value): value is string => Boolean(value));
 
-    void emitGameEvent(
+    emitGameEventDetached(
       table.tableId,
       hand.handId,
       undefined,
@@ -196,7 +203,7 @@ export function createHandLifecycle(deps: HandLifecycleDeps): HandLifecycle {
     });
 
     if (settleResult.type === 'unavailable') {
-      void emitGameEvent(
+      emitGameEventDetached(
         table.tableId,
         hand.handId,
         undefined,
@@ -207,7 +214,7 @@ export function createHandLifecycle(deps: HandLifecycleDeps): HandLifecycle {
         },
       );
     } else if (settleResult.type === 'error') {
-      void emitGameEvent(
+      emitGameEventDetached(
         table.tableId,
         hand.handId,
         undefined,

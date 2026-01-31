@@ -46,7 +46,7 @@ describe('observability lifecycle', () => {
   it('starts and stops the OpenTelemetry SDK', async () => {
     const observability = await import('../../src/observability');
 
-    observability.startObservability();
+    await observability.startObservability();
     await observability.stopObservability();
 
     expect(start).toHaveBeenCalled();

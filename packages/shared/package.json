@@ -20,6 +20,11 @@
       "import": "./dist/pipeline/index.js",
       "require": "./dist/cjs/pipeline/index.js"
     },
+    "./observer": {
+      "types": "./dist/observer/index.d.ts",
+      "import": "./dist/observer/index.js",
+      "require": "./dist/cjs/observer/index.js"
+    },
     "./redis": {
       "types": "./dist/redis/index.d.ts",
       "import": "./dist/redis/index.js",
@@ -28,6 +33,7 @@
   },
   "typesVersions": {
     "*": {
+      "observer": ["dist/observer/index.d.ts"],
       "pipeline": ["dist/pipeline/index.d.ts"],
       "redis": ["dist/redis/index.d.ts"]
     }

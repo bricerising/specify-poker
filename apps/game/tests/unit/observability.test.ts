@@ -44,7 +44,7 @@ describe('observability lifecycle', () => {
   it('starts and stops the SDK', async () => {
     const { startObservability, stopObservability } = await import('../../src/observability');
 
-    startObservability();
+    await startObservability();
     await stopObservability();
 
     expect(sdkState.start).toHaveBeenCalledTimes(1);

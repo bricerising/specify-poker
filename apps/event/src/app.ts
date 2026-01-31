@@ -1,11 +1,11 @@
 import {
   closeHttpServer,
+  createAsyncLifecycle,
   createShutdownManager,
   type ShutdownManager,
 } from '@specify-poker/shared';
 import type { Server as HttpServer } from 'http';
 import type { Config } from './config';
-import { startObservability, stopObservability } from './observability';
 import logger from './observability/logger';
 
 export type EventApp = {
@@ -24,24 +24,10 @@ export function createEventApp(options: CreateEventAppOptions): EventApp {
     metricsServer: HttpServer | null;
   };
 
-  type AppState =
-    | { kind: 'stopped' }
-    | { kind: 'starting'; promise: Promise<void> }
-    | { kind: 'started'; resources: RunningResources }
-    | { kind: 'stopping'; promise: Promise<void> };
-
-  let state: AppState = { kind: 'stopped' };
+  let resources: RunningResources | null = null;
 
   const startInternal = async (resources: RunningResources): Promise<void> => {
     const shutdown = resources.shutdown;
-
-    if (!options.isTest) {
-      // Start OTel before importing instrumented subsystems (pg, redis, grpc, etc.)
-      await startObservability();
-      shutdown.add('otel.shutdown', async () => {
-        await stopObservability();
-      });
-    }
 
     const { closePgPool } = await import('./storage/pgClient');
     shutdown.add('pg.close', async () => {
@@ -88,77 +74,39 @@ export function createEventApp(options: CreateEventAppOptions): EventApp {
     });
   };
 
-  const start = async (): Promise<void> => {
-    while (true) {
-      const current = state;
-      switch (current.kind) {
-        case 'started':
-          return;
-        case 'starting':
-          await current.promise;
-          return;
-        case 'stopping':
-          await current.promise;
-          continue;
-        case 'stopped': {
-          const shutdown = createShutdownManager({ logger });
-          const resources: RunningResources = { shutdown, metricsServer: null };
+  const lifecycle = createAsyncLifecycle({
+    start: async () => {
+      const shutdown = createShutdownManager({ logger });
+      const startedResources: RunningResources = { shutdown, metricsServer: null };
 
-          const startPromise = (async () => {
-            try {
-              await startInternal(resources);
-              state = { kind: 'started', resources };
-            } catch (error: unknown) {
-              try {
-                await shutdown.run();
-              } catch (shutdownError: unknown) {
-                logger.error(
-                  { err: shutdownError },
-                  'EventApp shutdown failed after start error',
-                );
-              } finally {
-                state = { kind: 'stopped' };
-              }
-              throw error;
-            }
-          })();
-
-          state = { kind: 'starting', promise: startPromise };
-          await startPromise;
-          return;
+      try {
+        await startInternal(startedResources);
+        resources = startedResources;
+      } catch (error: unknown) {
+        try {
+          await shutdown.run();
+        } catch (shutdownError: unknown) {
+          logger.error({ err: shutdownError }, 'EventApp shutdown failed after start error');
+        } finally {
+          resources = null;
         }
+
+        throw error;
       }
-    }
-  };
-
-  const stop = async (): Promise<void> => {
-    while (true) {
-      const current = state;
-      switch (current.kind) {
-        case 'stopped':
-          return;
-        case 'starting':
-          await current.promise.catch(() => undefined);
-          continue;
-        case 'stopping':
-          await current.promise;
-          return;
-        case 'started': {
-          const promise = (async () => {
-            try {
-              await current.resources.shutdown.run();
-            } finally {
-              state = { kind: 'stopped' };
-            }
-          })();
-
-          state = { kind: 'stopping', promise };
-          await promise;
-          return;
-        }
+    },
+    stop: async () => {
+      if (!resources) {
+        return;
       }
-    }
-  };
 
-  return { start, stop };
+      const current = resources;
+      try {
+        await current.shutdown.run();
+      } finally {
+        resources = null;
+      }
+    },
+  });
+
+  return { start: () => lifecycle.start(), stop: () => lifecycle.stop() };
 }

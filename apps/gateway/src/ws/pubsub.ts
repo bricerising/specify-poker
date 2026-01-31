@@ -1,10 +1,18 @@
 import { randomUUID } from 'crypto';
+import { createAsyncLifecycle, createLazyValue } from '@specify-poker/shared';
 import { createRedisClientManager, type RedisClientLogger } from '@specify-poker/shared/redis';
 import { getConfig } from '../config';
 import logger from '../observability/logger';
 import { isRecord, safeJsonParseRecord } from '../utils/json';
 
 type WsChannel = 'table' | 'chat' | 'timer' | 'lobby';
+
+const HANDLER_BY_CHANNEL: Record<WsChannel, keyof WsPubSubHandlers> = {
+  table: 'onTableEvent',
+  chat: 'onChatEvent',
+  timer: 'onTimerEvent',
+  lobby: 'onLobbyEvent',
+};
 
 export type WsPubSubMessage = {
   channel: WsChannel;
@@ -92,32 +100,16 @@ export function createWsPubSub(options: CreateWsPubSubOptions): WsPubSub {
     name: 'gateway-ws-pubsub',
   });
 
-  let initialized = false;
-  let initPromise: Promise<boolean> | null = null;
-  let closePromise: Promise<void> | null = null;
+  let activeHandlers: WsPubSubHandlers | null = null;
 
-  const init = async (handlers: WsPubSubHandlers): Promise<boolean> => {
-    if (initialized) {
-      return true;
-    }
-    if (initPromise) {
-      return initPromise;
-    }
-
-    initPromise = (async () => {
-      if (closePromise) {
-        await closePromise;
+  const lifecycle = createAsyncLifecycle({
+    start: async () => {
+      if (!activeHandlers) {
+        throw new Error('ws.pubsub.handlers_missing');
       }
 
       await redis.getClient(); // Ensure pub client is connected before returning.
       const subClient = await redis.getBlockingClient();
-
-      const handlerByChannel: Record<WsChannel, (message: WsPubSubMessage) => void> = {
-        table: handlers.onTableEvent,
-        chat: handlers.onChatEvent,
-        timer: handlers.onTimerEvent,
-        lobby: handlers.onLobbyEvent,
-      };
 
       await subClient.subscribe(channel, (message) => {
         const parsed = parseWsPubSubMessage(message);
@@ -128,36 +120,34 @@ export function createWsPubSub(options: CreateWsPubSubOptions): WsPubSub {
           return;
         }
 
-        handlerByChannel[parsed.channel](parsed);
+        const handlers = activeHandlers;
+        if (!handlers) {
+          return;
+        }
+
+        handlers[HANDLER_BY_CHANNEL[parsed.channel]](parsed);
       });
 
-      initialized = true;
       log.info('WebSocket Pub/Sub initialized');
-      return true;
-    })().finally(() => {
-      initPromise = null;
-    });
+    },
+    stop: async () => {
+      activeHandlers = null;
+      await redis.close();
+    },
+  });
 
-    return initPromise;
+  const init = async (handlers: WsPubSubHandlers): Promise<boolean> => {
+    activeHandlers = handlers;
+    await lifecycle.start();
+    return true;
   };
 
   const close = async (): Promise<void> => {
-    if (closePromise) {
-      return closePromise;
-    }
-
-    closePromise = redis
-      .close()
-      .finally(() => {
-        initialized = false;
-        closePromise = null;
-      });
-
-    return closePromise;
+    await lifecycle.stop();
   };
 
   const publish = async (message: Omit<WsPubSubMessage, 'sourceId'>): Promise<boolean> => {
-    if (!initialized) {
+    if (!lifecycle.isRunning()) {
       return false;
     }
 
@@ -180,13 +170,16 @@ export function createWsPubSub(options: CreateWsPubSubOptions): WsPubSub {
 }
 
 export async function closeWsPubSub(): Promise<void> {
-  if (!defaultPubSub) {
+  const server = defaultPubSub.peek();
+  if (!server) {
     return;
   }
 
-  const server = defaultPubSub;
-  defaultPubSub = null;
-  await server.close();
+  try {
+    await server.close();
+  } finally {
+    defaultPubSub.reset();
+  }
 }
 
 export async function publishTableEvent(tableId: string, payload: Record<string, unknown>) {
@@ -205,14 +198,12 @@ export async function publishLobbyEvent(tables: unknown[]) {
   return getDefaultPubSub().publishLobbyEvent(tables);
 }
 
-let defaultPubSub: WsPubSub | null = null;
+const defaultPubSub = createLazyValue<WsPubSub>(() =>
+  createWsPubSub({ redisUrl: getConfig().redisUrl, logger }),
+);
 
 function getDefaultPubSub(): WsPubSub {
-  if (!defaultPubSub) {
-    defaultPubSub = createWsPubSub({ redisUrl: getConfig().redisUrl, logger });
-  }
-
-  return defaultPubSub;
+  return defaultPubSub.get();
 }
 
 export async function initWsPubSub(handlers: WsPubSubHandlers): Promise<boolean> {

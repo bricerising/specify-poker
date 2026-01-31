@@ -6,6 +6,7 @@ import { recordWebSocketMessage } from '../observability/otel';
 import { decodeJwtUserId } from '../utils/jwt';
 import { asRecord, readTrimmedString } from '../utils/unknown';
 import type { z } from 'zod';
+import { createSubject } from '@specify-poker/shared/observer';
 import { dispatchByTypeNoCtx } from '@specify-poker/shared/pipeline';
 import { wsServerMessageSchema } from '@specify-poker/shared/schemas';
 
@@ -119,22 +120,16 @@ export function createTableStore(): TableStore {
     privateHandId: null,
   };
 
-  const listeners = new Set<(state: TableStoreState) => void>();
+  const stateSubject = createSubject<TableStoreState>();
   type WsClientMessage = { type: string; tableId?: string } & Record<string, unknown>;
 
   const requestedHoleCards = new Set<string>();
   const profileCache = new Map<string, { username: string; avatarUrl: string | null }>();
   const requestedProfiles = new Set<string>();
 
-  const notify = () => {
-    for (const listener of listeners) {
-      listener(state);
-    }
-  };
-
   const setState = (next: Partial<TableStoreState>) => {
     state = { ...state, ...next };
-    notify();
+    void stateSubject.notify(state);
   };
 
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -693,10 +688,7 @@ export function createTableStore(): TableStore {
 
   return {
     getState: () => state,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
+    subscribe: (listener) => stateSubject.subscribe(listener),
     fetchTables: async () => {
       const response = await apiFetch('/api/tables');
       const payload: unknown = await response.json();
