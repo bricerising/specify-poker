@@ -37,14 +37,19 @@ export type ProfileFacade = {
     userId: string;
     username?: string | null;
     body: unknown;
+    idempotencyKey: string;
   }): Promise<UserProfile>;
-  deleteMe(params: { userId: string }): Promise<{ success: boolean }>;
+  deleteMe(params: { userId: string; idempotencyKey: string }): Promise<{ success: boolean }>;
   getStatistics(params: { userId: string }): Promise<Record<string, unknown>>;
   getProfile(params: { userId: string }): Promise<PublicProfile>;
   getFriendIds(params: { userId: string }): Promise<string[]>;
-  syncFriends(params: { userId: string; desiredFriendIds: unknown[] }): Promise<string[]>;
-  addFriend(params: { userId: string; friendId: string }): Promise<void>;
-  removeFriend(params: { userId: string; friendId: string }): Promise<void>;
+  syncFriends(params: {
+    userId: string;
+    desiredFriendIds: unknown[];
+    idempotencyKey: string;
+  }): Promise<string[]>;
+  addFriend(params: { userId: string; friendId: string; idempotencyKey: string }): Promise<void>;
+  removeFriend(params: { userId: string; friendId: string; idempotencyKey: string }): Promise<void>;
   getNicknames(params: { userIds: unknown[] }): Promise<Array<Record<string, unknown>>>;
 };
 
@@ -128,8 +133,12 @@ function normalizeUserProfile(params: {
 
 type UpdateProfileRequest = Parameters<GatewayGrpc['player']['UpdateProfile']>[0];
 
-function buildUpdateProfileRequest(userId: string, body: unknown): UpdateProfileRequest {
-  const updateRequest: UpdateProfileRequest = { user_id: userId };
+function buildUpdateProfileRequest(
+  userId: string,
+  body: unknown,
+  idempotencyKey: string,
+): UpdateProfileRequest {
+  const updateRequest: UpdateProfileRequest = { user_id: userId, idempotency_key: idempotencyKey };
   const record = isRecord(body) ? body : {};
 
   const nickname = record.nickname;
@@ -199,9 +208,14 @@ export function createProfileFacade(overrides: Partial<ProfileFacadeDeps> = {}):
     userId: string;
     username?: string | null;
     body: unknown;
+    idempotencyKey: string;
   }): Promise<UserProfile> {
     const username = params.username ?? undefined;
-    const updateRequest = buildUpdateProfileRequest(params.userId, params.body);
+    const updateRequest = buildUpdateProfileRequest(
+      params.userId,
+      params.body,
+      params.idempotencyKey,
+    );
 
     const updateResponse = await deps.grpcPlayer.UpdateProfile(updateRequest);
 
@@ -219,8 +233,14 @@ export function createProfileFacade(overrides: Partial<ProfileFacadeDeps> = {}):
     });
   }
 
-  async function deleteMe(params: { userId: string }): Promise<{ success: boolean }> {
-    return deps.grpcPlayer.DeleteProfile({ user_id: params.userId });
+  async function deleteMe(params: {
+    userId: string;
+    idempotencyKey: string;
+  }): Promise<{ success: boolean }> {
+    return deps.grpcPlayer.DeleteProfile({
+      user_id: params.userId,
+      idempotency_key: params.idempotencyKey,
+    });
   }
 
   async function getStatistics(params: { userId: string }): Promise<Record<string, unknown>> {
@@ -241,6 +261,7 @@ export function createProfileFacade(overrides: Partial<ProfileFacadeDeps> = {}):
   async function syncFriends(params: {
     userId: string;
     desiredFriendIds: unknown[];
+    idempotencyKey: string;
   }): Promise<string[]> {
     const desiredIds = normalizeDesiredFriendIds(params.userId, params.desiredFriendIds);
     const desiredSet = new Set(desiredIds);
@@ -254,25 +275,49 @@ export function createProfileFacade(overrides: Partial<ProfileFacadeDeps> = {}):
       if (currentIds.has(friendId)) {
         continue;
       }
-      await deps.grpcPlayer.AddFriend({ user_id: params.userId, friend_id: friendId });
+      await deps.grpcPlayer.AddFriend({
+        user_id: params.userId,
+        friend_id: friendId,
+        idempotency_key: `${params.idempotencyKey}:add:${friendId}`,
+      });
     }
 
     for (const friendId of currentIds) {
       if (desiredSet.has(friendId)) {
         continue;
       }
-      await deps.grpcPlayer.RemoveFriend({ user_id: params.userId, friend_id: friendId });
+      await deps.grpcPlayer.RemoveFriend({
+        user_id: params.userId,
+        friend_id: friendId,
+        idempotency_key: `${params.idempotencyKey}:remove:${friendId}`,
+      });
     }
 
     return Array.from(desiredSet.values());
   }
 
-  async function addFriend(params: { userId: string; friendId: string }): Promise<void> {
-    await deps.grpcPlayer.AddFriend({ user_id: params.userId, friend_id: params.friendId });
+  async function addFriend(params: {
+    userId: string;
+    friendId: string;
+    idempotencyKey: string;
+  }): Promise<void> {
+    await deps.grpcPlayer.AddFriend({
+      user_id: params.userId,
+      friend_id: params.friendId,
+      idempotency_key: params.idempotencyKey,
+    });
   }
 
-  async function removeFriend(params: { userId: string; friendId: string }): Promise<void> {
-    await deps.grpcPlayer.RemoveFriend({ user_id: params.userId, friend_id: params.friendId });
+  async function removeFriend(params: {
+    userId: string;
+    friendId: string;
+    idempotencyKey: string;
+  }): Promise<void> {
+    await deps.grpcPlayer.RemoveFriend({
+      user_id: params.userId,
+      friend_id: params.friendId,
+      idempotency_key: params.idempotencyKey,
+    });
   }
 
   async function getNicknames(params: {

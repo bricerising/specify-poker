@@ -11,6 +11,14 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Optional idempotency key for safe retries of mutating requests.
+      schema:
+        type: string
   schemas:
     ErrorResponse:
       type: object
@@ -346,7 +354,7 @@ security:
   - bearerAuth: []
 
 paths:
-  /api/health:
+  /health:
     get:
       summary: Health check
       security: []
@@ -354,17 +362,35 @@ paths:
         '200':
           description: OK
 
-  /metrics:
+  /ready:
     get:
-      summary: Prometheus metrics
+      summary: Readiness check
       security: []
       responses:
         '200':
-          description: Metrics payload
+          description: Ready
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [ready]
+        '503':
+          description: Degraded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, reason]
+                properties:
+                  status:
+                    type: string
+                    enum: [degraded]
+                  reason:
+                    type: string
 
   /api/push/vapid:
     get:
@@ -392,6 +418,8 @@ paths:
   /api/push/subscribe:
     post:
       summary: Register push subscription
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -415,6 +443,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
     delete:
       summary: Remove push subscription
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -461,6 +491,8 @@ paths:
   /api/profile:
     post:
       summary: Update nickname and avatar
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -511,6 +543,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
     put:
       summary: Update friends list
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -557,6 +591,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
     post:
       summary: Create table
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -592,6 +628,7 @@ paths:
           required: true
           schema:
             type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -633,6 +670,7 @@ paths:
           required: true
           schema:
             type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '204':
           description: Left table
@@ -658,6 +696,7 @@ paths:
           required: true
           schema:
             type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -718,6 +757,7 @@ paths:
           required: true
           schema:
             type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:

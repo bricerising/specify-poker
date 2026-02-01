@@ -85,6 +85,7 @@ message UpdateProfileRequest {
   string nickname = 2;
   string avatar_url = 3;
   UserPreferences preferences = 4;
+  string idempotency_key = 5;
 }
 
 message UpdateProfileResponse {
@@ -93,6 +94,7 @@ message UpdateProfileResponse {
 
 message DeleteProfileRequest {
   string user_id = 1;
+  string idempotency_key = 2;
 }
 
 message DeleteProfileResponse {
@@ -122,6 +124,7 @@ message IncrementStatisticRequest {
   string user_id = 1;
   StatisticType type = 2;
   double amount = 3;
+  string idempotency_key = 4;
 }
 
 message GetFriendsRequest {
@@ -135,11 +138,13 @@ message GetFriendsResponse {
 message AddFriendRequest {
   string user_id = 1;
   string friend_id = 2;
+  string idempotency_key = 3;
 }
 
 message RemoveFriendRequest {
   string user_id = 1;
   string friend_id = 2;
+  string idempotency_key = 3;
 }
 
 message GetNicknamesRequest {

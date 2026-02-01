@@ -14,7 +14,7 @@ export type NodeOtelRuntimeConfig = {
 export type NodeOtelSdkDeps = {
   // Dependency injection types are intentionally loose to avoid hard-depending
   // on the Node OTel SDK packages from `@specify-poker/shared`.
-  NodeSDK: new (options?: Record<string, any>) => OtelSdkLike;
+  NodeSDK: new (options?: Record<string, unknown>) => OtelSdkLike;
   getNodeAutoInstrumentations: () => unknown;
   OTLPTraceExporter: new (options: { url: string }) => unknown;
   Resource: new (attributes: Attributes) => unknown;

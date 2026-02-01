@@ -23,8 +23,8 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     return next();
   }
 
-  // Health and metrics might be public or handled elsewhere, but for now let's exclude them if needed
-  if (req.path === '/health' || req.path === '/ready' || req.path === '/metrics') {
+  // Health and readiness endpoints are unauthenticated.
+  if (req.path === '/health' || req.path === '/ready') {
     return next();
   }
 

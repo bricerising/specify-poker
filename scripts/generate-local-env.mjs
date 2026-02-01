@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { generateKeyPairSync } from "node:crypto";
+import { generateKeyPairSync, randomBytes } from "node:crypto";
 
 function printUsage() {
   // eslint-disable-next-line no-console
@@ -9,7 +9,7 @@ Usage:
   npm run env:local [-- --force] [-- --subject=mailto:admin@localhost]
 
 Options:
-  --force                 Overwrite existing VAPID keys (and subject).
+  --force                 Overwrite existing VAPID keys, JWT secret (and subject).
   --subject=<value>       Set VAPID_SUBJECT (default: mailto:admin@localhost).
   -h, --help              Show help.
 `.trim());
@@ -56,6 +56,10 @@ function generateVapidKeys() {
     publicKey: bufferToBase64Url(uncompressedPublicKey),
     privateKey: bufferToBase64Url(dBytes),
   };
+}
+
+function generateJwtHs256Secret() {
+  return bufferToBase64Url(randomBytes(32));
 }
 
 function readEnvValue(lines, key) {
@@ -194,7 +198,7 @@ function main() {
     return;
   }
 
-  const managedKeys = ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT"];
+  const managedKeys = ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT", "JWT_HS256_SECRET"];
   const envPath = path.resolve(process.cwd(), ".env");
   const existing = fs.existsSync(envPath) ? fs.readFileSync(envPath, "utf8") : "";
   const lines = existing.split(/\r?\n/);
@@ -202,16 +206,20 @@ function main() {
   const currentPublic = readEnvValue(lines, "VAPID_PUBLIC_KEY");
   const currentPrivate = readEnvValue(lines, "VAPID_PRIVATE_KEY");
   const currentSubject = readEnvValue(lines, "VAPID_SUBJECT");
+  const currentJwtSecret = readEnvValue(lines, "JWT_HS256_SECRET");
 
   const wantsKeys = options.force || !currentPublic || !currentPrivate;
   const wantsSubject = options.force || options.subject !== null || !currentSubject;
+  const wantsJwtSecret = options.force || !currentJwtSecret;
 
   let nextLines = [...lines];
   let rotatedKeys = false;
+  let rotatedJwtSecret = false;
 
   const outputPublicKey = wantsKeys ? null : currentPublic;
   const outputPrivateKey = wantsKeys ? null : currentPrivate;
   const outputSubject = wantsSubject ? null : currentSubject;
+  const outputJwtSecret = wantsJwtSecret ? null : currentJwtSecret;
 
   if (wantsKeys) {
     if (!options.force && (currentPublic || currentPrivate)) {
@@ -232,6 +240,15 @@ function main() {
     nextLines = upsertEnvValue(nextLines, "VAPID_SUBJECT", outputSubject);
   }
 
+  if (wantsJwtSecret) {
+    if (!options.force && currentJwtSecret) {
+      rotatedJwtSecret = true;
+    }
+    nextLines = upsertEnvValue(nextLines, "JWT_HS256_SECRET", generateJwtHs256Secret());
+  } else if (outputJwtSecret) {
+    nextLines = upsertEnvValue(nextLines, "JWT_HS256_SECRET", outputJwtSecret);
+  }
+
   nextLines = stripBlankLinesBetweenManagedKeys(nextLines, managedKeys);
 
   const output = `${nextLines.join("\n").replace(/\n+$/g, "")}\n`;
@@ -244,7 +261,7 @@ function main() {
 
   fs.writeFileSync(envPath, output, "utf8");
 
-  const formattingOnly = !wantsKeys && !wantsSubject;
+  const formattingOnly = !wantsKeys && !wantsSubject && !wantsJwtSecret;
 
   // eslint-disable-next-line no-console
   console.log(
@@ -252,6 +269,7 @@ function main() {
       `Wrote ${envPath}`,
       wantsKeys ? `- VAPID keys: ${rotatedKeys ? "regenerated (incomplete prior config)" : "generated"}` : null,
       wantsSubject ? "- VAPID subject: set" : null,
+      wantsJwtSecret ? `- JWT_HS256_SECRET: ${rotatedJwtSecret ? "regenerated (incomplete prior config)" : "generated"}` : null,
       formattingOnly ? "- Formatting: removed extra blank lines" : null,
       "Tip: re-run with `-- --force` to rotate keys.",
     ]

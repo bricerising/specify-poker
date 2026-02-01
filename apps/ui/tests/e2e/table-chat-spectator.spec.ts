@@ -138,13 +138,16 @@ test.describe('Tables: spectator + chat + moderation', () => {
       )
       .toBe(true);
 
-    const aliceWs = await connectWs(gatewayWsUrl(aliceToken), {
+    const aliceWs = await connectWs(gatewayWsUrl(), {
+      authToken: aliceToken,
       headers: { 'X-Forwarded-For': '203.0.113.10' },
     });
-    const bobWs = await connectWs(gatewayWsUrl(bobToken), {
+    const bobWs = await connectWs(gatewayWsUrl(), {
+      authToken: bobToken,
       headers: { 'X-Forwarded-For': '203.0.113.11' },
     });
-    const spectatorWs = await connectWs(gatewayWsUrl(spectatorToken), {
+    const spectatorWs = await connectWs(gatewayWsUrl(), {
+      authToken: spectatorToken,
       headers: { 'X-Forwarded-For': '203.0.113.12' },
     });
 

@@ -8,6 +8,10 @@ function badRequest(res: Response, error: string, message: string) {
   return res.status(400).json({ error, message });
 }
 
+function isAuthBypassed(): boolean {
+  return process.env.NODE_ENV === 'test' || process.env.BALANCE_AUTH_BYPASS === 'true';
+}
+
 function requireAccountId(req: Request, res: Response): string | null {
   const accountId = toNonEmptyString(req.params.accountId);
   if (!accountId) {
@@ -48,6 +52,31 @@ function toTransactionHistoryItem(tx: Transaction) {
 
 export function createAccountRoutes(service: BalanceService): Router {
   const router = Router();
+
+  // Account authorization: only allow acting on your own accountId.
+  router.use('/:accountId', (req: Request, res: Response, next) => {
+    if (isAuthBypassed()) {
+      return next();
+    }
+
+    const accountId = requireAccountId(req, res);
+    if (!accountId) {
+      return;
+    }
+
+    const userId = req.auth?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'UNAUTHORIZED', message: 'Missing auth context' });
+      return;
+    }
+
+    if (userId !== accountId) {
+      res.status(403).json({ error: 'FORBIDDEN', message: 'Cannot access another account' });
+      return;
+    }
+
+    next();
+  });
 
   // Get account balance
   router.get('/:accountId/balance', async (req: Request, res: Response) => {

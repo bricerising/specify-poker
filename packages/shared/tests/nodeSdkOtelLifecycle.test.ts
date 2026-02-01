@@ -17,14 +17,14 @@ describe('createNodeSdkOtelLifecycle', () => {
 
     const sdkInstance = { start: vi.fn(), shutdown: vi.fn() };
     let capturedSdkOptions: unknown = null;
-    const NodeSDK = vi.fn((options: Record<string, any>) => {
+    const NodeSDK = vi.fn((options: Record<string, unknown>) => {
       capturedSdkOptions = options;
       return sdkInstance;
     });
 
     const lifecycle = createNodeSdkOtelLifecycle({
       deps: {
-        NodeSDK: NodeSDK as unknown as new (options?: Record<string, any>) => typeof sdkInstance,
+        NodeSDK: NodeSDK as unknown as new (options?: Record<string, unknown>) => typeof sdkInstance,
         getNodeAutoInstrumentations,
         OTLPTraceExporter: OTLPTraceExporter as unknown as new (options: {
           url: string;

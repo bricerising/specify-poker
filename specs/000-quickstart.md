@@ -20,6 +20,8 @@ It is not designed as a public matchmaking or real-money gambling platform (see 
 
 ## Default Local URLs
 
+Note: `docker-compose.yml` binds most internal service + observability ports to `127.0.0.1` by default. Only the UI, Gateway, and Keycloak are intended to be reachable by other machines unless you explicitly change port bindings.
+
 - **UI**: http://localhost:3000
 - **Gateway (HTTP API)**: http://localhost:4000/api
 - **WebSocket**: ws://localhost:4000/ws

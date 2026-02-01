@@ -57,7 +57,8 @@ The balance service will be available alongside the poker service.
 | `RAKE_MIN_POT_CHIPS` | 20 | Minimum pot size (in chips) before rake applies. |
 | `LOG_LEVEL` | info | Structured log level |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | http://localhost:4317 | OTLP gRPC exporter endpoint |
-| `JWT_SECRET` | default-secret | JWT secret for HS256 validation |
+| `JWT_SECRET` | (empty) | Legacy HS256 fallback secret for local/dev token validation (prefer `JWT_HS256_SECRET`). |
+| `JWT_HS256_SECRET` | (none) | Optional HS256 secret for local/dev token validation (overrides `JWT_SECRET`). |
 
 ## API Quick Reference
 

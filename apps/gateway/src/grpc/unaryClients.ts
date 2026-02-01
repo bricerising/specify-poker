@@ -3,6 +3,7 @@ import {
   createLazyUnaryCallResultProxy,
   type UnaryCallProxy,
   type UnaryCallResultProxy,
+  type UnaryCallOptions,
 } from '@specify-poker/shared';
 
 import type {
@@ -12,6 +13,7 @@ import type {
   PlayerServiceClient,
 } from '../types';
 import { getEventClient, getGameClient, getNotifyClient, getPlayerClient } from './clients';
+import { getConfig } from '../config';
 
 export type GatewayGrpcClients = {
   game: GameServiceClient;
@@ -34,21 +36,94 @@ export type LazyGatewayGrpcClients = {
   [K in GatewayGrpcKey]: () => GatewayGrpcClients[K];
 };
 
+function withDefaultUnaryCallOptions<TClient extends object>(options: {
+  client: UnaryCallProxy<TClient>;
+  getDefaults: () => UnaryCallOptions;
+}): UnaryCallProxy<TClient> {
+  return new Proxy(options.client as unknown as Record<string, unknown>, {
+    get: (target, prop) => {
+      const value = target[prop as keyof typeof target];
+      if (typeof value !== 'function') {
+        return value;
+      }
+
+      return (request: unknown, callOptions?: UnaryCallOptions) => {
+        const defaults = options.getDefaults();
+        return (value as (request: unknown, callOptions?: UnaryCallOptions) => Promise<unknown>)(
+          request,
+          callOptions ? { ...callOptions, timeoutMs: callOptions.timeoutMs ?? defaults.timeoutMs } : defaults,
+        );
+      };
+    },
+  }) as unknown as UnaryCallProxy<TClient>;
+}
+
+function withDefaultUnaryCallResultOptions<TClient extends object>(options: {
+  client: UnaryCallResultProxy<TClient>;
+  getDefaults: () => UnaryCallOptions;
+}): UnaryCallResultProxy<TClient> {
+  return new Proxy(options.client as unknown as Record<string, unknown>, {
+    get: (target, prop) => {
+      const value = target[prop as keyof typeof target];
+      if (typeof value !== 'function') {
+        return value;
+      }
+
+      return (request: unknown, callOptions?: UnaryCallOptions) => {
+        const defaults = options.getDefaults();
+        return (value as (request: unknown, callOptions?: UnaryCallOptions) => Promise<unknown>)(
+          request,
+          callOptions ? { ...callOptions, timeoutMs: callOptions.timeoutMs ?? defaults.timeoutMs } : defaults,
+        );
+      };
+    },
+  }) as unknown as UnaryCallResultProxy<TClient>;
+}
+
+function getDefaultUnaryCallOptions(): UnaryCallOptions {
+  const timeoutMs = getConfig().grpcClientTimeoutMs;
+  return { timeoutMs };
+}
+
 export function createGatewayGrpc(clientByKey: LazyGatewayGrpcClients): GatewayGrpc {
   return {
-    game: createLazyUnaryCallProxy(clientByKey.game),
-    player: createLazyUnaryCallProxy(clientByKey.player),
-    event: createLazyUnaryCallProxy(clientByKey.event),
-    notify: createLazyUnaryCallProxy(clientByKey.notify),
+    game: withDefaultUnaryCallOptions({
+      client: createLazyUnaryCallProxy(clientByKey.game),
+      getDefaults: getDefaultUnaryCallOptions,
+    }),
+    player: withDefaultUnaryCallOptions({
+      client: createLazyUnaryCallProxy(clientByKey.player),
+      getDefaults: getDefaultUnaryCallOptions,
+    }),
+    event: withDefaultUnaryCallOptions({
+      client: createLazyUnaryCallProxy(clientByKey.event),
+      getDefaults: getDefaultUnaryCallOptions,
+    }),
+    notify: withDefaultUnaryCallOptions({
+      client: createLazyUnaryCallProxy(clientByKey.notify),
+      getDefaults: getDefaultUnaryCallOptions,
+    }),
   };
 }
 
 export function createGatewayGrpcResult(clientByKey: LazyGatewayGrpcClients): GatewayGrpcResult {
   return {
-    game: createLazyUnaryCallResultProxy(clientByKey.game),
-    player: createLazyUnaryCallResultProxy(clientByKey.player),
-    event: createLazyUnaryCallResultProxy(clientByKey.event),
-    notify: createLazyUnaryCallResultProxy(clientByKey.notify),
+    game: withDefaultUnaryCallResultOptions({
+      client: createLazyUnaryCallResultProxy(clientByKey.game),
+      getDefaults: getDefaultUnaryCallOptions,
+    }),
+    player: withDefaultUnaryCallResultOptions({
+      client: createLazyUnaryCallResultProxy(clientByKey.player),
+      getDefaults: getDefaultUnaryCallOptions,
+    }),
+    event: withDefaultUnaryCallResultOptions({
+      client: createLazyUnaryCallResultProxy(clientByKey.event),
+      getDefaults: getDefaultUnaryCallOptions,
+    }),
+    notify: withDefaultUnaryCallResultOptions({
+      client: createLazyUnaryCallResultProxy(clientByKey.notify),
+      getDefaults: getDefaultUnaryCallOptions,
+    }),
   };
 }
 

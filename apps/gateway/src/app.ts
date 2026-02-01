@@ -2,9 +2,10 @@ import {
   closeHttpServer,
   createAsyncLifecycle,
   createServiceBootstrapBuilder,
+  startPrometheusMetricsServer,
   type ShutdownAction,
 } from '@specify-poker/shared';
-import { collectDefaultMetrics } from 'prom-client';
+import { collectDefaultMetrics, register } from 'prom-client';
 import type { Server as HttpServer } from 'http';
 import type { WebSocketServer } from 'ws';
 import type { Config } from './config';
@@ -36,6 +37,7 @@ export function createGatewayApp(options: CreateGatewayAppOptions): GatewayApp {
 
   let httpServer: HttpServer | null = null;
   let wsServer: WebSocketServer | null = null;
+  let metricsServer: HttpServer | null = null;
 
   type OnShutdown = (name: string, action: ShutdownAction) => void;
 
@@ -61,7 +63,18 @@ export function createGatewayApp(options: CreateGatewayAppOptions): GatewayApp {
       httpServer = null;
     });
 
+    onShutdown('metrics.close', async () => {
+      if (!metricsServer) {
+        return;
+      }
+      await closeHttpServer(metricsServer);
+      metricsServer = null;
+    });
+
     const app = deps.createExpressApp();
+    if (options.config.trustProxyHops > 0) {
+      app.set('trust proxy', options.config.trustProxyHops);
+    }
     const server = deps.createHttpServer(app);
     httpServer = server;
 
@@ -73,6 +86,12 @@ export function createGatewayApp(options: CreateGatewayAppOptions): GatewayApp {
 
     // Observability
     initDefaultMetrics();
+    metricsServer = startPrometheusMetricsServer({
+      port: options.config.metricsPort,
+      registry: register,
+      logger,
+      logMessage: 'Gateway metrics server listening',
+    });
 
     // Security
     app.use(

@@ -9,8 +9,10 @@ export type TablesFacade = {
   joinSeatWithDailyBonus(params: {
     tableId: string;
     userId: string;
+    userToken: string;
     seatId: number;
     buyInAmount: number;
+    idempotencyKey: string;
   }): Promise<JoinSeatResponse>;
   resolveTargetUserIdBySeatId(params: {
     tableId: string;
@@ -78,7 +80,7 @@ export function createTablesFacade(overrides: Partial<TablesFacadeDeps> = {}): T
     dailyLoginBonusTimeoutMs: overrides.dailyLoginBonusTimeoutMs ?? 2_000,
   };
 
-  async function ensureDailyLoginBonus(userId: string): Promise<void> {
+  async function ensureDailyLoginBonus(userId: string, userToken: string): Promise<void> {
     const date = isoDate(deps.now);
     const idempotencyKey = `bonus:daily_login:lobby:${userId}:${date}`;
 
@@ -89,6 +91,7 @@ export function createTablesFacade(overrides: Partial<TablesFacadeDeps> = {}): T
         source: 'BONUS',
         idempotencyKey,
         gatewayUserId: userId,
+        bearerToken: userToken,
         timeoutMs: deps.dailyLoginBonusTimeoutMs,
       });
 
@@ -104,19 +107,23 @@ export function createTablesFacade(overrides: Partial<TablesFacadeDeps> = {}): T
   async function joinSeatWithDailyBonus(params: {
     tableId: string;
     userId: string;
+    userToken: string;
     seatId: number;
     buyInAmount: number;
+    idempotencyKey: string;
   }): Promise<JoinSeatResponse> {
     const grpcRequest = {
       table_id: params.tableId,
       user_id: params.userId,
       seat_id: params.seatId,
       buy_in_amount: params.buyInAmount,
+      idempotency_key: params.idempotencyKey,
     };
 
     let response = await deps.grpcGame.JoinSeat(grpcRequest);
     if (!response.ok && deps.dailyLoginBonusErrors.has(response.error ?? '')) {
-      await ensureDailyLoginBonus(params.userId);
+      await ensureDailyLoginBonus(params.userId, params.userToken);
+      // Retry JoinSeat after ensuring the user has a daily login bonus.
       response = await deps.grpcGame.JoinSeat(grpcRequest);
     }
 

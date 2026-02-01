@@ -137,14 +137,37 @@ export function createTableStore(): TableStore {
   const buildWebSocketUrl = (wsUrl?: string) => {
     const apiBaseUrl = getApiBaseUrl();
     const defaultWsBaseUrl = apiBaseUrl.replace(/^http/, 'ws');
-    const token = getToken();
 
     const url = new URL(wsUrl ?? '/ws', defaultWsBaseUrl);
-    if (token && !url.searchParams.has('token')) {
-      url.searchParams.set('token', token);
-    }
 
     return url.toString();
+  };
+
+  const ensureWsAuthenticated = () => {
+    const token = getToken();
+    if (!token) {
+      return;
+    }
+
+    // Keep only the most recent Authenticate message while connecting.
+    ws.cancelOutbox((message) => message.type === 'Authenticate');
+    ws.sendOnOpen({ type: 'Authenticate', token });
+  };
+
+  const connectWs = (wsUrl?: string) => {
+    const existing = ws.getSocket();
+    ws.connect(wsUrl);
+    const socket = ws.getSocket();
+    if (!socket) {
+      return;
+    }
+
+    // Don't send Authenticate on already-open connections.
+    if (socket === existing && socket.readyState === WebSocket.OPEN) {
+      return;
+    }
+
+    ensureWsAuthenticated();
   };
 
   const ws = createWebSocketTransport<WsServerMessage, WsClientMessage>({
@@ -663,7 +686,7 @@ export function createTableStore(): TableStore {
       privateHandId: null,
     });
 
-    ws.connect(mode.wsUrl);
+    connectWs(mode.wsUrl);
     ws.sendOnOpen({ type: 'SubscribeTable', tableId });
     ws.sendOnOpen({ type: 'SubscribeChat', tableId });
 
@@ -702,7 +725,7 @@ export function createTableStore(): TableStore {
       setState({ tables });
     },
     subscribeLobby: () => {
-      ws.connect();
+      connectWs();
     },
     joinSeat: async (tableId, seatId) => {
       const response = await apiFetch(`/api/tables/${tableId}/join`, {
@@ -746,7 +769,7 @@ export function createTableStore(): TableStore {
       });
     },
     subscribeTable: (tableId) => {
-      ws.connect();
+      connectWs();
       ws.sendOnOpen({ type: 'SubscribeTable', tableId });
     },
     sendAction: (action) => {
@@ -762,7 +785,7 @@ export function createTableStore(): TableStore {
       });
     },
     subscribeChat: (tableId) => {
-      ws.connect();
+      connectWs();
       ws.sendOnOpen({ type: 'SubscribeChat', tableId });
     },
     sendChat: (message) => {

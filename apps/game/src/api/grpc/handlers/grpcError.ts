@@ -9,6 +9,8 @@ import {
 const messageToStatus: Partial<Record<string, grpc.status>> = {
   TABLE_NOT_FOUND: grpc.status.NOT_FOUND,
   NOT_AUTHORIZED: grpc.status.PERMISSION_DENIED,
+  MISSING_IDEMPOTENCY_KEY: grpc.status.INVALID_ARGUMENT,
+  IDEMPOTENCY_IN_PROGRESS: grpc.status.UNAVAILABLE,
 };
 
 export function toServiceError(error: unknown): grpc.ServiceError {

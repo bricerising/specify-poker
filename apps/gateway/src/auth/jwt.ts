@@ -9,7 +9,7 @@ export type VerifiedToken = JwtPayload & { sub?: string };
 
 const verifier = createJwtTokenVerifier<VerifiedToken>({
   env: process.env,
-  getFallbackHs256Secret: () => getConfig().jwtSecret,
+  getFallbackHs256Secret: () => getConfig().jwtSecret || null,
   verify: (token, key, options) => {
     const verified = jwt.verify(token, key, {
       algorithms: options.algorithms.map((alg) => alg as Algorithm),

@@ -11,7 +11,7 @@ receivers:
         - job_name: "gateway"
           metrics_path: "/metrics"
           static_configs:
-            - targets: ["gateway:4000"]
+            - targets: ["gateway:9104"]
         - job_name: "balance"
           metrics_path: "/metrics"
           static_configs:

@@ -444,6 +444,7 @@ describe('gRPC handler consumer flows', () => {
       table_id: table.tableId,
       user_id: 'spectator-1',
       action_type: 'fold',
+      idempotency_key: 'idempotency-1',
     });
 
     expect(response.err).toBeNull();
@@ -457,7 +458,10 @@ describe('gRPC handler consumer flows', () => {
     const getResult = await callUnary(handlers.GetTable, { table_id: 'missing' });
     expect(getResult.err?.message).toBe('TABLE_NOT_FOUND');
 
-    const deleteResult = await callUnary(handlers.DeleteTable, { table_id: 'missing' });
+    const deleteResult = await callUnary(handlers.DeleteTable, {
+      table_id: 'missing',
+      idempotency_key: 'idempotency-2',
+    });
     expect(deleteResult.err?.message).toBe('TABLE_NOT_FOUND');
   });
 
@@ -468,6 +472,7 @@ describe('gRPC handler consumer flows', () => {
     const joinResult = await callUnary(handlers.JoinSpectator, {
       table_id: table.tableId,
       user_id: 'spectator-1',
+      idempotency_key: 'idempotency-3',
     });
     expect(joinResult.err).toBeNull();
     expect(joinResult.response?.ok).toBe(true);
@@ -475,6 +480,7 @@ describe('gRPC handler consumer flows', () => {
     const leaveResult = await callUnary(handlers.LeaveSpectator, {
       table_id: table.tableId,
       user_id: 'spectator-1',
+      idempotency_key: 'idempotency-4',
     });
     expect(leaveResult.err).toBeNull();
     expect(leaveResult.response?.ok).toBe(true);
@@ -490,6 +496,7 @@ describe('gRPC handler consumer flows', () => {
       table_id: table.tableId,
       owner_id: 'not-owner',
       target_user_id: 'player-1',
+      idempotency_key: 'idempotency-5',
     });
     expect(kickDenied.err?.message).toBe('NOT_AUTHORIZED');
 
@@ -497,6 +504,7 @@ describe('gRPC handler consumer flows', () => {
       table_id: table.tableId,
       owner_id: 'owner-1',
       target_user_id: 'player-1',
+      idempotency_key: 'idempotency-6',
     });
     expect(muteResult.err).toBeNull();
 
@@ -511,6 +519,7 @@ describe('gRPC handler consumer flows', () => {
       table_id: table.tableId,
       owner_id: 'owner-1',
       target_user_id: 'player-1',
+      idempotency_key: 'idempotency-7',
     });
     expect(unmuteResult.err).toBeNull();
   });

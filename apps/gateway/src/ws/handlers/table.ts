@@ -1,4 +1,5 @@
 import type WebSocket from 'ws';
+import { randomUUID } from 'crypto';
 
 import { fireAndForget } from '@specify-poker/shared';
 import { grpcResult } from '../../grpc/unaryClients';
@@ -31,7 +32,12 @@ async function handleSubscribe(connectionId: string, userId: string, tableId: st
   await subscribeToChannel(connectionId, channel);
 
   fireAndForget(
-    () => grpcResult.game.JoinSpectator({ table_id: tableId, user_id: userId }),
+    () =>
+      grpcResult.game.JoinSpectator({
+        table_id: tableId,
+        user_id: userId,
+        idempotency_key: `ws:${connectionId}:JoinSpectator:${tableId}`,
+      }),
     (error: unknown) => {
       logger.warn({ err: error, tableId, userId }, 'spectator.join.failed');
     },
@@ -93,7 +99,10 @@ async function handleAction(
     request.amount = payload.amount;
   }
 
-  const result = await grpcResult.game.SubmitAction(request);
+  const result = await grpcResult.game.SubmitAction({
+    ...request,
+    idempotency_key: randomUUID(),
+  });
   if (!result.ok) {
     sendToLocal(connectionId, {
       type: 'ActionResult',
@@ -124,6 +133,7 @@ async function handleJoinSeat(
     user_id: userId,
     seat_id: payload.seatId,
     buy_in_amount: buyInAmount,
+    idempotency_key: randomUUID(),
   });
 
   if (!result.ok) {
@@ -143,6 +153,7 @@ async function handleLeaveTable(userId: string, tableId: string) {
   await grpcResult.game.LeaveSeat({
     table_id: tableId,
     user_id: userId,
+    idempotency_key: randomUUID(),
   });
 }
 
@@ -166,7 +177,12 @@ export function createTableHub(params: {
       },
       UnsubscribeTable: async (message) => {
         fireAndForget(
-          () => grpcResult.game.LeaveSpectator({ table_id: message.tableId, user_id: userId }),
+          () =>
+            grpcResult.game.LeaveSpectator({
+              table_id: message.tableId,
+              user_id: userId,
+              idempotency_key: `ws:${connectionId}:LeaveSpectator:${message.tableId}`,
+            }),
           (error: unknown) => {
             logger.warn(
               { err: error, tableId: message.tableId, userId },

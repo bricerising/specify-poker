@@ -10,7 +10,7 @@ type Logger = {
 };
 
 type DbClient = {
-  query: (text: string) => Promise<unknown>;
+  query: (text: string, params?: unknown[]) => Promise<unknown>;
   release: () => void;
 };
 
@@ -48,6 +48,10 @@ const defaultClock: Clock = {
   now: () => Date.now(),
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
 
 function loadDbConnectRetryConfig(env: Env): DbConnectRetryConfig {
   return {
@@ -130,11 +134,45 @@ export function createMigrationsRunner(deps: MigrationsRunnerDeps): MigrationsRu
         }
 
         await client.query('BEGIN');
+        // Ensure only one migration runner applies migrations at a time (per database).
+        // Use a fixed advisory lock ID to avoid depending on extensions.
+        await client.query('SELECT pg_advisory_xact_lock(912345678)');
+
+        await client.query(
+          `CREATE TABLE IF NOT EXISTS schema_migrations (
+            name TEXT PRIMARY KEY,
+            applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          )`,
+        );
+
+        const appliedResult = await client.query(
+          'SELECT name FROM schema_migrations ORDER BY name ASC',
+        );
+        const appliedRows = isRecord(appliedResult) && Array.isArray(appliedResult.rows)
+          ? appliedResult.rows
+          : [];
+
+        const appliedNames = new Set<string>(
+          appliedRows
+            .map((row) => {
+              if (!isRecord(row)) {
+                return null;
+              }
+              return typeof row.name === 'string' ? row.name : null;
+            })
+            .filter((name): name is string => Boolean(name)),
+        );
+
         for (const file of files) {
+          if (appliedNames.has(file)) {
+            continue;
+          }
+
           const migrationFile = deps.path.join(migrationsDir, file);
           deps.logger.info({ path: migrationFile }, 'Running migration file');
           const sql = deps.fs.readFileSync(migrationFile, 'utf8');
           await client.query(sql);
+          await client.query('INSERT INTO schema_migrations (name) VALUES ($1)', [file]);
         }
         await client.query('COMMIT');
 

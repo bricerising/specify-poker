@@ -74,8 +74,11 @@ describe('gRPC Handlers', () => {
       vi.mocked(profileService.updateProfile).mockResolvedValue({ ok: true, value: mockProfile });
 
       const call = {
-        request: { userId: 'user1', nickname: 'NewNick' },
-      } as unknown as ServerUnaryCall<{ userId: string; nickname?: string }, unknown>;
+        request: { userId: 'user1', nickname: 'NewNick', idempotencyKey: 'idempotency-1' },
+      } as unknown as ServerUnaryCall<
+        { userId: string; nickname?: string; idempotencyKey: string },
+        unknown
+      >;
       await handlers.UpdateProfile(call, callback);
 
       expect(callback).toHaveBeenCalledWith(null, {
@@ -120,8 +123,11 @@ describe('gRPC Handlers', () => {
       vi.mocked(friendsService.addFriend).mockResolvedValue({ ok: true, value: undefined });
 
       const call = {
-        request: { userId: 'user1', friendId: 'user2' },
-      } as unknown as ServerUnaryCall<{ userId: string; friendId: string }, unknown>;
+        request: { userId: 'user1', friendId: 'user2', idempotencyKey: 'idempotency-2' },
+      } as unknown as ServerUnaryCall<
+        { userId: string; friendId: string; idempotencyKey: string },
+        unknown
+      >;
       await handlers.AddFriend(call, callback);
 
       expect(friendsService.addFriend).toHaveBeenCalledWith('user1', 'user2');
@@ -146,8 +152,8 @@ describe('gRPC Handlers', () => {
 
   describe('DeleteProfile', () => {
     it('should delete profile', async () => {
-      const call = { request: { userId: 'user1' } } as unknown as ServerUnaryCall<
-        { userId: string },
+      const call = { request: { userId: 'user1', idempotencyKey: 'idempotency-3' } } as unknown as ServerUnaryCall<
+        { userId: string; idempotencyKey: string },
         unknown
       >;
       await handlers.DeleteProfile(call, callback);

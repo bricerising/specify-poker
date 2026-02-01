@@ -52,7 +52,7 @@ test.describe('Observability Stack', () => {
 
   test('gateway exposes Prometheus-format metrics', async ({ request }) => {
     await request.get(`${urls.gateway}/health`);
-    const res = await request.get(`${urls.gateway}/metrics`);
+    const res = await request.get(`${urls.gatewayMetrics}/metrics`);
     expect(res.ok()).toBeTruthy();
     const text = await res.text();
     expect(text).toContain('process_cpu_user_seconds_total');

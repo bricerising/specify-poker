@@ -1,5 +1,5 @@
 import { incrementRateLimit } from '../storage/rateLimitStore';
-import { readIntEnv } from '@specify-poker/shared';
+import { readIntEnv, readStringEnv } from '@specify-poker/shared';
 
 const allowedActions = {
   Fold: 'FOLD',
@@ -15,12 +15,27 @@ const seatMax = 8;
 
 const wsWindowMs = readIntEnv(process.env, 'WS_RATE_LIMIT_WINDOW_MS', 10_000, { min: 1 });
 const wsMax = readIntEnv(process.env, 'WS_RATE_LIMIT_MAX', 20, { min: 1 });
+const wsFailOpen = parseBoolean(readStringEnv(process.env, 'WS_RATE_LIMIT_FAIL_OPEN', 'true'), true);
+
+function parseBoolean(raw: string, fallback: boolean): boolean {
+  const normalized = raw.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(normalized)) {
+    return true;
+  }
+  if (['0', 'false', 'no', 'n', 'off'].includes(normalized)) {
+    return false;
+  }
+  return fallback;
+}
 
 export async function checkWsRateLimit(userId: string, ip: string, channel: 'chat' | 'action') {
   const userKey = `ratelimit:ws:user:${userId}:${channel}`;
   const ipKey = `ratelimit:ws:ip:${ip}:${channel}`;
   const userCount = await incrementRateLimit(userKey, wsWindowMs);
   const ipCount = await incrementRateLimit(ipKey, wsWindowMs);
+  if (userCount === null || ipCount === null) {
+    return { ok: wsFailOpen };
+  }
   return { ok: userCount <= wsMax && ipCount <= wsMax };
 }
 

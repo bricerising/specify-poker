@@ -7,7 +7,7 @@ describe('otel collector metrics scraping', () => {
   const config = readFileSync(configPath, 'utf8');
 
   it('scrapes service /metrics endpoints', () => {
-    expect(config).toContain('gateway:4000');
+    expect(config).toContain('gateway:9104');
     expect(config).toContain('balance:9102');
     expect(config).toContain('player:9103');
     expect(config).toContain('game:9105');

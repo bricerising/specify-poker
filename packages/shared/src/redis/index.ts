@@ -8,6 +8,8 @@ export { createRedisClientManager } from './redisClientManager';
 export type { RedisClientsFacade } from './redisClientsFacade';
 export { createRedisClientsFacade } from './redisClientsFacade';
 export { createAsyncMethodProxy } from '../proxy/asyncMethodProxy';
+export type { RedisIdempotencyOutcome } from './idempotency';
+export { IdempotencyInProgressError, runRedisIdempotent } from './idempotency';
 export type {
   RedisStreamConsumerClient,
   RedisStreamConsumerAckStrategy,

@@ -113,6 +113,7 @@ removed, and other services no longer return their data.
   with disambiguation (e.g., display user ID suffix).
 - **Statistics Accuracy**: Statistics MUST be eventually consistent with
   actual gameplay events.
+- **Idempotency**: All mutating gRPC calls MUST be idempotent via client-provided idempotency keys. In particular, statistics increments MUST NOT double-apply on retry.
 
 ## Requirements
 

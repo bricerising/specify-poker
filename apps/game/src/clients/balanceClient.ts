@@ -1,5 +1,6 @@
 import { createLazyUnaryCallResultProxy, mapResult, type Result } from '@specify-poker/shared';
 import { getBalanceClient } from '../api/grpc/clients';
+import { getConfig } from '../config';
 
 type NumericString = string | number;
 
@@ -14,6 +15,10 @@ function parseNumeric(value: NumericString | undefined): number {
 const unaryBalanceClient = createLazyUnaryCallResultProxy(getBalanceClient);
 
 export type BalanceCall<TResponse> = Result<TResponse, unknown>;
+
+function getTimeoutMs(): number {
+  return getConfig().grpcClientTimeoutMs;
+}
 
 export interface ReserveResult {
   ok: boolean;
@@ -117,7 +122,7 @@ export async function reserveForBuyIn(
     amount: params.amount,
     idempotency_key: params.idempotencyKey,
     timeout_seconds: params.timeoutSeconds ?? 30,
-  });
+  }, { timeoutMs: getTimeoutMs() });
 
   return mapResult(call, (response) => ({
     ok: response.ok,
@@ -132,7 +137,7 @@ export async function commitReservation(
 ): Promise<BalanceCall<CommitResult>> {
   const call = await unaryBalanceClient.CommitReservation({
     reservation_id: params.reservationId,
-  });
+  }, { timeoutMs: getTimeoutMs() });
 
   return mapResult(call, (response) => ({
     ok: response.ok,
@@ -148,7 +153,7 @@ export async function releaseReservation(
   const call = await unaryBalanceClient.ReleaseReservation({
     reservation_id: params.reservationId,
     reason: params.reason,
-  });
+  }, { timeoutMs: getTimeoutMs() });
 
   return mapResult(call, (response) => ({ ok: response.ok, error: response.error }));
 }
@@ -163,7 +168,7 @@ export async function processCashOut(
     amount: params.amount,
     idempotency_key: params.idempotencyKey,
     hand_id: params.handId,
-  });
+  }, { timeoutMs: getTimeoutMs() });
 
   return mapResult(call, (response) => ({
     ok: response.ok,
@@ -184,7 +189,7 @@ export async function recordContribution(
     amount: params.amount,
     contribution_type: params.contributionType,
     idempotency_key: params.idempotencyKey,
-  });
+  }, { timeoutMs: getTimeoutMs() });
 
   return mapResult(call, (response) => ({
     ok: response.ok,
@@ -206,7 +211,7 @@ export async function settlePot(
       amount: winner.amount,
     })),
     idempotency_key: params.idempotencyKey,
-  });
+  }, { timeoutMs: getTimeoutMs() });
 
   return mapResult(call, (response) => ({
     ok: response.ok,
@@ -227,7 +232,7 @@ export async function cancelPot(
     table_id: params.tableId,
     hand_id: params.handId,
     reason: params.reason,
-  });
+  }, { timeoutMs: getTimeoutMs() });
 
   return mapResult(call, (response) => ({ ok: response.ok, error: response.error }));
 }

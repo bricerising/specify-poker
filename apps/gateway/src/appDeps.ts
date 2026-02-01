@@ -5,6 +5,7 @@ type RequestListenerLike = (req: unknown, res: unknown) => void;
 
 export type ExpressAppLike = RequestListenerLike & {
   use: (...handlers: unknown[]) => unknown;
+  set: (setting: string, value: unknown) => unknown;
 };
 
 export type GatewayRuntimeDeps = {
@@ -62,4 +63,3 @@ export async function loadGatewayRuntimeDeps(): Promise<GatewayRuntimeDeps> {
     closeRedisClient,
   };
 }
-

@@ -31,7 +31,10 @@ describe('HTTP rate limit middleware', () => {
     const response = await done;
     expect(response.statusCode).toBe(429);
     expect(response.body).toEqual(
-      expect.objectContaining({ error: 'Too many requests from this IP' }),
+      expect.objectContaining({
+        code: 'RATE_LIMITED',
+        message: 'Too many requests from this IP',
+      }),
     );
   });
 
@@ -51,12 +54,28 @@ describe('HTTP rate limit middleware', () => {
     const response = await done;
     expect(response.statusCode).toBe(429);
     expect(response.body).toEqual(
-      expect.objectContaining({ error: 'Too many requests from this user' }),
+      expect.objectContaining({
+        code: 'RATE_LIMITED',
+        message: 'Too many requests from this user',
+      }),
     );
   });
 
   it('fails open when rate limit store errors', async () => {
     vi.mocked(incrementRateLimit).mockRejectedValue(new Error('redis down'));
+    const req = createMockReq({ method: 'GET', url: '/protected' });
+    req.ip = '1.2.3.4';
+    const { res } = createMockRes();
+    const next = vi.fn();
+
+    await httpRateLimitMiddleware(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('fails open when rate limit store is unavailable', async () => {
+    vi.mocked(incrementRateLimit).mockResolvedValue(null);
     const req = createMockReq({ method: 'GET', url: '/protected' });
     req.ip = '1.2.3.4';
     const { res } = createMockRes();

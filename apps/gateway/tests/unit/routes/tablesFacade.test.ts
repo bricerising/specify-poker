@@ -29,6 +29,7 @@ describe('Tables Facade', () => {
     const result = await facade.joinSeatWithDailyBonus({
       tableId: 't1',
       userId: 'user-1',
+      userToken: 'token-1',
       seatId: 0,
       buyInAmount: 200,
     });
@@ -42,6 +43,7 @@ describe('Tables Facade', () => {
       source: 'BONUS',
       idempotencyKey: 'bonus:daily_login:lobby:user-1:2026-01-31',
       gatewayUserId: 'user-1',
+      bearerToken: 'token-1',
       timeoutMs: 111,
     });
     expect(warn).not.toHaveBeenCalled();
@@ -69,6 +71,7 @@ describe('Tables Facade', () => {
     const result = await facade.joinSeatWithDailyBonus({
       tableId: 't1',
       userId: 'user-1',
+      userToken: 'token-1',
       seatId: 0,
       buyInAmount: 200,
     });
@@ -97,6 +100,7 @@ describe('Tables Facade', () => {
     const result = await facade.joinSeatWithDailyBonus({
       tableId: 't1',
       userId: 'user-1',
+      userToken: 'token-1',
       seatId: 0,
       buyInAmount: 200,
     });

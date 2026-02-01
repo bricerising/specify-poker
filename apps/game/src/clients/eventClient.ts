@@ -4,10 +4,15 @@ import { GameEventType } from '../domain/events';
 import logger from '../observability/logger';
 import { createLazyUnaryCallResultProxy, toStruct } from '@specify-poker/shared';
 import { getEventClient } from '../api/grpc/clients';
+import { getConfig } from '../config';
 
 export { GameEventType as EventTypes } from '../domain/events';
 
 const unaryEventClient = createLazyUnaryCallResultProxy(getEventClient);
+
+function getTimeoutMs(): number {
+  return getConfig().grpcClientTimeoutMs;
+}
 
 export interface GameEvent {
   type: string;
@@ -34,7 +39,7 @@ export async function publishEvent(event: GameEvent): Promise<PublishResult> {
       seat_id: event.seatId,
       payload: toStruct(event.payload),
       idempotency_key: event.idempotencyKey ?? randomUUID(),
-    });
+    }, { timeoutMs: getTimeoutMs() });
 
     if (!call.ok) {
       logger.error({ err: call.error, event }, 'Event publish failed');
@@ -66,7 +71,7 @@ export async function publishEvents(
         payload: toStruct(event.payload),
         idempotency_key: event.idempotencyKey ?? randomUUID(),
       })),
-    });
+    }, { timeoutMs: getTimeoutMs() });
 
     if (!call.ok) {
       logger.error({ err: call.error }, 'Batch event publish failed');

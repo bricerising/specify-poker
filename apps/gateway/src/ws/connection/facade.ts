@@ -12,6 +12,7 @@ import { attachWsMultiplexRouter } from '../router';
 import { parseWsClientMessage } from '../clientMessage';
 import { getSubscribedChannels, unsubscribeAll } from '../subscriptions';
 import { grpc, grpcResult } from '../../grpc/unaryClients';
+import { getConfig } from '../../config';
 import { getConnectionsByUser } from '../../storage/connectionStore';
 import { updatePresence } from '../../storage/sessionStore';
 import { setupHeartbeat } from '../heartbeat';
@@ -55,6 +56,10 @@ export type WsConnectionFacade = {
 };
 
 function getClientIp(request: IncomingMessage): string {
+  if (getConfig().trustProxyHops <= 0) {
+    return request.socket.remoteAddress ?? 'unknown';
+  }
+
   const forwarded = request.headers['x-forwarded-for'];
   if (typeof forwarded === 'string' && forwarded.length > 0) {
     return forwarded.split(',')[0].trim();
@@ -205,7 +210,11 @@ export function createWsConnectionFacade(
       void Promise.all(
         tableIds.map((tableId) =>
           deps.grpcResult.game
-            .LeaveSpectator({ table_id: tableId, user_id: identity.userId })
+            .LeaveSpectator({
+              table_id: tableId,
+              user_id: identity.userId,
+              idempotency_key: `ws:${connectionId}:Shutdown:LeaveSpectator:${tableId}`,
+            })
             .catch(() => null),
         ),
       );

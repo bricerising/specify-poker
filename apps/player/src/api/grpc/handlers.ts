@@ -99,7 +99,8 @@ export const handlers = {
   UpdateProfile: createPlayerUnaryHandler(
     'UpdateProfile',
     decodeUpdateProfileRequest,
-    async ({ userId, nickname, avatarUrl, preferences }) => {
+    async (request) => {
+      const { userId, nickname, avatarUrl, preferences } = request;
       const result = await profileService.updateProfile(userId, {
         nickname,
         avatarUrl,
@@ -119,7 +120,8 @@ export const handlers = {
   DeleteProfile: createPlayerUnaryHandler(
     'DeleteProfile',
     decodeDeleteProfileRequest,
-    async ({ userId }) => {
+    async (request) => {
+      const { userId } = request;
       await profileService.deleteProfile(userId);
       return { success: true };
     },
@@ -137,12 +139,18 @@ export const handlers = {
   IncrementStatistic: createPlayerUnaryHandler(
     'IncrementStatistic',
     decodeIncrementStatisticRequest,
-    async ({ userId, type, amount }) => {
+    async (request) => {
+      const { userId, type, amount, idempotencyKey } = request;
       const statisticType = toStatisticType(type);
       if (!statisticType) {
         throw new ValidationError('Invalid statistic type');
       }
-      const updated = await statisticsService.incrementStatistic(userId, statisticType, amount);
+      const updated = await statisticsService.incrementStatisticIdempotent(
+        userId,
+        statisticType,
+        amount,
+        idempotencyKey,
+      );
       recordStatisticsUpdate(statisticType);
       return toGrpcStatistics(updated);
     },
@@ -160,7 +168,8 @@ export const handlers = {
   AddFriend: createPlayerUnaryHandler(
     'AddFriend',
     decodeAddFriendRequest,
-    async ({ userId, friendId }) => {
+    async (request) => {
+      const { userId, friendId } = request;
       const result = await friendsService.addFriend(userId, friendId);
       if (!result.ok) {
         throw addFriendErrorToGrpc(result.error);
@@ -176,7 +185,8 @@ export const handlers = {
   RemoveFriend: createPlayerUnaryHandler(
     'RemoveFriend',
     decodeRemoveFriendRequest,
-    async ({ userId, friendId }) => {
+    async (request) => {
+      const { userId, friendId } = request;
       await friendsService.removeFriend(userId, friendId);
       return {};
     },

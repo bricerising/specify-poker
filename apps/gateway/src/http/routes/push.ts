@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { grpc } from '../../grpc/unaryClients';
 import { safeAuthedRoute } from '../utils/safeAuthedRoute';
+import { getIdempotencyKey } from '../utils/idempotencyKey';
 
 const router = Router();
 
@@ -61,9 +62,11 @@ router.post(
         return;
       }
 
+      const idempotencyKey = getIdempotencyKey(req);
       const response = await grpc.notify.RegisterSubscription({
         user_id: userId,
         subscription: parsed.subscription,
+        idempotency_key: idempotencyKey,
       });
 
       if (!response.ok) {
@@ -87,9 +90,11 @@ router.delete(
         return;
       }
 
+      const idempotencyKey = getIdempotencyKey(req);
       const response = await grpc.notify.UnregisterSubscription({
         user_id: userId,
         endpoint,
+        idempotency_key: idempotencyKey,
       });
 
       if (!response.ok) {

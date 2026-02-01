@@ -4,11 +4,15 @@ All messages are JSON objects with a `type` field.
 
 ## Connection/Auth
 
-- WebSocket URL: `ws(s)://{host}/ws?token={jwt}`
-- Connections without a valid `token` are closed with code `1008`.
+- WebSocket URL: `ws(s)://{host}/ws`
+- Clients MUST authenticate immediately after connecting by sending:
+  - `Authenticate` { token }
+- Connections that do not authenticate within a short timeout are closed with code `1008`.
+- Legacy query-string tokens (`?token=...`) are supported only when explicitly enabled (deployment flag).
 
 ## Client -> Server
 
+- `Authenticate` { token }
 - `SubscribeTable` { tableId }  // spectator subscription (no seat)
 - `UnsubscribeTable` { tableId }
 - `ResyncTable` { tableId }

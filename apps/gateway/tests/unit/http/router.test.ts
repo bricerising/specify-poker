@@ -1,13 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { dispatchToRouter } from '../helpers/express';
 
-vi.mock('prom-client', () => ({
-  register: {
-    contentType: 'text/plain',
-    metrics: vi.fn().mockResolvedValue('metrics'),
-  },
-}));
-
 vi.mock('../../../src/http/middleware/auth', () => ({
   authMiddleware: (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
@@ -82,18 +75,5 @@ describe('HTTP router', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toEqual({ status: 'ready' });
-  });
-
-  it('exposes metrics payload', async () => {
-    const { createRouter } = await import('../../../src/http/router');
-    const router = createRouter();
-    const response = await dispatchToRouter(router, {
-      method: 'GET',
-      url: '/metrics',
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.headers['content-type']).toBe('text/plain');
-    expect(response.body).toBe('metrics');
   });
 });

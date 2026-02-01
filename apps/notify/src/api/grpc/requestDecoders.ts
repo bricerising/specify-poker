@@ -24,6 +24,7 @@ export type DecodeMissingFieldsError = 'MISSING_FIELDS';
 export type RegisterSubscriptionInput = {
   userId: string;
   subscription: PushSubscription;
+  idempotencyKey: string;
 };
 
 export function decodeRegisterSubscriptionRequest(
@@ -34,8 +35,9 @@ export function decodeRegisterSubscriptionRequest(
   }
 
   const userId = asNonEmptyString(request.userId);
+  const idempotencyKey = asNonEmptyString(request.idempotencyKey);
   const subscriptionRecord = request.subscription;
-  if (!userId || !isRecord(subscriptionRecord)) {
+  if (!userId || !idempotencyKey || !isRecord(subscriptionRecord)) {
     return err('MISSING_FIELDS');
   }
 
@@ -60,12 +62,14 @@ export function decodeRegisterSubscriptionRequest(
         auth,
       },
     },
+    idempotencyKey,
   });
 }
 
 export type UnregisterSubscriptionInput = {
   userId: string;
   endpoint: string;
+  idempotencyKey: string;
 };
 
 export function decodeUnregisterSubscriptionRequest(
@@ -77,11 +81,12 @@ export function decodeUnregisterSubscriptionRequest(
 
   const userId = asNonEmptyString(request.userId);
   const endpoint = asNonEmptyString(request.endpoint);
-  if (!userId || !endpoint) {
+  const idempotencyKey = asNonEmptyString(request.idempotencyKey);
+  if (!userId || !endpoint || !idempotencyKey) {
     return err('MISSING_FIELDS');
   }
 
-  return ok({ userId, endpoint });
+  return ok({ userId, endpoint, idempotencyKey });
 }
 
 export function decodeListSubscriptionsRequest(request: unknown): { userId: string | null } {
@@ -96,6 +101,7 @@ export function decodeListSubscriptionsRequest(request: unknown): { userId: stri
 export type SendNotificationInput = {
   userId: string;
   payload: NotificationPayload;
+  idempotencyKey: string;
 };
 
 export function decodeSendNotificationRequest(
@@ -108,7 +114,8 @@ export function decodeSendNotificationRequest(
   const userId = asNonEmptyString(request.userId);
   const title = asNonEmptyString(request.title);
   const body = asNonEmptyString(request.body);
-  if (!userId || !title || !body) {
+  const idempotencyKey = asNonEmptyString(request.idempotencyKey);
+  if (!userId || !title || !body || !idempotencyKey) {
     return err('MISSING_FIELDS');
   }
 
@@ -121,5 +128,5 @@ export function decodeSendNotificationRequest(
     data: resolveNotificationData(request.data),
   };
 
-  return ok({ userId, payload });
+  return ok({ userId, payload, idempotencyKey });
 }

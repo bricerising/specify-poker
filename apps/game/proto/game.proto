@@ -130,6 +130,7 @@ message CreateTableRequest {
   string name = 1;
   string owner_id = 2;
   TableConfig config = 3;
+  string idempotency_key = 4;
 }
 
 message GetTableRequest {
@@ -144,6 +145,7 @@ message ListTablesResponse {
 
 message DeleteTableRequest {
   string table_id = 1;
+  string idempotency_key = 2;
 }
 
 message GetTableStateRequest {
@@ -161,6 +163,7 @@ message JoinSeatRequest {
   string user_id = 2;
   int32 seat_id = 3;
   int64 buy_in_amount = 4;
+  string idempotency_key = 5;
 }
 
 message JoinSeatResponse {
@@ -171,6 +174,7 @@ message JoinSeatResponse {
 message LeaveSeatRequest {
   string table_id = 1;
   string user_id = 2;
+  string idempotency_key = 3;
 }
 
 message LeaveSeatResponse {
@@ -181,6 +185,7 @@ message LeaveSeatResponse {
 message JoinSpectatorRequest {
   string table_id = 1;
   string user_id = 2;
+  string idempotency_key = 3;
 }
 
 message JoinSpectatorResponse {
@@ -191,6 +196,7 @@ message JoinSpectatorResponse {
 message LeaveSpectatorRequest {
   string table_id = 1;
   string user_id = 2;
+  string idempotency_key = 3;
 }
 
 message LeaveSpectatorResponse {
@@ -203,6 +209,7 @@ message SubmitActionRequest {
   string user_id = 2;
   string action_type = 3;
   optional int64 amount = 4;
+  string idempotency_key = 5;
 }
 
 message SubmitActionResponse {
@@ -214,18 +221,21 @@ message KickPlayerRequest {
   string table_id = 1;
   string owner_id = 2;
   string target_user_id = 3;
+  string idempotency_key = 4;
 }
 
 message MutePlayerRequest {
   string table_id = 1;
   string owner_id = 2;
   string target_user_id = 3;
+  string idempotency_key = 4;
 }
 
 message UnmutePlayerRequest {
   string table_id = 1;
   string owner_id = 2;
   string target_user_id = 3;
+  string idempotency_key = 4;
 }
 
 message IsMutedRequest {

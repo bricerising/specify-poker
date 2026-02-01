@@ -1,9 +1,14 @@
 import type { Request, Response } from 'express';
 import { Router } from 'express';
-import { tableCreateRequestInputSchema, tableJoinSeatRequestSchema } from '@specify-poker/shared';
+import {
+  tableCreateRequestInputSchema,
+  tableJoinSeatRequestSchema,
+  tableSubmitActionRequestSchema,
+} from '@specify-poker/shared';
 import { grpc } from '../../grpc/unaryClients';
 import { safeAuthedRoute } from '../utils/safeAuthedRoute';
 import { safeRoute } from '../utils/safeRoute';
+import { getIdempotencyKey } from '../utils/idempotencyKey';
 import { createTablesFacade } from './tables/facade';
 import { attachModerationRoutes } from './tables/moderation';
 
@@ -23,13 +28,17 @@ async function handleJoinSeatRequest(
   req: Request,
   res: Response,
   userId: string,
+  userToken: string,
   params: { tableId: string; seatId: number; buyInAmount?: number },
 ): Promise<void> {
+  const idempotencyKey = getIdempotencyKey(req);
   const response = await tablesFacade.joinSeatWithDailyBonus({
     tableId: params.tableId,
     userId,
+    userToken,
     seatId: params.seatId,
     buyInAmount: params.buyInAmount ?? 0,
+    idempotencyKey,
   });
 
   if (!response.ok) {
@@ -78,6 +87,7 @@ router.post(
       }
 
       const { name, config } = parsed.data;
+      const idempotencyKey = getIdempotencyKey(req);
 
       const response = await grpc.game.CreateTable({
         name,
@@ -90,6 +100,7 @@ router.post(
           starting_stack: config.startingStack,
           turn_timer_seconds: config.turnTimerSeconds ?? 20,
         },
+        idempotency_key: idempotencyKey,
       });
       res.status(201).json(response);
     },
@@ -121,7 +132,8 @@ router.delete(
   safeRoute(
     async (req: Request, res: Response) => {
       const { tableId } = req.params;
-      await grpc.game.DeleteTable({ table_id: tableId });
+      const idempotencyKey = getIdempotencyKey(req);
+      await grpc.game.DeleteTable({ table_id: tableId, idempotency_key: idempotencyKey });
       res.status(204).send();
     },
     {
@@ -163,8 +175,14 @@ router.post(
         return;
       }
 
+      const userToken = req.auth?.token;
+      if (!userToken) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
       const { seatId, buyInAmount } = parsed.data;
-      await handleJoinSeatRequest(req, res, userId, { tableId, seatId, buyInAmount });
+      await handleJoinSeatRequest(req, res, userId, userToken, { tableId, seatId, buyInAmount });
     },
     { logMessage: 'Failed to join seat' },
   ),
@@ -185,8 +203,14 @@ router.post(
         return;
       }
 
+      const userToken = req.auth?.token;
+      if (!userToken) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
       const { seatId: parsedSeatId, buyInAmount } = parsed.data;
-      await handleJoinSeatRequest(req, res, userId, {
+      await handleJoinSeatRequest(req, res, userId, userToken, {
         tableId,
         seatId: parsedSeatId,
         buyInAmount,
@@ -202,10 +226,12 @@ router.post(
   safeAuthedRoute(
     async (req: Request, res: Response, userId: string) => {
       const { tableId } = req.params;
+      const idempotencyKey = getIdempotencyKey(req);
 
       const response = await grpc.game.LeaveSeat({
         table_id: tableId,
         user_id: userId,
+        idempotency_key: idempotencyKey,
       });
 
       await handleOkGrpcResponse(res, response, 'Failed to leave seat');
@@ -220,10 +246,12 @@ router.post(
   safeAuthedRoute(
     async (req: Request, res: Response, userId: string) => {
       const { tableId } = req.params;
+      const idempotencyKey = getIdempotencyKey(req);
 
       const response = await grpc.game.JoinSpectator({
         table_id: tableId,
         user_id: userId,
+        idempotency_key: idempotencyKey,
       });
 
       await handleOkGrpcResponse(res, response, 'Failed to join as spectator');
@@ -238,10 +266,12 @@ router.post(
   safeAuthedRoute(
     async (req: Request, res: Response, userId: string) => {
       const { tableId } = req.params;
+      const idempotencyKey = getIdempotencyKey(req);
 
       const response = await grpc.game.LeaveSpectator({
         table_id: tableId,
         user_id: userId,
+        idempotency_key: idempotencyKey,
       });
 
       await handleOkGrpcResponse(res, response, 'Failed to leave spectating');
@@ -256,13 +286,21 @@ router.post(
   safeAuthedRoute(
     async (req: Request, res: Response, userId: string) => {
       const { tableId } = req.params;
-      const { actionType, amount } = req.body;
+      const parsed = tableSubmitActionRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'Invalid request' });
+        return;
+      }
+
+      const { actionType, amount } = parsed.data;
+      const idempotencyKey = getIdempotencyKey(req);
 
       const response = await grpc.game.SubmitAction({
         table_id: tableId,
         user_id: userId,
         action_type: actionType,
-        amount: amount,
+        ...(amount === undefined ? {} : { amount }),
+        idempotency_key: idempotencyKey,
       });
 
       await handleOkGrpcResponse(res, response, 'Invalid action');

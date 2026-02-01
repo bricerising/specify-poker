@@ -4,6 +4,7 @@ import type { GatewayGrpc } from '../../../grpc/unaryClients';
 import type { TablesFacade } from './facade';
 import logger from '../../../observability/logger';
 import { requireUserId } from '../../utils/requireUserId';
+import { getIdempotencyKey } from '../../utils/idempotencyKey';
 
 type ModerationAction = 'kick' | 'mute' | 'unmute';
 
@@ -11,6 +12,7 @@ type ModerationRequest = {
   readonly table_id: string;
   readonly owner_id: string;
   readonly target_user_id: string;
+  readonly idempotency_key: string;
 };
 
 type ModerationMethod = (request: ModerationRequest) => Promise<unknown>;
@@ -149,10 +151,12 @@ function createModerationHandler(deps: TablesModerationDeps, strategy: Moderatio
         ...(typeof target.seatId === 'number' ? { seatId: target.seatId } : {}),
       };
 
+      const idempotencyKey = getIdempotencyKey(req);
       await strategy.method({
         table_id: tableId,
         owner_id: ownerId,
         target_user_id: context.targetUserId,
+        idempotency_key: idempotencyKey,
       });
 
       await strategy.respond({ req, res, action: strategy.action, context });
@@ -224,4 +228,3 @@ export function attachModerationRoutes(
   // POST /api/tables/:tableId/unmute - Unmute a player (owner only)
   router.post('/:tableId/unmute', handleUnmuteByTargetUserId);
 }
-

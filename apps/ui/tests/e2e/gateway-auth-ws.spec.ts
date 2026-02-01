@@ -52,16 +52,22 @@ test.describe('Gateway Auth Boundary (HTTP + WebSocket)', () => {
     const noTokenClosed = await waitForClose(noTokenSocket);
     expect(noTokenClosed.code).toBe(1008);
 
-    const invalidTokenSocket = new WebSocket(gatewayWsUrl('not-a-jwt'), {
+    const invalidTokenSocket = new WebSocket(gatewayWsUrl(), {
       headers: { 'X-Forwarded-For': forwardedFor },
+    });
+    invalidTokenSocket.on('open', () => {
+      invalidTokenSocket.send(JSON.stringify({ type: 'Authenticate', token: 'not-a-jwt' }));
     });
     const invalidClosed = await waitForClose(invalidTokenSocket);
     expect(invalidClosed.code).toBe(1008);
 
     const userId = `user-ws-${crypto.randomUUID().slice(0, 8)}`;
     const token = generateToken(userId, 'WsUser');
-    const okSocket = new WebSocket(gatewayWsUrl(token), {
+    const okSocket = new WebSocket(gatewayWsUrl(), {
       headers: { 'X-Forwarded-For': forwardedFor },
+    });
+    okSocket.on('open', () => {
+      okSocket.send(JSON.stringify({ type: 'Authenticate', token }));
     });
     const welcome = await new Promise<Record<string, unknown>>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('Timed out waiting for Welcome')), 5000);

@@ -40,3 +40,5 @@ export * from './auth/jwtVerification';
 export * from './auth/jwtKid';
 export * from './auth/jwtTokenVerifier';
 export * from './proxy/asyncMethodProxy';
+export * from './resilience/index';
+export * from './http/index';

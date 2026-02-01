@@ -1,8 +1,13 @@
 import { defaultProfile, defaultStatistics } from '../domain/defaults';
 import type { Statistics } from '../domain/types';
+import { ValidationError } from '../domain/errors';
 import { generateNickname } from './nicknameService';
 import { statisticsStore } from '../storage/statisticsStore';
+import * as statisticsRepository from '../storage/statisticsRepository';
 import { profileStore } from '../storage/profileStore';
+import { transaction } from '../storage/db';
+import * as statisticsIdempotencyRepository from '../storage/statisticsIdempotencyRepository';
+import * as statisticsCache from '../storage/statisticsCache';
 
 async function ensureProfile(userId: string) {
   const existing = await profileStore.get(userId, true);
@@ -87,6 +92,72 @@ export async function incrementStatistic(
   const stats = await getStatistics(userId);
   const updated = applyStatisticUpdate(stats, type, amount, new Date().toISOString());
   return statisticsStore.update(updated);
+}
+
+export async function incrementStatisticIdempotent(
+  userId: string,
+  type: StatisticType,
+  amount: number,
+  idempotencyKey: string,
+): Promise<Statistics> {
+  const trimmedKey = idempotencyKey.trim();
+  if (!trimmedKey) {
+    throw new ValidationError('MISSING_IDEMPOTENCY_KEY');
+  }
+
+  await ensureProfile(userId);
+
+  const result = await transaction(async (client) => {
+    // Fast-path: return the prior result for this key (and wait for inflight callers via row lock).
+    const locked = await statisticsIdempotencyRepository.lockAndGetResult(trimmedKey, client);
+    if (locked) {
+      return locked;
+    }
+
+    // Ensure the idempotency row exists so concurrent callers will block on the row lock.
+    await statisticsIdempotencyRepository.insertIfMissing({
+      idempotencyKey: trimmedKey,
+      userId,
+      statisticType: type,
+      amount,
+      client,
+    });
+
+    const existing = await statisticsIdempotencyRepository.lockAndGetResult(trimmedKey, client);
+    if (existing) {
+      return existing;
+    }
+
+    const now = new Date();
+    const seed = defaultStatistics(userId, now);
+
+    let stats = await statisticsRepository.findByIdForUpdate(userId, client);
+    if (!stats) {
+      await statisticsRepository.insertIfMissing(seed, client);
+      stats = await statisticsRepository.findByIdForUpdate(userId, client);
+    }
+
+    if (!stats) {
+      throw new Error('STATISTICS_NOT_FOUND');
+    }
+
+    const updated = applyStatisticUpdate(stats, type, amount, now.toISOString());
+    const saved = await statisticsRepository.update(updated, client);
+
+    await statisticsIdempotencyRepository.setResult(
+      {
+        idempotencyKey: trimmedKey,
+        result: saved,
+      },
+      client,
+    );
+
+    return saved;
+  });
+
+  // Best-effort cache update (Redis optional).
+  await statisticsCache.set(result);
+  return result;
 }
 
 export async function incrementHandsPlayed(userId: string): Promise<Statistics> {

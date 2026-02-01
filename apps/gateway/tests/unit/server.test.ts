@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const app = { use: vi.fn() };
-const server = {
+const mainServer = {
+  listen: vi.fn((_port: number, cb: () => void) => cb()),
+  close: vi.fn((cb: () => void) => cb()),
+};
+const metricsServer = {
   listen: vi.fn((_port: number, cb: () => void) => cb()),
   close: vi.fn((cb: () => void) => cb()),
 };
@@ -9,6 +13,11 @@ const wss = {
   clients: new Set(),
   close: vi.fn((cb: () => void) => cb()),
 };
+
+const createServer = vi
+  .fn()
+  .mockImplementationOnce(() => mainServer)
+  .mockImplementationOnce(() => metricsServer);
 
 vi.mock('express', () => ({
   default: vi.fn(() => app),
@@ -19,11 +28,12 @@ vi.mock('cors', () => ({
 }));
 
 vi.mock('http', () => ({
-  createServer: vi.fn(() => server),
+  default: { createServer },
+  createServer,
 }));
 
 vi.mock('../../src/config', () => ({
-  getConfig: () => ({ port: 4000, corsOrigin: '*' }),
+  getConfig: () => ({ port: 4000, metricsPort: 9104, corsOrigin: '*', trustProxyHops: 0 }),
 }));
 
 vi.mock('../../src/http/router', () => ({
@@ -58,6 +68,10 @@ vi.mock('../../src/storage/redisClient', () => ({
 
 vi.mock('prom-client', () => ({
   collectDefaultMetrics: vi.fn(),
+  register: {
+    contentType: 'text/plain',
+    metrics: vi.fn().mockResolvedValue('metrics'),
+  },
 }));
 
 vi.mock('../../src/observability/logger', () => ({
@@ -82,11 +96,13 @@ describe('Gateway server startup', () => {
 
     await startServer();
 
-    expect(server.listen).toHaveBeenCalledWith(4000, expect.any(Function));
+    expect(mainServer.listen).toHaveBeenCalledWith(4000, expect.any(Function));
+    expect(metricsServer.listen).toHaveBeenCalledWith(9104, expect.any(Function));
     expect(logger.info).toHaveBeenCalledWith({ port: 4000 }, 'Gateway service started');
 
     await shutdown();
-    expect(server.close).toHaveBeenCalled();
+    expect(mainServer.close).toHaveBeenCalled();
+    expect(metricsServer.close).toHaveBeenCalled();
     expect(closeGrpcClients).toHaveBeenCalledTimes(1);
   });
 });

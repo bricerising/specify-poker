@@ -2,6 +2,26 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createHandlers } from '../../src/api/grpc/handlers';
 import type { NotifyService } from '../../src/services/notifyService';
 
+vi.mock('../../src/storage/redisClient', () => {
+  const store = new Map<string, string>();
+  return {
+    getRedisClient: vi.fn(async () => ({
+      get: vi.fn(async (key: string) => store.get(key) ?? null),
+      set: vi.fn(async (key: string, value: string, options?: { NX?: boolean; PX?: number }) => {
+        if (options?.NX && store.has(key)) {
+          return null;
+        }
+        store.set(key, value);
+        return 'OK';
+      }),
+      del: vi.fn(async (key: string) => {
+        const existed = store.delete(key);
+        return existed ? 1 : 0;
+      }),
+    })),
+  };
+});
+
 describe('gRPC Handlers', () => {
   let handlers: unknown;
   let notifyServiceMock: NotifyService;
@@ -24,6 +44,7 @@ describe('gRPC Handlers', () => {
           endpoint: 'e1',
           keys: { p256dh: 'd1', auth: 'a1' },
         },
+        idempotencyKey: 'idempotency-1',
       },
     };
     const callback = vi.fn();
@@ -51,6 +72,7 @@ describe('gRPC Handlers', () => {
       request: {
         userId: 'u1',
         endpoint: 'e1',
+        idempotencyKey: 'idempotency-2',
       },
     };
     const callback = vi.fn();
@@ -106,6 +128,7 @@ describe('gRPC Handlers', () => {
         userId: 'u1',
         title: 'T',
         body: 'B',
+        idempotencyKey: 'idempotency-3',
       },
     };
     const callback = vi.fn();
@@ -146,6 +169,7 @@ describe('gRPC Handlers', () => {
           endpoint: 'e1',
           keys: { p256dh: 'd1', auth: 'a1' },
         },
+        idempotencyKey: 'idempotency-4',
       },
     };
     const callback = vi.fn();

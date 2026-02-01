@@ -15,6 +15,7 @@ export type BalanceHttpClient = {
     source: string;
     idempotencyKey: string;
     gatewayUserId: string;
+    bearerToken?: string;
     timeoutMs?: number;
     signal?: AbortSignal;
   }): Promise<Result<void, BalanceDepositError>>;
@@ -57,6 +58,7 @@ export function createBalanceHttpClient(
     source: string;
     idempotencyKey: string;
     gatewayUserId: string;
+    bearerToken?: string;
     timeoutMs?: number;
     signal?: AbortSignal;
   }): Promise<Result<void, BalanceDepositError>> {
@@ -80,6 +82,7 @@ export function createBalanceHttpClient(
           'Idempotency-Key': params.idempotencyKey,
           'x-gateway-user-id': params.gatewayUserId,
           'x-user-id': params.gatewayUserId,
+          ...(params.bearerToken ? { Authorization: `Bearer ${params.bearerToken}` } : {}),
         },
         body: JSON.stringify({ amount: params.amount, source: params.source }),
         signal: controller.signal,

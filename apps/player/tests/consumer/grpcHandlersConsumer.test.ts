@@ -204,9 +204,10 @@ describe('gRPC handlers consumer flows', () => {
         userId: 'user-1',
         nickname: 'Alpha',
         avatarUrl: '',
+        idempotencyKey: 'idempotency-1',
       },
     } as unknown as ServerUnaryCall<
-      { userId: string; nickname?: string; avatarUrl?: string },
+      { userId: string; nickname?: string; avatarUrl?: string; idempotencyKey: string },
       unknown
     >;
     await handlers.UpdateProfile(call, callback);
@@ -221,8 +222,8 @@ describe('gRPC handlers consumer flows', () => {
 
   it('returns error for invalid statistic type', async () => {
     const call = {
-      request: { userId: 'user-1', type: 'STATISTIC_TYPE_UNKNOWN', amount: 5 },
-    } as unknown as ServerUnaryCall<{ userId: string; type: string; amount: number }, unknown>;
+      request: { userId: 'user-1', type: 'STATISTIC_TYPE_UNKNOWN', amount: 5, idempotencyKey: 'idempotency-2' },
+    } as unknown as ServerUnaryCall<{ userId: string; type: string; amount: number; idempotencyKey: string }, unknown>;
     await handlers.IncrementStatistic(call, callback);
 
     expect(callback).toHaveBeenCalledWith(expect.any(Error));
@@ -236,8 +237,8 @@ describe('gRPC handlers consumer flows', () => {
 
   it('returns error for invalid statistic amount', async () => {
     const call = {
-      request: { userId: 'user-1', type: 'STATISTIC_TYPE_HANDS_PLAYED', amount: Number.NaN },
-    } as unknown as ServerUnaryCall<{ userId: string; type: string; amount: number }, unknown>;
+      request: { userId: 'user-1', type: 'STATISTIC_TYPE_HANDS_PLAYED', amount: Number.NaN, idempotencyKey: 'idempotency-3' },
+    } as unknown as ServerUnaryCall<{ userId: string; type: string; amount: number; idempotencyKey: string }, unknown>;
     await handlers.IncrementStatistic(call, callback);
 
     expect(callback).toHaveBeenCalledWith(expect.any(Error));
@@ -250,7 +251,7 @@ describe('gRPC handlers consumer flows', () => {
   });
 
   it('increments statistics with a valid type', async () => {
-    vi.mocked(statisticsService.incrementStatistic).mockResolvedValue({
+    vi.mocked(statisticsService.incrementStatisticIdempotent).mockResolvedValue({
       userId: 'user-1',
       handsPlayed: 1,
       wins: 0,
@@ -263,8 +264,8 @@ describe('gRPC handlers consumer flows', () => {
     });
 
     const call = {
-      request: { userId: 'user-1', type: 'STATISTIC_TYPE_HANDS_PLAYED', amount: 1 },
-    } as unknown as ServerUnaryCall<{ userId: string; type: string; amount: number }, unknown>;
+      request: { userId: 'user-1', type: 'STATISTIC_TYPE_HANDS_PLAYED', amount: 1, idempotencyKey: 'idempotency-4' },
+    } as unknown as ServerUnaryCall<{ userId: string; type: string; amount: number; idempotencyKey: string }, unknown>;
     await handlers.IncrementStatistic(call, callback);
 
     expect(metrics.recordStatisticsUpdate).toHaveBeenCalledWith('hands_played');
@@ -277,8 +278,8 @@ describe('gRPC handlers consumer flows', () => {
 
   it('supports friend removal via gRPC', async () => {
     const call = {
-      request: { userId: 'user-1', friendId: 'user-2' },
-    } as unknown as ServerUnaryCall<{ userId: string; friendId: string }, unknown>;
+      request: { userId: 'user-1', friendId: 'user-2', idempotencyKey: 'idempotency-5' },
+    } as unknown as ServerUnaryCall<{ userId: string; friendId: string; idempotencyKey: string }, unknown>;
     await handlers.RemoveFriend(call, callback);
 
     expect(friendsService.removeFriend).toHaveBeenCalledWith('user-1', 'user-2');
@@ -305,8 +306,8 @@ describe('gRPC handlers consumer flows', () => {
     vi.mocked(friendsService.addFriend).mockRejectedValue(new Error('boom'));
 
     const call = {
-      request: { userId: 'user-1', friendId: 'user-2' },
-    } as unknown as ServerUnaryCall<{ userId: string; friendId: string }, unknown>;
+      request: { userId: 'user-1', friendId: 'user-2', idempotencyKey: 'idempotency-6' },
+    } as unknown as ServerUnaryCall<{ userId: string; friendId: string; idempotencyKey: string }, unknown>;
     await handlers.AddFriend(call, callback);
 
     expect(metrics.recordFriendMutation).toHaveBeenCalledWith('add', 'error');
@@ -320,8 +321,8 @@ describe('gRPC handlers consumer flows', () => {
   it('records errors when delete fails', async () => {
     vi.mocked(profileService.deleteProfile).mockRejectedValue(new Error('boom'));
 
-    const call = { request: { userId: 'user-1' } } as unknown as ServerUnaryCall<
-      { userId: string },
+    const call = { request: { userId: 'user-1', idempotencyKey: 'idempotency-7' } } as unknown as ServerUnaryCall<
+      { userId: string; idempotencyKey: string },
       unknown
     >;
     await handlers.DeleteProfile(call, callback);

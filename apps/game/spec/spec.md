@@ -149,6 +149,7 @@ a player and their chat messages are blocked (via Gateway).
   identical state transitions.
 - **Rule Compliance**: Engine MUST implement standard Texas Hold'em rules including
   blinds, betting rounds, minimum raises, side pots, and showdowns.
+- **Idempotency**: All mutating gRPC calls (e.g. join/leave, submit action, moderation) MUST be idempotent via client-provided idempotency keys so Gateway retries are safe.
 - **Atomic Settlements**: Pot settlements MUST be atomic via Balance Service;
   either all winners credited or none.
 - **Audit Trail**: All actions MUST be emitted as events to Event Service.

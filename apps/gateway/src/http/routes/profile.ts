@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { normalizeUsernameFromClaims } from '../../auth/claims';
 import { safeAuthedRoute } from '../utils/safeAuthedRoute';
 import { safeRoute } from '../utils/safeRoute';
+import { getIdempotencyKey } from '../utils/idempotencyKey';
 import { createProfileFacade } from './profile/facade';
 
 const router = Router();
@@ -29,7 +30,8 @@ router.put(
   safeAuthedRoute(
     async (req: Request, res: Response, userId: string) => {
       const username = normalizeUsernameFromClaims(req.auth?.claims ?? undefined);
-      const profile = await profileFacade.updateMe({ userId, username, body: req.body });
+      const idempotencyKey = getIdempotencyKey(req);
+      const profile = await profileFacade.updateMe({ userId, username, body: req.body, idempotencyKey });
       res.json(profile);
     },
     { logMessage: 'Failed to update profile' },
@@ -42,7 +44,8 @@ router.post(
   safeAuthedRoute(
     async (req: Request, res: Response, userId: string) => {
       const username = normalizeUsernameFromClaims(req.auth?.claims ?? undefined);
-      const profile = await profileFacade.updateMe({ userId, username, body: req.body });
+      const idempotencyKey = getIdempotencyKey(req);
+      const profile = await profileFacade.updateMe({ userId, username, body: req.body, idempotencyKey });
       res.json(profile);
     },
     { logMessage: 'Failed to update profile' },
@@ -53,8 +56,9 @@ router.post(
 router.delete(
   '/me',
   safeAuthedRoute(
-    async (_req: Request, res: Response, userId: string) => {
-      const response = await profileFacade.deleteMe({ userId });
+    async (req: Request, res: Response, userId: string) => {
+      const idempotencyKey = getIdempotencyKey(req);
+      const response = await profileFacade.deleteMe({ userId, idempotencyKey });
       if (!response.success) {
         res.status(500).json({ error: 'Failed to delete profile' });
         return;
@@ -118,7 +122,8 @@ router.put(
         return;
       }
 
-      const friends = await profileFacade.syncFriends({ userId, desiredFriendIds: desired });
+      const idempotencyKey = getIdempotencyKey(req);
+      const friends = await profileFacade.syncFriends({ userId, desiredFriendIds: desired, idempotencyKey });
       res.json({ friends });
     },
     { logMessage: 'Failed to update friends' },
@@ -137,7 +142,8 @@ router.post(
         return;
       }
 
-      await profileFacade.addFriend({ userId, friendId });
+      const idempotencyKey = getIdempotencyKey(req);
+      await profileFacade.addFriend({ userId, friendId, idempotencyKey });
       res.status(201).json({ ok: true });
     },
     { logMessage: 'Failed to add friend' },
@@ -150,7 +156,8 @@ router.delete(
   safeAuthedRoute(
     async (req: Request, res: Response, userId: string) => {
       const { friendId } = req.params;
-      await profileFacade.removeFriend({ userId, friendId });
+      const idempotencyKey = getIdempotencyKey(req);
+      await profileFacade.removeFriend({ userId, friendId, idempotencyKey });
       res.status(204).send();
     },
     { logMessage: 'Failed to remove friend' },

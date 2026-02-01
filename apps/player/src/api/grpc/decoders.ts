@@ -135,6 +135,7 @@ export type UpdateProfileRequest = {
   nickname?: string;
   avatarUrl?: string | null;
   preferences?: Partial<UserPreferences>;
+  idempotencyKey: string;
 };
 
 export function decodeUpdateProfileRequest(value: unknown): UpdateProfileRequest {
@@ -143,6 +144,7 @@ export function decodeUpdateProfileRequest(value: unknown): UpdateProfileRequest
   }
 
   const userId = normalizeRequiredString(value.userId, 'userId');
+  const idempotencyKey = normalizeRequiredString(value.idempotencyKey, 'idempotencyKey');
   const nickname = normalizeOptionalString(value.nickname);
 
   const avatarUrlValue = value.avatarUrl;
@@ -164,11 +166,13 @@ export function decodeUpdateProfileRequest(value: unknown): UpdateProfileRequest
     ...(nickname ? { nickname } : {}),
     ...(avatarUrl !== undefined ? { avatarUrl } : {}),
     ...(preferences ? { preferences } : {}),
+    idempotencyKey,
   };
 }
 
 export type DeleteProfileRequest = {
   userId: string;
+  idempotencyKey: string;
 };
 
 export function decodeDeleteProfileRequest(value: unknown): DeleteProfileRequest {
@@ -176,7 +180,10 @@ export function decodeDeleteProfileRequest(value: unknown): DeleteProfileRequest
     throw new ValidationError('Request must be an object');
   }
 
-  return { userId: normalizeRequiredString(value.userId, 'userId') };
+  return {
+    userId: normalizeRequiredString(value.userId, 'userId'),
+    idempotencyKey: normalizeRequiredString(value.idempotencyKey, 'idempotencyKey'),
+  };
 }
 
 export type GetStatisticsRequest = {
@@ -195,6 +202,7 @@ export type IncrementStatisticRequest = {
   userId: string;
   type: string;
   amount: number;
+  idempotencyKey: string;
 };
 
 export function decodeIncrementStatisticRequest(value: unknown): IncrementStatisticRequest {
@@ -208,6 +216,7 @@ export function decodeIncrementStatisticRequest(value: unknown): IncrementStatis
     userId: normalizeRequiredString(value.userId, 'userId'),
     type: normalizeRequiredString(value.type, 'type'),
     amount,
+    idempotencyKey: normalizeRequiredString(value.idempotencyKey, 'idempotencyKey'),
   };
 }
 
@@ -226,6 +235,7 @@ export function decodeGetFriendsRequest(value: unknown): GetFriendsRequest {
 export type AddFriendRequest = {
   userId: string;
   friendId: string;
+  idempotencyKey: string;
 };
 
 export function decodeAddFriendRequest(value: unknown): AddFriendRequest {
@@ -236,12 +246,14 @@ export function decodeAddFriendRequest(value: unknown): AddFriendRequest {
   return {
     userId: normalizeRequiredString(value.userId, 'userId'),
     friendId: normalizeRequiredString(value.friendId, 'friendId'),
+    idempotencyKey: normalizeRequiredString(value.idempotencyKey, 'idempotencyKey'),
   };
 }
 
 export type RemoveFriendRequest = {
   userId: string;
   friendId: string;
+  idempotencyKey: string;
 };
 
 export function decodeRemoveFriendRequest(value: unknown): RemoveFriendRequest {
@@ -252,6 +264,7 @@ export function decodeRemoveFriendRequest(value: unknown): RemoveFriendRequest {
   return {
     userId: normalizeRequiredString(value.userId, 'userId'),
     friendId: normalizeRequiredString(value.friendId, 'friendId'),
+    idempotencyKey: normalizeRequiredString(value.idempotencyKey, 'idempotencyKey'),
   };
 }
 

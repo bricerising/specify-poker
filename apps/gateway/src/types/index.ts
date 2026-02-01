@@ -88,44 +88,57 @@ export interface GameServiceClient {
         starting_stack: number;
         turn_timer_seconds: number;
       };
+      idempotency_key: string;
     },
     callback: UnaryCallback<Record<string, unknown>>,
   ): void;
   GetTable(request: { table_id: string }, callback: UnaryCallback<Record<string, unknown>>): void;
   DeleteTable(
-    request: { table_id: string },
+    request: { table_id: string; idempotency_key: string },
     callback: UnaryCallback<Record<string, unknown>>,
   ): void;
   JoinSeat(
-    request: { table_id: string; user_id: string; seat_id: number; buy_in_amount: number },
+    request: {
+      table_id: string;
+      user_id: string;
+      seat_id: number;
+      buy_in_amount: number;
+      idempotency_key: string;
+    },
     callback: UnaryCallback<{ ok: boolean; error?: string }>,
   ): void;
   LeaveSeat(
-    request: { table_id: string; user_id: string },
+    request: { table_id: string; user_id: string; idempotency_key: string },
     callback: UnaryCallback<{ ok: boolean; error?: string }>,
   ): void;
   JoinSpectator(
-    request: { table_id: string; user_id: string },
+    request: { table_id: string; user_id: string; idempotency_key: string },
     callback: UnaryCallback<{ ok: boolean; error?: string }>,
   ): void;
   LeaveSpectator(
-    request: { table_id: string; user_id: string },
+    request: { table_id: string; user_id: string; idempotency_key: string },
     callback: UnaryCallback<{ ok: boolean; error?: string }>,
   ): void;
   SubmitAction(
-    request: { table_id: string; user_id: string; action_type: string; amount?: number },
+    request: {
+      table_id: string;
+      user_id: string;
+      action_type: string;
+      amount?: number;
+      idempotency_key: string;
+    },
     callback: UnaryCallback<{ ok: boolean; state?: TableState; error?: string }>,
   ): void;
   KickPlayer(
-    request: { table_id: string; owner_id: string; target_user_id: string },
+    request: { table_id: string; owner_id: string; target_user_id: string; idempotency_key: string },
     callback: UnaryCallback<Record<string, unknown>>,
   ): void;
   MutePlayer(
-    request: { table_id: string; owner_id: string; target_user_id: string },
+    request: { table_id: string; owner_id: string; target_user_id: string; idempotency_key: string },
     callback: UnaryCallback<Record<string, unknown>>,
   ): void;
   UnmutePlayer(
-    request: { table_id: string; owner_id: string; target_user_id: string },
+    request: { table_id: string; owner_id: string; target_user_id: string; idempotency_key: string },
     callback: UnaryCallback<Record<string, unknown>>,
   ): void;
   IsMuted(
@@ -150,10 +163,14 @@ export interface PlayerServiceClient {
         show_hand_strength?: boolean;
         theme?: string;
       };
+      idempotency_key: string;
     },
     callback: UnaryCallback<{ profile: Record<string, unknown> }>,
   ): void;
-  DeleteProfile(request: { user_id: string }, callback: UnaryCallback<{ success: boolean }>): void;
+  DeleteProfile(
+    request: { user_id: string; idempotency_key: string },
+    callback: UnaryCallback<{ success: boolean }>,
+  ): void;
   GetStatistics(
     request: { user_id: string },
     callback: UnaryCallback<{ statistics: Record<string, unknown> }>,
@@ -163,11 +180,11 @@ export interface PlayerServiceClient {
     callback: UnaryCallback<{ friends: Array<Record<string, unknown>> }>,
   ): void;
   AddFriend(
-    request: { user_id: string; friend_id: string },
+    request: { user_id: string; friend_id: string; idempotency_key: string },
     callback: UnaryCallback<Record<string, unknown>>,
   ): void;
   RemoveFriend(
-    request: { user_id: string; friend_id: string },
+    request: { user_id: string; friend_id: string; idempotency_key: string },
     callback: UnaryCallback<Record<string, unknown>>,
   ): void;
   GetNicknames(
@@ -246,11 +263,12 @@ export interface NotifyServiceClient {
     request: {
       user_id: string;
       subscription: { endpoint: string; keys?: { p256dh?: string; auth?: string } };
+      idempotency_key: string;
     },
     callback: UnaryCallback<{ ok: boolean; error?: string }>,
   ): void;
   UnregisterSubscription(
-    request: { user_id: string; endpoint: string },
+    request: { user_id: string; endpoint: string; idempotency_key: string },
     callback: UnaryCallback<{ ok: boolean; error?: string }>,
   ): void;
   ListSubscriptions(
@@ -268,6 +286,7 @@ export interface NotifyServiceClient {
       icon?: string;
       tag?: string;
       data?: Record<string, string>;
+      idempotency_key: string;
     },
     callback: UnaryCallback<{
       ok: boolean;

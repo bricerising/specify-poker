@@ -386,7 +386,7 @@ T059 -> T060 -> T061 -> T062 -> T063 -> T064
 
 ### Gateway Service
 - **HTTP API**: All REST calls route through `/api/*`
-- **WebSocket**: Connect to `/ws?token={jwt}`
+- **WebSocket**: Connect to `/ws` and immediately send `Authenticate { token }`
 - **Supported messages**: See `apps/gateway/spec/contracts/ws-messages.md`
 
 ### Keycloak

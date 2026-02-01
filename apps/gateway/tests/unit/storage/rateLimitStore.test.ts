@@ -53,12 +53,12 @@ describe('Rate limit store', () => {
     expect(redis.pExpire).not.toHaveBeenCalled();
   });
 
-  it('returns 0 when increment fails', async () => {
+  it('returns null when increment fails', async () => {
     redis.incr.mockRejectedValueOnce(new Error('down'));
     const { incrementRateLimit } = await import('../../../src/storage/rateLimitStore');
     const count = await incrementRateLimit('key', 1000);
 
-    expect(count).toBe(0);
+    expect(count).toBeNull();
   });
 
   it('gets rate limit value', async () => {

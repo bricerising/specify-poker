@@ -31,8 +31,26 @@ router.get('/health', async (req: Request, res: Response) => {
   });
 });
 
-router.get('/ready', async (req: Request, res: Response) => {
-  res.json({ ready: true });
+router.get('/ready', async (_req: Request, res: Response) => {
+  if (process.env.NODE_ENV === 'test') {
+    return res.json({ ready: true });
+  }
+
+  if (!isRedisEnabled()) {
+    return res.json({ ready: true });
+  }
+
+  const client = await getRedisClient();
+  if (!client) {
+    return res.status(503).json({ ready: false, reason: 'redis_unavailable' });
+  }
+
+  try {
+    await client.ping();
+    return res.json({ ready: true });
+  } catch {
+    return res.status(503).json({ ready: false, reason: 'redis_unreachable' });
+  }
 });
 
 export default router;

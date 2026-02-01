@@ -49,6 +49,23 @@ export const buyInAmountSchema = z.preprocess((value) => {
   return value;
 }, z.number().int().nonnegative());
 
+export const actionTypeSchema = z.preprocess((value) => {
+  if (typeof value === 'string') {
+    return value.trim().toUpperCase();
+  }
+  return String(value ?? '')
+    .trim()
+    .toUpperCase();
+}, z.enum(['FOLD', 'CHECK', 'CALL', 'BET', 'RAISE', 'ALL_IN']));
+
+export const actionAmountSchema = z.preprocess((value) => {
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : value;
+  }
+  return value;
+}, z.number().int().nonnegative());
+
 export const tableConfigInputSchema = z
   .object({
     smallBlind: z.number().int().positive().optional(),
@@ -84,6 +101,21 @@ export const tableJoinSeatRequestSchema = z.object({
   seatId: seatIdSchema,
   buyInAmount: buyInAmountSchema.optional(),
 });
+
+export const tableSubmitActionRequestSchema = z
+  .object({
+    actionType: actionTypeSchema,
+    amount: actionAmountSchema.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if ((value.actionType === 'BET' || value.actionType === 'RAISE') && value.amount === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'amount is required for BET and RAISE',
+        path: ['amount'],
+      });
+    }
+  });
 
 export const userProfileSchema = z.object({
   userId: z.string(),

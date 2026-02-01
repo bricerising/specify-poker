@@ -10,6 +10,8 @@ import type { UnaryCall, UnaryCallback } from '@specify-poker/shared';
 import { getErrorMessage, toError } from '../../shared/errors';
 import type { NotifyService } from '../../services/notifyService';
 import type { PushSubscription } from '../../domain/types';
+import { getRedisClient } from '../../storage/redisClient';
+import { runRedisIdempotent } from '@specify-poker/shared/redis';
 import {
   decodeListSubscriptionsRequest,
   decodeRegisterSubscriptionRequest,
@@ -94,8 +96,23 @@ export function createHandlers(
           return { ok: false, error: decoded.error };
         }
 
-        await notifyService.registerSubscription(decoded.value.userId, decoded.value.subscription);
-        return { ok: true };
+        const redis = await getRedisClient();
+        const result = await runRedisIdempotent({
+          redis,
+          redisKey: `idempotency:notify:RegisterSubscription:${decoded.value.idempotencyKey}`,
+          idempotencyKey: decoded.value.idempotencyKey,
+          ttlMs: 24 * 60 * 60_000,
+          isSuccess: (value) => value.ok,
+          operation: async () => {
+            await notifyService.registerSubscription(
+              decoded.value.userId,
+              decoded.value.subscription,
+            );
+            return { ok: true };
+          },
+        });
+
+        return result.value;
       },
     }),
 
@@ -110,8 +127,20 @@ export function createHandlers(
           return { ok: false, error: decoded.error };
         }
 
-        await notifyService.unregisterSubscription(decoded.value.userId, decoded.value.endpoint);
-        return { ok: true };
+        const redis = await getRedisClient();
+        const result = await runRedisIdempotent({
+          redis,
+          redisKey: `idempotency:notify:UnregisterSubscription:${decoded.value.idempotencyKey}`,
+          idempotencyKey: decoded.value.idempotencyKey,
+          ttlMs: 24 * 60 * 60_000,
+          isSuccess: (value) => value.ok,
+          operation: async () => {
+            await notifyService.unregisterSubscription(decoded.value.userId, decoded.value.endpoint);
+            return { ok: true };
+          },
+        });
+
+        return result.value;
       },
     }),
 
@@ -146,15 +175,27 @@ export function createHandlers(
           return { ok: false, error: decoded.error, successCount: 0, failureCount: 0 };
         }
 
-        const result = await notifyService.sendNotification(
-          decoded.value.userId,
-          decoded.value.payload,
-        );
-        return {
-          ok: true,
-          successCount: result.success,
-          failureCount: result.failure,
-        };
+        const redis = await getRedisClient();
+        const result = await runRedisIdempotent({
+          redis,
+          redisKey: `idempotency:notify:SendNotification:${decoded.value.idempotencyKey}`,
+          idempotencyKey: decoded.value.idempotencyKey,
+          ttlMs: 60 * 60_000,
+          isSuccess: (value) => value.ok,
+          operation: async () => {
+            const outcome = await notifyService.sendNotification(
+              decoded.value.userId,
+              decoded.value.payload,
+            );
+            return {
+              ok: true,
+              successCount: outcome.success,
+              failureCount: outcome.failure,
+            };
+          },
+        });
+
+        return result.value;
       },
     }),
   };

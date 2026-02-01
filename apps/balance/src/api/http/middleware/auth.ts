@@ -28,12 +28,6 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     return next();
   }
 
-  const gatewayUser = req.headers['x-gateway-user-id'] || req.headers['x-user-id'];
-  if (gatewayUser && typeof gatewayUser === 'string') {
-    req.auth = { userId: gatewayUser };
-    return next();
-  }
-
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) {
     return deny(res, 'Missing bearer token');

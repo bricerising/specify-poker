@@ -13,7 +13,7 @@ export type WsClient = {
 
 export async function connectWs(
   url: string,
-  options: { headers?: Record<string, string> } = {},
+  options: { headers?: Record<string, string>; authToken?: string } = {},
 ): Promise<WsClient> {
   const socket = new WebSocket(url, { headers: options.headers });
   const messages: Array<Record<string, unknown>> = [];
@@ -55,6 +55,10 @@ export async function connectWs(
     }
     throw new Error(`Timed out waiting for WS message after ${timeoutMs}ms`);
   };
+
+  if (options.authToken) {
+    socket.send(JSON.stringify({ type: 'Authenticate', token: options.authToken }));
+  }
 
   await waitForMessage((message) => message.type === 'Welcome', 10_000);
 

@@ -47,7 +47,7 @@ vi.mock('../../../src/observability/logger', () => ({
 import { gameClient } from '../../../src/grpc/clients';
 
 describe('Tables Routes', () => {
-  const auth = { userId: 'user-123', claims: {} };
+  const auth = { userId: 'user-123', token: 'test-token', claims: {} };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -304,6 +304,56 @@ describe('Tables Routes', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.body).toEqual(expect.objectContaining({ ok: true }));
+    });
+
+    it('should reject requests missing actionType', async () => {
+      const response = await dispatchToRouter(tablesRouter, {
+        method: 'POST',
+        url: '/t1/action',
+        auth,
+        body: {},
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.body).toEqual(expect.objectContaining({ error: 'Invalid request' }));
+      expect(gameClient.SubmitAction).not.toHaveBeenCalled();
+    });
+
+    it('should require amount for BET and RAISE', async () => {
+      const response = await dispatchToRouter(tablesRouter, {
+        method: 'POST',
+        url: '/t1/action',
+        auth,
+        body: { actionType: 'BET' },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.body).toEqual(expect.objectContaining({ error: 'Invalid request' }));
+      expect(gameClient.SubmitAction).not.toHaveBeenCalled();
+    });
+
+    it('coerces amount strings into numbers', async () => {
+      vi.mocked(gameClient.SubmitAction).mockImplementation(
+        (_req: unknown, callback: (err: Error | null, response: unknown) => void) => {
+          callback(null, { ok: true });
+        },
+      );
+
+      const response = await dispatchToRouter(tablesRouter, {
+        method: 'POST',
+        url: '/t1/action',
+        auth,
+        body: { actionType: 'RAISE', amount: '200' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(gameClient.SubmitAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action_type: 'RAISE',
+          amount: 200,
+        }),
+        expect.any(Function),
+      );
     });
 
     it('should return error for invalid action', async () => {

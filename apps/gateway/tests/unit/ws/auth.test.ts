@@ -21,6 +21,7 @@ function makeRequest(url?: string, host = 'localhost') {
 describe('WS auth', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.WS_QUERY_TOKEN_AUTH;
   });
 
   it('returns missing when token is absent', async () => {
@@ -28,19 +29,28 @@ describe('WS auth', () => {
     expect(result).toEqual({ status: 'missing' });
   });
 
-  it('returns ok when token is valid', async () => {
+  it('ignores token query param by default', async () => {
+    vi.mocked(verifyToken).mockResolvedValue({ sub: 'user-1' });
+    const result = await authenticateWs(makeRequest('/ws?token=good'));
+    expect(result).toEqual({ status: 'missing' });
+  });
+
+  it('returns ok when query token auth is enabled and token is valid', async () => {
+    process.env.WS_QUERY_TOKEN_AUTH = 'true';
     vi.mocked(verifyToken).mockResolvedValue({ sub: 'user-1' });
     const result = await authenticateWs(makeRequest('/ws?token=good'));
     expect(result).toEqual({ status: 'ok', userId: 'user-1' });
   });
 
-  it('returns invalid when token is rejected', async () => {
+  it('returns invalid when query token auth is enabled and token is rejected', async () => {
+    process.env.WS_QUERY_TOKEN_AUTH = 'true';
     vi.mocked(verifyToken).mockRejectedValue(new Error('bad token'));
     const result = await authenticateWs(makeRequest('/ws?token=bad'));
     expect(result).toEqual({ status: 'invalid', reason: 'invalid_token' });
   });
 
-  it('returns invalid when token lacks subject', async () => {
+  it('returns invalid when query token auth is enabled and token lacks subject', async () => {
+    process.env.WS_QUERY_TOKEN_AUTH = 'true';
     vi.mocked(verifyToken).mockResolvedValue({});
     const result = await authenticateWs(makeRequest('/ws?token=missing'));
     expect(result).toEqual({ status: 'invalid', reason: 'invalid_token' });

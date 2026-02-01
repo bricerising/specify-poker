@@ -8,7 +8,11 @@ services:
     ports:
       - "3000:3000"
     healthcheck:
-      test: ["CMD-SHELL", "true"]
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
       interval: 10s
       timeout: 2s
       retries: 3
@@ -18,20 +22,25 @@ services:
       context: .
       dockerfile: apps/balance/Dockerfile
     ports:
-      - "3002:3002"
-      - "50051:50051"
-      - "9102:9102"
+      - "127.0.0.1:3002:3002"
+      - "127.0.0.1:50051:50051"
+      - "127.0.0.1:9102:9102"
     environment:
       HTTP_PORT: "3002"
       GRPC_PORT: "50051"
       METRICS_PORT: "9102"
       REDIS_URL: "redis://redis:6379"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      JWT_HS256_SECRET: "${JWT_HS256_SECRET}"
     depends_on:
       - redis
       - otel-collector
     healthcheck:
-      test: ["CMD-SHELL", "true"]
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3002/api/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
       interval: 10s
       timeout: 2s
       retries: 3
@@ -43,7 +52,7 @@ services:
       POSTGRES_USER: keycloak
       POSTGRES_PASSWORD: keycloak
     healthcheck:
-      test: ["CMD-SHELL", "true"]
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
       interval: 10s
       timeout: 2s
       retries: 3
@@ -88,7 +97,7 @@ services:
     image: grafana/mimir:2.11.0
     command: ["-config.file=/etc/mimir/mimir.yaml"]
     ports:
-      - "9009:9009"
+      - "127.0.0.1:9009:9009"
     volumes:
       - ./infra/mimir/mimir.yaml:/etc/mimir/mimir.yaml
     healthcheck:
@@ -100,7 +109,7 @@ services:
   grafana:
     image: grafana/grafana:10.3.1
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     volumes:
       - ./infra/grafana/provisioning:/etc/grafana/provisioning
       - ./infra/grafana/dashboards:/etc/grafana/dashboards
@@ -117,7 +126,7 @@ services:
   loki:
     image: grafana/loki:2.9.4
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
     healthcheck:
       test: ["CMD-SHELL", "true"]
@@ -147,9 +156,9 @@ services:
     volumes:
       - ./infra/tempo/tempo.yaml:/etc/tempo.yaml
     ports:
-      - "3200:3200"
-      - "4317:4317" # otlp grpc
-      - "4318:4318" # otlp http
+      - "127.0.0.1:3200:3200"
+      - "127.0.0.1:4317:4317" # otlp grpc
+      - "127.0.0.1:4318:4318" # otlp http
     healthcheck:
       test: ["CMD-SHELL", "true"]
       interval: 10s
@@ -166,7 +175,11 @@ services:
     depends_on:
       - tempo
     healthcheck:
-      test: ["CMD-SHELL", "true"]
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3200/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
       interval: 10s
       timeout: 2s
       retries: 3
@@ -191,7 +204,7 @@ services:
         "allkeys-lru",
       ]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -216,7 +229,7 @@ services:
       context: .
       dockerfile: apps/event/Dockerfile
     ports:
-      - "50054:50054"
+      - "127.0.0.1:50054:50054"
     environment:
       GRPC_PORT: "50054"
       METRICS_PORT: "9104"
@@ -228,7 +241,11 @@ services:
       - redis
       - otel-collector
     healthcheck:
-      test: ["CMD-SHELL", "true"]
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:9104/metrics').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
       interval: 10s
       timeout: 2s
       retries: 3
@@ -238,7 +255,7 @@ services:
       context: .
       dockerfile: apps/game/Dockerfile
     ports:
-      - "50053:50053"
+      - "127.0.0.1:50053:50053"
     environment:
       PORT: "50053"
       METRICS_PORT: "9105"
@@ -252,7 +269,11 @@ services:
       - redis
       - otel-collector
     healthcheck:
-      test: ["CMD-SHELL", "true"]
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:9105/metrics').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
       interval: 10s
       timeout: 2s
       retries: 3
@@ -262,7 +283,7 @@ services:
       context: .
       dockerfile: apps/notify/Dockerfile
     ports:
-      - "50055:50055"
+      - "127.0.0.1:50055:50055"
     environment:
       GRPC_PORT: "50055"
       METRICS_PORT: "9105"
@@ -275,7 +296,11 @@ services:
       - redis
       - otel-collector
     healthcheck:
-      test: ["CMD-SHELL", "true"]
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:9105/metrics').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
       interval: 10s
       timeout: 2s
       retries: 3
@@ -297,8 +322,8 @@ services:
       context: .
       dockerfile: apps/player/Dockerfile
     ports:
-      - "50052:50052"
-      - "9103:9103"
+      - "127.0.0.1:50052:50052"
+      - "127.0.0.1:9103:9103"
     environment:
       GRPC_PORT: "50052"
       METRICS_PORT: "9103"
@@ -310,7 +335,11 @@ services:
       - redis
       - otel-collector
     healthcheck:
-      test: ["CMD-SHELL", "true"]
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:9103/metrics').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
       interval: 10s
       timeout: 2s
       retries: 3
@@ -321,10 +350,11 @@ services:
       dockerfile: apps/gateway/Dockerfile
     ports:
       - "4000:4000"
-      - "9104:9104"
+      - "127.0.0.1:9104:9104"
     environment:
       PORT: "4000"
       METRICS_PORT: "9104"
+      JWT_HS256_SECRET: "${JWT_HS256_SECRET}"
       HTTP_RATE_LIMIT_MAX: "1000"
       WS_RATE_LIMIT_MAX: "200"
       REDIS_URL: "redis://redis:6379"
@@ -348,7 +378,11 @@ services:
       - notify
       - otel-collector
     healthcheck:
-      test: ["CMD-SHELL", "true"]
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:4000/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
       interval: 10s
       timeout: 2s
       retries: 3

@@ -134,7 +134,11 @@ describe('Table WS handler', () => {
 
     expect(subscribeToChannel).toHaveBeenCalledWith('conn-1', 'table:t1');
     expect(gameClient.JoinSpectator).toHaveBeenCalledWith(
-      { table_id: 't1', user_id: 'user-1' },
+      expect.objectContaining({
+        table_id: 't1',
+        user_id: 'user-1',
+        idempotency_key: 'ws:conn-1:JoinSpectator:t1',
+      }),
       expect.any(Function),
     );
     expect(sendToLocal).toHaveBeenCalledWith(
@@ -168,7 +172,11 @@ describe('Table WS handler', () => {
     await flushPromises();
 
     expect(gameClient.LeaveSpectator).toHaveBeenCalledWith(
-      { table_id: 't2', user_id: 'user-1' },
+      expect.objectContaining({
+        table_id: 't2',
+        user_id: 'user-1',
+        idempotency_key: 'ws:conn-1:LeaveSpectator:t2',
+      }),
       expect.any(Function),
     );
     expect(unsubscribeFromChannel).toHaveBeenCalledWith('conn-1', 'table:t2');

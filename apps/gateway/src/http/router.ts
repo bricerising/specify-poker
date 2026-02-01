@@ -1,5 +1,4 @@
 import { Router, json } from 'express';
-import { register } from 'prom-client';
 import { authMiddleware } from './middleware/auth';
 import { httpRateLimitMiddleware } from './middleware/rateLimit';
 import { setupProxy } from './proxy';
@@ -29,18 +28,9 @@ export function createRouter(): Router {
   router.use((req, res, next) => {
     const startedAt = Date.now();
     res.on('finish', () => {
-      if (req.path === '/metrics') {
-        return;
-      }
       recordHttpRequest(req.method, getRouteLabel(req), res.statusCode, Date.now() - startedAt);
     });
     next();
-  });
-
-  // Metrics (Unauthenticated)
-  router.get('/metrics', async (_req, res) => {
-    res.set('Content-Type', register.contentType);
-    res.end(await register.metrics());
   });
 
   // Health (Unauthenticated)

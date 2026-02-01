@@ -8,6 +8,12 @@ export type WsAuthResult =
   | { status: 'missing' }
   | { status: 'invalid'; reason: string };
 
+function isQueryTokenAuthEnabled(): boolean {
+  const raw = process.env.WS_QUERY_TOKEN_AUTH ?? 'false';
+  const normalized = raw.trim().toLowerCase();
+  return ['1', 'true', 'yes', 'y', 'on'].includes(normalized);
+}
+
 async function authenticateToken(token: string): Promise<WsAuthResult> {
   try {
     const claims = await verifyToken(token);
@@ -24,6 +30,10 @@ async function authenticateToken(token: string): Promise<WsAuthResult> {
 }
 
 export async function authenticateWs(request: IncomingMessage): Promise<WsAuthResult> {
+  if (!isQueryTokenAuthEnabled()) {
+    return { status: 'missing' };
+  }
+
   const url = new URL(request.url || '', `http://${request.headers.host}`);
   const token = url.searchParams.get('token');
 

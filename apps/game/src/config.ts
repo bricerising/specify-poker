@@ -8,6 +8,7 @@ export type Config = {
   redisUrl: string;
   balanceServiceAddr: string;
   eventServiceAddr: string;
+  grpcClientTimeoutMs: number;
   turnTimeout: number;
   logLevel: string;
   otelExporterEndpoint: string;
@@ -26,6 +27,7 @@ export function loadConfig(): Config {
       'localhost:50051',
     )
     .string('eventServiceAddr', ['EVENT_SERVICE_URL', 'EVENT_SERVICE_ADDR'], 'localhost:50054')
+    .int('grpcClientTimeoutMs', 'GRPC_CLIENT_TIMEOUT_MS', 2_000, { min: 0 })
     .int('turnTimeout', 'TURN_TIMEOUT', 20000, { min: 0 })
     .string('logLevel', 'LOG_LEVEL', 'info')
     .string('otelExporterEndpoint', 'OTEL_EXPORTER_OTLP_ENDPOINT', 'http://localhost:4317')

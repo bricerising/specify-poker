@@ -37,7 +37,8 @@ export function loadConfig(): Config {
     .int('rakeMinPotChips', 'RAKE_MIN_POT_CHIPS', 20, { min: 0 })
     .string('logLevel', 'LOG_LEVEL', 'info')
     .string('otelExporterEndpoint', 'OTEL_EXPORTER_OTLP_ENDPOINT', 'http://localhost:4317')
-    .string('jwtSecret', 'JWT_SECRET', 'default-secret')
+    // NOTE: HS256 secrets must be explicitly configured (prefer Keycloak RS256).
+    .string('jwtSecret', ['JWT_HS256_SECRET', 'JWT_SECRET'], '')
     .build();
 
   return config;

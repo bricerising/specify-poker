@@ -10,13 +10,16 @@ In this repo’s intended usage, the Gateway fronts a **private instance** used 
 
 ### Entry Boundary
 - **JWT Validation**: All incoming requests (HTTP and WebSocket) MUST be authenticated at the Gateway.
-- **Service Trust**: Backend microservices trust the identity headers injected by the Gateway.
-- **Rate Limiting**: The Gateway enforces per-user and per-IP rate limits to protect backend services from abuse and DDoS attacks.
+- **Downstream Authorization**: HTTP-proxied services (e.g. Balance HTTP) MUST enforce authorization on resource identifiers (e.g. `accountId` must match `sub`) and MUST NOT treat Gateway-injected identity headers as an authorization mechanism.
+- **Identity Propagation**: The Gateway MAY inject identity headers (e.g. `x-user-id`) for logging/auditing, but they are not authoritative.
+- **Rate Limiting**: The Gateway enforces per-user and per-IP rate limits; deployers MUST choose a failure mode (fail-open vs fail-closed) appropriate for the environment.
+- **Idempotency**: Clients SHOULD send an `Idempotency-Key` header on all mutating HTTP requests. The Gateway MUST propagate this key to downstream services (gRPC `idempotency_key` fields and HTTP `Idempotency-Key`) so retries are safe. If the header is missing, the Gateway SHOULD generate a key per request for internal retries.
 
 ## Connectivity
 
 ### WebSocket Management
 - **Persistent Connections**: The Gateway maintains long-lived WebSocket connections for real-time gameplay updates.
+- **Authentication Handshake**: Clients MUST authenticate by sending an `Authenticate` message immediately after connecting: `{ "type": "Authenticate", "token": "<JWT>" }`. Query-string tokens are considered legacy and SHOULD be disabled by default.
 - **Heartbeats**: Bi-directional pings ensure stale connections are detected and cleaned up within 30 seconds.
 - **Multi-Instance Synchronization**: Gateway instances synchronize via Redis Pub/Sub to ensure that a broadcast to a "Table" reaches all connected clients regardless of which Gateway instance they are connected to.
 
@@ -46,6 +49,6 @@ In this repo’s intended usage, the Gateway fronts a **private instance** used 
 
 ## Performance Requirements
 
-- **Connection Time**: WebSocket handshake MUST complete within 500ms.
+- **Connection Time**: WebSocket upgrade SHOULD complete within 500ms. Authentication MUST complete within a short, bounded window (e.g. 5 seconds) to prevent unauthenticated idle connections.
 - **Message Latency**: P95 message delivery latency MUST be under 100ms.
 - **Throughput**: Each Gateway instance MUST support 10,000 concurrent WebSocket connections.

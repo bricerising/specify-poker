@@ -86,7 +86,15 @@ describe('migrations runner', () => {
     await runMigrations();
 
     expect(query).toHaveBeenCalledWith('BEGIN');
+    expect(query).toHaveBeenCalledWith('SELECT pg_advisory_xact_lock(912345678)');
+    expect(query).toHaveBeenCalledWith('SELECT name FROM schema_migrations ORDER BY name ASC');
     expect(query).toHaveBeenCalledWith('SELECT 1;');
+    expect(query).toHaveBeenCalledWith('INSERT INTO schema_migrations (name) VALUES ($1)', [
+      '001_initial.sql',
+    ]);
+    expect(query).toHaveBeenCalledWith('INSERT INTO schema_migrations (name) VALUES ($1)', [
+      '002_add_username.sql',
+    ]);
     expect(query).toHaveBeenCalledWith('COMMIT');
     expect(release).toHaveBeenCalled();
   });

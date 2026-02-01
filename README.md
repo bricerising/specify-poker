@@ -14,7 +14,7 @@ This repo is intentionally **not** a public poker network and does **not** handl
 **Start the full stack**
 
 ```bash
-# Optional (push notifications): generate VAPID keys in `.env`
+# Optional (push notifications + dev auth): generate local secrets in `.env`
 npm run env:local
 docker compose up --build
 ```
@@ -22,6 +22,8 @@ docker compose up --build
 More detail: `specs/000-quickstart.md`.
 
 **Default local URLs**
+
+Note: `docker-compose.yml` binds most internal service + observability ports to `127.0.0.1` by default. Only the UI, Gateway, and Keycloak are intended to be reachable by other machines unless you explicitly change port bindings.
 
 - UI: http://localhost:3000
 - Gateway (HTTP API): http://localhost:4000/api
@@ -140,9 +142,9 @@ For full per-service setup (env vars + dependencies), start with each service qu
 
 The UI is intentionally lightweight:
 
-- TypeScript compiles to ESM in `apps/ui/dist/` (no bundler).
+- TypeScript compiles to ESM in `apps/ui/dist/`.
+- `apps/ui/scripts/bundle.mjs` uses `esbuild` to bundle the UI into `apps/ui/dist/bundle.js` (no Vite/Webpack).
 - `apps/ui/server.mjs` serves `apps/ui/public/` plus built assets.
-- The browser loads React + dependencies via `importmap` from `https://esm.sh/` (internet required for the UI to load).
 
 Two-terminal loop:
 
@@ -158,7 +160,7 @@ npm -w @specify-poker/ui start
 
 Docker Compose loads environment variables from a root `.env` file (ignored by git).
 
-Generate a local `.env` with VAPID keys:
+Generate a local `.env` with VAPID keys (and dev JWT secret):
 
 ```bash
 npm run env:local

@@ -60,6 +60,7 @@ unregisters it; the service updates the store accordingly.
 - **Privacy**: Push notification content MUST NOT contain sensitive personal data.
 - **Reliability**: Notification delivery is best-effort but MUST be logged for 
   delivery failures.
+- **Idempotency**: All mutating gRPC calls (subscription writes and notification triggers) MUST be idempotent via client-provided idempotency keys to prevent duplicate deliveries.
 - **Subscription Lifecycle**: The service MUST automatically clean up stale or 
   invalid push subscriptions based on provider feedback.
 - **Scalability**: The service MUST handle bursts of notifications when multiple 
